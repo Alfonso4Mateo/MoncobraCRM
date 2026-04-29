@@ -72,6 +72,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('albaranes', AlbaranClienteController::class)->except(['edit', 'update']);
     Route::get('presupuestos/{presupuesto}/pdf', [PresupuestoController::class, 'viewPdf'])->name('presupuestos.pdf');
     Route::resource('presupuestos', PresupuestoController::class);
+    // Ajuste de correlativo de presupuestos (solo admin/superadmin)
+    Route::get('presupuestos/correlativo/editar', [PresupuestoController::class, 'editCorrelativo'])->name('presupuestos.correlativo.edit');
+    Route::post('presupuestos/correlativo', [PresupuestoController::class, 'updateCorrelativo'])->name('presupuestos.correlativo.update');
+    Route::patch('presupuestos/{presupuesto}/estado', [PresupuestoController::class, 'updateEstado'])->name('presupuestos.estado.update');
     Route::resource('bolsa', BolsaController::class);
     Route::resource('proveedores', ProveedorController::class);
     Route::resource('albaranes-proveedores', AlbaranProveedorController::class);

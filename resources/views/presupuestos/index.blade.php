@@ -13,10 +13,19 @@
             <p>Visualiza, filtra y gestiona las ofertas comerciales del proyecto activo.</p>
         </div>
 
-        <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
-            <i class="fas fa-plus"></i>
-            Nuevo Presupuesto
-        </a>
+        <div class="presupuestos-actions">
+            @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                <a href="{{ route('presupuestos.correlativo.edit') }}" class="presupuestos-create-btn">
+                    <i class="fas fa-cog"></i>
+                    Ajustar correlativo
+                </a>
+            @endif
+
+            <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
+                <i class="fas fa-plus"></i>
+                Nuevo Presupuesto
+            </a>
+        </div>
     </div>
 @endsection
 
@@ -34,10 +43,10 @@
 
         <div class="presupuestos-filters-card">
             <form method="GET" action="{{ route('presupuestos.index') }}" class="presupuestos-search-form">
-                <div class="presupuestos-search-copy">
+                    <div class="presupuestos-search-copy">
                     <span class="presupuestos-search-label">Buscador</span>
-                    <h2>Encuentra presupuestos por oferta, cliente, OT o fecha</h2>
-                    <p>Escribe un texto, un número de oferta, una OT o una fecha para localizar el registro.</p>
+                    <h2>Encuentra presupuestos por cliente, OT o fecha</h2>
+                    <p>Escribe un texto, una OT, un cliente o una fecha para localizar el registro.</p>
                 </div>
 
                 <div class="presupuestos-search-controls">
@@ -47,7 +56,7 @@
                             type="search"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por número de oferta, cliente, OT o fecha"
+                            placeholder="Buscar por cliente, OT o fecha"
                             autocomplete="off"
                         >
                     </div>
@@ -84,7 +93,6 @@
                 <table class="table presupuestos-table">
                     <thead>
                         <tr>
-                            <th>Nº Oferta</th>
                             <th>Número</th>
                             <th>Fecha</th>
                             <th>Cliente</th>
@@ -97,16 +105,6 @@
                     <tbody>
                         @forelse ($presupuestos as $presupuesto)
                             <tr>
-                                <td data-label="Nº Oferta">
-                                    <div class="presupuesto-primary">
-                                        <strong>{{ $presupuesto->documento }}</strong>
-                                        @if($presupuesto->titulo)
-                                            <span>{{ $presupuesto->titulo }}</span>
-                                        @else
-                                            <span class="text-muted">Sin título asociado</span>
-                                        @endif
-                                    </div>
-                                </td>
                                 <td data-label="Número">
                                     <span class="presupuesto-reference">{{ $presupuesto->numero }}</span>
                                 </td>
@@ -146,14 +144,31 @@
                                     <span class="{{ $estadoClass }}">{{ ucfirst($estado) }}</span>
                                 </td>
                                 <td data-label="Acciones" class="text-right">
-                                    <button type="button" class="presupuesto-action-btn" aria-label="Acción pendiente" title="Acción pendiente">
-                                        <i class="fas fa-ellipsis-h"></i>
-                                    </button>
+                                    <div class="presupuesto-action-group">
+                                        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver presupuesto" title="Ver presupuesto">
+                                            <i class="fas fa-eye"></i>
+                                            <span>Ver</span>
+                                        </a>
+                                        <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
+                                            <i class="fas fa-pen"></i>
+                                            <span>Editar</span>
+                                        </a>
+                                        <form method="POST" action="{{ route('presupuestos.estado.update', $presupuesto) }}" class="presupuesto-estado-form">
+                                            @csrf
+                                            @method('PATCH')
+                                            <select name="estado" class="{{ $estadoClass }} presupuesto-action-btn presupuesto-estado-select presupuesto-action-btn--state" onchange="this.form.submit()" aria-label="Cambiar estado" title="Cambiar estado">
+                                                <option value="pendiente" @selected($estado === 'pendiente')>Pendiente</option>
+                                                <option value="aceptado" @selected($estado === 'aceptado')>Aceptado</option>
+                                                <option value="rechazado" @selected($estado === 'rechazado')>Rechazado</option>
+                                                <option value="pendiente pedido" @selected($estado === 'pendiente pedido')>Pendiente pedido</option>
+                                            </select>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8">
+                                <td colspan="7">
                                     <div class="presupuestos-empty-state">
                                         <i class="fas fa-file-invoice-dollar"></i>
                                         <h4>No hay presupuestos para mostrar</h4>

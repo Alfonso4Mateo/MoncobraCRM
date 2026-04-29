@@ -44,12 +44,14 @@
 
                 <div class="presupuesto-detail-grid">
                     <div class="field-group">
-                        <label for="documento">Documento</label>
-                        <input type="text" id="documento" name="documento" maxlength="50" required value="{{ old('documento', $presupuesto->documento) }}">
+                        <label>Documento</label>
+                        <div class="documento-display"><strong>Presupuesto</strong></div>
+                        <input type="hidden" id="documento" name="documento" value="{{ old('documento', $presupuesto->documento) }}">
                     </div>
                     <div class="field-group">
                         <label for="numero">Número</label>
                         <input type="text" id="numero" name="numero" maxlength="50" required value="{{ old('numero', $presupuesto->numero) }}">
+                        <small class="text-muted">Siguiente sugerido: {{ $siguienteNumero }}</small>
                     </div>
                     <div class="field-group">
                         <label for="fecha">Fecha</label>
@@ -79,7 +81,7 @@
                         <label for="total">Total</label>
                         <input type="number" id="total" name="total" min="0" step="0.01" value="{{ old('total', number_format((float) ($presupuesto->total ?? 0), 2, '.', '')) }}">
                     </div>
-                    <div class="field-group">
+                    <div class="field-group" id="presupuesto-estado">
                         <label for="estado">Estado</label>
                         <select id="estado" name="estado">
                             @php

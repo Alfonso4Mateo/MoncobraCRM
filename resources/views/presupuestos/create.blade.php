@@ -39,13 +39,14 @@
 
                 <div class="presupuesto-grid">
                     <div class="field-group">
-                        <label for="documento">Documento</label>
-                        <input type="text" id="documento" name="documento" value="{{ old('documento') }}" placeholder="PRESUPUESTO" class="@error('documento') is-invalid @enderror" maxlength="50" required>
+                        <label>Documento</label>
+                        <div class="documento-display"><strong>Presupuesto</strong></div>
+                        <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
                     </div>
 
                     <div class="field-group">
                         <label for="numero">Numero</label>
-                        <input type="text" id="numero" name="numero" value="{{ old('numero') }}" placeholder="PR2026-016" class="@error('numero') is-invalid @enderror" maxlength="50" required>
+                        <input type="text" id="numero" name="numero" value="{{ old('numero', $siguienteNumero ?? '') }}" placeholder="{{ $siguienteNumero ?? '' }}" class="@error('numero') is-invalid @enderror" maxlength="50" required>
                     </div>
 
                     <div class="field-group">
@@ -97,7 +98,7 @@
                         </div>
                         <div class="field-group field-span-3">
                             <label for="item_descripcion">Descripcion</label>
-                            <input type="text" id="item_descripcion" placeholder="Descripcion detallada del material o servicio">
+                            <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
                         </div>
                         <div class="field-group">
                             <label for="item_cantidad">Cantidad</label>

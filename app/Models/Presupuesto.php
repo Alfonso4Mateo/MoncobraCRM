@@ -25,6 +25,7 @@ class Presupuesto extends Model
     protected $fillable = [
         'documento',
         'numero',
+        'numero_correlativo',
         'fecha',
         'cliente_id',
         'proyecto_id',
@@ -45,6 +46,7 @@ class Presupuesto extends Model
         'fecha' => 'date',
         'total' => 'decimal:2',
         'lista_articulos' => 'array',
+        'numero_correlativo' => 'integer',
     ];
 
     /**

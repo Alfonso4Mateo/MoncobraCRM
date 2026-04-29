@@ -46,6 +46,14 @@ body,
   margin: 6px 0 0;
   color: var(--pres-muted);
   font-size: .92rem;
+  .presupuesto-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
 }
 
 .presupuestos-create-btn {
@@ -105,6 +113,10 @@ body,
 }
 
 .presupuestos-search-copy h2 {
+
+      .presupuesto-action-group {
+          justify-content: flex-start;
+      }
   margin: 0;
   color: #0f172a;
   font-size: 1.1rem;
@@ -375,6 +387,94 @@ body,
   color: var(--pres-primary);
 }
 
+.presupuesto-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.presupuesto-action-btn {
+  width: auto;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
+  gap: 8px;
+  font-size: .8rem;
+  font-weight: 700;
+  text-decoration: none !important;
+}
+
+.presupuesto-action-btn i {
+  font-size: .85rem;
+}
+
+.presupuesto-action-btn span {
+  line-height: 1;
+}
+
+.presupuesto-action-btn--view:hover,
+.presupuesto-action-btn--edit:hover,
+.presupuesto-action-btn--state:hover {
+  background: #f8fbff;
+}
+
+.presupuesto-estado-form {
+  margin: 0;
+}
+
+.presupuesto-estado-select {
+  cursor: pointer;
+  border-radius: 999px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-width: 150px;
+  padding-right: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.presupuesto-estado-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+
+.presupuesto-estado-select.estado-pendiente {
+  background: #fff7e8 !important;
+  color: #9a6b16 !important;
+  border-color: #f2dfb2 !important;
+}
+
+.presupuesto-estado-select.estado-aceptado {
+  background: #ebfaf1 !important;
+  color: #1f7a43 !important;
+  border-color: #c8ebd5 !important;
+}
+
+.presupuesto-estado-select.estado-rechazado {
+  background: #feeff1 !important;
+  color: #b73045 !important;
+  border-color: #f5ccd4 !important;
+}
+
+.presupuesto-estado-select.estado-pendiente-pedido {
+  background: #eef4ff !important;
+  color: #275fa8 !important;
+  border-color: #d2def7 !important;
+}
+
+.presupuesto-action-group .estado-pill {
+  min-width: 0;
+}
+
 .presupuestos-empty-state {
   display: grid;
   justify-items: center;
@@ -447,6 +547,10 @@ body,
 
   .presupuestos-actions {
     justify-content: stretch;
+  }
+
+  .presupuesto-action-group {
+    justify-content: flex-start;
   }
 
   .presupuestos-search-btn,
