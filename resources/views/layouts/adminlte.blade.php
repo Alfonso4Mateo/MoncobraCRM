@@ -118,14 +118,14 @@
                     </li>
 
                     <li class="nav-item">
-                        <a href="{{ route('*') }}" class="nav-link {{ request()->routeIs('albaranes.*') ? 'active' : '' }}">
+                        <a href="{{ route('albaranes.index') }}" class="nav-link {{ request()->routeIs('albaranes.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-file-lines"></i>
                             <p>Documentos</p>
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a href="{{ route('*') }}" class="nav-link {{ request()->routeIs('users.*', 'profile.*') ? 'active' : '' }}">
+                        <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*', 'profile.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-users-gear"></i>
                             <p>Personal</p>
                         </a>

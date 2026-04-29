@@ -27,7 +27,7 @@ class Inventario extends Model
         'codigo',
         'descripcion',
         'referencia_proveedor',
-        'clase',
+        'clase_id',
         'ubicacion',
         'almacen',
         'stock_actual',
@@ -52,5 +52,13 @@ class Inventario extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    /**
+     * Get the clase relation for the inventario item.
+     */
+    public function claseRelacion(): BelongsTo
+    {
+        return $this->belongsTo(Clase::class, 'clase_id');
     }
 }

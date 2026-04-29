@@ -133,6 +133,13 @@ class PedidoController extends Controller
 
         $pedidos->getCollection()->transform(function (PedidoCliente $pedido) use ($presupuestos) {
             $pedido->ui_estado = $pedido->estado ?: 'pendiente';
+            $pedido->ui_estado_label = self::PEDIDO_CLIENTE_ESTADOS[$pedido->ui_estado] ?? ucfirst(str_replace('_', ' ', $pedido->ui_estado));
+            $pedido->ui_estado_class = match ($pedido->ui_estado) {
+                'pendiente' => 'pedido-chip pedido-chip--pending',
+                'facturado' => 'pedido-chip pedido-chip--paid',
+                'facturado_parcial' => 'pedido-chip pedido-chip--partial',
+                default => 'pedido-chip pedido-chip--pending',
+            };
             $pedido->ui_total = (float) ($pedido->total ?? 0);
             $pedido->ui_presupuesto_numero = $pedido->presupuesto?->numero
                 ?: $presupuestos->get($pedido->presupuesto_id)?->numero;

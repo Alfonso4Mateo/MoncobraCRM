@@ -18,6 +18,12 @@
             </div>
 
             <div class="inventory-hero-actions">
+                @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
+                    <a href="{{ route('clases.index') }}" class="inventory-primary-action" title="Gestionar categorías de items">
+                        <i class="fas fa-tags"></i>
+                        Gestionar Clases
+                    </a>
+                @endif
                 <a href="#" class="inventory-primary-action">
                     <i class="fas fa-clipboard-list"></i>
                     Registro de acciones
@@ -87,6 +93,48 @@
                     </article>
                 </div>
 
+                <div class="inventory-search-card">
+                    <div class="inventory-search-header">
+                        <div>
+                            <h2>Buscar inventario</h2>
+                            <p>Filtra por descripción, clase o almacén.</p>
+                        </div>
+
+                        @if(request()->hasAny(['descripcion', 'clase_id', 'almacen']))
+                            <a href="{{ route('inventario.index') }}" class="inventory-search-reset">Limpiar filtros</a>
+                        @endif
+                    </div>
+
+                    <form method="GET" action="{{ route('inventario.index') }}" class="inventory-search-form">
+                        <div class="inventory-search-field">
+                            <label for="descripcion">Descripción</label>
+                            <input id="descripcion" name="descripcion" type="text" value="{{ $descripcion }}" placeholder="Buscar por descripción">
+                        </div>
+
+                        <div class="inventory-search-field">
+                            <label for="clase_id">Clase</label>
+                            <select id="clase_id" name="clase_id">
+                                <option value="">Todas las clases</option>
+                                @foreach($clases as $id => $nombre)
+                                    <option value="{{ $id }}" @selected((string) $claseId === (string) $id)>{{ $nombre }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="inventory-search-field">
+                            <label for="almacen">Almacén</label>
+                            <input id="almacen" name="almacen" type="text" value="{{ $almacen }}" placeholder="Buscar por almacén">
+                        </div>
+
+                        <div class="inventory-search-actions">
+                            <button type="submit" class="inventory-search-btn">
+                                <i class="fas fa-search"></i>
+                                Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="inventory-card inventory-table-card">
 
                     <div class="table-responsive inventory-table-wrapper">
@@ -135,7 +183,11 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="inventory-pill muted">{{ $producto->clase ?: 'Sin clase' }}</span>
+                                            @if(is_object($producto->claseRelacion))
+                                                <span class="inventory-pill muted">{{ $producto->claseRelacion->nombre }}</span>
+                                            @else
+                                                <span class="inventory-pill muted">{{ $producto->clase ?: 'Sin clase' }}</span>
+                                            @endif
                                         </td>
                                         <td>
                                             <div class="inventory-location">
@@ -254,14 +306,16 @@
                     <div class="warehouse-list">
                         @forelse($ocupacionAlmacenes as $almacen)
                             <div class="warehouse-item">
-                                <div class="warehouse-head">
-                                    <span>{{ $almacen->nombre }}</span>
-                                    <strong>{{ $almacen->porcentaje }}%</strong>
+                                <div class="warehouse-icon">
+                                    <i class="fas fa-warehouse"></i>
                                 </div>
-                                <div class="warehouse-bar">
-                                    <span style="width: {{ $almacen->porcentaje }}%"></span>
+                                <div class="warehouse-body">
+                                    <div class="warehouse-head">
+                                        <span>{{ $almacen->nombre }}</span>
+                                        <strong>{{ number_format($almacen->total_productos, 0, ',', '.') }}</strong>
+                                    </div>
+                                    <small>productos registrados</small>
                                 </div>
-                                <small>{{ number_format($almacen->total_productos, 0, ',', '.') }} productos</small>
                             </div>
                         @empty
                             <div class="inventory-empty-mini inventory-empty-mini-light">

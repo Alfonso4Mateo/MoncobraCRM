@@ -161,6 +161,27 @@
     outline: none;
 }
 
+.field-group select {
+    width: 100%;
+    min-height: 2.45rem;
+    border: 1px solid #d3deed;
+    border-radius: 0.5rem;
+    background: #f7faff;
+    color: #324f72;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.55rem 0.72rem;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.field-group select:focus {
+    border-color: #7fa8eb;
+    box-shadow: 0 0 0 3px rgba(67, 128, 222, 0.14);
+    background: #fff;
+}
+
 .field-group input:focus {
     border-color: #7fa8eb;
     box-shadow: 0 0 0 3px rgba(67, 128, 222, 0.14);

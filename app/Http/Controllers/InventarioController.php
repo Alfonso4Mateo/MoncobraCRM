@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Almacen;
+use App\Models\Clase;
 use App\Models\Inventario;
 use Illuminate\Http\Request;
 
@@ -15,9 +16,29 @@ class InventarioController extends Controller
 
     public function index()
     {
+        $request = request();
         $proyectoId = $this->resolveActiveProyectoId(request());
+        $descripcion = trim((string) $request->query('descripcion', ''));
+        $claseId = $request->query('clase_id');
+        $almacen = trim((string) $request->query('almacen', ''));
 
-        $baseQuery = Inventario::query()->where('proyecto_id', $proyectoId);
+        $baseQuery = Inventario::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with('claseRelacion')
+            ->when($descripcion !== '', function ($query) use ($descripcion) {
+                $query->where('descripcion', 'like', '%' . $descripcion . '%');
+            })
+            ->when($claseId !== null && $claseId !== '', function ($query) use ($claseId) {
+                $query->where('clase_id', $claseId);
+            })
+            ->when($almacen !== '', function ($query) use ($almacen) {
+                $query->where('almacen', 'like', '%' . $almacen . '%');
+            });
+
+        $clases = Clase::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->pluck('nombre', 'id');
 
         $inventarios = (clone $baseQuery)
             ->orderBy('codigo')
@@ -129,6 +150,7 @@ class InventarioController extends Controller
 
         return view('inventario.index', compact(
             'inventarios',
+            'clases',
             'totalProductos',
             'nivelCritico',
             'stockBajo',
@@ -136,7 +158,10 @@ class InventarioController extends Controller
             'ubicaciones',
             'almacenes',
             'movimientosRecientes',
-            'ocupacionAlmacenes'
+            'ocupacionAlmacenes',
+            'descripcion',
+            'claseId',
+            'almacen'
         ));
     }
 
@@ -160,9 +185,14 @@ class InventarioController extends Controller
             ->pluck('referencia_proveedor')
             ->values();
 
+        $clases = \App\Models\Clase::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->pluck('nombre', 'id');
+
         $stockBase = (int) ($catalogo->first()?->stock_actual ?? 0);
 
-        return view('inventario.create', compact('catalogo', 'proveedores', 'stockBase'));
+        return view('inventario.create', compact('catalogo', 'proveedores', 'clases', 'stockBase'));
     }
 
     public function createItem()
@@ -174,7 +204,12 @@ class InventarioController extends Controller
             ->orderByDesc('updated_at')
             ->first();
 
-        return view('inventario.create-item', compact('ultimaAccion'));
+        $clases = \App\Models\Clase::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->pluck('nombre', 'id');
+
+        return view('inventario.create-item', compact('ultimaAccion', 'clases'));
     }
 
     public function createSalida()
@@ -403,7 +438,7 @@ class InventarioController extends Controller
             'codigo' => 'required|unique:inventario,codigo',
             'descripcion' => 'required|string',
             'referencia_proveedor' => 'nullable|string|max:255',
-            'clase' => 'nullable|string|max:255',
+            'clase_id' => 'nullable|integer|exists:clases,id',
             'ubicacion' => 'nullable|string|max:255',
             'almacen' => 'nullable|string|max:255',
             'stock_actual' => 'required|integer|min:0',
@@ -436,7 +471,12 @@ class InventarioController extends Controller
             abort(404);
         }
 
-        return view('inventario.edit', compact('inventario'));
+        $clases = \App\Models\Clase::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->pluck('nombre', 'id');
+
+        return view('inventario.edit', compact('inventario', 'clases'));
     }
 
     public function update(Request $request, Inventario $inventario)
@@ -451,7 +491,7 @@ class InventarioController extends Controller
             'codigo' => 'required|unique:inventario,codigo,' . $inventario->id,
             'descripcion' => 'required|string',
             'referencia_proveedor' => 'nullable|string|max:255',
-            'clase' => 'nullable|string|max:255',
+            'clase_id' => 'nullable|integer|exists:clases,id',
             'ubicacion' => 'nullable|string|max:255',
             'almacen' => 'nullable|string|max:255',
             'stock_actual' => 'required|integer|min:0',

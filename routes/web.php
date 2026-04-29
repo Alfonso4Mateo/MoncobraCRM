@@ -17,6 +17,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\GestionProyectoController;
 use App\Http\Controllers\ProyectoContextController;
 use App\Http\Controllers\AlmacenController;
+use App\Http\Controllers\ClaseController;
 
 // 1. CAMBIO: Nombre de ruta único para la página de bienvenida.
 // Antes se llamaba 'dashboard', ahora 'welcome'.
@@ -97,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('historico', HistoricoController::class)->only(['index']);
     Route::get('almacenes/nuevo', [AlmacenController::class, 'create'])->name('almacenes.create');
     Route::post('almacenes', [AlmacenController::class, 'store'])->name('almacenes.store');
+    Route::resource('clases', ClaseController::class);
     
     // Gestión de Usuarios (Solo admin y superadmin)
     Route::resource('users', UserController::class);

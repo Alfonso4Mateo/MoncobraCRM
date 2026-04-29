@@ -56,8 +56,16 @@
                         </div>
 
                         <div class="field-group">
-                            <label for="clase">Clase del producto</label>
-                            <input id="clase" name="clase" type="text" value="{{ old('clase') }}" placeholder="Ejem: EPI" class="@error('clase') is-invalid @enderror">
+                            <label for="clase_id">Clase del producto</label>
+                            <select id="clase_id" name="clase_id" class="@error('clase_id') is-invalid @enderror">
+                                <option value="">-- Seleccionar una clase --</option>
+                                @foreach($clases as $id => $nombre)
+                                    <option value="{{ $id }}" @selected(old('clase_id') == $id)>{{ $nombre }}</option>
+                                @endforeach
+                            </select>
+                            @error('clase_id')
+                                <span class="invalid-feedback">{{ $message }}</span>
+                            @enderror
                         </div>
                     </div>
                 </section>
@@ -118,7 +126,7 @@
                 <footer class="item-form-footer">
                     <p>* Todos los campos son obligatorios para el registro inicial.</p>
                     <div class="item-footer-actions">
-                        <a href="{{ route('inventario.create') }}" class="btn-footer-cancel">Cancelar</a>
+                            <a href="{{ route('inventario.index') }}" class="btn-footer-cancel">Cancelar</a>
                         <button type="submit" class="btn-footer-save">
                             <i class="fas fa-save"></i>
                             Guardar Producto

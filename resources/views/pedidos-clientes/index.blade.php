@@ -138,13 +138,6 @@
                     <tbody>
                         @forelse ($pedidos as $pedido)
                             @php
-                                $estado = (string) ($pedido->ui_estado ?: 'pendiente');
-                                $estadoClass = match ($estado) {
-                                    'facturado' => 'pedido-chip pedido-chip--blue',
-                                    'facturado_parcial' => 'pedido-chip pedido-chip--orange',
-                                    'pendiente' => 'pedido-chip pedido-chip--soft',
-                                    default => 'pedido-chip pedido-chip--soft',
-                                };
                                 $fechaPedido = optional($pedido->fecha_pedido);
                             @endphp
                             <tr>
@@ -177,7 +170,7 @@
                                     <span class="pedido-date">{{ $fechaPedido ? $fechaPedido->format('d M Y') : '—' }}</span>
                                 </td>
                                 <td data-label="Estado">
-                                    <span class="{{ $estadoClass }}">{{ strtoupper(str_replace('_', ' ', $estado)) }}</span>
+                                    <span class="{{ $pedido->ui_estado_class ?? 'pedido-chip pedido-chip--pending' }}">{{ $pedido->ui_estado_label ?? 'Pendiente' }}</span>
                                 </td>
                                 <td data-label="Albarán asociado">
                                     @if ($pedido->albaran_id && $pedido->ui_albaran_numero)
