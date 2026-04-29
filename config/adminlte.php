@@ -360,6 +360,22 @@ return [
             'active' => ['inventario*'],
         ],
 
+        // Documentos
+        [
+            'text' => 'Documentos',
+            'url' => 'albaranes',
+            'icon' => 'fas fa-fw fa-folder-open',
+            'active' => ['albaranes*'],
+        ],
+
+        // Personal
+        [
+            'text' => 'Personal',
+            'url' => 'users',
+            'icon' => 'fas fa-fw fa-users',
+            'active' => ['users*'],
+        ],
+
         // Sección inferior fija de utilidades
         [
             'header' => 'Herramientas',

@@ -110,6 +110,27 @@
                         </a>
                     </li>
 
+                    <li class="nav-item">
+                        <a href="{{ route('inventario.index') }}" class="nav-link {{ request()->routeIs('inventario.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-boxes-stacked"></i>
+                            <p>Inventario</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="{{ route('*') }}" class="nav-link {{ request()->routeIs('albaranes.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-file-lines"></i>
+                            <p>Documentos</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="{{ route('*') }}" class="nav-link {{ request()->routeIs('users.*', 'profile.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-users-gear"></i>
+                            <p>Personal</p>
+                        </a>
+                    </li>
+
                     <li class="nav-item {{ request()->is('clientes*', 'albaranes*', 'presupuestos*', 'bolsa*') ? 'menu-open' : '' }}">
                         <a href="#" data-lte-toggle="treeview" class="nav-link {{ request()->is('clientes*', 'albaranes*', 'presupuestos*', 'bolsa*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-users"></i>

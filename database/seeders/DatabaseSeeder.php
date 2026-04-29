@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Limpiar datos previos
+        $this->call(ResetDemoDataSeeder::class);
+
         // Crear proyectos primero
         $this->call(ProyectoSeeder::class);
 
@@ -30,8 +33,14 @@ class DatabaseSeeder extends Seeder
         // Crear pedidos de cliente de ejemplo
         $this->call(PedidoClienteSeeder::class);
 
+        // Crear almacenes de ejemplo
+        $this->call(AlmacenSeeder::class);
+
         // Crear inventario de ejemplo
         $this->call(InventarioSeeder::class);
+
+        // Crear articulos de ejemplo
+        $this->call(ArticuloSeeder::class);
 
         // Crear usuarios con diferentes roles
         $this->call(UserSeeder::class);
