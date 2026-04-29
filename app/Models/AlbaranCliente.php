@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AlbaranCliente extends Model
 {
@@ -62,5 +63,18 @@ class AlbaranCliente extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    /**
+     * Get the orders linked through the pivot table.
+     */
+    public function pedidosClientes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            PedidoCliente::class,
+            'pedido_cliente_albaran_cliente',
+            'albaran_cliente_id',
+            'pedido_cliente_id'
+        )->withTimestamps();
     }
 }

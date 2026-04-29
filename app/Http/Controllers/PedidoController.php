@@ -34,7 +34,7 @@ class PedidoController extends Controller
         $hasta = trim((string) $request->input('hasta', ''));
 
         $pedidosQuery = PedidoCliente::query()
-            ->with(['cliente', 'presupuesto', 'albaran'])
+            ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot'])
             ->where('proyecto_id', $proyectoId);
 
         if ($search !== '') {
@@ -131,6 +131,13 @@ class PedidoController extends Controller
             ->get(['id', 'numero'])
             ->keyBy('id');
 
+        $numerosPedido = $pedidos->getCollection()
+            ->pluck('numero_pedido')
+            ->filter()
+            ->map(fn ($item) => trim((string) $item))
+            ->unique()
+            ->values();
+
         $pedidos->getCollection()->transform(function (PedidoCliente $pedido) use ($presupuestos) {
             $pedido->ui_estado = $pedido->estado ?: 'pendiente';
             $pedido->ui_estado_label = self::PEDIDO_CLIENTE_ESTADOS[$pedido->ui_estado] ?? ucfirst(str_replace('_', ' ', $pedido->ui_estado));
@@ -143,7 +150,23 @@ class PedidoController extends Controller
             $pedido->ui_total = (float) ($pedido->total ?? 0);
             $pedido->ui_presupuesto_numero = $pedido->presupuesto?->numero
                 ?: $presupuestos->get($pedido->presupuesto_id)?->numero;
-            $pedido->ui_albaran_numero = $pedido->albaran?->numero;
+
+            $albaranesPedido = collect($pedido->albaranesPivot ?? [])
+                ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
+                ->merge($pedido->albaranes ?? collect())
+                ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $pedido->proyecto_id) === (int) $pedido->proyecto_id)
+                ->unique('id')
+                ->values();
+
+            $pedido->ui_albaranes_count = $albaranesPedido->count();
+            $pedido->ui_albaran_numero = $pedido->ui_albaranes_count === 1
+                ? (string) ($albaranesPedido->first()->numero ?? '')
+                : null;
+            $pedido->ui_albaran_id = $pedido->ui_albaranes_count === 1
+                ? (int) ($albaranesPedido->first()->id ?? 0)
+                : null;
+            $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
+
             return $pedido;
         });
 
@@ -386,6 +409,48 @@ class PedidoController extends Controller
             'pedidoCliente' => $pedidoCliente,
             'titulo' => 'Detalle del Pedido de Cliente',
             'breadcrumb' => 'Pedido de Cliente',
+        ]);
+    }
+
+    public function albaranesCliente(PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        $albaranes = collect($pedidoCliente->albaranesPivot)
+            ->merge($pedidoCliente->albaran?->id ? collect([$pedidoCliente->albaran->loadMissing('cliente')]) : collect())
+            ->merge($pedidoCliente->albaranes ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $pedidoCliente->proyecto_id) === (int) $proyectoId)
+            ->unique('id')
+            ->sortByDesc(fn (AlbaranCliente $albaran) => sprintf('%s-%06d', optional($albaran->fecha)->format('Y-m-d') ?? '0000-00-00', (int) $albaran->id))
+            ->values();
+
+        $totalAlbaranes = round((float) $albaranes->sum('total'), 2);
+        $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
+        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranes), 2);
+
+        $perPage = 10;
+        $currentPage = max(1, (int) request()->query('page', 1));
+        $pagedItems = $albaranes->forPage($currentPage, $perPage)->values();
+        $albaranes = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedItems,
+            $albaranes->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        return view('pedidos-clientes.albaranes', [
+            'pedidoCliente' => $pedidoCliente,
+            'albaranes' => $albaranes,
+            'totalPedido' => $totalPedido,
+            'totalAlbaranes' => $totalAlbaranes,
+            'pendienteFacturar' => $pendienteFacturar,
+            'titulo' => 'Albaranes del pedido',
+            'breadcrumb' => 'Albaranes del pedido',
         ]);
     }
 

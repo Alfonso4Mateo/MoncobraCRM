@@ -96,7 +96,7 @@
                         <select id="cliente_id" name="cliente_id" required>
                             <option value="">Selecciona cliente...</option>
                             @foreach ($clientes as $cliente)
-                                <option value="{{ $cliente->id }}" @selected((string) old('cliente_id') === (string) $cliente->id)>
+                                <option value="{{ $cliente->id }}" @selected((string) old('cliente_id', request('cliente_id')) === (string) $cliente->id)>
                                     {{ $cliente->empresa_nombre }}
                                 </option>
                             @endforeach
@@ -105,12 +105,12 @@
 
                     <div class="field-group">
                         <label for="ot">OT</label>
-                        <input type="text" id="ot" name="ot" value="{{ old('ot') }}">
+                        <input type="text" id="ot" name="ot" value="{{ old('ot', request('ot')) }}">
                     </div>
 
                     <div class="field-group">
                         <label for="pedido_cliente">Pedido cliente</label>
-                        <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente') }}">
+                        <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', request('pedido_cliente')) }}">
                     </div>
 
                     <div class="field-group col-span-2">

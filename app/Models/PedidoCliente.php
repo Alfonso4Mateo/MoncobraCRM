@@ -4,7 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\AlbaranCliente;
 use App\Models\Presupuesto;
 
@@ -78,5 +80,26 @@ class PedidoCliente extends Model
     public function albaran(): BelongsTo
     {
         return $this->belongsTo(AlbaranCliente::class, 'albaran_id');
+    }
+
+    /**
+     * Get all delivery notes linked to this order number.
+     */
+    public function albaranes(): HasMany
+    {
+        return $this->hasMany(AlbaranCliente::class, 'pedido_cliente', 'numero_pedido');
+    }
+
+    /**
+     * Get the delivery notes linked through the pivot table.
+     */
+    public function albaranesPivot(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            AlbaranCliente::class,
+            'pedido_cliente_albaran_cliente',
+            'pedido_cliente_id',
+            'albaran_cliente_id'
+        )->withTimestamps();
     }
 }
