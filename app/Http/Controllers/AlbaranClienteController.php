@@ -205,7 +205,8 @@ class AlbaranClienteController extends Controller
             $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('albaranes', 'public');
         }
 
-        AlbaranCliente::create($validated);
+        $albaran = AlbaranCliente::create($validated);
+        $this->syncPedidoClienteLink($albaran, $proyectoId);
         return redirect()->route('albaranes.index')->with('success', 'Albarán creado');
     }
 
@@ -310,6 +311,8 @@ class AlbaranClienteController extends Controller
             'estado' => $validated['estado'],
         ]);
 
+        $this->syncPedidoClienteLink($albaran, $proyectoId);
+
         return redirect()
             ->route('albaranes.pantalla-roja', $albaran)
             ->with('success', 'Albarán actualizado correctamente.');
@@ -411,5 +414,32 @@ class AlbaranClienteController extends Controller
         }
 
         return null;
+    }
+
+    private function syncPedidoClienteLink(AlbaranCliente $albaran, int $proyectoId): void
+    {
+        $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
+
+        if ($pedidoNumero === '') {
+            $albaran->pedidosClientes()->detach();
+            return;
+        }
+
+        $pedidoId = PedidoCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero_pedido', $pedidoNumero)
+            ->value('id');
+
+        if (!$pedidoId) {
+            $albaran->pedidosClientes()->detach();
+            return;
+        }
+
+        $albaran->pedidosClientes()->sync([$pedidoId]);
+
+        $pedido = PedidoCliente::query()->find($pedidoId);
+        if ($pedido && empty($pedido->albaran_id)) {
+            $pedido->forceFill(['albaran_id' => $albaran->id])->save();
+        }
     }
 }
