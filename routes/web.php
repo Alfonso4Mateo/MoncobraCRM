@@ -166,5 +166,13 @@ Route::middleware('auth')->group(function () {
     Route::get('personal/{user}', [UserController::class, 'personalShow'])
         ->middleware('can:manage-users')
         ->name('personal.show');
+    // Editar ficha de personal (pantalla dedicada)
+    Route::get('personal/{user}/edit', [UserController::class, 'personalEdit'])
+        ->middleware('can:manage-users')
+        ->name('personal.edit');
+
+    Route::put('personal/{user}', [UserController::class, 'personalUpdate'])
+        ->middleware('can:manage-users')
+        ->name('personal.update');
     
 });

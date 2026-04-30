@@ -282,4 +282,62 @@ class UserController extends Controller
 
         return view('personal.show', compact('user', 'historicoSalidas', 'tallas'));
     }
+
+    /**
+     * Mostrar formulario de edición de ficha de personal (pantalla dedicada)
+     */
+    public function personalEdit(User $user)
+    {
+        $this->authorize('edit-user', $user);
+
+        $proyectos = Proyecto::orderBy('nombre')->get();
+
+        return view('personal.edit', compact('user', 'proyectos'));
+    }
+
+    /**
+     * Actualizar ficha de personal
+     */
+    public function personalUpdate(Request $request, User $user)
+    {
+        $this->authorize('edit-user', $user);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'apellido' => 'nullable|string|max:255',
+            'dni_nie' => 'nullable|string|max:20|unique:users,dni_nie,' . $user->id,
+            'departamento' => 'nullable|string|max:255',
+            'tipo_personal' => 'nullable|in:indefinido,temporal',
+            'camiseta' => 'nullable|string|max:20',
+            'pantalon' => 'nullable|string|max:20',
+            'calzado' => 'nullable|string|max:20',
+            'casco' => 'nullable|string|max:20',
+            'guantes' => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:20',
+            'descripcion' => 'nullable|string|max:500',
+            'proyecto_ids' => 'nullable|array',
+            'proyecto_ids.*' => 'exists:proyectos,id',
+            'activo' => 'boolean',
+        ]);
+
+        $user->update([
+            'name' => $validated['name'],
+            'apellido' => $validated['apellido'] ?? $user->apellido,
+            'dni_nie' => $validated['dni_nie'] ?? $user->dni_nie,
+            'departamento' => $validated['departamento'] ?? $user->departamento,
+            'tipo_personal' => $validated['tipo_personal'] ?? $user->tipo_personal,
+            'camiseta' => $validated['camiseta'] ?? $user->camiseta,
+            'pantalon' => $validated['pantalon'] ?? $user->pantalon,
+            'calzado' => $validated['calzado'] ?? $user->calzado,
+            'casco' => $validated['casco'] ?? $user->casco,
+            'guantes' => $validated['guantes'] ?? $user->guantes,
+            'telefono' => $validated['telefono'] ?? $user->telefono,
+            'descripcion' => $validated['descripcion'] ?? $user->descripcion,
+            'activo' => $request->boolean('activo', $user->activo),
+        ]);
+
+        $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
+
+        return redirect()->route('personal.show', $user->id)->with('success', 'Ficha actualizada correctamente.');
+    }
 }

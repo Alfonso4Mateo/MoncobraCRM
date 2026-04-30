@@ -23,7 +23,7 @@
                     Exportar Ficha
                 </a>
                 @can('edit-user', $user)
-                    <a href="{{ route('users.edit', $user->id) }}" class="profile-action profile-action--primary">
+                    <a href="{{ route('personal.edit', $user->id) }}" class="profile-action profile-action--primary">
                         <i class="fas fa-pen"></i>
                         Editar Perfil
                     </a>

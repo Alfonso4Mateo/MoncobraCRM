@@ -513,6 +513,19 @@ body,
     font-size: .98rem;
 }
 
+.personal-size-badge {
+    display: inline-block;
+    padding: 8px 14px;
+    background: #f0f4f9;
+    color: #2c3e50;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-align: center;
+    min-width: 50px;
+}
+
 .personal-toolbar-footer {
     padding: 14px 22px 20px;
     display: flex;
