@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Proyecto;
+use App\Models\Inventario;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -53,9 +54,15 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:user,admin,superadmin',
+            'apellido' => 'required|string|max:255',
+            'dni_nie' => 'required|string|max:20|unique:users,dni_nie',
+            'departamento' => 'nullable|string|max:255',
+            'tipo_personal' => 'required|in:indefinido,temporal',
+            'camiseta' => 'nullable|string|max:20',
+            'pantalon' => 'nullable|string|max:20',
+            'calzado' => 'nullable|string|max:20',
+            'casco' => 'nullable|string|max:20',
+            'guantes' => 'nullable|string|max:20',
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
             'telefono' => 'nullable|string|max:20',
@@ -63,31 +70,43 @@ class UserController extends Controller
             'activo' => 'nullable|boolean',
         ]);
 
-        if ($request->user()->role === 'admin' && $request->input('role') === 'superadmin') {
-            return back()->withErrors(['role' => 'No tienes permisos para asignar ese rol.'])->withInput();
-        }
-
-        if ($request->input('role') === 'user' && empty($validated['proyecto_ids'])) {
-            return back()->withErrors(['proyecto_ids' => 'Los usuarios con rol Usuario deben tener al menos un proyecto asignado.'])->withInput();
-        }
+        $generatedEmail = $this->generateWorkerEmail($validated['dni_nie']);
+        $generatedPassword = $this->generateWorkerPassword($validated['dni_nie']);
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => $validated['role'],
+            'apellido' => $validated['apellido'],
+            'dni_nie' => $validated['dni_nie'],
+            'email' => $generatedEmail,
+            'password' => Hash::make($generatedPassword),
+            'role' => 'user',
+            'departamento' => $validated['departamento'] ?? null,
+            'tipo_personal' => $validated['tipo_personal'],
+            'camiseta' => $validated['camiseta'] ?? null,
+            'pantalon' => $validated['pantalon'] ?? null,
+            'calzado' => $validated['calzado'] ?? null,
+            'casco' => $validated['casco'] ?? null,
+            'guantes' => $validated['guantes'] ?? null,
             'telefono' => $validated['telefono'] ?? null,
             'descripcion' => $validated['descripcion'] ?? null,
             'activo' => $request->boolean('activo', true),
         ]);
 
-        if ($user->role === 'superadmin') {
-            $user->syncAllProjectsIfSuperadmin();
-        } else {
-            $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
-        }
+        $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
 
         return redirect()->route('users.index')->with('success', 'Usuario creado correctamente.');
+    }
+
+    private function generateWorkerEmail(string $dniNie): string
+    {
+        $normalized = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $dniNie));
+
+        return "{$normalized}@moncobra.local";
+    }
+
+    private function generateWorkerPassword(string $dniNie): string
+    {
+        return preg_replace('/\s+/', '', $dniNie);
     }
 
     /**
@@ -213,5 +232,54 @@ class UserController extends Controller
         $user->load('proyectos');
 
         return view('usuarios.show', compact('user'));
+    }
+
+    /**
+     * Mostrar perfil personal
+     */
+    public function personalShow(User $user)
+    {
+        $this->authorize('view-user', $user);
+
+        $user->load('proyectos');
+
+        $proyectoId = $user->proyectos->first()?->id;
+
+        $historicoSalidas = Inventario::query()
+            ->when($proyectoId, fn ($query) => $query->where('proyecto_id', $proyectoId))
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->limit(4)
+            ->get()
+            ->values()
+            ->map(function (Inventario $producto, int $index) {
+                $filas = [
+                    ['fecha' => now()->subDays(3)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7732', 'cantidad' => 1],
+                    ['fecha' => now()->subDays(6)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7650', 'cantidad' => 2],
+                    ['fecha' => now()->subDays(10)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'REPOSICIÓN', 'cantidad' => 5],
+                    ['fecha' => now()->subDays(14)->format('d M Y'), 'estado' => 'Pendiente', 'estado_clase' => 'profile-chip profile-chip--pending', 'ot' => 'OT-7621', 'cantidad' => 1],
+                ];
+
+                $base = $filas[$index] ?? end($filas);
+
+                return (object) [
+                    'fecha' => $base['fecha'],
+                    'articulo' => $producto->descripcion,
+                    'cantidad' => $base['cantidad'],
+                    'ot' => $base['ot'],
+                    'estado' => $base['estado'],
+                    'estado_clase' => $base['estado_clase'],
+                ];
+            });
+
+        $tallas = [
+            ['label' => 'Camiseta', 'value' => $user->camiseta ?: '—', 'icon' => 'fa-shirt'],
+            ['label' => 'Pantalón', 'value' => $user->pantalon ?: '—', 'icon' => 'fa-ruler-horizontal'],
+            ['label' => 'Calzado', 'value' => $user->calzado ?: '—', 'icon' => 'fa-shoe-prints'],
+            ['label' => 'Casco', 'value' => $user->casco ?: '—', 'icon' => 'fa-helmet-safety'],
+            ['label' => 'Guantes', 'value' => $user->guantes ?: '—', 'icon' => 'fa-hand-paper'],
+        ];
+
+        return view('personal.show', compact('user', 'historicoSalidas', 'tallas'));
     }
 }

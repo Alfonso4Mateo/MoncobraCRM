@@ -125,7 +125,7 @@
                     </li>
 
                     <li class="nav-item">
-                        <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*', 'profile.*') ? 'active' : '' }}">
+                        <a href="{{ route('personal.index') }}" class="nav-link {{ request()->routeIs('personal.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-users-gear"></i>
                             <p>Personal</p>
                         </a>

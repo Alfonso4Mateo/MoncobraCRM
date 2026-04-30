@@ -1,268 +1,215 @@
 @extends('adminlte::page')
 
-@section('title', 'Crear Usuario')
+@section('title', 'Añadir Trabajador')
 
 @section('css')
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/usuarios-create.css'])
 @endsection
 
 @section('content_header')
-    <div class="row mb-2">
-        <div class="col-sm-6">
-            <h1 class="m-0">Crear Usuario</h1>
-            <p class="page-subtitle">Alta de nuevo personal en el sistema.</p>
-        </div>
-        <div class="col-sm-6">
-            <ol class="breadcrumb float-sm-right">
-                <li class="breadcrumb-item"><a href="{{ route('users.index') }}">Panel de Usuarios</a></li>
-                <li class="breadcrumb-item active">Crear</li>
-            </ol>
+    <div class="usuarios-create-hero">
+        <div class="usuarios-create-hero__copy">
+            <div class="usuarios-create-crumbs">GESTIÓN DE PERSONAL <span>•</span> AÑADIR TRABAJADOR</div>
+            <h1>Registro de nuevo personal</h1>
+            <p>Complete el expediente técnico del trabajador. Los campos marcados con asterisco son obligatorios para la asignación de EPIs.</p>
         </div>
     </div>
 @endsection
 
 @section('content')
+    @php
+        $sugerenciaCorreo = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', old('dni_nie', '')));
+    @endphp
+
     <div class="usuarios-create-page">
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card card-primary">
-                    <div class="card-header">
-                        <h3 class="card-title">Datos del Nuevo Usuario</h3>
-                    </div>
-
-                    <form action="{{ route('users.store') }}" method="POST">
-                        @csrf
-
-                        <div class="card-body">
-                            @if ($errors->any())
-                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    <strong>Error:</strong>
-                                    <ul class="mb-0 mt-2">
-                                        @foreach ($errors->all() as $error)
-                                            <li>{{ $error }}</li>
-                                        @endforeach
-                                    </ul>
-                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                            @endif
-
-                            <div class="form-group">
-                                <label for="name">Nombre</label>
-                                <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name') }}" required>
-                                @error('name')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" required>
-                                @error('email')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="password">Contraseña</label>
-                                        <input type="password" class="form-control @error('password') is-invalid @enderror" id="password" name="password" required>
-                                        @error('password')
-                                            <span class="invalid-feedback">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="password_confirmation">Confirmar Contraseña</label>
-                                        <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="role">Rol</label>
-                                <select class="form-control @error('role') is-invalid @enderror" id="role" name="role" required>
-                                    <option value="user" {{ old('role', 'user') === 'user' ? 'selected' : '' }}>Usuario</option>
-                                    <option value="admin" {{ old('role', 'user') === 'admin' ? 'selected' : '' }}>Admin</option>
-                                    @if(auth()->user()->role === 'superadmin')
-                                        <option value="superadmin" {{ old('role', 'user') === 'superadmin' ? 'selected' : '' }}>Super Admin</option>
-                                    @endif
-                                </select>
-                                @error('role')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                                <small class="form-text text-muted">Si eliges rol Usuario, debes asignar al menos un proyecto. Si eliges Super Admin, se asignarán todos automáticamente.</small>
-                            </div>
-
-                            <div class="form-group" id="proyectos-wrapper">
-                                <label for="proyecto_ids">Proyectos asignados</label>
-                                <div class="project-selector @error('proyecto_ids') is-invalid @enderror @error('proyecto_ids.*') is-invalid @enderror">
-                                    <div class="project-selector-header">
-                                        <div class="custom-control custom-checkbox">
-                                            <input type="checkbox" class="custom-control-input" id="select-all-proyectos">
-                                            <label class="custom-control-label" for="select-all-proyectos">Seleccionar todos</label>
-                                        </div>
-                                    </div>
-
-                                    <div class="project-options">
-                                        @foreach($proyectos as $proyecto)
-                                            <label class="project-option" for="proyecto_{{ $proyecto->id }}">
-                                                <input
-                                                    type="checkbox"
-                                                    id="proyecto_{{ $proyecto->id }}"
-                                                    name="proyecto_ids[]"
-                                                    value="{{ $proyecto->id }}"
-                                                    {{ in_array($proyecto->id, old('proyecto_ids', [])) ? 'checked' : '' }}
-                                                >
-                                                <span>{{ $proyecto->nombre }}</span>
-                                            </label>
-                                        @endforeach
-                                    </div>
-                                </div>
-                                @error('proyecto_ids')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                                @error('proyecto_ids.*')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                                <small class="form-text text-muted">Puedes seleccionar uno, varios o todos los proyectos.</small>
-                                <small class="form-text text-info d-none" id="superadmin-proyectos-info">
-                                    <i class="fas fa-info-circle"></i>
-                                    Al crear un Super Admin, el sistema le asigna automáticamente todos los proyectos.
-                                </small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="telefono">Teléfono</label>
-                                <input type="text" class="form-control @error('telefono') is-invalid @enderror" id="telefono" name="telefono" value="{{ old('telefono') }}">
-                                @error('telefono')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            <div class="form-group">
-                                <label for="descripcion">Descripción</label>
-                                <textarea class="form-control @error('descripcion') is-invalid @enderror" id="descripcion" name="descripcion" rows="3">{{ old('descripcion') }}</textarea>
-                                @error('descripcion')
-                                    <span class="invalid-feedback">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            <div class="form-group">
-                                <div class="custom-control custom-switch">
-                                    <input type="checkbox" class="custom-control-input" id="activo" name="activo" value="1" {{ old('activo', 1) ? 'checked' : '' }}>
-                                    <label class="custom-control-label" for="activo">Usuario activo</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-footer">
-                            <a href="{{ route('users.index') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Volver
-                            </a>
-                            <button type="submit" class="btn btn-primary float-right">
-                                <i class="fas fa-save"></i> Guardar Usuario
-                            </button>
-                        </div>
-                    </form>
+        @if ($errors->any())
+            <div class="usuarios-create-alert usuarios-create-alert--danger">
+                <i class="fas fa-triangle-exclamation"></i>
+                <div>
+                    <strong>Revisa el formulario.</strong>
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             </div>
+        @endif
 
-            <div class="col-md-4">
-                <div class="card card-info">
-                    <div class="card-header">
-                        <h3 class="card-title">Ayuda rápida</h3>
+        <form action="{{ route('users.store') }}" method="POST" class="usuarios-create-grid">
+            @csrf
+
+            <section class="usuarios-create-main">
+                <article class="usuarios-panel">
+                    <header class="usuarios-panel__header">
+                        <i class="fas fa-user"></i>
+                        <h2>1. Datos personales</h2>
+                    </header>
+
+                    <div class="usuarios-panel__body usuarios-panel__body--grid">
+                        <div class="field-group">
+                            <label for="name">Nombre *</label>
+                            <input type="text" id="name" name="name" value="{{ old('name') }}" placeholder="Ej. Juan" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="apellido">Apellido *</label>
+                            <input type="text" id="apellido" name="apellido" value="{{ old('apellido') }}" placeholder="Ej. García López" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="dni_nie">DNI / NIE *</label>
+                            <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie') }}" placeholder="12345678X" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="departamento">Departamento</label>
+                            <select id="departamento" name="departamento">
+                                @php($departamentos = ['' => 'Selecciona departamento', 'Producción' => 'Producción', 'Logística' => 'Logística', 'Mantenimiento' => 'Mantenimiento', 'Calidad' => 'Calidad', 'Administración' => 'Administración'])
+                                @foreach($departamentos as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('departamento') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--full">
+                            <label>Tipo de personal</label>
+                            <div class="choice-grid">
+                                <label class="choice-card">
+                                    <input type="radio" name="tipo_personal" value="indefinido" @checked(old('tipo_personal', 'indefinido') === 'indefinido')>
+                                    <span>Indefinido</span>
+                                </label>
+                                <label class="choice-card">
+                                    <input type="radio" name="tipo_personal" value="temporal" @checked(old('tipo_personal') === 'temporal')>
+                                    <span>Temporal / ETT</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p><strong>Roles:</strong></p>
-                        <ul class="mb-3">
-                            <li><strong>Usuario:</strong> Operativa diaria.</li>
-                            <li><strong>Admin:</strong> Gestión operativa y usuarios.</li>
-                            <li><strong>Super Admin:</strong> Control total.</li>
-                        </ul>
-                        <p><strong>Proyectos:</strong></p>
-                        <p class="mb-0">Si no asignas proyectos, el usuario tendrá acceso general.</p>
+                </article>
+
+                <article class="usuarios-panel usuarios-panel--wide">
+                    <header class="usuarios-panel__header">
+                        <i class="fas fa-file-circle-plus"></i>
+                        <h2>2. Documentación</h2>
+                    </header>
+
+                    <div class="usuarios-panel__body usuarios-doc-grid">
+                        <label class="upload-card">
+                            <input type="file" hidden disabled>
+                            <i class="fas fa-id-card"></i>
+                            <strong>DNI escaneado</strong>
+                            <span>PDF, JPG o PNG (Max 5MB)</span>
+                        </label>
+
+                        <label class="upload-card">
+                            <input type="file" hidden disabled>
+                            <i class="fas fa-file-contract"></i>
+                            <strong>Contrato laboral</strong>
+                            <span>PDF firmado (Max 10MB)</span>
+                        </label>
                     </div>
+                </article>
+            </section>
+
+            <aside class="usuarios-create-sidebar">
+                <article class="usuarios-panel">
+                    <header class="usuarios-panel__header">
+                        <i class="fas fa-shirt"></i>
+                        <h2>3. Gestión de tallas</h2>
+                    </header>
+
+                    <div class="usuarios-panel__body usuarios-panel__body--stack">
+                        <div class="field-group field-group--inline">
+                            <label for="camiseta">Camiseta</label>
+                            <select id="camiseta" name="camiseta">
+                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', 'XXL' => 'XXL'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('camiseta') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="pantalon">Pantalón</label>
+                            <select id="pantalon" name="pantalon">
+                                @foreach(['' => 'Selecciona talla', '36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('pantalon') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="calzado">Calzado</label>
+                            <select id="calzado" name="calzado">
+                                @foreach(['' => 'Selecciona talla', '36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('calzado') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="casco">Casco</label>
+                            <select id="casco" name="casco">
+                                @foreach(['' => 'Selecciona talla', 'Standard' => 'Standard', 'S' => 'S', 'M' => 'M', 'L' => 'L'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('casco') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="guantes">Guantes</label>
+                            <select id="guantes" name="guantes">
+                                @foreach(['' => 'Selecciona talla', '6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('guantes') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="usuarios-note-card">
+                    <i class="fas fa-circle-info"></i>
+                    <div>
+                        <strong>Nota de seguridad</strong>
+                        <p>Las tallas y el expediente se revisan antes de la entrega formal de EPIs.</p>
+                    </div>
+                </article>
+
+                <div class="usuarios-create-actions">
+                    <a href="{{ route('personal.index') }}" class="btn-secondary-action">Cancelar</a>
+                    <button type="submit" class="btn-primary-action">Guardar Trabajador</button>
                 </div>
-            </div>
-        </div>
+            </aside>
+
+            <section class="usuarios-create-main usuarios-create-main--bottom">
+                <article class="usuarios-panel usuarios-panel--full">
+                    <header class="usuarios-panel__header">
+                        <i class="fas fa-address-card"></i>
+                        <h2>4. Observaciones</h2>
+                    </header>
+                    <div class="usuarios-panel__body">
+                        <div class="field-group">
+                            <label for="telefono">Teléfono</label>
+                            <input type="text" id="telefono" name="telefono" value="{{ old('telefono') }}" placeholder="Ej. 600 000 000">
+                        </div>
+
+                        <div class="field-group field-group--full">
+                            <label for="descripcion">Observaciones</label>
+                            <textarea id="descripcion" name="descripcion" rows="4" placeholder="Información adicional sobre el trabajador...">{{ old('descripcion') }}</textarea>
+                        </div>
+
+                        <div class="field-group field-group--full">
+                            <label class="switch-field" for="activo">
+                                <input type="checkbox" id="activo" name="activo" value="1" @checked(old('activo', true))>
+                                <span>Trabajador activo</span>
+                            </label>
+                        </div>
+                    </div>
+                </article>
+            </section>
+        </form>
     </div>
-@endsection
-
-@section('js')
-    <script>
-        (function () {
-            const roleSelect = document.getElementById('role');
-            const selectAll = document.getElementById('select-all-proyectos');
-            const projectCheckboxes = Array.from(document.querySelectorAll('input[name="proyecto_ids[]"]'));
-            const proyectosWrapper = document.getElementById('proyectos-wrapper');
-            const superadminInfo = document.getElementById('superadmin-proyectos-info');
-
-            const syncSelectAll = () => {
-                if (!selectAll || projectCheckboxes.length === 0) {
-                    return;
-                }
-
-                selectAll.checked = projectCheckboxes.every(checkbox => checkbox.checked);
-                selectAll.indeterminate = !selectAll.checked && projectCheckboxes.some(checkbox => checkbox.checked);
-            };
-
-            if (selectAll) {
-                selectAll.addEventListener('change', function () {
-                    projectCheckboxes.forEach(checkbox => {
-                        checkbox.checked = this.checked;
-                    });
-                    syncSelectAll();
-                });
-            }
-
-            projectCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', syncSelectAll);
-            });
-
-            const updateProjectSelectorByRole = () => {
-                const isSuperadmin = roleSelect && roleSelect.value === 'superadmin';
-
-                if (proyectosWrapper) {
-                    proyectosWrapper.style.opacity = isSuperadmin ? '0.55' : '1';
-                }
-
-                if (superadminInfo) {
-                    superadminInfo.classList.toggle('d-none', !isSuperadmin);
-                }
-
-                if (isSuperadmin) {
-                    if (selectAll) {
-                        selectAll.checked = false;
-                        selectAll.indeterminate = false;
-                    }
-                }
-
-                if (selectAll) {
-                    selectAll.disabled = isSuperadmin;
-                }
-
-                projectCheckboxes.forEach(checkbox => {
-                    checkbox.checked = isSuperadmin ? false : checkbox.checked;
-                    checkbox.disabled = isSuperadmin;
-                });
-
-                if (!isSuperadmin) {
-                    syncSelectAll();
-                }
-            };
-
-            if (roleSelect) {
-                roleSelect.addEventListener('change', updateProjectSelectorByRole);
-            }
-
-            syncSelectAll();
-            updateProjectSelectorByRole();
-        })();
-    </script>
 @endsection
