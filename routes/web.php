@@ -104,5 +104,67 @@ Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class);
     Route::post('users/{user}/change-role', [UserController::class, 'changeRole'])->name('users.changeRole');
     Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggleActive');
+    // Pantalla de Personal con buscador y exportación
+    Route::get('personal', function (\Illuminate\Http\Request $request) {
+        $query = (string) $request->input('q', '');
+        $export = $request->input('export');
+
+        $buildQuery = function () use ($query) {
+            $usersQuery = \App\Models\User::with('proyectos');
+
+            if ($query !== '') {
+                $usersQuery->where(function ($subQuery) use ($query) {
+                    $subQuery->where('name', 'like', "%{$query}%")
+                        ->orWhere('email', 'like', "%{$query}%")
+                        ->orWhere('telefono', 'like', "%{$query}%")
+                        ->orWhere('role', 'like', "%{$query}%");
+                });
+            }
+
+            return $usersQuery->orderBy('name');
+        };
+
+        if ($export === 'csv') {
+            $rows = $buildQuery()->get();
+
+            return response()->streamDownload(function () use ($rows) {
+                $handle = fopen('php://output', 'w');
+                fwrite($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+                fputcsv($handle, ['ID', 'Nombre', 'Email', 'Rol', 'Telefono', 'Estado', 'Proyectos']);
+
+                foreach ($rows as $user) {
+                    fputcsv($handle, [
+                        $user->id,
+                        $user->name,
+                        $user->email,
+                        $user->role,
+                        $user->telefono,
+                        $user->activo ? 'Activo' : 'Inactivo',
+                        $user->proyectos->pluck('nombre')->join(' | '),
+                    ]);
+                }
+
+                fclose($handle);
+            }, 'personal.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        $users = $buildQuery()->paginate(12)->withQueryString();
+        $usersTotal = \App\Models\User::count();
+        $usuariosActivos = \App\Models\User::where('activo', true)->count();
+        $usuariosAdministrativos = \App\Models\User::whereIn('role', ['admin', 'superadmin'])->count();
+        $usuariosSinProyectos = \App\Models\User::whereDoesntHave('proyectos')->count();
+
+        return view('personal.index', compact(
+            'users',
+            'query',
+            'usersTotal',
+            'usuariosActivos',
+            'usuariosAdministrativos',
+            'usuariosSinProyectos'
+        ));
+    })->middleware('can:manage-users')->name('personal.index');
+    Route::get('personal/{user}', [UserController::class, 'personalShow'])
+        ->middleware('can:manage-users')
+        ->name('personal.show');
     
 });

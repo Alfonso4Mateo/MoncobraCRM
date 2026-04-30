@@ -368,12 +368,12 @@ return [
             'active' => ['albaranes*'],
         ],
 
-        // Personal
+        // Personal (vista dedicada)
         [
             'text' => 'Personal',
-            'url' => 'users',
+            'url' => 'personal',
             'icon' => 'fas fa-fw fa-users',
-            'active' => ['users*'],
+            'active' => ['personal*'],
         ],
 
         // Sección inferior fija de utilidades
