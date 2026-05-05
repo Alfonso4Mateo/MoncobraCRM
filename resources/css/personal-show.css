@@ -102,7 +102,7 @@ body,
 
 .profile-grid {
     display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-columns: 1fr;
     gap: 18px;
     align-items: start;
 }
@@ -124,6 +124,22 @@ body,
 .profile-card--main {
     padding: 16px 18px 18px;
     position: relative;
+}
+
+.profile-card--main-sidebar {
+    padding: 18px 20px;
+}
+
+.profile-main-row {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.profile-main-left {
+    display: grid;
+    gap: 18px;
 }
 
 .profile-status {
@@ -203,6 +219,9 @@ body,
 
 .profile-card--tallas {
     padding: 0;
+    border: 1px solid var(--profile-line);
+    border-radius: var(--profile-radius-sm);
+    background: var(--profile-card);
 }
 
 .profile-card--tallas h3 {
@@ -220,6 +239,7 @@ body,
 
 .profile-size-list {
     display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
     padding: 14px 18px 18px;
 }

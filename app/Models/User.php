@@ -29,6 +29,8 @@ class User extends Authenticatable
         'departamento',
         'tipo_personal',
         'camiseta',
+        'chaqueta',
+        'sudadera',
         'pantalon',
         'calzado',
         'casco',

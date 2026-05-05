@@ -35,7 +35,7 @@ body,
 }
 
 .personal-page {
-    max-width: 1280px;
+    max-width: 1500px;
     margin: 0 auto;
 }
 
@@ -323,7 +323,7 @@ body,
 }
 
 .personal-table-wrap {
-    padding: 0 10px;
+    padding: 0;
 }
 
 .personal-table {
@@ -334,12 +334,12 @@ body,
 }
 
 .personal-table thead th {
-    font-size: .68rem !important;
+    font-size: .66rem !important;
     text-transform: uppercase !important;
     letter-spacing: .12em !important;
     font-weight: 800 !important;
     color: #8a98ad !important;
-    padding: 16px 18px !important;
+    padding: 14px 12px !important;
     background: #f7f9fc !important;
     border: none !important;
     border-bottom: 1px solid var(--personal-line) !important;
@@ -356,9 +356,10 @@ body,
 
 .personal-table tbody td {
     border: none !important;
-    padding: 16px 18px !important;
+    padding: 14px 12px !important;
     vertical-align: middle !important;
     color: var(--personal-ink) !important;
+    font-size: .9rem;
 }
 
 .personal-code {

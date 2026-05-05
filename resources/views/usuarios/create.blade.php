@@ -113,21 +113,64 @@
                         </label>
                     </div>
                 </article>
+
+                <article class="usuarios-panel usuarios-panel--full">
+                    <header class="usuarios-panel__header">
+                        <i class="fas fa-address-card"></i>
+                        <h2>3. Observaciones</h2>
+                    </header>
+                    <div class="usuarios-panel__body">
+                        <div class="field-group">
+                            <label for="telefono">Teléfono</label>
+                            <input type="text" id="telefono" name="telefono" value="{{ old('telefono') }}" placeholder="Ej. 600 000 000">
+                        </div>
+
+                        <div class="field-group field-group--full">
+                            <label for="descripcion">Observaciones</label>
+                            <textarea id="descripcion" name="descripcion" rows="4" placeholder="Información adicional sobre el trabajador...">{{ old('descripcion') }}</textarea>
+                        </div>
+
+                        <div class="field-group field-group--full">
+                            <label class="switch-field" for="activo">
+                                <input type="checkbox" id="activo" name="activo" value="1" @checked(old('activo', true))>
+                                <span>Trabajador activo</span>
+                            </label>
+                        </div>
+                    </div>
+                </article>
             </section>
 
             <aside class="usuarios-create-sidebar">
                 <article class="usuarios-panel">
                     <header class="usuarios-panel__header">
                         <i class="fas fa-shirt"></i>
-                        <h2>3. Gestión de tallas</h2>
+                        <h2>4. Gestión de tallas</h2>
                     </header>
 
                     <div class="usuarios-panel__body usuarios-panel__body--stack">
                         <div class="field-group field-group--inline">
                             <label for="camiseta">Camiseta</label>
                             <select id="camiseta" name="camiseta">
-                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', 'XXL' => 'XXL'] as $value => $label)
+                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
                                     <option value="{{ $value }}" @selected(old('camiseta') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="chaqueta">Chaqueta</label>
+                            <select id="chaqueta" name="chaqueta">
+                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('chaqueta') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="field-group field-group--inline">
+                            <label for="sudadera">Sudadera</label>
+                            <select id="sudadera" name="sudadera">
+                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('sudadera') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -153,7 +196,7 @@
                         <div class="field-group field-group--inline">
                             <label for="casco">Casco</label>
                             <select id="casco" name="casco">
-                                @foreach(['' => 'Selecciona talla', 'Standard' => 'Standard', 'S' => 'S', 'M' => 'M', 'L' => 'L'] as $value => $label)
+                                @foreach(['' => 'Selecciona talla', 'Estándar' => 'Estándar'] as $value => $label)
                                     <option value="{{ $value }}" @selected(old('casco') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
@@ -183,33 +226,6 @@
                     <button type="submit" class="btn-primary-action">Guardar Trabajador</button>
                 </div>
             </aside>
-
-            <section class="usuarios-create-main usuarios-create-main--bottom">
-                <article class="usuarios-panel usuarios-panel--full">
-                    <header class="usuarios-panel__header">
-                        <i class="fas fa-address-card"></i>
-                        <h2>4. Observaciones</h2>
-                    </header>
-                    <div class="usuarios-panel__body">
-                        <div class="field-group">
-                            <label for="telefono">Teléfono</label>
-                            <input type="text" id="telefono" name="telefono" value="{{ old('telefono') }}" placeholder="Ej. 600 000 000">
-                        </div>
-
-                        <div class="field-group field-group--full">
-                            <label for="descripcion">Observaciones</label>
-                            <textarea id="descripcion" name="descripcion" rows="4" placeholder="Información adicional sobre el trabajador...">{{ old('descripcion') }}</textarea>
-                        </div>
-
-                        <div class="field-group field-group--full">
-                            <label class="switch-field" for="activo">
-                                <input type="checkbox" id="activo" name="activo" value="1" @checked(old('activo', true))>
-                                <span>Trabajador activo</span>
-                            </label>
-                        </div>
-                    </div>
-                </article>
-            </section>
         </form>
     </div>
 @endsection

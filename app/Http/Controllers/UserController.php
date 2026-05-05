@@ -59,6 +59,8 @@ class UserController extends Controller
             'departamento' => 'nullable|string|max:255',
             'tipo_personal' => 'required|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
+            'chaqueta' => 'nullable|string|max:20',
+            'sudadera' => 'nullable|string|max:20',
             'pantalon' => 'nullable|string|max:20',
             'calzado' => 'nullable|string|max:20',
             'casco' => 'nullable|string|max:20',
@@ -83,6 +85,8 @@ class UserController extends Controller
             'departamento' => $validated['departamento'] ?? null,
             'tipo_personal' => $validated['tipo_personal'],
             'camiseta' => $validated['camiseta'] ?? null,
+            'chaqueta' => $validated['chaqueta'] ?? null,
+            'sudadera' => $validated['sudadera'] ?? null,
             'pantalon' => $validated['pantalon'] ?? null,
             'calzado' => $validated['calzado'] ?? null,
             'casco' => $validated['casco'] ?? null,
@@ -237,7 +241,7 @@ class UserController extends Controller
     /**
      * Mostrar perfil personal
      */
-    public function personalShow(User $user)
+    public function personalShow(User $user, Request $request)
     {
         $this->authorize('view-user', $user);
 
@@ -245,38 +249,62 @@ class UserController extends Controller
 
         $proyectoId = $user->proyectos->first()?->id;
 
-        $historicoSalidas = Inventario::query()
-            ->when($proyectoId, fn ($query) => $query->where('proyecto_id', $proyectoId))
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->limit(4)
-            ->get()
-            ->values()
-            ->map(function (Inventario $producto, int $index) {
-                $filas = [
-                    ['fecha' => now()->subDays(3)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7732', 'cantidad' => 1],
-                    ['fecha' => now()->subDays(6)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7650', 'cantidad' => 2],
-                    ['fecha' => now()->subDays(10)->format('d M Y'), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'REPOSICIÓN', 'cantidad' => 5],
-                    ['fecha' => now()->subDays(14)->format('d M Y'), 'estado' => 'Pendiente', 'estado_clase' => 'profile-chip profile-chip--pending', 'ot' => 'OT-7621', 'cantidad' => 1],
-                ];
+        // Array de datos mockeados
+        $datosCompletos = [
+            ['fecha' => now()->subDays(3), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7732', 'cantidad' => 1, 'articulo' => 'Casco de Seguridad'],
+            ['fecha' => now()->subDays(6), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7650', 'cantidad' => 2, 'articulo' => 'Guantes de Protección'],
+            ['fecha' => now()->subDays(10), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'REPOSICIÓN', 'cantidad' => 5, 'articulo' => 'Arnés de Seguridad'],
+            ['fecha' => now()->subDays(14), 'estado' => 'Pendiente', 'estado_clase' => 'profile-chip profile-chip--pending', 'ot' => 'OT-7621', 'cantidad' => 1, 'articulo' => 'Cinturón de Trabajo'],
+            ['fecha' => now()->subDays(18), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7589', 'cantidad' => 3, 'articulo' => 'Zapatos de Seguridad'],
+            ['fecha' => now()->subDays(22), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7512', 'cantidad' => 2, 'articulo' => 'Gafas de Protección'],
+            ['fecha' => now()->subDays(26), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7445', 'cantidad' => 1, 'articulo' => 'Mascarilla FFP2'],
+            ['fecha' => now()->subDays(30), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7321', 'cantidad' => 4, 'articulo' => 'Chaleco Reflectante'],
+        ];
 
-                $base = $filas[$index] ?? end($filas);
+        // Obtener parámetros de filtro
+        $fechaDesde = $request->input('fecha_desde');
+        $fechaHasta = $request->input('fecha_hasta');
+        $articuloBuscar = $request->input('articulo');
 
-                return (object) [
-                    'fecha' => $base['fecha'],
-                    'articulo' => $producto->descripcion,
-                    'cantidad' => $base['cantidad'],
-                    'ot' => $base['ot'],
-                    'estado' => $base['estado'],
-                    'estado_clase' => $base['estado_clase'],
-                ];
-            });
+        // Filtrar datos
+        $datosFiltrados = array_filter($datosCompletos, function ($item) use ($fechaDesde, $fechaHasta, $articuloBuscar) {
+            $fecha = $item['fecha'];
+
+            // Filtro de fechas
+            if ($fechaDesde && $fecha < \Carbon\Carbon::parse($fechaDesde)->startOfDay()) {
+                return false;
+            }
+            if ($fechaHasta && $fecha > \Carbon\Carbon::parse($fechaHasta)->endOfDay()) {
+                return false;
+            }
+
+            // Filtro de artículo
+            if ($articuloBuscar && stripos($item['articulo'], $articuloBuscar) === false) {
+                return false;
+            }
+
+            return true;
+        });
+
+        // Construir historicoSalidas con datos filtrados
+        $historicoSalidas = array_map(function ($item) {
+            return (object) [
+                'fecha' => $item['fecha']->format('d M Y'),
+                'articulo' => $item['articulo'],
+                'cantidad' => $item['cantidad'],
+                'ot' => $item['ot'],
+                'estado' => $item['estado'],
+                'estado_clase' => $item['estado_clase'],
+            ];
+        }, array_slice($datosFiltrados, 0, 8));
 
         $tallas = [
             ['label' => 'Camiseta', 'value' => $user->camiseta ?: '—', 'icon' => 'fa-shirt'],
-            ['label' => 'Pantalón', 'value' => $user->pantalon ?: '—', 'icon' => 'fa-ruler-horizontal'],
+            ['label' => 'Chaqueta', 'value' => $user->chaqueta ?: '—', 'icon' => 'fa-jacket'],
+            ['label' => 'Sudadera', 'value' => $user->sudadera ?: '—', 'icon' => 'fa-hoodie'],
+            ['label' => 'Pantalón', 'value' => $user->pantalon ?: '—', 'icon' => 'fa-person'],
             ['label' => 'Calzado', 'value' => $user->calzado ?: '—', 'icon' => 'fa-shoe-prints'],
-            ['label' => 'Casco', 'value' => $user->casco ?: '—', 'icon' => 'fa-helmet-safety'],
+            ['label' => 'Casco', 'value' => $user->casco ?: '—', 'icon' => 'fa-hard-hat'],
             ['label' => 'Guantes', 'value' => $user->guantes ?: '—', 'icon' => 'fa-hand-paper'],
         ];
 
@@ -309,6 +337,8 @@ class UserController extends Controller
             'departamento' => 'nullable|string|max:255',
             'tipo_personal' => 'nullable|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
+            'chaqueta' => 'nullable|string|max:20',
+            'sudadera' => 'nullable|string|max:20',
             'pantalon' => 'nullable|string|max:20',
             'calzado' => 'nullable|string|max:20',
             'casco' => 'nullable|string|max:20',
@@ -327,6 +357,8 @@ class UserController extends Controller
             'departamento' => $validated['departamento'] ?? $user->departamento,
             'tipo_personal' => $validated['tipo_personal'] ?? $user->tipo_personal,
             'camiseta' => $validated['camiseta'] ?? $user->camiseta,
+            'chaqueta' => $validated['chaqueta'] ?? $user->chaqueta,
+            'sudadera' => $validated['sudadera'] ?? $user->sudadera,
             'pantalon' => $validated['pantalon'] ?? $user->pantalon,
             'calzado' => $validated['calzado'] ?? $user->calzado,
             'casco' => $validated['casco'] ?? $user->casco,

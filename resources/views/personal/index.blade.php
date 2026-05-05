@@ -68,6 +68,8 @@
                                 <th>DEPARTAMENTO</th>
                                 <th>VINCULACIÓN</th>
                                 <th>CAMISETA</th>
+                                <th>CHAQUETA</th>
+                                <th>SUDADERA</th>
                                 <th>PANTALÓN</th>
                                 <th>CALZADO</th>
                                 <th>GUANTES</th>
@@ -110,6 +112,12 @@
                                     <td data-label="CAMISETA">
                                         <span class="personal-size-badge">{{ $user->camiseta ?? '—' }}</span>
                                     </td>
+                                    <td data-label="CHAQUETA">
+                                        <span class="personal-size-badge">{{ $user->chaqueta ?? '—' }}</span>
+                                    </td>
+                                    <td data-label="SUDADERA">
+                                        <span class="personal-size-badge">{{ $user->sudadera ?? '—' }}</span>
+                                    </td>
                                     <td data-label="PANTALÓN">
                                         <span class="personal-size-badge">{{ $user->pantalon ?? '—' }}</span>
                                     </td>
@@ -134,7 +142,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9">
+                                    <td colspan="11">
                                         <div class="personal-empty-state">
                                             <i class="fas fa-users-slash"></i>
                                             <strong>No hay personal para mostrar</strong>
