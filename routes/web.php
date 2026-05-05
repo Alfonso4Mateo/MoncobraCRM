@@ -15,6 +15,7 @@ use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\GestionProyectoController;
 use App\Http\Controllers\ProyectoContextController;
 use App\Http\Controllers\AlmacenController;
@@ -63,6 +64,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/change-password', [ProfileController::class, 'updatePassword'])->name('profile.update-password');
     
+    // Documentos
+    Route::get('documentos', [DocumentosController::class, 'index'])->name('documentos.index');
+    Route::get('documentos/cargar', [DocumentosController::class, 'create'])->name('documentos.create');
+
     // Recursos CRUD
     Route::resource('clientes', ClienteController::class);
     Route::post('clientes/{cliente}/favorito', [ClienteController::class, 'toggleFavorito'])->name('clientes.favorito.toggle');

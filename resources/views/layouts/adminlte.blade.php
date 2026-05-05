@@ -118,7 +118,7 @@
                     </li>
 
                     <li class="nav-item">
-                        <a href="{{ route('albaranes.index') }}" class="nav-link {{ request()->routeIs('albaranes.*') ? 'active' : '' }}">
+                        <a href="{{ route('documentos.index') }}" class="nav-link {{ request()->routeIs('documentos.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-file-lines"></i>
                             <p>Documentos</p>
                         </a>

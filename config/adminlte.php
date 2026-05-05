@@ -363,9 +363,9 @@ return [
         // Documentos
         [
             'text' => 'Documentos',
-            'url' => 'albaranes',
+            'url' => 'documentos',
             'icon' => 'fas fa-fw fa-folder-open',
-            'active' => ['albaranes*'],
+            'active' => ['documentos*'],
         ],
 
         // Personal (vista dedicada)
