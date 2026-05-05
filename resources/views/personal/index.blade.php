@@ -18,7 +18,7 @@
                 <p>Consulta y administra el equipo de trabajo con información de equipamiento.</p>
             </div>
 
-            <a href="{{ route('users.create') }}" class="personal-primary-action">
+            <a href="{{ route('personal.create') }}" class="personal-primary-action">
                 <i class="fas fa-user-plus" aria-hidden="true"></i>
                 + Añadir Nuevo Trabajador
             </a>
@@ -43,7 +43,7 @@
                 <header class="personal-card__header">
                     <div>
                         <h3>Registro general de personal</h3>
-                        <p>{{ $users->total() }} trabajadores</p>
+                        <p>{{ $personals->total() }} trabajadores</p>
                     </div>
 
                     <div class="personal-card__actions">
@@ -77,14 +77,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($users as $user)
+                            @forelse ($personals as $personal)
                                 @php
-                                    $initials = collect(explode(' ', trim($user->name)))
+                                    $initials = collect(explode(' ', trim($personal->name)))
                                         ->filter()
                                         ->map(fn ($part) => strtoupper(mb_substr($part, 0, 1)))
                                         ->take(2)
                                         ->implode('');
-                                    $userCode = str_pad((string) $user->id, 4, '0', STR_PAD_LEFT);
+                                    $userCode = str_pad((string) $personal->id, 4, '0', STR_PAD_LEFT);
                                 @endphp
                                 <tr>
                                     <td data-label="ID">
@@ -94,46 +94,46 @@
                                         <div class="personal-person-cell">
                                             <span class="personal-avatar">{{ $initials ?: 'U' }}</span>
                                             <div class="personal-person-copy">
-                                                <strong>{{ $user->name }} {{ $user->apellido }}</strong>
-                                                <span style="font-size: 12px; color: #999;">{{ $user->email ?? '—' }}</span>
+                                                <strong>{{ $personal->name }} {{ $personal->apellido }}</strong>
+                                                <span style="font-size: 12px; color: #999;">{{ $personal->dni_nie ?: ($personal->telefono ?: '—') }}</span>
                                             </div>
                                         </div>
                                     </td>
                                     <td data-label="DEPARTAMENTO">
-                                        <span class="personal-muted">{{ $user->departamento ?? '—' }}</span>
+                                        <span class="personal-muted">{{ $personal->departamento ?? '—' }}</span>
                                     </td>
                                     <td data-label="VINCULACIÓN">
-                                        @if($user->activo)
+                                        @if($personal->activo)
                                             <span class="personal-status personal-status--active">Plantilla Fija</span>
                                         @else
                                             <span class="personal-status personal-status--inactive">Personal Externo</span>
                                         @endif
                                     </td>
                                     <td data-label="CAMISETA">
-                                        <span class="personal-size-badge">{{ $user->camiseta ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->camiseta ?? '—' }}</span>
                                     </td>
                                     <td data-label="CHAQUETA">
-                                        <span class="personal-size-badge">{{ $user->chaqueta ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->chaqueta ?? '—' }}</span>
                                     </td>
                                     <td data-label="SUDADERA">
-                                        <span class="personal-size-badge">{{ $user->sudadera ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->sudadera ?? '—' }}</span>
                                     </td>
                                     <td data-label="PANTALÓN">
-                                        <span class="personal-size-badge">{{ $user->pantalon ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->pantalon ?? '—' }}</span>
                                     </td>
                                     <td data-label="CALZADO">
-                                        <span class="personal-size-badge">{{ $user->calzado ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->calzado ?? '—' }}</span>
                                     </td>
                                     <td data-label="GUANTES">
-                                        <span class="personal-size-badge">{{ $user->guantes ?? '—' }}</span>
+                                        <span class="personal-size-badge">{{ $personal->guantes ?? '—' }}</span>
                                     </td>
                                     <td data-label="ACCIONES" class="text-right">
                                         <div class="personal-actions">
-                                            <a href="{{ route('personal.show', $user->id) }}" class="personal-action-icon" title="Ver">
+                                            <a href="{{ route('personal.show', $personal->id) }}" class="personal-action-icon" title="Ver">
                                                 <i class="far fa-eye"></i>
                                             </a>
-                                            @can('edit-user', $user)
-                                                <a href="{{ route('personal.edit', $user->id) }}" class="personal-action-icon" title="Editar">
+                                            @can('manage-users')
+                                                <a href="{{ route('personal.edit', $personal->id) }}" class="personal-action-icon" title="Editar">
                                                     <i class="far fa-pen-to-square"></i>
                                                 </a>
                                             @endcan
@@ -156,11 +156,11 @@
                 </div>
 
                 <div class="personal-toolbar personal-toolbar-footer">
-                    <span class="personal-toolbar-label">Mostrando {{ $users->firstItem() ?? 0 }} - {{ $users->lastItem() ?? 0 }} de {{ number_format($users->total(), 0, ',', '.') }} trabajadores</span>
+                    <span class="personal-toolbar-label">Mostrando {{ $personals->firstItem() ?? 0 }} - {{ $personals->lastItem() ?? 0 }} de {{ number_format($personals->total(), 0, ',', '.') }} trabajadores</span>
 
-                    @if ($users->hasPages())
+                    @if ($personals->hasPages())
                         <div class="personal-pagination">
-                            {{ $users->onEachSide(1)->links('pagination::bootstrap-4') }}
+                            {{ $personals->onEachSide(1)->links('pagination::bootstrap-4') }}
                         </div>
                     @endif
                 </div>

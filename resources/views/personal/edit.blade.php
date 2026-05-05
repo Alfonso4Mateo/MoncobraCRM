@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'Editar Ficha')
+@section('title', ($isCreate ?? false) ? 'Crear Trabajador' : 'Editar Ficha')
 
 @section('css')
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,12 +68,18 @@
         <header class="profile-hero">
             <div>
                 <div class="profile-crumbs">GESTIÓN DE PERSONAL <span>•</span> EDITAR TRABAJADOR</div>
-                <h1>Editar Ficha: {{ $user->name }} {{ $user->apellido }}</h1>
+                <h1>
+                    @if($isCreate ?? false)
+                        Crear Trabajador
+                    @else
+                        Editar Ficha: {{ $personal->name }} {{ $personal->apellido }}
+                    @endif
+                </h1>
                 <p>Actualiza la información personal y equipamiento de protección individual (EPIS)</p>
             </div>
 
             <div class="profile-hero-actions">
-                <a href="{{ route('personal.show', $user->id) }}" class="profile-action profile-action--soft">
+                <a href="{{ ($isCreate ?? false) ? route('personal.index') : route('personal.show', $personal->id) }}" class="profile-action profile-action--soft">
                     <i class="fas fa-arrow-left"></i>
                     Volver
                 </a>
@@ -84,9 +90,11 @@
             </div>
         </header>
 
-        <form id="personal-edit-form" action="{{ route('personal.update', $user->id) }}" method="POST">
+        <form id="personal-edit-form" action="{{ ($isCreate ?? false) ? route('personal.store') : route('personal.update', $personal->id) }}" method="POST">
             @csrf
-            @method('PUT')
+            @if(!($isCreate ?? false))
+                @method('PUT')
+            @endif
 
             <div class="profile-grid">
                 <section class="profile-main">
@@ -101,18 +109,24 @@
                                 </div>
 
                                 <div class="profile-name-block">
-                                    <h2>{{ $user->name }} {{ $user->apellido }}</h2>
-                                    <p>{{ strtoupper($user->departamento ?: 'Sin departamento') }}</p>
+                                    <h2>{{ $personal->name }} {{ $personal->apellido }}</h2>
+                                    <p>{{ strtoupper($personal->departamento ?: 'Sin departamento') }}</p>
                                 </div>
 
                                 <div class="profile-metadata">
                                     <div>
                                         <span>ID EMPLEADO</span>
-                                        <strong>AL-{{ str_pad((string) $user->id, 3, '0', STR_PAD_LEFT) }}</strong>
+                                        <strong>
+                                            @if($isCreate ?? false)
+                                                —
+                                            @else
+                                                AL-{{ str_pad((string) $personal->id, 3, '0', STR_PAD_LEFT) }}
+                                            @endif
+                                        </strong>
                                     </div>
                                     <div>
                                         <span>REGISTRADO DESDE</span>
-                                        <strong>{{ optional($user->created_at)->format('d M Y') }}</strong>
+                                        <strong>{{ optional($personal->created_at)->format('d M Y') ?: '—' }}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -121,32 +135,27 @@
                             <div style="flex: 1;">
                                 <div class="profile-edit-form-group">
                                     <label for="name">Nombre</label>
-                                    <input type="text" id="name" name="name" value="{{ old('name', $user->name) }}">
+                                    <input type="text" id="name" name="name" value="{{ old('name', $personal->name) }}">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="apellido">Apellido</label>
-                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $user->apellido) }}">
+                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $personal->apellido) }}">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="dni_nie">DNI / NIE</label>
-                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $user->dni_nie) }}" disabled>
-                                </div>
-
-                                <div class="profile-edit-form-group">
-                                    <label for="email">Email</label>
-                                    <input type="email" id="email" name="email" value="{{ old('email', $user->email) }}" disabled>
+                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="departamento">Departamento</label>
-                                    <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $user->departamento) }}">
+                                    <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $personal->departamento) }}">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="telefono">Teléfono</label>
-                                    <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $user->telefono ?? '') }}" placeholder="Ej. 600 000 000">
+                                    <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000">
                                 </div>
                             </div>
                         </div>
@@ -168,7 +177,7 @@
                                     <select id="camiseta" name="camiseta">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('camiseta', $user->camiseta) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -178,7 +187,7 @@
                                     <select id="chaqueta" name="chaqueta">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('chaqueta', $user->chaqueta) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -188,7 +197,7 @@
                                     <select id="sudadera" name="sudadera">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('sudadera', $user->sudadera) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -198,7 +207,7 @@
                                     <select id="pantalon" name="pantalon">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('pantalon', $user->pantalon) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -208,7 +217,7 @@
                                     <select id="calzado" name="calzado">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('calzado', $user->calzado) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -218,7 +227,7 @@
                                     <select id="guantes" name="guantes">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('guantes', $user->guantes) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -227,7 +236,7 @@
                                     <label for="casco">Casco</label>
                                     <select id="casco" name="casco">
                                         <option value="">Selecciona talla</option>
-                                        <option value="Estándar" @selected(old('casco', $user->casco) === 'Estándar')>Estándar</option>
+                                        <option value="Estándar" @selected(old('casco', $personal->casco) === 'Estándar')>Estándar</option>
                                     </select>
                                 </div>
                             </div>
@@ -246,7 +255,7 @@
                         <div class="profile-card__body" style="padding: 20px;">
                             <div class="profile-edit-form-group">
                                 <label for="descripcion">Observaciones</label>
-                                <textarea id="descripcion" name="descripcion" placeholder="Añade información adicional, notas especiales, o comentarios...">{{ old('descripcion', $user->descripcion ?? '') }}</textarea>
+                                <textarea id="descripcion" name="descripcion" placeholder="Añade información adicional, notas especiales, o comentarios...">{{ old('descripcion', $personal->descripcion ?? '') }}</textarea>
                             </div>
                         </div>
                     </article>
