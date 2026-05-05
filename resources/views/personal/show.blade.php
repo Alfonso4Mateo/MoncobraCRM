@@ -110,8 +110,8 @@
                     <i class="fas fa-file-export"></i>
                     Exportar Ficha
                 </a>
-                @can('edit-user', $user)
-                    <a href="{{ route('personal.edit', $user->id) }}" class="profile-action profile-action--primary">
+                @can('manage-users')
+                    <a href="{{ route('personal.edit', $personal->id) }}" class="profile-action profile-action--primary">
                         <i class="fas fa-pen"></i>
                         Editar Perfil
                     </a>
@@ -124,7 +124,7 @@
                 <article class="profile-card profile-card--main-sidebar">
                     <div class="profile-main-row">
                         <div class="profile-main-left">
-                            <div class="profile-status">{{ $user->activo ? 'ACTIVO' : 'INACTIVO' }}</div>
+                            <div class="profile-status">{{ $personal->activo ? 'ACTIVO' : 'INACTIVO' }}</div>
 
                             <div class="profile-avatar-wrap">
                                 <div class="profile-avatar">
@@ -133,22 +133,22 @@
                             </div>
 
                             <div class="profile-name-block">
-                                <h2>{{ $user->name }} {{ $user->apellido }}</h2>
-                                <p>{{ strtoupper($user->departamento ?: 'Sin departamento') }}</p>
+                                <h2>{{ $personal->name }} {{ $personal->apellido }}</h2>
+                                <p>{{ strtoupper($personal->departamento ?: 'Sin departamento') }}</p>
                             </div>
 
                             <div class="profile-metadata">
                                 <div>
                                     <span>ID EMPLEADO</span>
-                                    <strong>AL-{{ str_pad((string) $user->id, 3, '0', STR_PAD_LEFT) }}</strong>
+                                    <strong>AL-{{ str_pad((string) $personal->id, 3, '0', STR_PAD_LEFT) }}</strong>
                                 </div>
                                 <div>
                                     <span>DEPARTAMENTO</span>
-                                    <strong>{{ $user->departamento ?: '—' }}</strong>
+                                    <strong>{{ $personal->departamento ?: '—' }}</strong>
                                 </div>
                                 <div>
                                     <span>ANTIGÜEDAD</span>
-                                    <strong>{{ optional($user->created_at)->format('d M Y') }}</strong>
+                                    <strong>{{ optional($personal->created_at)->format('d M Y') }}</strong>
                                 </div>
                             </div>
                         </div>
@@ -172,7 +172,7 @@
                 </article>
 
                 <!-- Panel de Observaciones -->
-                @if($user->descripcion)
+                @if($personal->descripcion)
                     <article class="profile-card">
                         <div class="profile-card__header">
                             <div>
@@ -183,7 +183,7 @@
 
                         <div class="profile-card__body" style="padding: 20px;">
                             <div style="color: var(--profile-ink); line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
-                                {{ $user->descripcion }}
+                                {{ $personal->descripcion }}
                             </div>
                         </div>
                     </article>
@@ -222,7 +222,7 @@
                                         Buscar
                                     </button>
                                     @if(request('fecha_desde') || request('fecha_hasta') || request('articulo'))
-                                        <a href="{{ route('personal.show', $user->id) }}" class="profile-filter-reset" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                                        <a href="{{ route('personal.show', $personal->id) }}" class="profile-filter-reset" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
                                             <i class="fas fa-times"></i>
                                             Limpiar
                                         </a>
