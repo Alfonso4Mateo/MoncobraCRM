@@ -12,6 +12,7 @@ use App\Http\Controllers\AlbaranProveedorController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\InventarioController;
+use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\GestionProyectoController;
@@ -89,6 +90,15 @@ Route::middleware('auth')->group(function () {
     
     // Nota: 'only' limita las rutas generadas para optimizar el sistema.
     Route::resource('productos', ProductoController::class)->only(['index']);
+
+    Route::get('inventario/acciones', [InventarioAccionController::class, 'index'])->name('inventario.acciones.index');
+    Route::get('inventario/acciones/{tipo}/{id}', [InventarioAccionController::class, 'show'])
+        ->where('tipo', 'salida|entrada|traslado')
+        ->name('inventario.acciones.show');
+    Route::post('inventario/acciones/{tipo}/{id}/cancelar', [InventarioAccionController::class, 'cancel'])
+        ->where('tipo', 'salida|entrada|traslado')
+        ->name('inventario.acciones.cancel');
+    
     Route::post('inventario/entradas', [InventarioController::class, 'storeEntrada'])->name('inventario.entrada.store');
     Route::get('inventario/salidas/nueva', [InventarioController::class, 'createSalida'])->name('inventario.salida.create');
     Route::post('inventario/salidas', [InventarioController::class, 'storeSalida'])->name('inventario.salida.store');

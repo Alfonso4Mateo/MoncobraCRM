@@ -24,7 +24,7 @@
                         Gestionar Clases
                     </a>
                 @endif
-                <a href="#" class="inventory-primary-action">
+                <a href="{{ route('inventario.acciones.index') }}" class="inventory-primary-action">
                     <i class="fas fa-clipboard-list"></i>
                     Registro de acciones
                 </a>

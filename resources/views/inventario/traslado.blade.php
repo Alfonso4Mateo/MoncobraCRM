@@ -59,6 +59,16 @@
                         <label for="product_search">Buscar producto</label>
                         <input id="product_search" type="text" list="inventario-catalogo-traslado" placeholder="Buscar por nombre o SKU...">
                     </div>
+
+                    <div class="field-group">
+                        <label for="ot">Orden de trabajo (OT)</label>
+                        <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="OT-XXXX" class="@error('ot') is-invalid @enderror">
+                    </div>
+
+                    <div class="field-group">
+                        <label for="solicitante">Solicitante</label>
+                        <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', auth()->user()->name ?? '') }}" placeholder="Nombre del solicitante" class="@error('solicitante') is-invalid @enderror">
+                    </div>
                 </div>
 
                 <div class="transfer-table-wrap">

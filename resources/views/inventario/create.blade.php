@@ -165,6 +165,30 @@
                             </div>
 
                             <div class="field-group">
+                                <label for="ot">Orden de trabajo (OT)</label>
+                                <input
+                                    id="ot"
+                                    name="ot"
+                                    type="text"
+                                    value="{{ old('ot') }}"
+                                    placeholder="Buscar OT activa..."
+                                    class="@error('ot') is-invalid @enderror"
+                                >
+                            </div>
+
+                            <div class="field-group">
+                                <label for="solicitante">Solicitante</label>
+                                <input
+                                    id="solicitante"
+                                    name="solicitante"
+                                    type="text"
+                                    value="{{ old('solicitante', auth()->user()->name ?? '') }}"
+                                    placeholder="Nombre del solicitante"
+                                    class="@error('solicitante') is-invalid @enderror"
+                                >
+                            </div>
+
+                            <div class="field-group">
                                 <label for="referencia_proveedor">Proveedor asociado</label>
                                 <select id="referencia_proveedor" name="referencia_proveedor" class="@error('referencia_proveedor') is-invalid @enderror">
                                     <option value="">Seleccionar proveedor</option>

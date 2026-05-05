@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Almacen;
 use App\Models\Clase;
+use App\Models\EntradaStock;
 use App\Models\Inventario;
+use App\Models\SalidaStock;
+use App\Models\TrasladoStock;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InventarioController extends Controller
 {
@@ -277,8 +281,28 @@ class InventarioController extends Controller
                 ]);
         }
 
-        $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
-        $producto->save();
+        DB::transaction(function () use ($proyectoId, $producto, $cantidad, $validated) {
+            $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
+            $producto->save();
+
+            SalidaStock::create([
+                'proyecto_id' => $proyectoId,
+                'numero_salida' => 'SL-' . now()->format('Ymd-His-u'),
+                'fecha' => now(),
+                'solicitante' => $validated['solicitante'] ?? null,
+                'ot' => $validated['ot'] ?? null,
+                'almacen_origen' => $producto->almacen,
+                'items' => [
+                    [
+                        'inventario_id' => (int) $producto->id,
+                        'codigo' => (string) $producto->codigo,
+                        'descripcion' => (string) $producto->descripcion,
+                        'cantidad' => (int) $cantidad,
+                    ],
+                ],
+                'estado' => 'aceptado',
+            ]);
+        });
 
         return redirect()
             ->route('inventario.index')
@@ -315,6 +339,8 @@ class InventarioController extends Controller
 
         $validated = $request->validate([
             'destino_global' => 'required|string|max:255',
+            'ot' => 'nullable|string|max:255',
+            'solicitante' => 'nullable|string|max:255',
             'item_ids' => 'required|array|min:1',
             'item_ids.*' => 'required|integer',
             'cantidades' => 'required|array|min:1',
@@ -338,6 +364,9 @@ class InventarioController extends Controller
                 ]);
         }
 
+        $itemsMovimiento = [];
+        $almacenesOrigen = [];
+
         foreach ($itemIds as $index => $itemId) {
             $producto = $productos->get($itemId);
             $cantidad = (int) ($cantidades[$index] ?? 0);
@@ -358,10 +387,51 @@ class InventarioController extends Controller
                     ]);
             }
 
-            // El modelo actual no separa stock por lote/ubicacion parcial; se actualiza la ubicacion global del item.
-            $producto->almacen = $validated['destino_global'];
-            $producto->save();
+            $almacenOrigenItem = (string) ($producto->almacen ?? '');
+            if (trim($almacenOrigenItem) !== '') {
+                $almacenesOrigen[] = $almacenOrigenItem;
+            }
+
+            $itemsMovimiento[] = [
+                'inventario_id' => (int) $producto->id,
+                'codigo' => (string) $producto->codigo,
+                'descripcion' => (string) $producto->descripcion,
+                'cantidad' => (int) $cantidad,
+                'almacen_origen' => $almacenOrigenItem,
+                'almacen_actual' => (string) $validated['destino_global'],
+            ];
         }
+
+        $almacenesUnicos = collect($almacenesOrigen)
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        DB::transaction(function () use ($proyectoId, $validated, $itemIds, $productos, $almacenesUnicos, $itemsMovimiento) {
+            foreach ($itemIds as $itemId) {
+                $producto = $productos->get($itemId);
+                if (!$producto) {
+                    continue;
+                }
+
+                // El modelo actual no separa stock por lote/ubicacion parcial; se actualiza la ubicacion global del item.
+                $producto->almacen = $validated['destino_global'];
+                $producto->save();
+            }
+
+            TrasladoStock::create([
+                'proyecto_id' => $proyectoId,
+                'numero_traslado' => 'TR-' . now()->format('Ymd-His-u'),
+                'fecha' => now(),
+                'solicitante' => $validated['solicitante'] ?? null,
+                'ot' => $validated['ot'] ?? null,
+                'almacen_origen' => $almacenesUnicos->count() === 1 ? $almacenesUnicos->first() : 'Varios',
+                'almacen_actual' => $validated['destino_global'],
+                'items' => $itemsMovimiento,
+                'estado' => 'aceptado',
+            ]);
+        });
 
         return redirect()
             ->route('inventario.index')
@@ -380,6 +450,8 @@ class InventarioController extends Controller
             'ubicacion' => 'nullable|string|max:255',
             'clase' => 'nullable|string|max:255',
             'stock_actual' => 'required|integer|min:1',
+            'ot' => 'nullable|string|max:255',
+            'solicitante' => 'nullable|string|max:255',
         ]);
 
         $codigo = trim((string) ($validated['codigo'] ?? ''));
@@ -405,25 +477,47 @@ class InventarioController extends Controller
                 ]);
         }
 
-        $producto->stock_actual = (int) $producto->stock_actual + (int) $validated['stock_actual'];
+        DB::transaction(function () use ($proyectoId, $producto, $validated) {
+            $cantidad = (int) $validated['stock_actual'];
 
-        if (!empty($validated['almacen'])) {
-            $producto->almacen = $validated['almacen'];
-        }
+            $producto->stock_actual = (int) $producto->stock_actual + $cantidad;
 
-        if (!empty($validated['ubicacion'])) {
-            $producto->ubicacion = $validated['ubicacion'];
-        }
+            if (!empty($validated['almacen'])) {
+                $producto->almacen = $validated['almacen'];
+            }
 
-        if (!empty($validated['clase'])) {
-            $producto->clase = $validated['clase'];
-        }
+            if (!empty($validated['ubicacion'])) {
+                $producto->ubicacion = $validated['ubicacion'];
+            }
 
-        if (!empty($validated['referencia_proveedor'])) {
-            $producto->referencia_proveedor = $validated['referencia_proveedor'];
-        }
+            if (!empty($validated['clase'])) {
+                $producto->clase = $validated['clase'];
+            }
 
-        $producto->save();
+            if (!empty($validated['referencia_proveedor'])) {
+                $producto->referencia_proveedor = $validated['referencia_proveedor'];
+            }
+
+            $producto->save();
+
+            EntradaStock::create([
+                'proyecto_id' => $proyectoId,
+                'numero_entrada' => 'EN-' . now()->format('Ymd-His-u'),
+                'fecha' => now(),
+                'solicitante' => $validated['solicitante'] ?? null,
+                'ot' => $validated['ot'] ?? null,
+                'almacen_origen' => $producto->almacen,
+                'items' => [
+                    [
+                        'inventario_id' => (int) $producto->id,
+                        'codigo' => (string) $producto->codigo,
+                        'descripcion' => (string) $producto->descripcion,
+                        'cantidad' => (int) $cantidad,
+                    ],
+                ],
+                'estado' => 'aceptado',
+            ]);
+        });
 
         return redirect()
             ->route('inventario.index')
