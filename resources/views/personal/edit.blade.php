@@ -147,7 +147,7 @@
                                     <label for="dni_nie">DNI / NIE</label>
                                     <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}">
                                 </div>
-
+                
                                 <div class="profile-edit-form-group">
                                     <label for="departamento">Departamento</label>
                                     <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $personal->departamento) }}">

@@ -200,8 +200,6 @@
                                     <a
                                         href="{{ $accion['url'] }}"
                                         class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
-                                        target="_blank"
-                                        rel="noopener"
                                     >
                                         <i class="fas {{ $accion['icon'] }}"></i>
                                         {{ $accion['label'] }}

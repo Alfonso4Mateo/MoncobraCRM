@@ -247,6 +247,11 @@ class InventarioController extends Controller
             'cantidad_retirar' => 'required|integer|min:1',
             'ot' => 'nullable|string|max:255',
             'solicitante' => 'nullable|string|max:255',
+            'pdf_delegacion' => 'nullable|string|max:255',
+            'pdf_fecha' => 'nullable|string|max:30',
+            'pdf_trabajador' => 'nullable|string|max:255',
+            'pdf_ficha' => 'nullable|string|max:255',
+            'pdf_observaciones' => 'nullable|string|max:2000',
         ]);
 
         $codigo = trim((string) ($validated['codigo'] ?? ''));
@@ -281,13 +286,52 @@ class InventarioController extends Controller
                 ]);
         }
 
-        DB::transaction(function () use ($proyectoId, $producto, $cantidad, $validated) {
+        $numeroSalida = 'SL-' . now()->format('Ymd-His-u');
+        $lineasDocumento = [];
+
+        for ($i = 1; $i <= 10; $i++) {
+            $articulo = trim((string) $request->input('pdf_articulo_' . $i, ''));
+            $cantidadLinea = trim((string) $request->input('pdf_cantidad_' . $i, ''));
+
+            if ($articulo === '' && $cantidadLinea === '') {
+                continue;
+            }
+
+            $lineasDocumento[] = [
+                'articulo' => $articulo,
+                'cantidad' => $cantidadLinea,
+            ];
+        }
+
+        $documentoMeta = [
+            'nombre' => 'EPI_' . $numeroSalida . '.pdf',
+            'delegacion' => trim((string) $request->input('pdf_delegacion', '')),
+            'fecha' => trim((string) $request->input('pdf_fecha', now()->format('d/m/Y'))),
+            'trabajador' => trim((string) $request->input('pdf_trabajador', $validated['solicitante'] ?? '')),
+            'ficha' => trim((string) $request->input('pdf_ficha', '')),
+            'observaciones' => trim((string) $request->input('pdf_observaciones', '')),
+            'lineas' => $lineasDocumento,
+        ];
+
+        $documentoMeta = array_filter($documentoMeta, function ($value, $key) {
+            if ($key === 'lineas') {
+                return !empty($value);
+            }
+
+            return $value !== '' && $value !== null;
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $guardarDocumento = $request->boolean('guardar_documento');
+        $documentoMeta = $guardarDocumento ? $documentoMeta : null;
+        $salida = null;
+
+        DB::transaction(function () use ($proyectoId, $producto, $cantidad, $validated, $numeroSalida, $documentoMeta, &$salida) {
             $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
             $producto->save();
 
-            SalidaStock::create([
+            $salida = SalidaStock::create([
                 'proyecto_id' => $proyectoId,
-                'numero_salida' => 'SL-' . now()->format('Ymd-His-u'),
+                'numero_salida' => $numeroSalida,
                 'fecha' => now(),
                 'solicitante' => $validated['solicitante'] ?? null,
                 'ot' => $validated['ot'] ?? null,
@@ -300,13 +344,53 @@ class InventarioController extends Controller
                         'cantidad' => (int) $cantidad,
                     ],
                 ],
+                'documento_meta' => !empty($documentoMeta) ? $documentoMeta : null,
                 'estado' => 'aceptado',
             ]);
         });
 
+        if ($guardarDocumento && $salida) {
+            return redirect()
+                ->route('inventario.salida.documento', $salida)
+                ->with('success', 'Salida registrada y documento guardado correctamente.');
+        }
+
         return redirect()
             ->route('inventario.index')
             ->with('success', 'Salida de stock registrada correctamente.');
+    }
+
+    public function showSalidaDocumento(SalidaStock $salida)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $salida->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        $documento = (array) ($salida->documento_meta ?? []);
+        $lineasDocumento = $documento['lineas'] ?? [];
+
+        if (empty($lineasDocumento) && is_array($salida->items)) {
+            $lineasDocumento = collect($salida->items)
+                ->filter(fn ($item) => is_array($item))
+                ->map(function (array $item) {
+                    return [
+                        'articulo' => $item['descripcion'] ?? $item['codigo'] ?? 'Item',
+                        'cantidad' => (string) ($item['cantidad'] ?? ''),
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        $lineasDocumento = array_slice($lineasDocumento, 0, 10);
+
+        return view('inventario.salida-documento', [
+            'salida' => $salida,
+            'documento' => $documento,
+            'lineasDocumento' => $lineasDocumento,
+        ]);
     }
 
     public function createTraslado()

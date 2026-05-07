@@ -264,6 +264,15 @@ class DocumentosController extends Controller
             ->map(function (SalidaStock $salida) {
                 $estado = $this->estadoMap($salida->estado);
                 $total = $this->itemsTotal($salida->items);
+                $acciones = $this->accionesMovimiento('salida', $salida->id);
+
+                if (!empty($salida->documento_meta)) {
+                    array_unshift($acciones, [
+                        'label' => 'Ver documento',
+                        'icon' => 'fa-file-pdf',
+                        'url' => route('inventario.salida.documento', $salida),
+                    ]);
+                }
 
                 return [
                     'id' => (string) $salida->id,
@@ -283,7 +292,7 @@ class DocumentosController extends Controller
                         ['label' => 'Estado', 'value' => $estado['label']],
                     ],
                     'lineas' => $this->lineasFromArray($salida->items),
-                    'acciones' => $this->accionesMovimiento('salida', $salida->id),
+                    'acciones' => $acciones,
                 ];
             });
     }

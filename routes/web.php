@@ -108,6 +108,7 @@ Route::middleware('auth')->group(function () {
     Route::post('inventario/entradas', [InventarioController::class, 'storeEntrada'])->name('inventario.entrada.store');
     Route::get('inventario/salidas/nueva', [InventarioController::class, 'createSalida'])->name('inventario.salida.create');
     Route::post('inventario/salidas', [InventarioController::class, 'storeSalida'])->name('inventario.salida.store');
+    Route::get('inventario/salidas/{salida}/documento', [InventarioController::class, 'showSalidaDocumento'])->name('inventario.salida.documento');
     Route::get('inventario/traslados/nuevo', [InventarioController::class, 'createTraslado'])->name('inventario.traslado.create');
     Route::post('inventario/traslados', [InventarioController::class, 'storeTraslado'])->name('inventario.traslado.store');
     Route::get('inventario/nuevo-item', [InventarioController::class, 'createItem'])->name('inventario.item.create');

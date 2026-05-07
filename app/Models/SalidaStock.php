@@ -17,11 +17,13 @@ class SalidaStock extends Model
         'ot',
         'almacen_origen',
         'items',
+        'documento_meta',
         'estado',
     ];
 
     protected $casts = [
         'fecha' => 'datetime',
         'items' => 'array',
+        'documento_meta' => 'array',
     ];
 }
