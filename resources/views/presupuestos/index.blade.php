@@ -147,22 +147,42 @@
                                     <div class="presupuesto-action-group">
                                         <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver presupuesto" title="Ver presupuesto">
                                             <i class="fas fa-eye"></i>
-                                            <span>Ver</span>
                                         </a>
                                         <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
                                             <i class="fas fa-pen"></i>
-                                            <span>Editar</span>
                                         </a>
-                                        <form method="POST" action="{{ route('presupuestos.estado.update', $presupuesto) }}" class="presupuesto-estado-form">
-                                            @csrf
-                                            @method('PATCH')
-                                            <select name="estado" class="{{ $estadoClass }} presupuesto-action-btn presupuesto-estado-select presupuesto-action-btn--state" onchange="this.form.submit()" aria-label="Cambiar estado" title="Cambiar estado">
-                                                <option value="pendiente" @selected($estado === 'pendiente')>Pendiente</option>
-                                                <option value="aceptado" @selected($estado === 'aceptado')>Aceptado</option>
-                                                <option value="rechazado" @selected($estado === 'rechazado')>Rechazado</option>
-                                                <option value="pendiente pedido" @selected($estado === 'pendiente pedido')>Pendiente pedido</option>
-                                            </select>
-                                        </form>
+                                        <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
+                                            <i class="fas fa-cart-plus"></i>
+                                        </a>
+
+                                        @php
+                                            $dropdownId = 'presupuesto-estado-dropdown-' . $presupuesto->id;
+                                        @endphp
+                                        <div class="dropdown presupuesto-dropdown">
+                                            <button
+                                                type="button"
+                                                class="presupuesto-action-btn presupuesto-action-btn--more dropdown-toggle"
+                                                id="{{ $dropdownId }}"
+                                                data-toggle="dropdown"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                aria-label="Más acciones"
+                                                title="Más acciones"
+                                            >
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
+                                                <h6 class="dropdown-header">Cambiar estado</h6>
+                                                <form method="POST" action="{{ route('presupuestos.estado.update', $presupuesto) }}" class="presupuesto-estado-menu-form">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                    <button class="dropdown-item" type="submit" name="estado" value="aceptado">Aceptado</button>
+                                                    <button class="dropdown-item" type="submit" name="estado" value="rechazado">Rechazado</button>
+                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente pedido">Pendiente pedido</button>
+                                                </form>
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>

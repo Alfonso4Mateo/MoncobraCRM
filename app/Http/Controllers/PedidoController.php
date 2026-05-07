@@ -231,13 +231,33 @@ class PedidoController extends Controller
         $numeroPedidoAuto = $this->resolveNextPedidoClienteNumber($proyectoId);
         $fechaPedido = (string) $request->query('fecha_pedido', now()->toDateString());
 
-        $lineasIniciales = is_array($presupuestoSeleccionado?->lista_articulos)
+        $lineasInicialesRaw = is_array($presupuestoSeleccionado?->lista_articulos)
             ? $presupuestoSeleccionado->lista_articulos
             : [];
 
+        $lineasIniciales = collect($lineasInicialesRaw)
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(function (array $linea) {
+                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
+                $margen = max(0, (float) ($linea['margen'] ?? 0));
+                $precioFinal = $precioUnitario * (1 + ($margen / 100));
+                $total = $cantidad * $precioFinal;
+
+                return [
+                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
+                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                    'cantidad' => round($cantidad, 2),
+                    'precio_unitario' => round($precioFinal, 2),
+                    'margen' => 0.0,
+                    'total' => round($total, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
         $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 2);
-        $iva = round($baseImponible * 0.21, 2);
-        $totalPedido = round($baseImponible + $iva, 2);
+        $totalPedido = $baseImponible;
         $presupuestosParaPedido = $presupuestos->map(function (Presupuesto $presupuesto) {
             $lineas = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
 
@@ -253,14 +273,15 @@ class PedidoController extends Controller
                         $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
                         $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
                         $margen = max(0, (float) ($linea['margen'] ?? 0));
-                        $total = isset($linea['total']) ? (float) $linea['total'] : $cantidad * $precioUnitario * (1 + ($margen / 100));
+                        $precioFinal = $precioUnitario * (1 + ($margen / 100));
+                        $total = isset($linea['total']) ? (float) $linea['total'] : $cantidad * $precioFinal;
 
                         return [
                             'articulo' => trim((string) ($linea['articulo'] ?? '')),
                             'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                             'cantidad' => round($cantidad, 2),
-                            'precio_unitario' => round($precioUnitario, 2),
-                            'margen' => round($margen, 2),
+                            'precio_unitario' => round($precioFinal, 2),
+                            'margen' => 0.0,
                             'total' => round($total, 2),
                         ];
                     })
@@ -281,7 +302,6 @@ class PedidoController extends Controller
             'lineasIniciales',
             'presupuestosParaPedido',
             'baseImponible',
-            'iva',
             'totalPedido'
         ) + [
             'titulo' => 'Crear Nuevo Pedido',

@@ -171,15 +171,33 @@
                                 </td>
                                 <td>
                                     <div class="acciones-col">
-                                        <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" class="estado-form">
-                                            @csrf
-                                            @method('PATCH')
-                                            <select name="estado" class="estado-select" onchange="this.form.submit()" aria-label="Cambiar estado">
-                                                <option value="pendiente" @selected($estado === 'pendiente')>Pendiente</option>
-                                                <option value="recibido" @selected($estado === 'recibido')>Recibido</option>
-                                                <option value="entregado" @selected($estado === 'entregado')>Entregado</option>
-                                            </select>
-                                        </form>
+                                        @php
+                                            $dropdownId = 'albaran-estado-dropdown-' . $albaran->id;
+                                        @endphp
+                                        <div class="dropdown acciones-dropdown">
+                                            <button
+                                                type="button"
+                                                class="accion-more dropdown-toggle"
+                                                id="{{ $dropdownId }}"
+                                                data-toggle="dropdown"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                aria-label="Cambiar estado"
+                                                title="Cambiar estado"
+                                            >
+                                                <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                            </button>
+                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
+                                                <h6 class="dropdown-header">Cambiar estado</h6>
+                                                <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" class="estado-menu-form">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                    <button class="dropdown-item" type="submit" name="estado" value="recibido">Recibido</button>
+                                                    <button class="dropdown-item" type="submit" name="estado" value="entregado">Entregado</button>
+                                                </form>
+                                            </div>
+                                        </div>
 
                                         <a href="{{ route('albaranes.pdf', $albaran) }}" class="accion-eye" title="Ver albarán">
                                             <i class="far fa-eye"></i>

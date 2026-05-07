@@ -46,14 +46,6 @@ body,
   margin: 6px 0 0;
   color: var(--pres-muted);
   font-size: .92rem;
-  .presupuesto-action-group {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
 }
 
 .presupuestos-create-btn {
@@ -113,10 +105,6 @@ body,
 }
 
 .presupuestos-search-copy h2 {
-
-      .presupuesto-action-group {
-          justify-content: flex-start;
-      }
   margin: 0;
   color: #0f172a;
   font-size: 1.1rem;
@@ -375,6 +363,7 @@ body,
   border-radius: 12px;
   background: #fff;
   color: #64748b;
+  text-decoration: none !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -395,29 +384,57 @@ body,
   flex-wrap: wrap;
 }
 
-.presupuesto-action-btn {
-  width: auto;
-  height: 38px;
-  min-height: 38px;
-  padding: 0 14px;
-  gap: 8px;
-  font-size: .8rem;
-  font-weight: 700;
-  text-decoration: none !important;
-}
-
 .presupuesto-action-btn i {
-  font-size: .85rem;
+  font-size: .9rem;
 }
 
-.presupuesto-action-btn span {
-  line-height: 1;
+.presupuesto-action-btn.dropdown-toggle::after {
+  display: none;
 }
 
 .presupuesto-action-btn--view:hover,
 .presupuesto-action-btn--edit:hover,
+.presupuesto-action-btn--order:hover,
 .presupuesto-action-btn--state:hover {
   background: #f8fbff;
+}
+
+.presupuesto-action-btn--more:hover {
+  background: #f8fbff;
+}
+
+.presupuesto-dropdown {
+  display: inline-flex;
+}
+
+.presupuesto-dropdown .dropdown-menu {
+  padding: 8px;
+  border: 1px solid var(--pres-border);
+  border-radius: 14px;
+  box-shadow: var(--pres-shadow);
+}
+
+.presupuesto-dropdown .dropdown-header {
+  padding: 8px 10px;
+  margin: 0;
+  color: var(--pres-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.presupuesto-dropdown .dropdown-item {
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+  color: var(--pres-text);
+}
+
+.presupuesto-dropdown .dropdown-item:hover,
+.presupuesto-dropdown .dropdown-item:focus {
+  background: #f8fafc;
+  color: var(--pres-primary);
 }
 
 .presupuesto-estado-form {

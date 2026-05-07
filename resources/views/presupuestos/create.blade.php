@@ -162,10 +162,6 @@
                             <span>Subtotal</span>
                             <strong id="items_subtotal">0,00 EUR</strong>
                         </div>
-                        <div class="total-row">
-                            <span>IVA (21%)</span>
-                            <strong id="items_iva">0,00 EUR</strong>
-                        </div>
                         <div class="total-row total-final">
                             <span>Total presupuesto</span>
                             <strong id="items_total">0,00 EUR</strong>
@@ -187,7 +183,6 @@
             const hiddenInput = document.getElementById('lista_articulos');
             const tbody = document.getElementById('items_tbody');
             const subtotalEl = document.getElementById('items_subtotal');
-            const ivaEl = document.getElementById('items_iva');
             const totalEl = document.getElementById('items_total');
 
             const articuloInput = document.getElementById('item_articulo');
@@ -282,11 +277,9 @@
 
             const renderTotals = () => {
                 const subtotal = items.reduce((acc, item) => acc + safeNumber(item.total), 0);
-                const iva = subtotal * 0.21;
-                const total = subtotal + iva;
+                const total = subtotal;
 
                 subtotalEl.textContent = `${eur.format(subtotal)} EUR`;
-                ivaEl.textContent = `${eur.format(iva)} EUR`;
                 totalEl.textContent = `${eur.format(total)} EUR`;
             };
 

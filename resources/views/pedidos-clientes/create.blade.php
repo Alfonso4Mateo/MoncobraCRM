@@ -29,14 +29,13 @@
         $estadoActual = (string) old('estado', 'pendiente');
         $numeroPedido = old('numero_pedido', $numeroPedidoAuto ?? '');
         $fechaPedido = old('fecha_pedido', $fechaPedido ?? now()->toDateString());
-        $otPedido = old('ot');
+        $otPedido = old('ot', $presupuestoSeleccionado?->ot ?? null);
         $referenciaManual = old('referencia_manual');
         $lineasJson = old('lista_articulos', json_encode($lineasIniciales ?? [], JSON_UNESCAPED_UNICODE));
         $lineasInicialesJs = json_decode($lineasJson, true);
         $lineasInicialesJs = is_array($lineasInicialesJs) ? $lineasInicialesJs : ($lineasIniciales ?? []);
         $presupuestosParaPedidoJs = $presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
-        $iva = (float) ($iva ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
     @endphp
 
@@ -214,10 +213,6 @@
                         <span>Base imponible</span>
                         <strong id="summary-base">{{ number_format($baseImponible, 2, ',', '.') }} €</strong>
                     </div>
-                    <div class="pedido-summary-row">
-                        <span>IVA (21%)</span>
-                        <strong id="summary-iva">{{ number_format($iva, 2, ',', '.') }} €</strong>
-                    </div>
                     <div class="pedido-summary-row pedido-summary-row--total">
                         <span>Total pedido</span>
                         <strong id="summary-total">{{ number_format($totalPedido, 2, ',', '.') }} €</strong>
@@ -260,7 +255,6 @@
             const hiddenState = document.getElementById('pedido_estado');
             const hiddenTotal = document.getElementById('pedido_total');
             const summaryBase = document.getElementById('summary-base');
-            const summaryIva = document.getElementById('summary-iva');
             const summaryTotal = document.getElementById('summary-total');
             const initialLines = @json($lineasInicialesJs ?? []);
             const presupuestos = @json($presupuestosParaPedidoJs ?? []);
@@ -317,12 +311,10 @@
 
             const renderTotals = () => {
                 const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
-                const iva = base * 0.21;
-                const total = base + iva;
+                const total = base;
 
                 hiddenTotal.value = total.toFixed(2);
                 summaryBase.textContent = formatMoney(base);
-                summaryIva.textContent = formatMoney(iva);
                 summaryTotal.textContent = formatMoney(total);
             };
 
