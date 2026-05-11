@@ -135,7 +135,28 @@ class PresupuestoController extends Controller
         });
         $validated['estado'] = 'pendiente';
 
-        Presupuesto::create($validated);
+        $presupuesto = Presupuesto::create($validated);
+
+        // Attempt to generate and store a PDF copy of the presupuesto if a PDF library is available
+        try {
+            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
+                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                Storage::disk('public')->put($filePath, $pdf->output());
+                $presupuesto->update(['archivo_pdf' => $filePath]);
+            } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                $html = view('presupuestos.pdf', compact('presupuesto'))->render();
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                Storage::disk('public')->put($filePath, $dompdf->output());
+                $presupuesto->update(['archivo_pdf' => $filePath]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         if ($redirectClienteId > 0 && $redirectClienteId === (int) $validated['cliente_id']) {
             return redirect()->route('clientes.show', $redirectClienteId)->with('success', 'Presupuesto cargado correctamente');
@@ -152,6 +173,12 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
+        $presupuesto->load([
+            'cliente',
+            'pedidosClientes.cliente',
+            'pedidosClientes.albaran',
+        ]);
+
         return view('presupuestos.show', compact('presupuesto'));
     }
 
@@ -163,21 +190,34 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
-        if (!$presupuesto->archivo_pdf) {
+        return $this->renderPdfResponse($presupuesto, false);
+    }
+
+    public function downloadPdf(Presupuesto $presupuesto)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $presupuesto->proyecto_id !== $proyectoId) {
             abort(404);
         }
 
-        $disk = Storage::disk('public');
-        if (!$disk->exists($presupuesto->archivo_pdf)) {
+        return $this->renderPdfResponse($presupuesto, true);
+    }
+
+    public function preview(Presupuesto $presupuesto)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $presupuesto->proyecto_id !== $proyectoId) {
             abort(404);
         }
 
-        $path = $disk->path($presupuesto->archivo_pdf);
-        $fileName = basename((string) $presupuesto->archivo_pdf);
+        $presupuesto->loadMissing('cliente');
 
-        return response()->file($path, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+        return view('presupuestos.preview', [
+            'presupuesto' => $presupuesto,
+            'pdfUrl' => route('presupuestos.pdf', $presupuesto),
+            'downloadUrl' => route('presupuestos.pdf.download', $presupuesto),
         ]);
     }
 
@@ -345,5 +385,48 @@ class PresupuestoController extends Controller
         }
 
         return (string) (($maxNumero ?? 0) + 1);
+    }
+
+    private function renderPdfResponse(Presupuesto $presupuesto, bool $download)
+    {
+        $disk = Storage::disk('public');
+
+        if ($presupuesto->archivo_pdf && $disk->exists($presupuesto->archivo_pdf)) {
+            $path = $disk->path($presupuesto->archivo_pdf);
+            $fileName = basename((string) $presupuesto->archivo_pdf);
+
+            return response()->file($path, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+            ]);
+        }
+
+        $pdfContent = null;
+        $fileName = 'presupuesto-' . ($presupuesto->numero ?: $presupuesto->id) . '.pdf';
+
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
+            $pdfContent = $pdf->output();
+        } elseif (class_exists(\Dompdf\Dompdf::class)) {
+            $html = view('presupuestos.pdf', compact('presupuesto'))->render();
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->loadHtml($html);
+            $dompdf->render();
+            $pdfContent = $dompdf->output();
+        }
+
+        if ($pdfContent === null) {
+            abort(404);
+        }
+
+        if ($presupuesto->archivo_pdf) {
+            $disk->put($presupuesto->archivo_pdf, $pdfContent);
+        }
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+        ]);
     }
 }

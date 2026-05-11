@@ -51,16 +51,19 @@
                         <div class="out-grid out-grid-top">
                             <div class="field-group field-wide">
                                 <label for="producto_busqueda">Producto</label>
-                                <textarea
-                                    id="producto_busqueda"
-                                    name="producto_busqueda"
-                                    rows="1"
-                                    maxlength="1000"
-                                    placeholder="Escribe SKU o nombre..."
-                                    data-sync="producto_busqueda"
-                                    class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
-                                    required
-                                >{{ old('producto_busqueda') }}</textarea>
+                                <div class="autocomplete-wrapper">
+                                    <textarea
+                                        id="producto_busqueda"
+                                        name="producto_busqueda"
+                                        rows="1"
+                                        maxlength="1000"
+                                        placeholder="Escribe SKU o nombre..."
+                                        data-sync="producto_busqueda"
+                                        class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
+                                        required
+                                    >{{ old('producto_busqueda') }}</textarea>
+                                    <div id="producto-suggestions" class="autocomplete-dropdown" role="listbox" aria-label="Sugerencias de productos"></div>
+                                </div>
                             </div>
 
                             <div class="field-group field-tight">
@@ -314,6 +317,7 @@
         (function () {
             const catalogo = @json($catalogoSalidaJs);
             const productoInput = document.getElementById('producto_busqueda');
+            const suggestionsDropdown = document.getElementById('producto-suggestions');
             const codigoInput = document.getElementById('codigo');
             const cantidadInput = document.getElementById('cantidad_retirar');
             const qtyPreview = document.getElementById('qty-preview');
@@ -341,6 +345,52 @@
                 }) || null;
             };
 
+            const findSimilarProductos = (query) => {
+                if (!query) return [];
+                const normalized = normalize(query);
+                return catalogo.filter((item) => {
+                    return normalize(item.codigo).includes(normalized) || normalize(item.descripcion).includes(normalized);
+                }).slice(0, 8);
+            };
+
+            const renderSuggestions = () => {
+                const query = productoInput.value.trim();
+                if (!query) {
+                    suggestionsDropdown.classList.remove('is-open');
+                    suggestionsDropdown.innerHTML = '';
+                    return;
+                }
+
+                const similares = findSimilarProductos(query);
+                if (similares.length === 0) {
+                    suggestionsDropdown.classList.remove('is-open');
+                    suggestionsDropdown.innerHTML = '';
+                    return;
+                }
+
+                suggestionsDropdown.innerHTML = similares
+                    .map((item, index) => `
+                        <div class="autocomplete-item" data-index="${index}" role="option">
+                            <strong>${item.codigo}</strong>
+                            <small>${item.descripcion}</small>
+                        </div>
+                    `)
+                    .join('');
+
+                suggestionsDropdown.classList.add('is-open');
+
+                suggestionsDropdown.querySelectorAll('.autocomplete-item').forEach((item) => {
+                    item.addEventListener('click', () => {
+                        const index = parseInt(item.dataset.index, 10);
+                        const selected = similares[index];
+                        productoInput.value = selected.descripcion;
+                        hydrateProduct();
+                        suggestionsDropdown.classList.remove('is-open');
+                        suggestionsDropdown.innerHTML = '';
+                    });
+                });
+            };
+
             const updateSummary = () => {
                 const qty = parseInt(cantidadInput.value || '0', 10) || 0;
                 qtyPreview.textContent = `-${Math.max(1, qty)}`;
@@ -364,8 +414,18 @@
             };
 
             productoInput.addEventListener('change', hydrateProduct);
-            productoInput.addEventListener('input', hydrateProduct);
+            productoInput.addEventListener('input', () => {
+                renderSuggestions();
+                hydrateProduct();
+            });
             cantidadInput.addEventListener('input', updateSummary);
+
+            // Cerrar dropdown cuando se hace click fuera
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('.autocomplete-wrapper')) {
+                    suggestionsDropdown.classList.remove('is-open');
+                }
+            });
 
             if (pdfOpenButton && pdfModal) {
                 const openModal = () => {

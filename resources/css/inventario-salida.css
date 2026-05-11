@@ -639,6 +639,62 @@ body.pdf-modal-open {
     padding: 0 1rem;
 }
 
+/* Autocomplete styles */
+.autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #d3deed;
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.autocomplete-dropdown.is-open {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 0.6rem 0.72rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f4fb;
+    font-size: 0.84rem;
+    color: #324f72;
+    transition: background-color 0.15s ease;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.is-selected {
+    background-color: #eef2f9;
+}
+
+.autocomplete-item strong {
+    color: #0f3560;
+    font-weight: 700;
+}
+
+.autocomplete-item small {
+    display: block;
+    font-size: 0.72rem;
+    color: #8a9bb2;
+    margin-top: 0.25rem;
+}
+
 .pdf-sheet {
     background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
     border: 1px solid #2a3646;

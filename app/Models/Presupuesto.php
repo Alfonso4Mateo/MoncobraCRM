@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Presupuesto extends Model
 {
@@ -63,5 +64,13 @@ class Presupuesto extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    /**
+     * Get the customer orders linked to this presupuesto.
+     */
+    public function pedidosClientes(): HasMany
+    {
+        return $this->hasMany(PedidoCliente::class, 'presupuesto_id');
     }
 }

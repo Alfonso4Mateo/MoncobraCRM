@@ -52,9 +52,8 @@
 
                         <div class="field-group field-full">
                             <label for="descripcion">Descripcion del item</label>
-                            <input id="descripcion" name="descripcion" type="text" value="{{ old('descripcion') }}" placeholder="Nombre descriptivo completo del material o pieza industrial" class="@error('descripcion') is-invalid @enderror" required>
+                            <textarea id="descripcion" name="descripcion" rows="1" maxlength="1000" placeholder="Nombre descriptivo completo del material o pieza industrial" class="input-auto-grow @error('descripcion') is-invalid @enderror" required>{{ old('descripcion') }}</textarea>
                         </div>
-
                         <div class="field-group">
                             <label for="clase_id">Clase del producto</label>
                             <select id="clase_id" name="clase_id" class="@error('clase_id') is-invalid @enderror">
@@ -152,4 +151,23 @@
             </aside>
         </div>
     </section>
+@endsection
+
+@section('js')
+    <script>
+        (function () {
+            const autoGrowAreas = document.querySelectorAll('.input-auto-grow');
+            if (autoGrowAreas.length) {
+                const resizeArea = (el) => {
+                    el.style.height = 'auto';
+                    el.style.height = `${el.scrollHeight}px`;
+                };
+
+                autoGrowAreas.forEach((area) => {
+                    resizeArea(area);
+                    area.addEventListener('input', () => resizeArea(area));
+                });
+            }
+        })();
+    </script>
 @endsection

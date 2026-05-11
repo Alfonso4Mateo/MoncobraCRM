@@ -154,7 +154,7 @@ class DocumentosController extends Controller
 
     private function fromPresupuestos(): Collection
     {
-        return Presupuesto::with('cliente')
+        return Presupuesto::with(['cliente', 'pedidosClientes'])
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -179,6 +179,7 @@ class DocumentosController extends Controller
                         ['label' => 'OT', 'value' => $presupuesto->ot ?: '—'],
                         ['label' => 'Documento', 'value' => $presupuesto->documento ?: '—'],
                         ['label' => 'Numero', 'value' => $presupuesto->numero ?: '—'],
+                        ['label' => 'Pedido', 'value' => $presupuesto->pedidosClientes->isNotEmpty() ? $presupuesto->pedidosClientes->pluck('numero_pedido')->filter()->implode(', ') : '—'],
                     ],
                     'lineas' => $this->lineasFromArray($presupuesto->lista_articulos),
                     'acciones' => $this->accionesPresupuesto($presupuesto),
@@ -468,7 +469,8 @@ class DocumentosController extends Controller
     private function accionesPresupuesto(Presupuesto $presupuesto): array
     {
         return [
-            ['label' => 'Ver PDF', 'icon' => 'fa-file-pdf', 'url' => route('presupuestos.pdf', $presupuesto)],
+            ['label' => 'Ver documento', 'icon' => 'fa-file-pdf', 'url' => route('presupuestos.preview', $presupuesto)],
+            ['label' => 'Ver detalle', 'icon' => 'fa-eye', 'url' => route('presupuestos.show', $presupuesto)],
             ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('presupuestos.edit', $presupuesto)],
         ];
     }

@@ -14,6 +14,14 @@
         </div>
 
         <div class="presupuesto-detail-header__actions">
+            <a href="{{ route('presupuestos.preview', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                Previsualizar
+            </a>
+            <a href="{{ route('presupuestos.pdf.download', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
+                <i class="fas fa-download" aria-hidden="true"></i>
+                Descargar PDF
+            </a>
             <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
                 <i class="fas fa-pen" aria-hidden="true"></i>
                 Editar
@@ -36,6 +44,10 @@
             default => 'estado-pill estado-pendiente',
         };
         $items = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
+    @endphp
+
+    @php
+        $pedidosClientes = $presupuesto->pedidosClientes ?? collect();
     @endphp
 
     <section class="presupuesto-detail-shell">
@@ -78,6 +90,72 @@
                         <strong>{{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR</strong>
                     </div>
                 </div>
+            </div>
+        </article>
+
+        <article class="presupuesto-detail-card">
+            <header class="presupuesto-detail-card__head">
+                <h2>Pedidos vinculados</h2>
+            </header>
+            <div class="presupuesto-detail-card__body">
+                @if ($pedidosClientes->isEmpty())
+                    <p class="presupuesto-empty-items">No hay pedidos vinculados a este presupuesto.</p>
+                @else
+                    <div class="table-responsive presupuesto-items-table-wrap">
+                        <table class="table presupuesto-items-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Nº Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>Albarán</th>
+                                    <th class="text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($pedidosClientes as $pedido)
+                                    @php
+                                        $estadoPedido = (string) ($pedido->estado ?: 'pendiente');
+                                        $estadoPedidoClass = match ($estadoPedido) {
+                                            'facturado' => 'estado-pill estado-aceptado',
+                                            'facturado_parcial' => 'estado-pill estado-pendiente-pedido',
+                                            default => 'estado-pill estado-pendiente',
+                                        };
+                                    @endphp
+                                    <tr>
+                                        <td data-label="Nº Pedido">
+                                            <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link">
+                                                {{ $pedido->numero_pedido ?: ('PED-' . $pedido->id) }}
+                                            </a>
+                                        </td>
+                                        <td data-label="Cliente">
+                                            {{ $pedido->cliente?->empresa_nombre ?? 'Sin cliente' }}
+                                        </td>
+                                        <td data-label="Fecha">
+                                            {{ optional($pedido->fecha_pedido)->format('d/m/Y') ?: '—' }}
+                                        </td>
+                                        <td data-label="Estado">
+                                            <span class="{{ $estadoPedidoClass }}">{{ ucfirst(str_replace('_', ' ', $estadoPedido)) }}</span>
+                                        </td>
+                                        <td data-label="Albarán">
+                                            @if ($pedido->albaran)
+                                                <a href="{{ route('albaranes.show', $pedido->albaran) }}" class="pedido-code-link pedido-code-link--soft">
+                                                    {{ $pedido->albaran->numero ?? 'Ver albarán' }}
+                                                </a>
+                                            @else
+                                                <span class="pedido-muted">—</span>
+                                            @endif
+                                        </td>
+                                        <td data-label="Total" class="text-right">
+                                            {{ number_format((float) ($pedido->total ?? 0), 2, ',', '.') }} EUR
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
         </article>
 

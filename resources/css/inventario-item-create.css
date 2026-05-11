@@ -188,6 +188,39 @@
     background: #fff;
 }
 
+.field-group textarea {
+    width: 100%;
+    border: 1px solid #d3deed;
+    border-radius: 0.5rem;
+    background: #f7faff;
+    color: #324f72;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.55rem 0.72rem;
+    outline: none;
+    font-family: inherit;
+    resize: none;
+    overflow: hidden;
+}
+
+.field-group textarea:focus {
+    border-color: #7fa8eb;
+    box-shadow: 0 0 0 3px rgba(67, 128, 222, 0.14);
+    background: #fff;
+}
+
+.field-group textarea.input-auto-grow {
+    min-height: 2.3rem;
+}
+
+.field-group textarea::placeholder {
+    color: #98a9be;
+}
+
+.field-group textarea.is-invalid {
+    border-color: #d84a4a;
+}
+
 .field-group input::placeholder {
     color: #98a9be;
 }
