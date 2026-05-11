@@ -158,8 +158,8 @@ a / Fecha) -->
                         <tr>
                             <td style="vertical-align:top">{{ $i + 1 }}</td>
                             <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                            <td style="text-align:right">{{ $line['cantidad'] ?? '' }}</td>
-                            <td style="text-align:right">{{ number_format($line['precio_unitario'] ?? 0, 2, ',', '.') }}</td>
+                            <td style="text-align:right">{{ isset($line['cantidad']) ? ((int) $line['cantidad']) . (isset($line['unidad']) && $line['unidad'] ? ' ' . e($line['unidad']) : '') : '' }}</td>
+                            <td style="text-align:right">{{ number_format($line['precio_con_margen'] ?? $line['precio_unitario'] ?? 0, 2, ',', '.') }}</td>
                             <td style="text-align:right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }}</td>
                         </tr>
                         @php $lineasMostradas++; @endphp

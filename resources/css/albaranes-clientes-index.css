@@ -319,21 +319,25 @@
     font-size: 0.64rem;
     font-weight: 800;
     letter-spacing: 0.03em;
+    border: 1px solid transparent;
 }
 
 .estado-pendiente {
-    background: #fff1d7;
-    color: #9f6a13;
+    background: #fff8e1;
+    color: #b8860b;
+    border-color: #ffe4b5;
 }
 
 .estado-recibido {
-    background: #e7efff;
-    color: #265cb6;
+    background: #e1f5fe;
+    color: #01579b;
+    border-color: #b3e5fc;
 }
 
 .estado-entregado {
-    background: #dff8e9;
-    color: #168852;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #c8e6c9;
 }
 
 .acciones-col {
@@ -544,4 +548,111 @@
     .clear-btn {
         width: 100%;
     }
+}
+
+/* Estado change button styling */
+/* Action buttons styling */
+.presupuesto-action-btn {
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #64748b;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .18s ease, border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.presupuesto-action-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(37, 99, 235, .3);
+    color: #2563eb;
+}
+
+.presupuesto-action-btn i {
+    font-size: .9rem;
+}
+
+.presupuesto-action-btn--view:hover,
+.presupuesto-action-btn--edit:hover {
+    background: #f8fbff;
+}
+
+.presupuesto-action-btn--state {
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    color: #64748b;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s ease;
+}
+
+.presupuesto-action-btn--state:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+}
+
+.presupuesto-action-btn--state.dropdown-toggle::after {
+    display: none;
+}
+
+/* Action buttons group layout */
+.presupuesto-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.presupuesto-dropdown {
+    display: inline-flex;
+}
+
+.presupuesto-dropdown .dropdown-menu {
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.presupuesto-dropdown .dropdown-header {
+    padding: 8px 10px;
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.presupuesto-dropdown .dropdown-item {
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    color: #475569;
+    font-size: 0.87rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.presupuesto-dropdown .dropdown-item:hover {
+    background: #f8fafc;
+    color: #1e293b;
 }

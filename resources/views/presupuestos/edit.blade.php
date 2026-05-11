@@ -3,27 +3,67 @@
 @section('title', 'Editar Presupuesto - MoncobraCRM')
 
 @section('css')
-    @vite(['resources/css/presupuestos-detail.css'])
+    @vite(['resources/css/presupuestos-detail.css', 'resources/css/presupuestos-create.css'])
 @endsection
 
 @section('content_header')
     <div class="presupuesto-detail-header">
         <div class="presupuesto-detail-header__copy">
-            <h1>Editar Presupuesto</h1>
-            <p>Actualiza estado, cliente y datos administrativos del presupuesto.</p>
+            <h1>Editar Artículos del Presupuesto</h1>
+            <p>Modifica los productos, cantidades, unidades de medida y márgenes del presupuesto.</p>
         </div>
-        <a href="{{ route('presupuestos.index') }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
+        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
             <i class="fas fa-arrow-left" aria-hidden="true"></i>
-            Volver al listado
+            Volver al detalle
         </a>
     </div>
 @endsection
 
 @section('content')
     <section class="presupuesto-detail-shell">
+        <!-- Información de solo lectura -->
         <article class="presupuesto-detail-card">
             <header class="presupuesto-detail-card__head">
-                <h2>Datos generales</h2>
+                <h2>Información del presupuesto</h2>
+            </header>
+            <div class="presupuesto-detail-card__body">
+                <div class="presupuesto-summary-grid">
+                    <div class="summary-item">
+                        <span>Documento</span>
+                        <strong>{{ $presupuesto->documento ?: 'N/D' }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Número</span>
+                        <strong>{{ $presupuesto->numero ?: 'N/D' }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Fecha</span>
+                        <strong>{{ optional($presupuesto->fecha)->format('d/m/Y') ?: 'N/D' }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Estado</span>
+                        <strong>{{ ucfirst($presupuesto->estado ?? 'pendiente') }}</strong>
+                    </div>
+                    <div class="summary-item summary-item--wide">
+                        <span>Cliente</span>
+                        <strong>{{ $presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}</strong>
+                    </div>
+                    <div class="summary-item summary-item--wide">
+                        <span>Título</span>
+                        <strong>{{ $presupuesto->titulo ?: 'Sin título' }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>OT</span>
+                        <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- Edición de artículos -->
+        <article class="presupuesto-detail-card">
+            <header class="presupuesto-detail-card__head">
+                <h2>Editar artículos</h2>
             </header>
 
             <div class="presupuesto-detail-card__body">
@@ -38,74 +78,349 @@
                 </div>
             @endif
 
-            <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" novalidate>
+            <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate>
                 @csrf
                 @method('PUT')
 
-                <div class="presupuesto-detail-grid">
-                    <div class="field-group">
-                        <label>Documento</label>
-                        <div class="documento-display"><strong>Presupuesto</strong></div>
-                        <input type="hidden" id="documento" name="documento" value="{{ old('documento', $presupuesto->documento) }}">
-                    </div>
-                    <div class="field-group">
-                        <label for="numero">Número</label>
-                        <input type="text" id="numero" name="numero" maxlength="50" required value="{{ old('numero', $presupuesto->numero) }}">
-                        <small class="text-muted">Siguiente sugerido: {{ $siguienteNumero }}</small>
-                    </div>
-                    <div class="field-group">
-                        <label for="fecha">Fecha</label>
-                        <input type="date" id="fecha" name="fecha" required value="{{ old('fecha', optional($presupuesto->fecha)->toDateString()) }}">
-                    </div>
-                    <div class="field-group">
-                        <label for="cliente_id">Cliente</label>
-                        <select id="cliente_id" name="cliente_id" required>
-                            <option value="">Seleccione...</option>
-                            @foreach($clientes as $cliente)
-                                <option value="{{ $cliente->id }}" {{ (string) old('cliente_id', $presupuesto->cliente_id) === (string) $cliente->id ? 'selected' : '' }}>
-                                    {{ $cliente->empresa_nombre }}
-                                </option>
-                            @endforeach
-                        </select>
+                <section class="items-builder" aria-labelledby="items-builder-title">
+                    <header class="items-builder-head">
+                        <h3 id="items-builder-title">Datos del item</h3>
+                        <button type="button" id="btn_agregar_item" class="btn-agregar-item">
+                            Agregar
+                        </button>
+                    </header>
+
+                    <div class="items-form-grid">
+                        <div class="field-group">
+                            <label for="item_articulo">Articulo</label>
+                            <input type="text" id="item_articulo" placeholder="Codigo o referencia">
+                        </div>
+                        <div class="field-group field-span-3">
+                            <label for="item_descripcion">Descripcion</label>
+                            <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
+                        </div>
+                        <div class="field-group">
+                            <label for="item_cantidad">Cantidad</label>
+                            <input type="number" id="item_cantidad" min="1" step="1" value="1">
+                        </div>
+                        <div class="field-group">
+                            <label for="item_unidad">Unidades de medida</label>
+                            <input type="text" id="item_unidad" placeholder="u, kg, m, etc.">
+                        </div>
+                        <div class="field-group">
+                            <label for="item_precio_unitario">Precio unitario</label>
+                            <input type="number" id="item_precio_unitario" min="0" step="0.01" value="0">
+                        </div>
+                        <div class="field-group field-group-margen">
+                            <label for="item_margen">Margen (%)</label>
+                            <input type="number" id="item_margen" min="0" step="0.01" value="0">
+                        </div>
                     </div>
 
-                    <div class="field-group field-group--wide">
-                        <label for="titulo">Título</label>
-                        <input type="text" id="titulo" name="titulo" maxlength="255" value="{{ old('titulo', $presupuesto->titulo) }}">
-                    </div>
-                    <div class="field-group">
-                        <label for="ot">OT</label>
-                        <input type="text" id="ot" name="ot" maxlength="255" value="{{ old('ot', $presupuesto->ot) }}">
-                    </div>
-                    <div class="field-group">
-                        <label for="total">Total</label>
-                        <input type="number" id="total" name="total" min="0" step="0.01" value="{{ old('total', number_format((float) ($presupuesto->total ?? 0), 2, '.', '')) }}">
-                    </div>
-                    <div class="field-group" id="presupuesto-estado">
-                        <label for="estado">Estado</label>
-                        <select id="estado" name="estado">
-                            @php
-                                $estadoActual = (string) old('estado', $presupuesto->estado ?? 'pendiente');
-                            @endphp
-                            @foreach (['pendiente', 'aceptado', 'rechazado', 'pendiente pedido'] as $estado)
-                                <option value="{{ $estado }}" {{ $estadoActual === $estado ? 'selected' : '' }}>{{ ucfirst($estado) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
+                    <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', json_encode($presupuesto->lista_articulos ?? [])) }}'>
 
-                <div class="presupuesto-detail-actions">
-                    <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
-                        <i class="fas fa-eye" aria-hidden="true"></i>
-                        Ver detalle
-                    </a>
-                    <button type="submit" class="presupuesto-detail-btn presupuesto-detail-btn--primary">
+                    <div class="items-table-wrap">
+                        <table class="items-table" aria-label="Listado de items del presupuesto">
+                            <thead>
+                                <tr>
+                                    <th>Articulo</th>
+                                    <th>Descripcion</th>
+                                    <th>Cantidad</th>
+                                    <th>P. Unitario</th>
+                                    <th>Total</th>
+                                    <th class="actions-col"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="items_tbody">
+                                <tr class="items-empty-row">
+                                    <td colspan="6">No hay items agregados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <footer class="presupuesto-actions">
+                    <div class="presupuesto-actions-left">
+                        <button type="button" id="btn_eliminar_item" class="btn-neutral btn-eliminar" disabled>
+                            <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                            Eliminar
+                        </button>
+                        <button type="button" id="btn_editar_item" class="btn-neutral btn-editar" disabled>
+                            <i class="fas fa-pen" aria-hidden="true"></i>
+                            Editar
+                        </button>
+                        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="btn-neutral btn-salir">
+                            <i class="fas fa-times" aria-hidden="true"></i>
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn-guardar">
                         <i class="fas fa-save" aria-hidden="true"></i>
-                        Guardar cambios
-                    </button>
-                </div>
+                            Guardar cambios
+                        </button>
+                    </div>
+
+                    <div class="presupuesto-totals-box" aria-live="polite">
+                        <div class="total-row">
+                            <span>Subtotal</span>
+                            <strong id="items_subtotal">0,00 EUR</strong>
+                        </div>
+                        <div class="total-row total-final">
+                            <span>Total presupuesto</span>
+                            <strong id="items_total">0,00 EUR</strong>
+                        </div>
+                    </div>
+                </footer>
             </form>
             </div>
         </article>
     </section>
+@endsection
+
+@section('js')
+    <script>
+        (function () {
+            const hiddenInput = document.getElementById('lista_articulos');
+            const tbody = document.getElementById('items_tbody');
+            const subtotalEl = document.getElementById('items_subtotal');
+            const totalEl = document.getElementById('items_total');
+
+            const articuloInput = document.getElementById('item_articulo');
+            const descripcionInput = document.getElementById('item_descripcion');
+            const cantidadInput = document.getElementById('item_cantidad');
+            const unidadInput = document.getElementById('item_unidad');
+            const precioInput = document.getElementById('item_precio_unitario');
+            const margenInput = document.getElementById('item_margen');
+            const addButton = document.getElementById('btn_agregar_item');
+            const editButton = document.getElementById('btn_editar_item');
+            const deleteButton = document.getElementById('btn_eliminar_item');
+
+            const eur = new Intl.NumberFormat('es-ES', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+
+            const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+            const safeNumber = (value) => {
+                const numeric = Number.parseFloat(String(value).replace(',', '.'));
+                return Number.isFinite(numeric) ? numeric : 0;
+            };
+
+            const parseItems = () => {
+                try {
+                    const parsed = JSON.parse(hiddenInput.value || '[]');
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch (error) {
+                    return [];
+                }
+            };
+
+            const items = parseItems();
+            let selectedIndex = -1;
+            let editingIndex = null;
+
+            const resetItemForm = () => {
+                articuloInput.value = '';
+                descripcionInput.value = '';
+                cantidadInput.value = '1';
+                unidadInput.value = '';
+                precioInput.value = '0';
+                margenInput.value = '0';
+                editingIndex = null;
+                addButton.textContent = 'Agregar';
+            };
+
+            const setButtonsState = () => {
+                const hasSelection = selectedIndex >= 0 && selectedIndex < items.length;
+                editButton.disabled = !hasSelection;
+                deleteButton.disabled = !hasSelection;
+            };
+
+            const fillFormFromItem = (index) => {
+                const item = items[index];
+                if (!item) {
+                    return;
+                }
+
+                articuloInput.value = item.articulo || '';
+                descripcionInput.value = item.descripcion || '';
+                cantidadInput.value = String(item.cantidad ?? 1);
+                unidadInput.value = String(item.unidad ?? '');
+                precioInput.value = String(item.precio_unitario ?? 0);
+                margenInput.value = String(item.margen ?? 0);
+                editingIndex = index;
+                addButton.textContent = 'Actualizar';
+                descripcionInput.focus();
+            };
+
+            const deleteItemAt = (index) => {
+                if (index < 0 || index >= items.length) {
+                    return;
+                }
+
+                items.splice(index, 1);
+
+                if (editingIndex === index) {
+                    resetItemForm();
+                } else if (editingIndex !== null && editingIndex > index) {
+                    editingIndex -= 1;
+                }
+
+                if (selectedIndex === index) {
+                    selectedIndex = -1;
+                } else if (selectedIndex > index) {
+                    selectedIndex -= 1;
+                }
+
+                renderRows();
+            };
+
+            const syncHidden = () => {
+                hiddenInput.value = JSON.stringify(items);
+            };
+
+            const renderTotals = () => {
+                const subtotal = items.reduce((acc, item) => acc + safeNumber(item.total), 0);
+                const total = subtotal;
+
+                subtotalEl.textContent = `${eur.format(subtotal)} EUR`;
+                totalEl.textContent = `${eur.format(total)} EUR`;
+            };
+
+            const renderRows = () => {
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr class="items-empty-row"><td colspan="6">No hay items agregados.</td></tr>';
+                    renderTotals();
+                    syncHidden();
+                    setButtonsState();
+                    return;
+                }
+
+                tbody.innerHTML = items.map((item, index) => `
+                    <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
+                        <td>${String(index + 1).padStart(2, '0')}</td>
+                        <td>${item.articulo ? `<strong>${item.articulo}</strong><br>` : ''}${item.descripcion}</td>
+                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + item.unidad : ''}</td>
+                        <td>${eur.format(safeNumber(item.precio_con_margen || item.precio_unitario))} EUR</td>
+                        <td>${eur.format(safeNumber(item.total))} EUR</td>
+                        <td class="actions-col">
+                            <div class="row-actions">
+                                <button type="button" class="btn-row-action btn-edit-item" data-index="${index}" aria-label="Editar item" title="Editar item">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button type="button" class="btn-row-action btn-remove-item" data-index="${index}" aria-label="Eliminar item" title="Eliminar item">×</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                renderTotals();
+                syncHidden();
+                setButtonsState();
+            };
+
+            addButton.addEventListener('click', function () {
+                const descripcion = descripcionInput.value.trim();
+                const articulo = articuloInput.value.trim();
+                const cantidadRaw = safeNumber(cantidadInput.value);
+                const cantidad = Math.max(1, Math.round(cantidadRaw));
+                const unidad = String(unidadInput.value || '').trim();
+                const precioUnitario = Math.max(0, safeNumber(precioInput.value));
+                const margen = Math.max(0, safeNumber(margenInput.value));
+
+                if (!descripcion || cantidad <= 0) {
+                    window.alert('Complete al menos la descripcion y una cantidad entera mayor que cero.');
+                    return;
+                }
+
+                const precioConMargen = precioUnitario * (1 + (margen / 100));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+                const total = cantidad * precioConMargenRounded;
+
+                const payload = {
+                    articulo,
+                    descripcion,
+                    cantidad: Number(cantidad),
+                    unidad: unidad,
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    margen: Number(margen.toFixed(2)),
+                    precio_con_margen: precioConMargenRounded,
+                    total: Number(total.toFixed(2)),
+                };
+
+                if (editingIndex !== null && editingIndex >= 0 && editingIndex < items.length) {
+                    items[editingIndex] = payload;
+                    selectedIndex = editingIndex;
+                } else {
+                    items.push(payload);
+                    selectedIndex = items.length - 1;
+                }
+
+                editingIndex = null;
+                addButton.textContent = 'Agregar';
+                articuloInput.value = '';
+                descripcionInput.value = '';
+                cantidadInput.value = '1';
+                unidadInput.value = '';
+                precioInput.value = '0';
+                margenInput.value = '0';
+
+                renderRows();
+            });
+
+            editButton.addEventListener('click', function () {
+                if (selectedIndex < 0 || selectedIndex >= items.length) {
+                    return;
+                }
+
+                fillFormFromItem(selectedIndex);
+                renderRows();
+            });
+
+            deleteButton.addEventListener('click', function () {
+                if (selectedIndex < 0 || selectedIndex >= items.length) {
+                    return;
+                }
+
+                deleteItemAt(selectedIndex);
+            });
+
+            tbody.addEventListener('click', function (event) {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const removeButton = target.closest('.btn-remove-item');
+                if (removeButton instanceof HTMLElement) {
+                    const index = Number.parseInt(removeButton.dataset.index || '-1', 10);
+                    deleteItemAt(index);
+                    return;
+                }
+
+                const rowEditButton = target.closest('.btn-edit-item');
+                if (rowEditButton instanceof HTMLElement) {
+                    const index = Number.parseInt(rowEditButton.dataset.index || '-1', 10);
+                    if (index >= 0 && index < items.length) {
+                        selectedIndex = index;
+                        fillFormFromItem(index);
+                        renderRows();
+                    }
+                    return;
+                }
+
+                const row = target.closest('tr[data-index]');
+                if (row instanceof HTMLElement) {
+                    const index = Number.parseInt(row.dataset.index || '-1', 10);
+                    if (index >= 0 && index < items.length) {
+                        selectedIndex = index;
+                        renderRows();
+                    }
+                }
+            });
+
+            renderRows();
+        })();
+    </script>
 @endsection

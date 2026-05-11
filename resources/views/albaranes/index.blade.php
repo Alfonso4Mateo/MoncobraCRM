@@ -170,14 +170,21 @@
                                     <span class="estado-chip estado-{{ $estado }}">{{ strtoupper($estado) }}</span>
                                 </td>
                                 <td>
-                                    <div class="acciones-col">
+                                    <div class="presupuesto-action-group">
+                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver albarán" title="Ver albarán">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('albaranes.pantalla-roja', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
+                                            <i class="fas fa-pen"></i>
+                                        </a>
+
                                         @php
                                             $dropdownId = 'albaran-estado-dropdown-' . $albaran->id;
                                         @endphp
-                                        <div class="dropdown acciones-dropdown">
+                                        <div class="dropdown presupuesto-dropdown">
                                             <button
                                                 type="button"
-                                                class="accion-more dropdown-toggle"
+                                                class="presupuesto-action-btn--state dropdown-toggle"
                                                 id="{{ $dropdownId }}"
                                                 data-toggle="dropdown"
                                                 aria-haspopup="true"
@@ -198,14 +205,6 @@
                                                 </form>
                                             </div>
                                         </div>
-
-                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="accion-eye" title="Ver albarán">
-                                            <i class="far fa-eye"></i>
-                                        </a>
-
-                                        <a href="{{ route('albaranes.pantalla-roja', $albaran) }}" class="accion-red" title="Editar albarán">
-                                            <i class="far fa-edit"></i>
-                                        </a>
                                     </div>
                                 </td>
                             </tr>

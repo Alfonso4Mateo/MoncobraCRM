@@ -288,27 +288,27 @@
 }
 
 .estado-pendiente {
-    background: #e8f1ff;
-    color: #2765b8;
-    border-color: #cfe2fb;
+    background: #fff8e1;
+    color: #b8860b;
+    border-color: #ffe4b5;
 }
 
 .estado-aceptado {
-    background: #e8f1ff;
-    color: #2765b8;
-    border-color: #cfe2fb;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #c8e6c9;
 }
 
 .estado-rechazado {
-    background: #fce8eb;
-    color: #b84853;
-    border-color: #f0d6da;
+    background: #ffebee;
+    color: #c62828;
+    border-color: #ffcdd2;
 }
 
 .estado-pendiente-pedido {
-    background: #f2f7ff;
-    color: #2968ab;
-    border-color: #dde9f6;
+    background: #e1f5fe;
+    color: #01579b;
+    border-color: #b3e5fc;
 }
 
 .presupuesto-empty-items {

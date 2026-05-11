@@ -112,15 +112,25 @@ class PresupuestoController extends Controller
                 $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
                 $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? 0));
                 $margen = max(0, (float) ($item['margen'] ?? 0));
-                $total = max(0, (float) ($item['total'] ?? 0));
+
+                $cantidadInt = (int) max(0, round($cantidad, 0));
+                $precioUnitarioRounded = round($precioUnitario, 2);
+                $margenRounded = round($margen, 2);
+
+                // Apply margin to unit price on server-side (only once)
+                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
+                $precioConMargenRounded = round($precioConMargen, 2);
+                $totalComputed = round($precioConMargenRounded * $cantidadInt, 2);
 
                 return [
                     'articulo' => trim((string) ($item['articulo'] ?? '')),
                     'descripcion' => trim((string) ($item['descripcion'] ?? '')),
-                    'cantidad' => round($cantidad, 2),
-                    'precio_unitario' => round($precioUnitario, 2),
-                    'margen' => round($margen, 2),
-                    'total' => round($total, 2),
+                    'cantidad' => $cantidadInt,
+                    'unidad' => isset($item['unidad']) ? trim((string) $item['unidad']) : null,
+                    'precio_unitario' => $precioUnitarioRounded,
+                    'margen' => $margenRounded,
+                    'precio_con_margen' => $precioConMargenRounded,
+                    'total' => $totalComputed,
                 ];
             })
             ->values()
@@ -229,6 +239,12 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
+        $estado = (string) ($presupuesto->estado ?: 'pendiente');
+        if (in_array($estado, ['aceptado', 'rechazado'], true)) {
+            return redirect()->route('presupuestos.show', $presupuesto)
+                ->with('error', 'No se pueden editar presupuestos ' . $estado . 's.');
+        }
+
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
 
@@ -326,26 +342,52 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
+        // En edición solo se permite cambiar los artículos
         $validated = $request->validate([
-            'documento' => 'required|string|max:50',
-            'numero' => 'required|string|max:50',
-            'fecha' => 'required|date',
-            'cliente_id' => [
-                'required',
-                Rule::exists('clientes', 'id')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
-            ],
-            'titulo' => 'nullable|string|max:255',
-            'ot' => 'nullable|string|max:255',
-            'total' => 'nullable|numeric|min:0',
-            'estado' => ['nullable', Rule::in(['pendiente', 'aceptado', 'rechazado', 'pendiente pedido'])],
+            'lista_articulos' => 'nullable|json',
         ]);
 
-        $validated['proyecto_id'] = $proyectoId;
-        $validated['total'] = isset($validated['total']) ? round((float) $validated['total'], 2) : (float) $presupuesto->total;
-        $validated['estado'] = $validated['estado'] ?? ($presupuesto->estado ?: 'pendiente');
+        $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
+        $articulosNormalizados = collect(is_array($listaArticulos) ? $listaArticulos : [])
+            ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
+            ->map(function (array $item) {
+                $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? 0));
+                $margen = max(0, (float) ($item['margen'] ?? 0));
 
-        $presupuesto->update($validated);
-        return redirect()->route('presupuestos.index')->with('success', 'Presupuesto actualizado');
+                $cantidadInt = (int) max(0, round($cantidad, 0));
+                $precioUnitarioRounded = round($precioUnitario, 2);
+                $margenRounded = round($margen, 2);
+
+                // Apply margin to unit price on server-side (only once)
+                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
+                $precioConMargenRounded = round($precioConMargen, 2);
+                $totalComputed = round($precioConMargenRounded * $cantidadInt, 2);
+
+                return [
+                    'articulo' => trim((string) ($item['articulo'] ?? '')),
+                    'descripcion' => trim((string) ($item['descripcion'] ?? '')),
+                    'cantidad' => $cantidadInt,
+                    'unidad' => isset($item['unidad']) ? trim((string) $item['unidad']) : null,
+                    'precio_unitario' => $precioUnitarioRounded,
+                    'margen' => $margenRounded,
+                    'precio_con_margen' => $precioConMargenRounded,
+                    'total' => $totalComputed,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $totalComputed = collect($articulosNormalizados)->sum(function (array $item) {
+            return (float) ($item['total'] ?? 0);
+        });
+
+        $presupuesto->update([
+            'lista_articulos' => $articulosNormalizados ?: null,
+            'total' => round($totalComputed, 2),
+        ]);
+
+        return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Artículos del presupuesto actualizados');
     }
 
     public function destroy(Presupuesto $presupuesto)

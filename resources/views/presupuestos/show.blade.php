@@ -2,6 +2,18 @@
 
 @section('title', 'Detalle de Presupuesto - MoncobraCRM')
 
+@php
+    $estado = (string) ($presupuesto->estado ?: 'pendiente');
+    $estadoClass = match (strtolower($estado)) {
+        'aceptado' => 'estado-pill estado-aceptado',
+        'rechazado' => 'estado-pill estado-rechazado',
+        'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
+        default => 'estado-pill estado-pendiente',
+    };
+    $items = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
+    $puedeEditar = $estado !== 'aceptado' && $estado !== 'rechazado';
+@endphp
+
 @section('css')
     @vite(['resources/css/presupuestos-detail.css'])
 @endsection
@@ -22,10 +34,17 @@
                 <i class="fas fa-download" aria-hidden="true"></i>
                 Descargar PDF
             </a>
-            <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
-                <i class="fas fa-pen" aria-hidden="true"></i>
-                Editar
-            </a>
+            @if ($puedeEditar)
+                <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft" title="Editar presupuesto">
+                    <i class="fas fa-pen" aria-hidden="true"></i>
+                    Editar
+                </a>
+            @else
+                <button type="button" class="presupuesto-detail-btn presupuesto-detail-btn--soft" disabled title="No puedes editar presupuestos {{ $estado }}s">
+                    <i class="fas fa-pen" aria-hidden="true"></i>
+                    Editar
+                </button>
+            @endif
             <a href="{{ route('presupuestos.index') }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
                 <i class="fas fa-arrow-left" aria-hidden="true"></i>
                 Volver
@@ -35,16 +54,25 @@
 @endsection
 
 @section('content')
-    @php
-        $estado = (string) ($presupuesto->estado ?: 'pendiente');
-        $estadoClass = match (strtolower($estado)) {
-            'aceptado' => 'estado-pill estado-aceptado',
-            'rechazado' => 'estado-pill estado-rechazado',
-            'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
-            default => 'estado-pill estado-pendiente',
-        };
-        $items = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
-    @endphp
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-circle-exclamation"></i>
+            {{ session('error') }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-circle-check"></i>
+            {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
 
     @php
         $pedidosClientes = $presupuesto->pedidosClientes ?? collect();

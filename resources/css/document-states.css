@@ -1,0 +1,72 @@
+/* Unified Status Colors for all Documents */
+/* This file defines consistent status colors across Presupuestos, Pedidos, Albaranes, etc. */
+
+/* Estado badge base styles */
+.estado-pill,
+.pedido-chip,
+.albaran-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+/* Pendiente - Orange/Amber */
+.estado-pendiente,
+.pedido-chip--pending,
+.albaran-chip--pending {
+    background: #fff8e1;
+    color: #b8860b;
+    border-color: #ffe4b5;
+}
+
+/* Aceptado / Pagado / Recibido - Green */
+.estado-aceptado,
+.pedido-chip--paid,
+.albaran-chip--received {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
+/* Rechazado / Cancelado - Red */
+.estado-rechazado,
+.pedido-chip--cancelled,
+.albaran-chip--cancelled {
+    background: #ffebee;
+    color: #c62828;
+    border-color: #ffcdd2;
+}
+
+/* Parcial / Pendiente Pedido - Cyan/Light Blue */
+.estado-pendiente-pedido,
+.pedido-chip--partial,
+.albaran-chip--partial {
+    background: #e1f5fe;
+    color: #01579b;
+    border-color: #b3e5fc;
+}
+
+/* Entregado - Purple */
+.albaran-chip--delivered {
+    background: #f3e5f5;
+    color: #6a1b9a;
+    border-color: #e1bee7;
+}
+
+/* Default/Fallback - Gray */
+.estado-default,
+.pedido-chip--default,
+.albaran-chip--default {
+    background: #f5f5f5;
+    color: #616161;
+    border-color: #e0e0e0;
+}

@@ -161,7 +161,7 @@
                                         <div class="dropdown presupuesto-dropdown">
                                             <button
                                                 type="button"
-                                                class="presupuesto-action-btn presupuesto-action-btn--more dropdown-toggle"
+                                                class="presupuesto-action-btn--state dropdown-toggle"
                                                 id="{{ $dropdownId }}"
                                                 data-toggle="dropdown"
                                                 aria-haspopup="true"

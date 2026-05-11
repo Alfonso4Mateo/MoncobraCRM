@@ -8,6 +8,7 @@ use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class PedidoController extends Controller
 {
@@ -492,6 +493,28 @@ class PedidoController extends Controller
     public function update(Request $request, string $id)
     {
         //
+    }
+
+    /**
+     * Update estado of a pedido cliente
+     */
+    public function updateEstado(Request $request, PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        if ((int) $pedidoCliente->proyecto_id !== (int) $proyectoId) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'estado' => ['required', Rule::in(['pendiente', 'facturado', 'facturado_parcial'])],
+        ]);
+
+        $pedidoCliente->update([
+            'estado' => $validated['estado'],
+        ]);
+
+        return redirect()->route('pedidos-clientes.index')->with('success', 'Estado del pedido actualizado');
     }
 
     /**
