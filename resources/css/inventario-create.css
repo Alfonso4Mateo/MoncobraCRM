@@ -205,7 +205,16 @@
 
 .field-group textarea {
     min-height: 4rem;
-    resize: vertical;
+    resize: none;
+    overflow: hidden;
+}
+
+.field-group textarea.input-auto-grow {
+    min-height: 2.3rem;
+}
+
+.field-group textarea.input-auto-grow--notes {
+    min-height: 4rem;
 }
 
 .field-group input::placeholder,

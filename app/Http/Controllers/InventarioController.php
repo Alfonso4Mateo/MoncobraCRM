@@ -242,7 +242,7 @@ class InventarioController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'producto_busqueda' => 'required|string|max:255',
+            'producto_busqueda' => 'required|string|max:1000',
             'codigo' => 'nullable|string|max:255',
             'cantidad_retirar' => 'required|integer|min:1',
             'ot' => 'nullable|string|max:255',
@@ -527,7 +527,7 @@ class InventarioController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'producto_busqueda' => 'required|string|max:255',
+            'producto_busqueda' => 'required|string|max:1000',
             'codigo' => 'nullable|string|max:255',
             'referencia_proveedor' => 'nullable|string|max:255',
             'almacen' => 'nullable|string|max:255',

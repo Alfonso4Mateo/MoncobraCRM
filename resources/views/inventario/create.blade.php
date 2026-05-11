@@ -61,16 +61,15 @@
                         <div class="entry-grid entry-grid-producto">
                             <div class="field-group field-wide">
                                 <label for="producto_busqueda">Producto</label>
-                                <input
+                                <textarea
                                     id="producto_busqueda"
                                     name="producto_busqueda"
-                                    type="text"
-                                    list="inventario-catalogo"
-                                    value="{{ old('producto_busqueda') }}"
+                                    rows="1"
+                                    maxlength="1000"
                                     placeholder="Buscar por nombre o SKU..."
-                                    class="@error('producto_busqueda') is-invalid @enderror"
+                                    class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
                                     required
-                                >
+                                >{{ old('producto_busqueda') }}</textarea>
                                 <small>Se mostraran resultados coincidentes del catalogo activo.</small>
                             </div>
 
@@ -147,7 +146,7 @@
                         </header>
 
                         <div class="field-group full">
-                            <textarea id="notas" rows="4" placeholder="Indicar cualquier incidencia, estado del embalaje o instrucciones especiales..."></textarea>
+                            <textarea id="notas" rows="4" class="input-auto-grow input-auto-grow--notes" placeholder="Indicar cualquier incidencia, estado del embalaje o instrucciones especiales..."></textarea>
                         </div>
                     </article>
                 </div>
@@ -336,6 +335,19 @@
             codigoInput.addEventListener('input', function () {
                 albaranPreview.value = this.value || 'ALB-2025-XXXX';
             });
+
+            const autoGrowAreas = document.querySelectorAll('.input-auto-grow');
+            if (autoGrowAreas.length) {
+                const resizeArea = (el) => {
+                    el.style.height = 'auto';
+                    el.style.height = `${el.scrollHeight}px`;
+                };
+
+                autoGrowAreas.forEach((area) => {
+                    resizeArea(area);
+                    area.addEventListener('input', () => resizeArea(area));
+                });
+            }
 
             refreshSummary();
         })();

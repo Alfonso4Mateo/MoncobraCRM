@@ -146,7 +146,8 @@
     font-weight: 800;
 }
 
-.field-group input {
+.field-group input,
+.field-group textarea {
     width: 100%;
     min-height: 2.15rem;
     border: 1px solid #d3deec;
@@ -159,13 +160,20 @@
     outline: none;
 }
 
-.field-group input:focus {
+.field-group textarea {
+    resize: none;
+    overflow: hidden;
+}
+
+.field-group input:focus,
+.field-group textarea:focus {
     border-color: #7ea9ec;
     box-shadow: 0 0 0 3px rgba(67, 128, 222, 0.14);
     background: #fff;
 }
 
-.field-group input::placeholder {
+.field-group input::placeholder,
+.field-group textarea::placeholder {
     color: #99aabc;
 }
 
@@ -758,6 +766,10 @@ body.pdf-modal-open {
 }
 
 .pdf-cell-input--center {
+    text-align: center;
+}
+
+.pdf-table td:nth-child(2) .pdf-cell-input {
     text-align: center;
 }
 

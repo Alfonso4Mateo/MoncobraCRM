@@ -51,17 +51,16 @@
                         <div class="out-grid out-grid-top">
                             <div class="field-group field-wide">
                                 <label for="producto_busqueda">Producto</label>
-                                <input
+                                <textarea
                                     id="producto_busqueda"
                                     name="producto_busqueda"
-                                    type="text"
-                                    list="inventario-catalogo-salida"
-                                    value="{{ old('producto_busqueda') }}"
+                                    rows="1"
+                                    maxlength="1000"
                                     placeholder="Escribe SKU o nombre..."
                                     data-sync="producto_busqueda"
-                                    class="@error('producto_busqueda') is-invalid @enderror"
+                                    class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
                                     required
-                                >
+                                >{{ old('producto_busqueda') }}</textarea>
                             </div>
 
                             <div class="field-group field-tight">
@@ -327,6 +326,7 @@
             const pdfPrintButtons = document.querySelectorAll('[data-pdf-print]');
             const syncInputs = document.querySelectorAll('[data-sync]');
             const autoGrowAreas = document.querySelectorAll('.pdf-auto-grow');
+            const formAutoGrowAreas = document.querySelectorAll('.input-auto-grow');
 
             const normalize = (value) => String(value || '').trim().toLowerCase();
 
@@ -447,6 +447,18 @@
                 };
 
                 autoGrowAreas.forEach((area) => {
+                    resizeArea(area);
+                    area.addEventListener('input', () => resizeArea(area));
+                });
+            }
+
+            if (formAutoGrowAreas.length) {
+                const resizeArea = (el) => {
+                    el.style.height = 'auto';
+                    el.style.height = `${el.scrollHeight}px`;
+                };
+
+                formAutoGrowAreas.forEach((area) => {
                     resizeArea(area);
                     area.addEventListener('input', () => resizeArea(area));
                 });
