@@ -176,26 +176,12 @@
                                 <td data-label="Albarán asociado">
                                     @php
                                         $albaranesCount = (int) ($pedido->ui_albaranes_count ?? 0);
-                                        $urlCrearAlbaran = route('albaranes.create', [
-                                            'pedido_cliente' => $pedido->numero_pedido,
-                                            'cliente_id' => $pedido->id_cliente,
-                                            'ot' => $pedido->ot,
-                                        ]);
                                     @endphp
 
-                                    @if ($albaranesCount <= 0)
-                                        <a href="{{ $urlCrearAlbaran }}" class="pedido-albaran-add-btn" title="Agregar albarán" aria-label="Agregar albarán">
-                                            <i class="fas fa-plus" aria-hidden="true"></i>
-                                        </a>
-                                    @elseif ($albaranesCount === 1 && $pedido->ui_albaran_id && $pedido->ui_albaran_numero)
-                                        <a href="{{ route('albaranes.show', $pedido->ui_albaran_id) }}" class="pedido-code-link pedido-code-link--soft">
-                                            {{ $pedido->ui_albaran_numero }}
-                                        </a>
-                                    @else
-                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-code-link pedido-code-link--soft pedido-multi-albaranes-link">
-                                            {{ $albaranesCount }} {{ \Illuminate\Support\Str::plural('albarán', $albaranesCount) }}
-                                        </a>
-                                    @endif
+                                    <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es" aria-label="Ver albarán/es">
+                                        <i class="fas fa-file-invoice" aria-hidden="true"></i>
+                                        Ver albarán/es
+                                    </a>
                                 </td>
                                 <td data-label="Total" class="text-right">
                                     <strong class="pedido-total">€{{ number_format((float) ($pedido->ui_total ?? 0), 2, ',', '.') }}</strong>

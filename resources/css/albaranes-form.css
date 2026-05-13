@@ -191,6 +191,7 @@
 .linea-input-row {
     display: flex;
     align-items: flex-end;
+    flex-wrap: wrap;
     gap: 0.65rem;
 }
 
@@ -240,7 +241,7 @@
     padding: 0.65rem 0.6rem;
 }
 
-.lineas-table tbody td:nth-child(2) {
+.lineas-table tbody td:nth-child(3) {
     white-space: normal;
     overflow-wrap: anywhere;
     min-width: 220px;

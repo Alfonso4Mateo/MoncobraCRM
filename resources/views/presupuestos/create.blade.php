@@ -93,7 +93,7 @@
 
                     <div class="items-form-grid">
                         <div class="field-group">
-                            <label for="item_articulo">Articulo</label>
+                            <label for="item_articulo">Código referencia</label>
                             <input type="text" id="item_articulo" placeholder="Codigo o referencia">
                         </div>
                         <div class="field-group field-span-3">
@@ -102,11 +102,11 @@
                         </div>
                         <div class="field-group">
                             <label for="item_cantidad">Cantidad</label>
-                            <input type="number" id="item_cantidad" min="1" step="1" value="1">
+                            <input type="number" id="item_cantidad" min="0" step="0.01" value="1">
                         </div>
                         <div class="field-group">
-                            <label for="item_unidad">Unidades de medida</label>
-                            <input type="text" id="item_unidad" placeholder="u, kg, m, etc.">
+                            <label for="item_medida">Medida</label>
+                            <input type="text" id="item_medida" placeholder="u, kg, m...">
                         </div>
                         <div class="field-group">
                             <label for="item_precio_unitario">Precio unitario</label>
@@ -124,17 +124,20 @@
                         <table class="items-table" aria-label="Listado de items del presupuesto">
                             <thead>
                                 <tr>
-                                    <th>Articulo</th>
-                                    <th>Descripcion</th>
+                                    <th>Línea</th>
+                                    <th>Código ref.</th>
+                                    <th>Descripción</th>
                                     <th>Cantidad</th>
-                                    <th>P. Unitario</th>
+                                    <th>Medida</th>
+                                    <th>P. unitario</th>
+                                    <th>Margen</th>
                                     <th>Total</th>
                                     <th class="actions-col"></th>
                                 </tr>
                             </thead>
                             <tbody id="items_tbody">
                                 <tr class="items-empty-row">
-                                    <td colspan="6">No hay items agregados.</td>
+                                    <td colspan="9">No hay items agregados.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -192,7 +195,7 @@
             const articuloInput = document.getElementById('item_articulo');
             const descripcionInput = document.getElementById('item_descripcion');
             const cantidadInput = document.getElementById('item_cantidad');
-            const unidadInput = document.getElementById('item_unidad');
+            const medidaInput = document.getElementById('item_medida');
             const precioInput = document.getElementById('item_precio_unitario');
             const margenInput = document.getElementById('item_margen');
             const addButton = document.getElementById('btn_agregar_item');
@@ -220,7 +223,27 @@
                 }
             };
 
-            const items = parseItems();
+            const normalizeItem = (item) => {
+                const cantidad = Math.max(0, safeNumber(item?.cantidad));
+                const precioUnitario = Math.max(0, safeNumber(item?.precio_unitario));
+                const margen = Math.max(0, safeNumber(item?.margen));
+                const total = cantidad * precioUnitario * (1 + (margen / 100));
+
+                return {
+                    articulo: String(item?.articulo ?? '').trim(),
+                    descripcion: String(item?.descripcion ?? '').trim(),
+                    cantidad: Number(cantidad.toFixed(2)),
+                    medida: String(item?.medida ?? item?.unidad ?? '').trim(),
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    margen: Number(margen.toFixed(2)),
+                    total: Number(total.toFixed(2)),
+                };
+            };
+
+            const items = parseItems()
+                .filter((item) => item && typeof item === 'object')
+                .map(normalizeItem)
+                .filter((item) => item.descripcion !== '');
             let selectedIndex = -1;
             let editingIndex = null;
 
@@ -228,6 +251,7 @@
                 articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
+                medidaInput.value = '';
                 precioInput.value = '0';
                 margenInput.value = '0';
                 editingIndex = null;
@@ -249,7 +273,7 @@
                 articuloInput.value = item.articulo || '';
                 descripcionInput.value = item.descripcion || '';
                 cantidadInput.value = String(item.cantidad ?? 1);
-                unidadInput.value = String(item.unidad ?? '');
+                medidaInput.value = String(item.medida ?? item.unidad ?? '');
                 precioInput.value = String(item.precio_unitario ?? 0);
                 margenInput.value = String(item.margen ?? 0);
                 editingIndex = index;
@@ -293,7 +317,7 @@
 
             const renderRows = () => {
                 if (items.length === 0) {
-                    tbody.innerHTML = '<tr class="items-empty-row"><td colspan="6">No hay items agregados.</td></tr>';
+                    tbody.innerHTML = '<tr class="items-empty-row"><td colspan="9">No hay items agregados.</td></tr>';
                     renderTotals();
                     syncHidden();
                     setButtonsState();
@@ -303,9 +327,12 @@
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.articulo ? `<strong>${item.articulo}</strong><br>` : ''}${item.descripcion}</td>
-                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + item.unidad : ''}</td>
-                        <td>${eur.format(safeNumber(item.precio_con_margen || item.precio_unitario))} EUR</td>
+                        <td>${item.articulo ? `<strong>${item.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
+                        <td>${item.descripcion}</td>
+                        <td style="text-align:right">${eur.format(safeNumber(item.cantidad))}</td>
+                        <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
+                        <td>${eur.format(safeNumber(item.precio_unitario))} EUR</td>
+                        <td>${eur.format(safeNumber(item.margen))} %</td>
                         <td>${eur.format(safeNumber(item.total))} EUR</td>
                         <td class="actions-col">
                             <div class="row-actions">
@@ -326,29 +353,25 @@
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
                 const articulo = articuloInput.value.trim();
-                const cantidadRaw = safeNumber(cantidadInput.value);
-                const cantidad = Math.max(1, Math.round(cantidadRaw));
-                const unidad = String(unidadInput.value || '').trim();
+                const cantidad = Math.max(0, safeNumber(cantidadInput.value));
+                const medida = String(medidaInput.value || '').trim();
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
                 const margen = Math.max(0, safeNumber(margenInput.value));
 
                 if (!descripcion || cantidad <= 0) {
-                    window.alert('Complete al menos la descripcion y una cantidad entera mayor que cero.');
+                    window.alert('Complete al menos la descripción y una cantidad mayor que cero.');
                     return;
                 }
 
-                const precioConMargen = precioUnitario * (1 + (margen / 100));
-                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
-                const total = cantidad * precioConMargenRounded;
+                const total = cantidad * precioUnitario * (1 + (margen / 100));
 
                 const payload = {
                     articulo,
                     descripcion,
-                    cantidad: Number(cantidad),
-                    unidad: unidad,
+                    cantidad: Number(cantidad.toFixed(2)),
+                    medida,
                     precio_unitario: Number(precioUnitario.toFixed(2)),
                     margen: Number(margen.toFixed(2)),
-                    precio_con_margen: precioConMargenRounded,
                     total: Number(total.toFixed(2)),
                 };
 
@@ -365,7 +388,7 @@
                 articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
-                unidadInput.value = '';
+                medidaInput.value = '';
                 precioInput.value = '0';
                 margenInput.value = '0';
 

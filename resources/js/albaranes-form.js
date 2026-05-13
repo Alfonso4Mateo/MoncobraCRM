@@ -12,15 +12,22 @@ const clampNumber = (value) => {
     return parsed;
 };
 
+const round2 = (value) => {
+    return Math.round(clampNumber(value) * 100) / 100;
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     const root = document.querySelector("[data-albaran-form]");
     if (!root) {
         return;
     }
 
+    const articuloInput = document.getElementById("linea_articulo");
     const descripcionInput = document.getElementById("linea_descripcion");
     const cantidadInput = document.getElementById("linea_cantidad");
     const precioInput = document.getElementById("linea_precio");
+    const medidaInput = document.getElementById("linea_medida");
+    const margenInput = document.getElementById("linea_margen");
     const addButton = document.getElementById("btnAddLinea");
     const editButton = document.getElementById("btnEditLinea");
     const deleteButton = document.getElementById("btnDeleteLinea");
@@ -28,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalElement = document.getElementById("albaranTotalValue");
     const lineasJsonInput = document.getElementById("lineasJson");
 
-    if (!descripcionInput || !cantidadInput || !precioInput || !addButton || !tableBody || !totalElement || !lineasJsonInput) {
+    if (!articuloInput || !descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput || !addButton || !tableBody || !totalElement || !lineasJsonInput) {
         return;
     }
 
@@ -45,11 +52,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
             return decoded
                 .filter((linea) => linea && typeof linea === "object")
-                .map((linea) => ({
-                    descripcion: String(linea.descripcion ?? "").trim(),
-                    cantidad: clampNumber(linea.cantidad),
-                    precio: clampNumber(linea.precio),
-                }))
+                .map((linea) => {
+                    const cantidad = round2(linea.cantidad);
+                    const precioUnitario = round2(linea.precio_unitario ?? linea.precio);
+                    const margen = round2(linea.margen);
+                    const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+
+                    return {
+                        articulo_id: linea.articulo_id ?? null,
+                        articulo: String(linea.articulo ?? "").trim(),
+                        descripcion: String(linea.descripcion ?? "").trim(),
+                        cantidad,
+                        medida: String(linea.medida ?? linea.unidad ?? "").trim(),
+                        precio_unitario: precioUnitario,
+                        margen,
+                        total,
+                    };
+                })
                 .filter((linea) => linea.descripcion !== "");
         } catch (error) {
             return [];
@@ -72,9 +91,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const resetInputs = () => {
+        articuloInput.value = "";
         descripcionInput.value = "";
         cantidadInput.value = "1";
+        medidaInput.value = "";
         precioInput.value = "0";
+        margenInput.value = "0";
         autosizeDescripcion();
         descripcionInput.focus();
     };
@@ -84,8 +106,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateTotal = () => {
-        const total = lineas.reduce((acc, linea) => acc + (linea.cantidad * linea.precio), 0);
-        totalElement.textContent = `${euroFormatter.format(total)} €`;
+        const total = lineas.reduce((acc, linea) => acc + clampNumber(linea.total), 0);
+        totalElement.textContent = `${euroFormatter.format(round2(total))} €`;
     };
 
     const setSideButtonsState = () => {
@@ -102,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const renderRows = () => {
         if (lineas.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="lineas-empty">No hay lineas añadidas.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="9" class="lineas-empty">No hay lineas añadidas.</td></tr>';
             selectedIndex = -1;
             setSideButtonsState();
             syncHiddenField();
@@ -113,14 +135,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const rowsHtml = lineas
             .map((linea, index) => {
                 const isSelected = index === selectedIndex;
-                const totalLinea = linea.cantidad * linea.precio;
+                const medida = String(linea.medida ?? "").trim();
+                const totalLinea = clampNumber(linea.total);
 
                 return `
                     <tr data-index="${index}"${isSelected ? ' class="is-selected"' : ""}>
                         <td>${index + 1}</td>
+                        <td>${linea.articulo ? `<strong>${linea.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
                         <td>${linea.descripcion}</td>
                         <td>${euroFormatter.format(linea.cantidad)}</td>
-                        <td>${euroFormatter.format(linea.precio)} €</td>
+                        <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
+                        <td>${euroFormatter.format(linea.precio_unitario)} €</td>
+                        <td>${euroFormatter.format(linea.margen)} %</td>
                         <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
                         <td>
                             <button type="button" class="linea-btn linea-edit" data-action="edit" data-index="${index}" title="Editar linea">
@@ -142,19 +168,29 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const saveCurrentInputs = () => {
+        const articulo = articuloInput.value.trim();
         const descripcion = descripcionInput.value.trim();
-        const cantidad = clampNumber(cantidadInput.value);
-        const precio = clampNumber(precioInput.value);
+        const cantidad = round2(cantidadInput.value);
+        const medida = medidaInput.value.trim();
+        const precioUnitario = round2(precioInput.value);
+        const margen = round2(margenInput.value);
 
-        if (!descripcion) {
+        if (!descripcion || cantidad <= 0) {
             descripcionInput.focus();
             return;
         }
 
+        const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+
         const payload = {
+            articulo_id: selectedIndex >= 0 && selectedIndex < lineas.length ? (lineas[selectedIndex].articulo_id ?? null) : null,
+            articulo,
             descripcion,
             cantidad,
-            precio,
+            medida,
+            precio_unitario: precioUnitario,
+            margen,
+            total,
         };
 
         if (selectedIndex >= 0 && selectedIndex < lineas.length) {
@@ -171,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     addButton.addEventListener("click", saveCurrentInputs);
 
-    [cantidadInput, precioInput].forEach((input) => {
+    [cantidadInput, precioInput, margenInput].forEach((input) => {
         input.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
                 event.preventDefault();
@@ -208,9 +244,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 selectedIndex = index;
+                articuloInput.value = linea.articulo ?? "";
                 descripcionInput.value = linea.descripcion;
                 cantidadInput.value = String(linea.cantidad);
-                precioInput.value = String(linea.precio);
+                medidaInput.value = linea.medida ?? "";
+                precioInput.value = String(linea.precio_unitario);
+                margenInput.value = String(linea.margen);
                 addButton.innerHTML = '<i class="far fa-save"></i> Aplicar';
                 renderRows();
                 autosizeDescripcion();
@@ -229,9 +268,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const linea = lineas[selectedIndex];
+            articuloInput.value = linea.articulo ?? "";
             descripcionInput.value = linea.descripcion;
             cantidadInput.value = String(linea.cantidad);
-            precioInput.value = String(linea.precio);
+            medidaInput.value = linea.medida ?? "";
+            precioInput.value = String(linea.precio_unitario);
+            margenInput.value = String(linea.margen);
             addButton.innerHTML = '<i class="far fa-save"></i> Aplicar';
             autosizeDescripcion();
             descripcionInput.focus();

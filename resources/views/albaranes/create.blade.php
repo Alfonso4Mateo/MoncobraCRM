@@ -7,7 +7,13 @@
 @endsection
 
 @section('content')
-    @include('albaranes.partials.form', ['mode' => 'create', 'clientes' => $clientes])
+    @include('albaranes.partials.form', [
+        'mode' => 'create',
+        'clientes' => $clientes,
+        'pedidoContext' => $pedidoContext ?? null,
+        'lineasIniciales' => $lineasIniciales ?? [],
+        'pedidoDefaults' => $pedidoDefaults ?? [],
+    ])
 @endsection
 
 @section('css')

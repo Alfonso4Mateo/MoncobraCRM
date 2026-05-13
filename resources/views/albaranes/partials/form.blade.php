@@ -1,6 +1,13 @@
 @php
     $formAction = route('albaranes.store');
     $currentEstado = old('estado', 'pendiente');
+    $pedidoContext = $pedidoContext ?? null;
+    $lineasDesdeController = $lineasIniciales ?? [];
+    $pedidoDefaults = $pedidoDefaults ?? [];
+
+    $clienteIdDefault = old('cliente_id', $pedidoDefaults['cliente_id'] ?? $pedidoContext?->id_cliente ?? '');
+    $pedidoClienteDefault = old('pedido_cliente', $pedidoDefaults['pedido_cliente'] ?? $pedidoContext?->numero_pedido ?? '');
+    $otDefault = old('ot', $pedidoDefaults['ot'] ?? $pedidoContext?->ot ?? '');
 
     $lineasIniciales = [];
     $lineasDesdeOld = old('lineas_json');
@@ -12,18 +19,32 @@
         }
     }
 
+    if ($lineasIniciales === [] && is_array($lineasDesdeController) && $lineasDesdeController !== []) {
+        $lineasIniciales = $lineasDesdeController;
+    }
+
     $lineasIniciales = collect($lineasIniciales)
         ->filter(fn ($linea) => is_array($linea) && trim((string) ($linea['descripcion'] ?? '')) !== '')
         ->map(function (array $linea) {
+            $articuloId = isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null;
+            $articulo = trim((string) ($linea['articulo'] ?? ''));
             $descripcion = trim((string) ($linea['descripcion'] ?? ''));
             $cantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
-            $precio = round(max(0, (float) ($linea['precio'] ?? 0)), 2);
+            $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+            $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2);
+            $margen = round(max(0, (float) ($linea['margen'] ?? 0)), 2);
+
+            $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
             return [
+                'articulo_id' => $articuloId,
+                'articulo' => $articulo,
                 'descripcion' => $descripcion,
                 'cantidad' => $cantidad,
-                'precio' => $precio,
-                'total' => round($cantidad * $precio, 2),
+                'medida' => $medida,
+                'precio_unitario' => $precioUnitario,
+                'margen' => $margen,
+                'total' => round($total, 2),
             ];
         })
         ->values()
@@ -96,7 +117,7 @@
                         <select id="cliente_id" name="cliente_id" required>
                             <option value="">Selecciona cliente...</option>
                             @foreach ($clientes as $cliente)
-                                <option value="{{ $cliente->id }}" @selected((string) old('cliente_id', request('cliente_id')) === (string) $cliente->id)>
+                                <option value="{{ $cliente->id }}" @selected((string) $clienteIdDefault === (string) $cliente->id)>
                                     {{ $cliente->empresa_nombre }}
                                 </option>
                             @endforeach
@@ -105,12 +126,12 @@
 
                     <div class="field-group">
                         <label for="ot">OT</label>
-                        <input type="text" id="ot" name="ot" value="{{ old('ot', request('ot')) }}">
+                        <input type="text" id="ot" name="ot" value="{{ $otDefault }}">
                     </div>
 
                     <div class="field-group">
                         <label for="pedido_cliente">Pedido cliente</label>
-                        <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', request('pedido_cliente')) }}">
+                        <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ $pedidoClienteDefault }}">
                     </div>
 
                     <div class="field-group col-span-2">
@@ -128,6 +149,10 @@
             <article class="albaran-card">
                 <h2>ARTICULOS</h2>
                 <div class="linea-input-row">
+                    <div class="field-group flex-1">
+                        <label for="linea_articulo">Código referencia</label>
+                        <input type="text" id="linea_articulo" placeholder="Código o referencia">
+                    </div>
                     <div class="field-group flex-2">
                         <label for="linea_descripcion">Descripcion</label>
                         <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
@@ -137,8 +162,16 @@
                         <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
                     </div>
                     <div class="field-group flex-1">
-                        <label for="linea_precio">Precio</label>
+                        <label for="linea_medida">Medida</label>
+                        <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_precio">P. unitario</label>
                         <input type="number" id="linea_precio" value="0" min="0" step="0.01">
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_margen">Margen (%)</label>
+                        <input type="number" id="linea_margen" value="0" min="0" step="0.01">
                     </div>
                     <button type="button" class="btn-add-linea" id="btnAddLinea">
                         <i class="fas fa-plus"></i>
@@ -153,16 +186,19 @@
                         <thead>
                             <tr>
                                 <th>Linea</th>
+                                <th>Código ref.</th>
                                 <th>Descripcion</th>
                                 <th>Cantidad</th>
-                                <th>Precio</th>
+                                <th>Medida</th>
+                                <th>P. unitario</th>
+                                <th>Margen</th>
                                 <th>Total</th>
                                 <th>Accion</th>
                             </tr>
                         </thead>
                         <tbody id="lineasBody">
                             <tr>
-                                <td colspan="6" class="lineas-empty">No hay lineas añadidas.</td>
+                                <td colspan="9" class="lineas-empty">No hay lineas añadidas.</td>
                             </tr>
                         </tbody>
                     </table>

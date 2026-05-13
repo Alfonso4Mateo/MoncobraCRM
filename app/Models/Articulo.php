@@ -10,6 +10,10 @@ class Articulo extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'facturado' => false,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -20,9 +24,11 @@ class Articulo extends Model
         'numero_referencia',
         'descripcion',
         'cantidad',
+        'medida',
         'precio_unitario',
         'margen',
         'total',
+        'facturado',
     ];
 
     /**
@@ -35,6 +41,7 @@ class Articulo extends Model
         'precio_unitario' => 'decimal:2',
         'margen' => 'decimal:2',
         'total' => 'decimal:2',
+        'facturado' => 'boolean',
     ];
 
     /**

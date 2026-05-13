@@ -161,7 +161,7 @@
                 <div class="pedido-line-editor">
                     <div class="pedido-form-grid pedido-form-grid--line">
                         <div class="pedido-field">
-                            <label for="line_articulo">Artículo</label>
+                            <label for="line_articulo">Código referencia</label>
                             <input type="text" id="line_articulo" class="pedido-input" placeholder="Código o referencia">
                         </div>
                         <div class="pedido-field pedido-field--wide">
@@ -173,12 +173,16 @@
                             <input type="number" step="0.01" min="0" id="line_cantidad" class="pedido-input" value="1">
                         </div>
                         <div class="pedido-field pedido-field--compact">
+                            <label for="line_medida">Medida</label>
+                            <input type="text" id="line_medida" class="pedido-input" placeholder="u, kg, m...">
+                        </div>
+                        <div class="pedido-field pedido-field--compact">
                             <label for="line_precio">P. unitario</label>
                             <input type="number" step="0.01" min="0" id="line_precio" class="pedido-input" value="0">
                         </div>
                         <div class="pedido-field pedido-field--compact">
-                            <label for="line_total">Total</label>
-                            <input type="text" id="line_total" class="pedido-input pedido-input--readonly" value="0,00" readonly>
+                            <label for="line_margen">Margen</label>
+                            <input type="number" step="0.01" min="0" id="line_margen" class="pedido-input" value="0">
                         </div>
                     </div>
                 </div>
@@ -187,10 +191,12 @@
                     <table class="pedido-table">
                         <thead>
                             <tr>
-                                <th style="width: 14%">Artículo</th>
+                                <th style="width: 14%">Código ref.</th>
                                 <th>Descripción</th>
                                 <th style="width: 10%">Cant.</th>
+                                <th style="width: 10%">Medida</th>
                                 <th style="width: 14%">P. unitario</th>
+                                <th style="width: 10%">Margen</th>
                                 <th style="width: 14%">Total</th>
                                 <th style="width: 6%"></th>
                             </tr>
@@ -247,8 +253,9 @@
             const articuloInput = document.getElementById('line_articulo');
             const descripcionInput = document.getElementById('line_descripcion');
             const cantidadInput = document.getElementById('line_cantidad');
+            const medidaInput = document.getElementById('line_medida');
             const precioInput = document.getElementById('line_precio');
-            const totalInput = document.getElementById('line_total');
+            const margenInput = document.getElementById('line_margen');
             const presupuestoSelect = document.getElementById('presupuesto_id');
             const clienteSelect = document.getElementById('id_cliente');
             const hiddenLines = document.getElementById('pedido_lista_articulos');
@@ -271,18 +278,91 @@
 
             const formatMoney = (value) => `${moneyFormatter.format(value)} €`;
 
+            const computeTotal = (cantidad, precioUnitario, margen) => {
+                const qty = Math.max(0, parseValue(cantidad));
+                const unit = Math.max(0, parseValue(precioUnitario));
+                const pct = Math.max(0, parseValue(margen));
+                return Number((qty * unit * (1 + (pct / 100))).toFixed(2));
+            };
+
             const normalizeLines = (lines) => Array.isArray(lines)
-                ? lines.filter((line) => line && typeof line === 'object')
-                    .map((line) => ({
-                        articulo: String(line.articulo ?? '').trim(),
-                        descripcion: String(line.descripcion ?? '').trim(),
-                        cantidad: Number(parseValue(line.cantidad).toFixed(2)),
-                        precio_unitario: Number(parseValue(line.precio_unitario).toFixed(2)),
-                        total: Number(parseValue(line.total).toFixed(2)),
-                    }))
+                ? lines
+                    .filter((line) => line && typeof line === 'object')
+                    .map((line) => {
+                        const cantidad = Number(parseValue(line.cantidad).toFixed(2));
+                        const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(2));
+                        const margen = Number(parseValue(line.margen).toFixed(2));
+
+                        return {
+                            articulo: String(line.articulo ?? '').trim(),
+                            descripcion: String(line.descripcion ?? '').trim(),
+                            cantidad,
+                            medida: String(line.medida ?? line.unidad ?? '').trim(),
+                            precio_unitario: precioUnitario,
+                            margen,
+                            total: computeTotal(cantidad, precioUnitario, margen),
+                        };
+                    })
+                    .filter((line) => line.descripcion !== '')
                 : [];
 
             const findPresupuesto = (presupuestoId) => presupuestos.find((presupuesto) => String(presupuesto.id) === String(presupuestoId));
+
+            const items = normalizeLines(initialLines);
+
+            const syncHidden = () => {
+                hiddenLines.value = JSON.stringify(items);
+            };
+
+            const renderTotals = () => {
+                const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
+                const total = base;
+
+                hiddenTotal.value = total.toFixed(2);
+                summaryBase.textContent = formatMoney(base);
+                summaryTotal.textContent = formatMoney(total);
+            };
+
+            const renderRows = () => {
+                if (items.length === 0) {
+                    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay items agregados.</td></tr>';
+                    syncHidden();
+                    renderTotals();
+                    return;
+                }
+
+                body.innerHTML = items.map((item, index) => `
+                    <tr>
+                        <td>
+                            ${item.articulo ? `<strong>${item.articulo}</strong>` : '<span class="text-muted">-</span>'}
+                        </td>
+                        <td>${item.descripcion || '<span class="text-muted">Sin descripción</span>'}</td>
+                        <td>${moneyFormatter.format(parseValue(item.cantidad))}</td>
+                        <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
+                        <td>${moneyFormatter.format(parseValue(item.precio_unitario))} €</td>
+                        <td>${moneyFormatter.format(parseValue(item.margen))} %</td>
+                        <td>${moneyFormatter.format(parseValue(item.total))} €</td>
+                        <td>
+                            <button type="button" class="pedido-line-remove" data-index="${index}" aria-label="Eliminar línea">
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                syncHidden();
+                renderTotals();
+            };
+
+            const resetLineForm = () => {
+                articuloInput.value = '';
+                descripcionInput.value = '';
+                cantidadInput.value = '1';
+                medidaInput.value = '';
+                precioInput.value = '0';
+                margenInput.value = '0';
+                articuloInput.focus();
+            };
 
             const applyPresupuesto = (presupuestoId) => {
                 const presupuesto = findPresupuesto(presupuestoId);
@@ -303,91 +383,36 @@
                 resetLineForm();
             };
 
-            const items = normalizeLines(initialLines);
-
-            const syncHidden = () => {
-                hiddenLines.value = JSON.stringify(items);
-            };
-
-            const renderTotals = () => {
-                const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
-                const total = base;
-
-                hiddenTotal.value = total.toFixed(2);
-                summaryBase.textContent = formatMoney(base);
-                summaryTotal.textContent = formatMoney(total);
-            };
-
-            const renderRows = () => {
-                if (items.length === 0) {
-                    body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay items agregados.</td></tr>';
-                    syncHidden();
-                    renderTotals();
-                    return;
-                }
-
-                body.innerHTML = items.map((item, index) => `
-                    <tr>
-                        <td>
-                            ${item.articulo ? `<strong>${item.articulo}</strong>` : '<span class="text-muted">-</span>'}
-                        </td>
-                        <td>${item.descripcion || '<span class="text-muted">Sin descripción</span>'}</td>
-                        <td>${moneyFormatter.format(parseValue(item.cantidad))}</td>
-                        <td>${moneyFormatter.format(parseValue(item.precio_unitario))} €</td>
-                        <td>${moneyFormatter.format(parseValue(item.total))} €</td>
-                        <td>
-                            <button type="button" class="pedido-line-remove" data-index="${index}" aria-label="Eliminar línea">
-                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-
-                syncHidden();
-                renderTotals();
-            };
-
-            const setAddButtonState = () => {
-                addLineButton.disabled = articuloInput.value.trim().length === 0;
-            };
-
-            const resetLineForm = () => {
-                articuloInput.value = '';
-                descripcionInput.value = '';
-                cantidadInput.value = '1';
-                precioInput.value = '0';
-                totalInput.value = '0,00';
-                setAddButtonState();
-                articuloInput.focus();
-            };
-
-            const updatePreviewTotal = () => {
-                const cantidad = Math.max(0, parseValue(cantidadInput.value));
-                const precio = Math.max(0, parseValue(precioInput.value));
-                totalInput.value = moneyFormatter.format(cantidad * precio);
-                setAddButtonState();
-            };
-
             const addLine = () => {
                 const articulo = articuloInput.value.trim();
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, parseValue(cantidadInput.value));
+                const medida = medidaInput.value.trim();
                 const precioUnitario = Math.max(0, parseValue(precioInput.value));
+                const margen = Math.max(0, parseValue(margenInput.value));
 
                 if (!articulo) {
-                    window.alert('Completa el artículo antes de añadir la línea.');
+                    window.alert('Completa el código referencia antes de añadir la línea.');
                     articuloInput.focus();
                     return;
                 }
 
-                const total = cantidad * precioUnitario;
+                if (!descripcion) {
+                    window.alert('Completa la descripción antes de añadir la línea.');
+                    descripcionInput.focus();
+                    return;
+                }
+
+                const total = computeTotal(cantidad, precioUnitario, margen);
 
                 items.push({
                     articulo,
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
+                    medida,
                     precio_unitario: Number(precioUnitario.toFixed(2)),
-                    total: Number(total.toFixed(2)),
+                    margen: Number(margen.toFixed(2)),
+                    total,
                 });
 
                 renderRows();
@@ -395,25 +420,18 @@
             };
 
             const refreshFromBudgetSelection = () => {
-                const presupuesto = findPresupuesto(presupuestoSelect.value);
-                if (!presupuesto) {
-                    return;
-                }
-
-                if (presupuesto.cliente_id) {
-                    clienteSelect.value = String(presupuesto.cliente_id);
-                }
-
-                if (Array.isArray(presupuesto.lineas) && presupuesto.lineas.length > 0) {
-                    items.splice(0, items.length, ...normalizeLines(presupuesto.lineas));
-                    renderRows();
-                    resetLineForm();
-                }
+                applyPresupuesto(presupuestoSelect.value);
             };
 
-            articuloInput.addEventListener('input', setAddButtonState);
-            cantidadInput.addEventListener('input', updatePreviewTotal);
-            precioInput.addEventListener('input', updatePreviewTotal);
+            articuloInput.addEventListener('input', () => {
+                addLineButton.disabled = articuloInput.value.trim().length === 0;
+            });
+
+            [cantidadInput, precioInput, margenInput].forEach((input) => {
+                input.addEventListener('input', () => {
+                    addLineButton.disabled = articuloInput.value.trim().length === 0;
+                });
+            });
 
             presupuestoSelect.addEventListener('change', refreshFromBudgetSelection);
 
@@ -437,18 +455,18 @@
             });
 
             renderRows();
-            setAddButtonState();
-            updatePreviewTotal();
+            addLineButton.disabled = articuloInput.value.trim().length === 0;
 
             if (presupuestoSelect.value) {
                 applyPresupuesto(presupuestoSelect.value);
             }
 
-            form.addEventListener('submit', (event) => {
+            form.addEventListener('submit', () => {
                 const button = document.activeElement;
                 if (button && button.dataset && button.dataset.estado) {
                     hiddenState.value = button.dataset.estado;
                 }
+
                 syncHidden();
                 renderTotals();
             });

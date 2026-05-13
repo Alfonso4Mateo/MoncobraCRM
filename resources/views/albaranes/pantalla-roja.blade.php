@@ -101,6 +101,10 @@
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
                         <div class="line-row">
+                            <div class="field flex-1">
+                                <label for="linea_articulo">Código referencia</label>
+                                <input type="text" id="linea_articulo" placeholder="Código o referencia">
+                            </div>
                             <div class="field flex-3">
                                 <label for="linea_descripcion">Descripción</label>
                                 <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
@@ -110,8 +114,16 @@
                                 <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
                             </div>
                             <div class="field flex-1">
-                                <label for="linea_precio">Precio</label>
+                                <label for="linea_medida">Medida</label>
+                                <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                            </div>
+                            <div class="field flex-1">
+                                <label for="linea_precio">P. unitario</label>
                                 <input type="number" id="linea_precio" value="0.00" min="0" step="0.01">
+                            </div>
+                            <div class="field flex-1">
+                                <label for="linea_margen">Margen (%)</label>
+                                <input type="number" id="linea_margen" value="0" min="0" step="0.01">
                             </div>
                             <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
                         </div>
@@ -123,16 +135,19 @@
                                 <thead>
                                     <tr>
                                         <th>Línea</th>
+                                        <th>Código ref.</th>
                                         <th>Descripción</th>
                                         <th>Cantidad</th>
-                                        <th>Precio</th>
+                                        <th>Medida</th>
+                                        <th>P. unitario</th>
+                                        <th>Margen</th>
                                         <th>Total</th>
                                         <th>Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody id="lineasBody">
                                     <tr>
-                                        <td colspan="6" class="lineas-empty">No hay líneas añadidas.</td>
+                                        <td colspan="9" class="lineas-empty">No hay líneas añadidas.</td>
                                     </tr>
                                 </tbody>
                             </table>

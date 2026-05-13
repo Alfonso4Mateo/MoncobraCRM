@@ -155,11 +155,21 @@ a / Fecha) -->
                         $lineasMostradas = 0;
                     @endphp
                     @foreach((array) $presupuesto->lista_articulos as $i => $line)
+                        @php
+                            $cantidad = (float) ($line['cantidad'] ?? 0);
+                            $precioUnitario = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
+                            $margen = (float) ($line['margen'] ?? 0);
+                            $precioConMargen = isset($line['precio_con_margen'])
+                                ? (float) $line['precio_con_margen']
+                                : ($precioUnitario * (1 + ($margen / 100)));
+                            $medida = $line['medida'] ?? ($line['unidad'] ?? null);
+                            $medida = is_string($medida) ? trim($medida) : $medida;
+                        @endphp
                         <tr>
                             <td style="vertical-align:top">{{ $i + 1 }}</td>
                             <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                            <td style="text-align:right">{{ isset($line['cantidad']) ? ((int) $line['cantidad']) . (isset($line['unidad']) && $line['unidad'] ? ' ' . e($line['unidad']) : '') : '' }}</td>
-                            <td style="text-align:right">{{ number_format($line['precio_con_margen'] ?? $line['precio_unitario'] ?? 0, 2, ',', '.') }}</td>
+                            <td style="text-align:right">{{ number_format($cantidad, 2, ',', '.') }}{{ $medida ? ' ' . e($medida) : '' }}</td>
+                            <td style="text-align:right">{{ number_format($precioConMargen, 2, ',', '.') }}</td>
                             <td style="text-align:right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }}</td>
                         </tr>
                         @php $lineasMostradas++; @endphp

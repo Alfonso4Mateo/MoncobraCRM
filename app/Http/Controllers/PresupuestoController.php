@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Articulo;
 use Carbon\Carbon;
 use App\Models\Presupuesto;
 use App\Models\Cliente;
@@ -110,23 +111,28 @@ class PresupuestoController extends Controller
             ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
             ->map(function (array $item) {
                 $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? 0));
+                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? ($item['precio'] ?? 0)));
                 $margen = max(0, (float) ($item['margen'] ?? 0));
 
-                $cantidadInt = (int) max(0, round($cantidad, 0));
+                $cantidadRounded = round($cantidad, 2);
                 $precioUnitarioRounded = round($precioUnitario, 2);
                 $margenRounded = round($margen, 2);
 
                 // Apply margin to unit price on server-side (only once)
                 $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
                 $precioConMargenRounded = round($precioConMargen, 2);
-                $totalComputed = round($precioConMargenRounded * $cantidadInt, 2);
+                $totalComputed = round($precioConMargenRounded * $cantidadRounded, 2);
+
+                $medida = trim((string) ($item['medida'] ?? ($item['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
 
                 return [
                     'articulo' => trim((string) ($item['articulo'] ?? '')),
                     'descripcion' => trim((string) ($item['descripcion'] ?? '')),
-                    'cantidad' => $cantidadInt,
-                    'unidad' => isset($item['unidad']) ? trim((string) $item['unidad']) : null,
+                    'cantidad' => $cantidadRounded,
+                    'medida' => $medida,
+                    // compatibilidad con formatos antiguos
+                    'unidad' => $medida,
                     'precio_unitario' => $precioUnitarioRounded,
                     'margen' => $margenRounded,
                     'precio_con_margen' => $precioConMargenRounded,
@@ -146,6 +152,7 @@ class PresupuestoController extends Controller
         $validated['estado'] = 'pendiente';
 
         $presupuesto = Presupuesto::create($validated);
+        $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
 
         // Attempt to generate and store a PDF copy of the presupuesto if a PDF library is available
         try {
@@ -387,6 +394,8 @@ class PresupuestoController extends Controller
             'total' => round($totalComputed, 2),
         ]);
 
+        $this->syncArticulosFromLineas($proyectoId, $articulosNormalizados);
+
         return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Artículos del presupuesto actualizados');
     }
 
@@ -470,5 +479,37 @@ class PresupuestoController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
         ]);
+    }
+
+    private function syncArticulosFromLineas(int $proyectoId, array $lineas): void
+    {
+        foreach ($lineas as $linea) {
+            if (!is_array($linea)) {
+                continue;
+            }
+
+            $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
+            $descripcion = trim((string) ($linea['descripcion'] ?? ''));
+
+            if ($numeroReferencia === '' || $descripcion === '') {
+                continue;
+            }
+
+            Articulo::updateOrCreate(
+                [
+                    'proyecto_id' => $proyectoId,
+                    'numero_referencia' => $numeroReferencia,
+                ],
+                [
+                    'descripcion' => $descripcion,
+                    'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
+                    'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
+                    'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
+                    'facturado' => false,
+                ]
+            );
+        }
     }
 }

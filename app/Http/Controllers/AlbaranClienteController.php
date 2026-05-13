@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AlbaranCliente;
+use App\Models\Articulo;
 use App\Models\Cliente;
 use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
@@ -169,8 +170,16 @@ class AlbaranClienteController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
+        $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
+        $lineasIniciales = $pedidoContext ? $this->buildLineasInicialesFromPedido($pedidoContext, $proyectoId) : [];
+        $pedidoDefaults = [
+            'cliente_id' => $pedidoContext?->id_cliente,
+            'pedido_cliente' => $pedidoContext?->numero_pedido,
+            'ot' => $pedidoContext?->ot,
+            'pedido_id' => $pedidoContext?->id,
+        ];
 
-        return view('albaranes.create', compact('clientes'));
+        return view('albaranes.create', compact('clientes', 'pedidoContext', 'lineasIniciales', 'pedidoDefaults'));
     }
 
     public function store(Request $request)
@@ -207,12 +216,102 @@ class AlbaranClienteController extends Controller
 
         $albaran = AlbaranCliente::create($validated);
         $this->syncPedidoClienteLink($albaran, $proyectoId);
+
+        $articuloIdsFacturados = collect($lineas)
+            ->pluck('articulo_id')
+            ->filter(fn ($value) => (int) $value > 0)
+            ->unique()
+            ->values();
+
+        if ($articuloIdsFacturados->isNotEmpty()) {
+            Articulo::query()
+                ->where('proyecto_id', $proyectoId)
+                ->whereIn('id', $articuloIdsFacturados)
+                ->update(['facturado' => true]);
+        }
+
         return redirect()->route('albaranes.index')->with('success', 'Albarán creado');
+    }
+
+    private function resolvePedidoContext(Request $request, int $proyectoId): ?PedidoCliente
+    {
+        $pedidoId = (int) $request->query('pedido_id', 0);
+        if ($pedidoId > 0) {
+            $pedido = PedidoCliente::query()
+                ->with('cliente')
+                ->where('proyecto_id', $proyectoId)
+                ->find($pedidoId);
+
+            if ($pedido) {
+                return $pedido;
+            }
+        }
+
+        $numeroPedido = trim((string) $request->query('pedido_cliente', ''));
+        if ($numeroPedido === '') {
+            return null;
+        }
+
+        return PedidoCliente::query()
+            ->with('cliente')
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero_pedido', $numeroPedido)
+            ->first();
+    }
+
+    private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int $proyectoId): array
+    {
+        $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
+
+        return collect($lineas)
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(function (array $linea) use ($proyectoId) {
+                $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
+                if ($numeroReferencia === '') {
+                    return null;
+                }
+
+                $articulo = Articulo::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('numero_referencia', $numeroReferencia)
+                    ->where(function ($query) {
+                        $query->where('facturado', false)
+                            ->orWhereNull('facturado');
+                    })
+                    ->first();
+
+                if (!$articulo) {
+                    return null;
+                }
+
+                $cantidad = round(max(0, (float) ($linea['cantidad'] ?? $articulo->cantidad ?? 0)), 2);
+                $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
+                $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));
+                $medida = $medida !== '' ? $medida : null;
+                $descripcion = trim((string) ($linea['descripcion'] ?? $articulo->descripcion ?? ''));
+                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+
+                return [
+                    'articulo_id' => $articulo->id,
+                    'articulo' => $numeroReferencia,
+                    'descripcion' => $descripcion,
+                    'cantidad' => $cantidad,
+                    'medida' => $medida,
+                    'precio_unitario' => $precioUnitario,
+                    'margen' => $margen,
+                    'total' => $total,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function show(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -226,7 +325,8 @@ class AlbaranClienteController extends Controller
 
     public function pdfViewer(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -240,7 +340,8 @@ class AlbaranClienteController extends Controller
 
     public function streamPdf(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -263,7 +364,8 @@ class AlbaranClienteController extends Controller
 
     public function pantallaRoja(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -280,7 +382,8 @@ class AlbaranClienteController extends Controller
 
     public function updatePantallaRoja(Request $request, AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -320,7 +423,8 @@ class AlbaranClienteController extends Controller
 
     public function updateEstado(Request $request, AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -343,7 +447,8 @@ class AlbaranClienteController extends Controller
 
     public function destroy(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -378,14 +483,28 @@ class AlbaranClienteController extends Controller
             }
 
             $cantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
-            $precio = round(max(0, (float) ($linea['precio'] ?? 0)), 2);
-            $total = round($cantidad * $precio, 2);
+            $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2);
+            $margen = round(max(0, (float) ($linea['margen'] ?? 0)), 2);
+            $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+
+            $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+            $medida = $medida !== '' ? $medida : null;
+
+            $articulo = trim((string) ($linea['articulo'] ?? ''));
+            $articuloId = isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null;
 
             $lineas[] = [
+                'articulo_id' => $articuloId,
+                'articulo' => $articulo,
                 'descripcion' => $descripcion,
                 'cantidad' => $cantidad,
-                'precio' => $precio,
+                'medida' => $medida,
+                'precio_unitario' => $precioUnitario,
+                'margen' => $margen,
                 'total' => $total,
+                // compatibilidad con formatos antiguos
+                'precio' => $precioUnitario,
+                'unidad' => $medida,
             ];
         }
 
@@ -414,6 +533,43 @@ class AlbaranClienteController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Resolve proyecto_id with fallback to model's proyecto_id if session is not available.
+     * This allows accessing resources even without an active session proyecto.
+     */
+    private function resolveProyectoIdWithFallback(?int $fallbackProyectoId = null): int
+    {
+        $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
+        if ($sessionProyectoId > 0) {
+            return $sessionProyectoId;
+        }
+
+        if ($fallbackProyectoId && $fallbackProyectoId > 0) {
+            return $fallbackProyectoId;
+        }
+
+        // If no fallback available, try to enforce session (original behavior)
+        return $this->resolveActiveProyectoId(request());
+    }
+
+    /**
+     * Validate user access to a specific proyecto.
+     */
+    private function validateProyectoAccess(int $proyectoId): void
+    {
+        $user = request()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $hasAccess = $user->role === 'superadmin'
+            || $user->proyectos()->where('proyectos.id', $proyectoId)->exists();
+
+        if (!$hasAccess) {
+            abort(403);
+        }
     }
 
     private function syncPedidoClienteLink(AlbaranCliente $albaran, int $proyectoId): void

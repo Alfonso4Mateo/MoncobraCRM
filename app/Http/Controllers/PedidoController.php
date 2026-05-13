@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AlbaranCliente;
+use App\Models\Articulo;
 use App\Models\Cliente;
 use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
@@ -242,15 +243,15 @@ class PedidoController extends Controller
                 $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
                 $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
                 $margen = max(0, (float) ($linea['margen'] ?? 0));
-                $precioFinal = $precioUnitario * (1 + ($margen / 100));
-                $total = $cantidad * $precioFinal;
+                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
                 return [
                     'articulo' => trim((string) ($linea['articulo'] ?? '')),
                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                     'cantidad' => round($cantidad, 2),
-                    'precio_unitario' => round($precioFinal, 2),
-                    'margen' => 0.0,
+                    'medida' => trim((string) ($linea['medida'] ?? $linea['unidad'] ?? '')),
+                    'precio_unitario' => round($precioUnitario, 2),
+                    'margen' => round($margen, 2),
                     'total' => round($total, 2),
                 ];
             })
@@ -274,15 +275,15 @@ class PedidoController extends Controller
                         $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
                         $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
                         $margen = max(0, (float) ($linea['margen'] ?? 0));
-                        $precioFinal = $precioUnitario * (1 + ($margen / 100));
-                        $total = isset($linea['total']) ? (float) $linea['total'] : $cantidad * $precioFinal;
+                        $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
                         return [
                             'articulo' => trim((string) ($linea['articulo'] ?? '')),
                             'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                             'cantidad' => round($cantidad, 2),
-                            'precio_unitario' => round($precioFinal, 2),
-                            'margen' => 0.0,
+                            'medida' => trim((string) ($linea['medida'] ?? $linea['unidad'] ?? '')),
+                            'precio_unitario' => round($precioUnitario, 2),
+                            'margen' => round($margen, 2),
                             'total' => round($total, 2),
                         ];
                     })
@@ -353,14 +354,19 @@ class PedidoController extends Controller
             ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
             ->map(function (array $linea) {
                 $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
+                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
                 $margen = max(0, (float) ($linea['margen'] ?? 0));
-                $total = isset($linea['total']) ? (float) $linea['total'] : $cantidad * $precioUnitario * (1 + ($margen / 100));
+
+                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
+
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
 
                 return [
                     'articulo' => trim((string) ($linea['articulo'] ?? '')),
                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                     'cantidad' => round($cantidad, 2),
+                    'medida' => $medida,
                     'precio_unitario' => round($precioUnitario, 2),
                     'margen' => round($margen, 2),
                     'total' => round($total, 2),
@@ -369,7 +375,7 @@ class PedidoController extends Controller
             ->values()
             ->all();
 
-        $total = (float) ($validated['total'] ?? collect($lineas)->sum('total'));
+        $total = (float) collect($lineas)->sum('total');
 
         PedidoCliente::create([
             'id_cliente' => $validated['id_cliente'],
@@ -383,6 +389,8 @@ class PedidoController extends Controller
             'total' => round($total, 2),
             'lista_articulos' => $lineas ?: null,
         ]);
+
+        $this->syncArticulosFromLineas($proyectoId, $lineas);
 
         return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente creado correctamente');
     }
@@ -435,8 +443,24 @@ class PedidoController extends Controller
 
     public function albaranesCliente(PedidoCliente $pedidoCliente)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        // Try to get proyecto from session, fallback to pedido's proyecto
+        $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
+        $proyectoId = $sessionProyectoId > 0 ? $sessionProyectoId : (int) ($pedidoCliente->proyecto_id ?? 0);
 
+        // Validate that user has access to this proyecto
+        $user = request()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $hasAccess = $user->role === 'superadmin'
+            || $user->proyectos()->where('proyectos.id', $proyectoId)->exists();
+
+        if (!$hasAccess) {
+            abort(403);
+        }
+
+        // Verify pedido belongs to the proyectoId
         if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
             abort(404);
         }
@@ -532,5 +556,37 @@ class PedidoController extends Controller
             ->count() + 1;
 
         return sprintf('PC-%s-%03d', now()->format('Y'), $nextIndex);
+    }
+
+    private function syncArticulosFromLineas(int $proyectoId, array $lineas): void
+    {
+        foreach ($lineas as $linea) {
+            if (!is_array($linea)) {
+                continue;
+            }
+
+            $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
+            $descripcion = trim((string) ($linea['descripcion'] ?? ''));
+
+            if ($numeroReferencia === '' || $descripcion === '') {
+                continue;
+            }
+
+            Articulo::updateOrCreate(
+                [
+                    'proyecto_id' => $proyectoId,
+                    'numero_referencia' => $numeroReferencia,
+                ],
+                [
+                    'descripcion' => $descripcion,
+                    'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
+                    'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
+                    'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
+                    'facturado' => false,
+                ]
+            );
+        }
     }
 }

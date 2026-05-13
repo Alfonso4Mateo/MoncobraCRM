@@ -385,24 +385,43 @@ body,
     text-decoration: underline !important;
 }
 
-.pedido-albaran-add-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    border: 1px solid #cfd9e8;
-    background: #f3f8ff;
-    color: #1e5fa5 !important;
+.pedido-albaran-btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-size: .84rem;
+    font-weight: 700;
     text-decoration: none !important;
-    transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    transition: all .18s ease;
+    cursor: pointer;
 }
 
-.pedido-albaran-add-btn:hover {
-    transform: translateY(-1px);
+.pedido-albaran-btn--add {
     background: #e8f2ff;
     border-color: #b7cbe6;
+    color: #1e5fa5 !important;
+}
+
+.pedido-albaran-btn--add:hover {
+    background: #d4e8ff;
+    border-color: #9db8d8;
+    transform: translateY(-1px);
+}
+
+.pedido-albaran-btn--view {
+    background: #f0f4f8;
+    border-color: #d1dbe8;
+    color: #2c5aa0 !important;
+}
+
+.pedido-albaran-btn--view:hover {
+    background: #e4ecf5;
+    border-color: #bccce0;
+    transform: translateY(-1px);
 }
 
 .pedido-multi-albaranes-link {
@@ -794,4 +813,223 @@ body,
 .presupuesto-dropdown .dropdown-item:hover {
     background: #f8fafc;
     color: #1e293b;
+}
+
+/* ========================================
+   Estilos para Pantalla de Albaranes del Pedido
+   ======================================== */
+
+.pedidos-clientes-header__actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.pedidos-clientes-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #f0f4f8;
+    color: #2c5aa0 !important;
+    font-size: .84rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    border: 1px solid #d1dbe8;
+    transition: all .18s ease;
+}
+
+.pedidos-clientes-action-btn--secondary:hover {
+    background: #e4ecf5;
+    border-color: #bccce0;
+    transform: translateY(-1px);
+}
+
+.card-subtitle {
+    margin: 4px 0 0;
+    color: var(--pedido-muted);
+    font-size: .84rem;
+    font-weight: 600;
+}
+
+/* Información del Pedido */
+.albaran-pedido-info {
+    padding: 20px 22px;
+    border: 2px solid var(--pedido-accent-soft);
+    background: linear-gradient(135deg, #fafbfc 0%, #f3f8ff 100%);
+}
+
+.albaran-info-header {
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--pedido-border);
+    padding-bottom: 12px;
+}
+
+.albaran-info-header h3 {
+    margin: 0;
+    color: var(--pedido-primary);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.albaran-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.albaran-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.albaran-info-label {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--pedido-muted);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.albaran-info-value {
+    font-size: .95rem;
+    color: var(--pedido-text);
+    word-break: break-word;
+}
+
+/* Resumen de Pagos */
+.albaran-resumen-pagos {
+    padding: 20px 22px;
+}
+
+.albaran-pagos-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.albaran-pago-item {
+    border: 1px solid var(--pedido-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: #fbfdff;
+    transition: all .18s ease;
+}
+
+.albaran-pago-item:hover {
+    border-color: #b7cbe6;
+    background: #f3f8ff;
+}
+
+.albaran-pago-item--paid {
+    border-color: #b8e6c8;
+    background: #f0fdf5;
+}
+
+.albaran-pago-item--paid:hover {
+    border-color: #82d09e;
+    background: #e6fce0;
+}
+
+.albaran-pago-item--pending {
+    border-color: #ffc7a3;
+    background: #fffaf7;
+}
+
+.albaran-pago-item--pending:hover {
+    border-color: #ffb380;
+    background: #fff5ed;
+}
+
+.albaran-pago-item--count {
+    border-color: #d4b7e8;
+    background: #faf8ff;
+}
+
+.albaran-pago-item--count:hover {
+    border-color: #b58fd6;
+    background: #f3eaff;
+}
+
+.albaran-pago-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.albaran-pago-label {
+    font-size: .75rem;
+    font-weight: 800;
+    color: var(--pedido-muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.albaran-pago-amount {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--pedido-primary);
+}
+
+/* Barra de Progreso */
+.albaran-pago-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--pedido-border);
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 24px;
+    border-radius: 12px;
+    background: #e8eef7;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(15, 41, 69, .08);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1e5fa5 0%, #2f80ed 100%);
+    border-radius: 12px;
+    transition: width .4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-text {
+    font-size: .81rem;
+    font-weight: 700;
+    color: var(--pedido-primary);
+    text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .albaran-info-grid,
+    .albaran-pagos-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .pedidos-clientes-header__actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .pedidos-clientes-action-btn,
+    .pedidos-clientes-create-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .albaran-info-grid,
+    .albaran-pagos-grid {
+        grid-template-columns: 1fr;
+    }
 }
