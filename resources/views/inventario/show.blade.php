@@ -57,6 +57,41 @@
 
                 <section class="item-section">
                     <aside class="item-section-label">
+                        <span>SECCION 1.5</span>
+                        <h2>Variantes del Producto</h2>
+                        <p>Información de variantes dinámicas.</p>
+                    </aside>
+
+                    <div class="item-section-fields fields-1">
+                        <div class="field-group">
+                            <label>Tipos de variantes</label>
+                            <div class="field-read">
+                                @if($inventario->variante && $inventario->variante->tipos_atributos)
+                                    {{ implode(', ', $inventario->variante->tipos_atributos) }}
+                                @else
+                                    Sin variantes definidas
+                                @endif
+                            </div>
+                        </div>
+
+                        @if($inventario->atributos_variante && count($inventario->atributos_variante) > 0)
+                            @foreach($inventario->atributos_variante as $tipo => $valor)
+                                <div class="field-group">
+                                    <label>{{ $tipo }}</label>
+                                    <div class="field-read">{{ $valor }}</div>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="field-group">
+                                <label>Valores</label>
+                                <div class="field-read">Sin valores especificados</div>
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="item-section">
+                    <aside class="item-section-label">
                         <span>SECCION 2</span>
                         <h2>Control de Existencias</h2>
                         <p>Parametros de stock y ubicacion fisica dentro de los almacenes operativos.</p>

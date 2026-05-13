@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Almacen;
+use App\Models\Clase;
 use App\Models\Cliente;
 use App\Models\AlbaranCliente;
 use App\Models\Presupuesto;
 use App\Models\Inventario;
+use App\Models\Personal;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +46,10 @@ class DashboardController extends Controller
 
         $totalInventario = Inventario::count();
         $stockBajo = Inventario::whereColumn('stock_actual', '<=', 'stock_minimo')->count();
+        $totalClases = Clase::count();
+        $totalAlmacenes = Almacen::count();
+        $totalPersonal = Personal::count();
+        $personalActivos = Personal::where('activo', true)->count();
 
         $countFromFirstAvailableTable = function (array $tables, ?callable $constraint = null): int {
             foreach ($tables as $table) {
@@ -73,8 +80,8 @@ class DashboardController extends Controller
             return $query->whereRaw('1 = 0');
         };
 
-        $totalPedidos = $countFromFirstAvailableTable(['pedidos']);
-        $pedidosHoy = $countFromFirstAvailableTable(['pedidos'], $todayConstraint);
+        $totalPedidos = $countFromFirstAvailableTable(['pedidos_clientes', 'pedidos']);
+        $pedidosHoy = $countFromFirstAvailableTable(['pedidos_clientes', 'pedidos'], $todayConstraint);
 
         $totalDocumentos = $countFromFirstAvailableTable(['documentos', 'historicos']);
         $documentosHoy = $countFromFirstAvailableTable(['documentos', 'historicos'], $todayConstraint);
@@ -137,11 +144,11 @@ class DashboardController extends Controller
                 'title' => 'Inventario',
                 'icon' => 'fas fa-warehouse',
                 'tone' => 'inventario',
-                'description' => 'Vigilancia de stock critico y acceso a reposicion.',
+                'description' => 'Vigilancia de stock critico, variantes dinamicas y acceso a altas rapidas.',
                 'route' => route('inventario.index'),
                 'cta' => 'Gestionar inventario',
-                'secondary_route' => route('inventario.create'),
-                'secondary_text' => 'Anadir producto',
+                'secondary_route' => route('inventario.item.create'),
+                'secondary_text' => 'Nuevo item',
                 'metrics' => [
                     ['label' => 'Stock critico', 'value' => $stockBajo],
                     ['label' => 'Productos', 'value' => $totalInventario],
@@ -154,44 +161,118 @@ class DashboardController extends Controller
                 'icon' => 'fas fa-dolly',
                 'tone' => 'pedidos',
                 'description' => 'Entrada directa al modulo de pedidos y sus emisiones.',
-                'route' => route('pedidos.index'),
+                'route' => route('pedidos-clientes.index'),
                 'cta' => 'Ver pedidos',
-                'secondary_route' => route('pedidos.create'),
+                'secondary_route' => route('pedidos-clientes.create'),
                 'secondary_text' => 'Nuevo pedido',
                 'metrics' => [
                     ['label' => 'Total', 'value' => $totalPedidos],
                     ['label' => 'Emitidos hoy', 'value' => $pedidosHoy],
                 ],
             ],
-            [
-                'id' => 'documentos',
-                'category' => 'DOCUMENTOS',
-                'title' => 'Documentos',
-                'icon' => 'fas fa-folder-open',
-                'tone' => 'documentos',
-                'description' => 'Acceso al historico documental del sistema.',
-                'route' => route('historico.index'),
-                'cta' => 'Ver documentos',
-                'metrics' => [
-                    ['label' => 'Registros', 'value' => $totalDocumentos],
-                    ['label' => 'Actualizados hoy', 'value' => $documentosHoy],
-                ],
+        ];
+
+        $dashboardPanels[] = [
+            'id' => 'almacenes',
+            'category' => 'ALMACEN',
+            'title' => 'Almacenes',
+            'icon' => 'fas fa-warehouse',
+            'tone' => 'clientes',
+            'description' => 'Alta y administración de almacenes operativos del proyecto.',
+            'route' => route('almacenes.create'),
+            'cta' => 'Abrir almacén',
+            'metrics' => [
+                ['label' => 'Total', 'value' => $totalAlmacenes],
+                ['label' => 'Inventario', 'value' => $totalInventario],
             ],
-            [
-                'id' => 'bolsa',
-                'category' => 'FINANZAS',
-                'title' => 'Bolsa de Clientes',
-                'icon' => 'fas fa-wallet',
+        ];
+
+        $dashboardPanels[] = [
+            'id' => 'documentos',
+            'category' => 'DOCUMENTOS',
+            'title' => 'Documentos',
+            'icon' => 'fas fa-folder-open',
+            'tone' => 'documentos',
+            'description' => 'Acceso al historico documental del sistema.',
+            'route' => route('historico.index'),
+            'cta' => 'Ver documentos',
+            'metrics' => [
+                ['label' => 'Registros', 'value' => $totalDocumentos],
+                ['label' => 'Actualizados hoy', 'value' => $documentosHoy],
+            ],
+        ];
+
+        $dashboardPanels[] = [
+            'id' => 'bolsa',
+            'category' => 'FINANZAS',
+            'title' => 'Bolsa de Clientes',
+            'icon' => 'fas fa-wallet',
+            'tone' => 'bolsa',
+            'description' => 'Resumen rapido de proyectos y asignaciones activas.',
+            'route' => route('bolsa.index'),
+            'cta' => 'Abrir bolsa',
+            'metrics' => [
+                ['label' => 'Proyectos', 'value' => $totalProyectos],
+                ['label' => 'Asignaciones', 'value' => $asignacionesProyecto],
+            ],
+        ];
+
+        if (auth()->user()->can('manage-users')) {
+            $dashboardPanels[] = [
+                'id' => 'personal',
+                'category' => 'RRHH',
+                'title' => 'Personal',
+                'icon' => 'fas fa-users-cog',
+                'tone' => 'presupuestos',
+                'description' => 'Acceso al registro de trabajadores y su información asociada.',
+                'route' => route('personal.index'),
+                'cta' => 'Ver personal',
+                'secondary_route' => route('personal.create'),
+                'secondary_text' => 'Nuevo trabajador',
+                'metrics' => [
+                    ['label' => 'Total', 'value' => $totalPersonal],
+                    ['label' => 'Activos', 'value' => $personalActivos],
+                ],
+            ];
+        }
+
+        if (auth()->user()->can('manage-users') || auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin') {
+            $dashboardPanels[] = [
+                'id' => 'clases',
+                'category' => 'INVENTARIO',
+                'title' => 'Clases',
+                'icon' => 'fas fa-tags',
+                'tone' => 'documentos',
+                'description' => 'Clasificación de productos y agrupación de inventario por categorías.',
+                'route' => route('clases.index'),
+                'cta' => 'Ver clases',
+                'secondary_route' => route('clases.create'),
+                'secondary_text' => 'Nueva clase',
+                'metrics' => [
+                    ['label' => 'Total', 'value' => $totalClases],
+                    ['label' => 'Productos', 'value' => $totalInventario],
+                ],
+            ];
+        }
+
+        if (auth()->user()->can('manage-projects')) {
+            $dashboardPanels[] = [
+                'id' => 'proyectos',
+                'category' => 'PROYECTOS',
+                'title' => 'Gestión de Proyectos',
+                'icon' => 'fas fa-code-branch',
                 'tone' => 'bolsa',
-                'description' => 'Resumen rapido de proyectos y asignaciones activas.',
-                'route' => route('bolsa.index'),
-                'cta' => 'Abrir bolsa',
+                'description' => 'Administración de proyectos y sus asignaciones activas.',
+                'route' => route('herramientas.proyectos.index'),
+                'cta' => 'Abrir proyectos',
+                'secondary_route' => route('herramientas.proyectos.create'),
+                'secondary_text' => 'Nuevo proyecto',
                 'metrics' => [
                     ['label' => 'Proyectos', 'value' => $totalProyectos],
                     ['label' => 'Asignaciones', 'value' => $asignacionesProyecto],
                 ],
-            ],
-        ];
+            ];
+        }
 
         $dashboardPanels = $this->applyPanelOrder(
             $dashboardPanels,
@@ -200,7 +281,7 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'dashboardPanels' => $dashboardPanels,
-            'dashboardVersion' => '2.0.42',
+            'dashboardVersion' => '2.1.0',
         ]);
     }
 
@@ -273,8 +354,12 @@ class DashboardController extends Controller
             'albaranes',
             'inventario',
             'pedidos',
+            'almacenes',
             'documentos',
             'bolsa',
+            'personal',
+            'clases',
+            'proyectos',
         ];
     }
 }

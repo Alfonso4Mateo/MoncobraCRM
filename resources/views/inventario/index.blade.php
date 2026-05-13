@@ -143,6 +143,7 @@
                                 <tr>
                                     <th>Código</th>
                                     <th>Descripción</th>
+                                    <th>Variante</th>
                                     <th>Clase</th>
                                     <th>Almacén</th>
                                     <th>Stock actual</th>
@@ -179,6 +180,17 @@
                                                 <strong>{{ $producto->descripcion }}</strong>
                                                 @if($producto->referencia_proveedor)
                                                     <span>{{ $producto->referencia_proveedor }}</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="inventory-variant">
+                                                @if($producto->atributos_variante && count($producto->atributos_variante) > 0)
+                                                    @foreach($producto->atributos_variante as $tipo => $valor)
+                                                        <span class="inventory-variant-badge">{{ $tipo }}: {{ $valor }}</span>
+                                                    @endforeach
+                                                @else
+                                                    <span class="inventory-pill muted">Sin variante</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -222,7 +234,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9">
+                                        <td colspan="10">
                                             <div class="inventory-empty-state">
                                                 <i class="fas fa-box-open"></i>
                                                 <strong>No hay productos en inventario</strong>

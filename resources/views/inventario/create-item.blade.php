@@ -14,7 +14,7 @@
         <header class="inventory-item-head">
             <span class="module-tag">MODULO DE INVENTARIO</span>
             <h1>Crear Nuevo Item de Inventario</h1>
-            <p>Registro de nuevas existencias, especificaciones tecnicas y parametros economicos para el sistema central de logistica.</p>
+            <p>Registro de nuevas existencias con variantes (tallas, colores), especificaciones tecnicas y parametros economicos para el sistema central de logistica.</p>
         </header>
 
         @if ($errors->any())
@@ -65,6 +65,26 @@
                             @error('clase_id')
                                 <span class="invalid-feedback">{{ $message }}</span>
                             @enderror
+                        </div>
+                    </div>
+                </section>
+
+                <section class="item-section">
+                    <aside class="item-section-label">
+                        <span>SECCION 1.5</span>
+                        <h2>Variantes Dinámicas del Producto</h2>
+                        <p>Define los tipos de variantes (Talla, Color, Material, etc.) y sus valores específicos.</p>
+                    </aside>
+
+                    <div class="item-section-fields fields-1">
+                        <div class="field-group field-full">
+                            <label for="tipos_atributos">Tipos de variantes</label>
+                            <input id="tipos_atributos" name="tipos_atributos" type="text" value="{{ old('tipos_atributos') }}" placeholder="Ejem: Talla, Color, Material (separados por coma)" class="@error('tipos_atributos') is-invalid @enderror">
+                            <small style="color: #666; display: block; margin-top: 0.5rem;">Especifica los tipos de variantes que tendrá este producto, separados por coma.</small>
+                        </div>
+
+                        <div id="atributos-container" class="field-group field-full" style="margin-top: 1rem;">
+                            <!-- Los campos de atributos se generarán dinámicamente con JavaScript -->
                         </div>
                     </div>
                 </section>
@@ -156,6 +176,7 @@
 @section('js')
     <script>
         (function () {
+            // Auto-grow para textarea
             const autoGrowAreas = document.querySelectorAll('.input-auto-grow');
             if (autoGrowAreas.length) {
                 const resizeArea = (el) => {
@@ -168,6 +189,43 @@
                     area.addEventListener('input', () => resizeArea(area));
                 });
             }
+
+            // Generar campos dinámicos para variantes
+            const tiposAtributosInput = document.getElementById('tipos_atributos');
+            const atributosContainer = document.getElementById('atributos-container');
+
+            const generarCamposAtributos = () => {
+                const valor = tiposAtributosInput.value.trim();
+                atributosContainer.innerHTML = '';
+
+                if (!valor) return;
+
+                // Parsear tipos de atributos (separados por coma)
+                const tipos = valor.split(',')
+                    .map(t => t.trim())
+                    .filter(t => t.length > 0);
+
+                if (tipos.length === 0) return;
+
+                // Crear campos para cada tipo
+                tipos.forEach(tipo => {
+                    const fieldGroup = document.createElement('div');
+                    fieldGroup.className = 'field-group';
+                    fieldGroup.innerHTML = `
+                        <label for="atributo_${tipo}">Valor - ${tipo}</label>
+                        <input id="atributo_${tipo}" name="atributos_variante[${tipo}]" type="text" 
+                            placeholder="Ejem: ${tipo === 'Talla' ? 'M, L, XL' : tipo === 'Color' ? 'Rojo, Azul' : 'especifica un valor'}"
+                            value="{{ old('atributos_variante.${tipo}', '') }}">
+                    `;
+                    atributosContainer.appendChild(fieldGroup);
+                });
+            };
+
+            // Generar campos iniciales si hay valores en old()
+            generarCamposAtributos();
+
+            // Regenerar cuando cambie el input de tipos
+            tiposAtributosInput.addEventListener('input', generarCamposAtributos);
         })();
     </script>
 @endsection

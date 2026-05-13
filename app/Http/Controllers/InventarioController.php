@@ -613,7 +613,7 @@ class InventarioController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'codigo' => 'required|unique:inventario,codigo',
+            'codigo' => 'required|string|max:255',
             'descripcion' => 'required|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
@@ -622,12 +622,78 @@ class InventarioController extends Controller
             'stock_actual' => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
             'nivel_critico' => 'nullable|integer|min:0',
+            'tipos_atributos' => 'nullable|string', // JSON string con tipos de variantes
+            'atributos_variante' => 'nullable|array', // Valores de los atributos
         ]);
 
         $validated['proyecto_id'] = $proyectoId;
 
-        Inventario::create($validated);
-        return redirect()->route('inventario.index')->with('success', 'Producto creado');
+        // Parsear tipos de atributos si viene como string JSON
+        $tiposAtributos = [];
+        if (!empty($validated['tipos_atributos'])) {
+            $tiposAtributos = is_array($validated['tipos_atributos']) 
+                ? $validated['tipos_atributos'] 
+                : json_decode($validated['tipos_atributos'], true) ?? [];
+        }
+
+        // Limpiar y preparar atributos de variante
+        $atributosVariante = [];
+        if (!empty($validated['atributos_variante'])) {
+            foreach ($validated['atributos_variante'] as $tipo => $valor) {
+                if (!empty($valor)) {
+                    $atributosVariante[$tipo] = $valor;
+                }
+            }
+        }
+
+        // Buscar o crear la variante del producto
+        $variante = \App\Models\InventarioVariante::firstOrCreate(
+            [
+                'proyecto_id' => $proyectoId,
+                'codigo' => $validated['codigo'],
+            ],
+            [
+                'descripcion' => $validated['descripcion'],
+                'referencia_proveedor' => $validated['referencia_proveedor'],
+                'clase_id' => $validated['clase_id'],
+                'ubicacion' => $validated['ubicacion'],
+                'almacen' => $validated['almacen'],
+                'stock_minimo' => $validated['stock_minimo'] ?? 0,
+                'nivel_critico' => $validated['nivel_critico'] ?? 0,
+                'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+            ]
+        );
+
+        // Actualizar tipos de atributos si ya existía
+        if (!empty($tiposAtributos)) {
+            $variante->update(['tipos_atributos' => $tiposAtributos]);
+        }
+
+        // Crear código único del item basado en los atributos
+        $codigo_item = $validated['codigo'];
+        foreach ($atributosVariante as $tipo => $valor) {
+            $codigo_item .= '-' . strtoupper(str_replace(' ', '', substr($valor, 0, 3)));
+        }
+
+        // Crear el item de inventario con la variante
+        $inventarioData = [
+            'proyecto_id' => $proyectoId,
+            'inventario_variante_id' => $variante->id,
+            'codigo' => $codigo_item,
+            'descripcion' => $validated['descripcion'],
+            'referencia_proveedor' => $validated['referencia_proveedor'],
+            'clase_id' => $validated['clase_id'],
+            'ubicacion' => $validated['ubicacion'],
+            'almacen' => $validated['almacen'],
+            'stock_actual' => $validated['stock_actual'],
+            'stock_minimo' => $validated['stock_minimo'] ?? 0,
+            'nivel_critico' => $validated['nivel_critico'] ?? 0,
+            'atributos_variante' => !empty($atributosVariante) ? $atributosVariante : null,
+        ];
+
+        Inventario::create($inventarioData);
+
+        return redirect()->route('inventario.index')->with('success', 'Producto con variante creado correctamente');
     }
 
     public function show(Inventario $inventario)
@@ -666,7 +732,7 @@ class InventarioController extends Controller
         }
 
         $validated = $request->validate([
-            'codigo' => 'required|unique:inventario,codigo,' . $inventario->id,
+            'codigo' => 'required|string|max:255',
             'descripcion' => 'required|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
@@ -675,9 +741,55 @@ class InventarioController extends Controller
             'stock_actual' => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
             'nivel_critico' => 'nullable|integer|min:0',
+            'tipos_atributos' => 'nullable|string',
+            'atributos_variante' => 'nullable|array',
         ]);
 
-        $inventario->update($validated);
+        // Parsear tipos de atributos si viene como string JSON
+        $tiposAtributos = [];
+        if (!empty($validated['tipos_atributos'])) {
+            $tiposAtributos = is_array($validated['tipos_atributos']) 
+                ? $validated['tipos_atributos'] 
+                : json_decode($validated['tipos_atributos'], true) ?? [];
+        }
+
+        // Limpiar y preparar atributos de variante
+        $atributosVariante = [];
+        if (!empty($validated['atributos_variante'])) {
+            foreach ($validated['atributos_variante'] as $tipo => $valor) {
+                if (!empty($valor)) {
+                    $atributosVariante[$tipo] = $valor;
+                }
+            }
+        }
+
+        // Actualizar la variante si existe
+        if ($inventario->variante) {
+            $inventario->variante->update([
+                'descripcion' => $validated['descripcion'],
+                'referencia_proveedor' => $validated['referencia_proveedor'],
+                'clase_id' => $validated['clase_id'],
+                'ubicacion' => $validated['ubicacion'],
+                'almacen' => $validated['almacen'],
+                'stock_minimo' => $validated['stock_minimo'] ?? 0,
+                'nivel_critico' => $validated['nivel_critico'] ?? 0,
+                'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+            ]);
+        }
+
+        // Actualizar el inventario
+        $inventario->update([
+            'descripcion' => $validated['descripcion'],
+            'referencia_proveedor' => $validated['referencia_proveedor'],
+            'clase_id' => $validated['clase_id'],
+            'ubicacion' => $validated['ubicacion'],
+            'almacen' => $validated['almacen'],
+            'stock_actual' => $validated['stock_actual'],
+            'stock_minimo' => $validated['stock_minimo'] ?? 0,
+            'nivel_critico' => $validated['nivel_critico'] ?? 0,
+            'atributos_variante' => !empty($atributosVariante) ? $atributosVariante : null,
+        ]);
+
         return redirect()->route('inventario.index')->with('success', 'Producto actualizado');
     }
 

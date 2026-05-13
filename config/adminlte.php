@@ -257,7 +257,7 @@ return [
     */
 
     'use_route_url' => false,
-    'dashboard_url' => 'home',
+    'dashboard_url' => 'dashboard',
     'logout_url' => 'logout',
     'login_url' => 'login',
     'register_url' => 'register',
@@ -339,9 +339,9 @@ return [
                 ],
                 [
                     'text' => 'Pedidos Clientes',
-                    'url' => 'pedidos',
+                    'url' => 'pedidos-clientes',
                     'icon' => 'fas fa-fw fa-briefcase',
-                    'active' => ['pedidos*'],
+                    'active' => ['pedidos-clientes*'],
                 ],
                 [
                     'text' => 'Albaranes Clientes',

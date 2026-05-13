@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Inventario extends Model
+class InventarioVariante extends Model
 {
     use HasFactory;
 
@@ -15,7 +16,7 @@ class Inventario extends Model
      *
      * @var string
      */
-    protected $table = 'inventario';
+    protected $table = 'inventario_variantes';
 
     /**
      * The attributes that are mass assignable.
@@ -24,17 +25,14 @@ class Inventario extends Model
      */
     protected $fillable = [
         'proyecto_id',
-        'inventario_variante_id',
         'codigo',
         'descripcion',
         'referencia_proveedor',
         'clase_id',
         'ubicacion',
         'almacen',
-        'stock_actual',
         'stock_minimo',
         'nivel_critico',
-        'atributos_variante',
     ];
 
     /**
@@ -43,14 +41,13 @@ class Inventario extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'stock_actual' => 'integer',
         'stock_minimo' => 'integer',
         'nivel_critico' => 'integer',
-        'atributos_variante' => 'array',
+        'tipos_atributos' => 'array',
     ];
 
     /**
-     * Get the proyecto that owns the inventario item.
+     * Get the proyecto that owns the inventario variante.
      */
     public function proyecto(): BelongsTo
     {
@@ -58,7 +55,7 @@ class Inventario extends Model
     }
 
     /**
-     * Get the clase relation for the inventario item.
+     * Get the clase that owns the inventario variante.
      */
     public function claseRelacion(): BelongsTo
     {
@@ -66,10 +63,38 @@ class Inventario extends Model
     }
 
     /**
-     * Get the inventario variante for this item.
+     * Get all the inventory items for this variant.
      */
-    public function variante(): BelongsTo
+    public function items(): HasMany
     {
-        return $this->belongsTo(InventarioVariante::class, 'inventario_variante_id');
+        return $this->hasMany(Inventario::class, 'inventario_variante_id');
+    }
+
+    /**
+     * Get the total stock for this variant across all items.
+     */
+    public function getStockTotalAttribute(): int
+    {
+        return $this->items()->sum('stock_actual') ?? 0;
+    }
+
+    /**
+     * Check if stock is critical for any variant item.
+     */
+    public function isStockCritical(): bool
+    {
+        return $this->items()
+            ->whereColumn('stock_actual', '<=', 'nivel_critico')
+            ->exists();
+    }
+
+    /**
+     * Check if stock is low for any variant item.
+     */
+    public function isStockLow(): bool
+    {
+        return $this->items()
+            ->whereColumn('stock_actual', '<=', 'stock_minimo')
+            ->exists();
     }
 }
