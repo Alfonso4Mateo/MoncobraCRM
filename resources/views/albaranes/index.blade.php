@@ -171,8 +171,11 @@
                                 </td>
                                 <td>
                                     <div class="presupuesto-action-group">
-                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver albarán" title="Ver albarán">
+                                        <a href="{{ route('albaranes.preview', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar albarán" title="Previsualizar albarán">
                                             <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán">
+                                            <i class="fas fa-file-pdf"></i>
                                         </a>
                                         <a href="{{ route('albaranes.pantalla-roja', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
                                             <i class="fas fa-pen"></i>

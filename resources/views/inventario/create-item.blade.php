@@ -123,25 +123,7 @@
                         </div>
                     </div>
                 </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 3</span>
-                        <h2>Informacion Economica</h2>
-                        <p>Valoracion de activos y politica de margenes comerciales aplicados.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-1">
-                        <div class="field-group field-tight">
-                            <label for="precio_coste_preview">Precio de coste</label>
-                            <div class="currency-preview">
-                                <span>EUR</span>
-                                <input id="precio_coste_preview" type="text" value="0.00" readonly>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
+                
                 <footer class="item-form-footer">
                     <p>* Todos los campos son obligatorios para el registro inicial.</p>
                     <div class="item-footer-actions">

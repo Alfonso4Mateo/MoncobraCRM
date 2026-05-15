@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Presupuesto {{ $presupuesto->numero ?? '' }}</title>
+    <!-- Cambiado el título a Albarán -->
+    <title>Albarán {{ $albaran->numero ?? '' }}</title>
     <style>
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
@@ -87,9 +88,10 @@
                             <div>CIF</div>
                         </td>
                         <td width="70%" class="client-content" valign="top">
-                            <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($presupuesto->cliente)->empresa_nombre }}</div>
-                            <div class="muted" style="margin-bottom: 8px;">{{ optional($presupuesto->cliente)->direccion ?? '' }}</div>
-                            <div style="font-weight:bold;">{{ optional($presupuesto->cliente)->cif ?? '' }}</div>
+                            <!-- Cambiado $presupuesto por $albaran -->
+                            <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($albaran->cliente)->empresa_nombre }}</div>
+                            <div class="muted" style="margin-bottom: 8px;">{{ optional($albaran->cliente)->direccion ?? '' }}</div>
+                            <div style="font-weight:bold;">{{ optional($albaran->cliente)->cif ?? '' }}</div>
                         </td>
                     </tr>
                 </table>
@@ -101,23 +103,27 @@
         <tr>
             <td width="32%" valign="top">
                 <div class="meta-header">DOCUMENTO</div>
-                <div class="meta-body">{{ $presupuesto->documento }}</div>
+                <!-- Cambiado $presupuesto por $albaran -->
+                <div class="meta-body">{{ $albaran->documento }}</div>
             </td>
             <td width="2%"></td>
             <td width="32%" valign="top">
                 <div class="meta-header">NÚMERO</div>
-                <div class="meta-body">{{ $presupuesto->numero }}</div>
+                <!-- Cambiado $presupuesto por $albaran -->
+                <div class="meta-body">{{ $albaran->numero }}</div>
             </td>
             <td width="2%"></td>
             <td width="32%" valign="top">
                 <div class="meta-header">FECHA</div>
-                <div class="meta-body">{{ optional($presupuesto->fecha)->format('d/m/Y') ?? $presupuesto->fecha }}</div>
+                <!-- Cambiado $presupuesto por $albaran -->
+                <div class="meta-body">{{ optional($albaran->fecha)->format('d/m/Y') ?? $albaran->fecha }}</div>
             </td>
         </tr>
     </table>
 
     @php
-        $lineasValidas = collect((array) $presupuesto->lista_articulos)->filter(function ($line) {
+        // Cambiado $presupuesto por $albaran
+        $lineasValidas = collect((array) $albaran->lista_articulos)->filter(function ($line) {
             if (!is_array($line)) { return false; }
             $descripcion = trim((string) ($line['descripcion'] ?? ''));
             $articulo = trim((string) ($line['articulo'] ?? ''));
@@ -168,23 +174,10 @@
                      <div style="display: inline-block; text-align: right; width: 160px;">
                          <strong style="color: #6b7b8f; font-size: 13px;">Total:</strong><br>
                         <div class="total-box" style="display: block; text-align: center;">
-                            {{ number_format((float) $presupuesto->total ?? 0, 2, ',', '.') }} €
+                            <!-- Cambiado $presupuesto por $albaran -->
+                            {{ number_format((float) $albaran->total ?? 0, 2, ',', '.') }} €
                          </div>
                      </div>
-                </td>
-            </tr>
-        </table>
-
-        <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-                <td width="48%" class="footer-box" valign="top">
-                    <strong>Validez oferta:</strong><br>
-                    <span class="muted" style="display:block; margin-top:4px;">30 días</span>
-                </td>
-                <td width="4%"></td>
-                <td width="48%" class="footer-box" valign="top">
-                    <strong>Exclusiones:</strong><br>
-                    <span class="muted" style="display:block; margin-top:4px;">Cualquier concepto no descrito en la oferta</span>
                 </td>
             </tr>
         </table>

@@ -317,9 +317,10 @@ class AlbaranClienteController extends Controller
             abort(404);
         }
 
-        return view('albaranes.show', [
+        return view('albaranes.preview', [
             'albaran' => $albaran,
-            'pdfStreamUrl' => $this->resolvePdfPath($albaran) ? route('albaranes.pdf.file', $albaran) : null,
+            'pdfUrl' => route('albaranes.pdf.file', $albaran),
+            'downloadUrl' => route('albaranes.pdf.download', $albaran),
         ]);
     }
 
@@ -332,10 +333,16 @@ class AlbaranClienteController extends Controller
             abort(404);
         }
 
-        return view('albaranes.show', [
+        return view('albaranes.preview', [
             'albaran' => $albaran,
-            'pdfStreamUrl' => $this->resolvePdfPath($albaran) ? route('albaranes.pdf.file', $albaran) : null,
+            'pdfUrl' => route('albaranes.pdf.file', $albaran),
+            'downloadUrl' => route('albaranes.pdf.download', $albaran),
         ]);
+    }
+
+    public function preview(AlbaranCliente $albaran)
+    {
+        return $this->pdfViewer($albaran);
     }
 
     public function streamPdf(AlbaranCliente $albaran)
@@ -347,18 +354,62 @@ class AlbaranClienteController extends Controller
             abort(404);
         }
 
-        $pdfPath = $this->resolvePdfPath($albaran);
-        if (!$pdfPath) {
+        [$pdfPath, $pdfContent, $fileName] = $this->buildOrResolvePdf($albaran);
+
+        if ($pdfPath && $pdfContent === null) {
+            $disk = Storage::disk('public');
+            $path = $disk->path($pdfPath);
+
+            return response()->file($path, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . basename($pdfPath) . '"',
+            ]);
+        }
+
+        if ($pdfContent === null) {
             abort(404);
         }
 
-        $disk = Storage::disk('public');
-        $path = $disk->path($pdfPath);
-        $fileName = basename($pdfPath);
+        if ($pdfPath) {
+            Storage::disk('public')->put($pdfPath, $pdfContent);
+        }
 
-        return response()->file($path, [
+        return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+        ]);
+    }
+
+    public function downloadPdf(AlbaranCliente $albaran)
+    {
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $this->validateProyectoAccess($proyectoId);
+
+        if ((int) $albaran->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        [$pdfPath, $pdfContent, $fileName] = $this->buildOrResolvePdf($albaran);
+
+        if ($pdfPath && $pdfContent === null) {
+            $disk = Storage::disk('public');
+            return response()->file($disk->path($pdfPath), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . basename($pdfPath) . '"',
+            ]);
+        }
+
+        if ($pdfContent === null) {
+            abort(404);
+        }
+
+        if ($pdfPath) {
+            Storage::disk('public')->put($pdfPath, $pdfContent);
+        }
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
     }
 
@@ -533,6 +584,38 @@ class AlbaranClienteController extends Controller
         }
 
         return null;
+    }
+
+    private function buildOrResolvePdf(AlbaranCliente $albaran): array
+    {
+        $disk = Storage::disk('public');
+        $pdfPath = $this->resolvePdfPath($albaran);
+        $fileName = 'albaran-' . ($albaran->numero ?: $albaran->id) . '.pdf';
+
+        if ($pdfPath && $disk->exists($pdfPath)) {
+            return [$pdfPath, null, basename($pdfPath)];
+        }
+
+        $pdfContent = null;
+
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('albaranes.pdf', ['albaran' => $albaran]);
+            $pdfContent = $pdf->output();
+        } elseif (class_exists(\Dompdf\Dompdf::class)) {
+            $html = view('albaranes.pdf', ['albaran' => $albaran])->render();
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->loadHtml($html);
+            $dompdf->render();
+            $pdfContent = $dompdf->output();
+        }
+
+        if ($pdfContent !== null) {
+            $pdfPath = $pdfPath ?: 'albaranes/albaran-' . $albaran->id . '.pdf';
+            $albaran->forceFill(['archivo_pdf' => $pdfPath])->save();
+        }
+
+        return [$pdfPath, $pdfContent, $fileName];
     }
 
     /**

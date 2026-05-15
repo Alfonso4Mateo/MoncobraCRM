@@ -441,6 +441,45 @@ class PedidoController extends Controller
         ]);
     }
 
+    public function viewPdf(PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        return $this->renderPdfResponse($pedidoCliente, false);
+    }
+
+    public function downloadPdf(PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        return $this->renderPdfResponse($pedidoCliente, true);
+    }
+
+    public function preview(PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        $pedidoCliente->loadMissing('cliente');
+
+        return view('pedidos-clientes.preview', [
+            'pedido' => $pedidoCliente,
+            'pdfUrl' => route('pedidos-clientes.pdf', $pedidoCliente),
+            'downloadUrl' => route('pedidos-clientes.pdf.download', $pedidoCliente),
+        ]);
+    }
+
     public function albaranesCliente(PedidoCliente $pedidoCliente)
     {
         // Try to get proyecto from session, fallback to pedido's proyecto
@@ -556,6 +595,49 @@ class PedidoController extends Controller
             ->count() + 1;
 
         return sprintf('PC-%s-%03d', now()->format('Y'), $nextIndex);
+    }
+
+    private function renderPdfResponse(PedidoCliente $pedido, bool $download)
+    {
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+
+        if ($pedido->archivo_pdf && $disk->exists($pedido->archivo_pdf)) {
+            $path = $disk->path($pedido->archivo_pdf);
+            $fileName = basename((string) $pedido->archivo_pdf);
+
+            return response()->file($path, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+            ]);
+        }
+
+        $pdfContent = null;
+        $fileName = 'pedido-' . ($pedido->numero_pedido ?: $pedido->id) . '.pdf';
+
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pedidos-clientes.pdf', compact('pedido'));
+            $pdfContent = $pdf->output();
+        } elseif (class_exists(\Dompdf\Dompdf::class)) {
+            $html = view('pedidos-clientes.pdf', compact('pedido'))->render();
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->loadHtml($html);
+            $dompdf->render();
+            $pdfContent = $dompdf->output();
+        }
+
+        if ($pdfContent === null) {
+            abort(404);
+        }
+
+        if ($pedido->archivo_pdf) {
+            $disk->put($pedido->archivo_pdf, $pdfContent);
+        }
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+        ]);
     }
 
     private function syncArticulosFromLineas(int $proyectoId, array $lineas): void
