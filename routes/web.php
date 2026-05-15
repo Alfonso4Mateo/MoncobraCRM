@@ -99,6 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::get('pedidos-clientes/{pedidoCliente}/pdf', [PedidoController::class, 'viewPdf'])->name('pedidos-clientes.pdf');
     Route::get('pedidos-clientes/{pedidoCliente}/pdf/download', [PedidoController::class, 'downloadPdf'])->name('pedidos-clientes.pdf.download');
     Route::patch('pedidos-clientes/{pedidoCliente}/estado', [PedidoController::class, 'updateEstado'])->name('pedidos-clientes.estado.update');
+    Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pedidos-clientes.data');
     Route::get('pedidos-clientes/{pedidoCliente}/albaranes', [PedidoController::class, 'albaranesCliente'])->name('pedidos-clientes.albaranes');
     Route::get('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'showCliente'])->name('pedidos-clientes.show');
     

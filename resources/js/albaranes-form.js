@@ -18,9 +18,12 @@ const round2 = (value) => {
 
 document.addEventListener("DOMContentLoaded", () => {
     const root = document.querySelector("[data-albaran-form]");
+    console.warn('[albaranes] albaranes-form.js loaded');
     if (!root) {
         return;
     }
+
+    let pedidoMode = root.dataset.pedidoMode === "1";
 
     const articuloInput = document.getElementById("linea_articulo");
     const descripcionInput = document.getElementById("linea_descripcion");
@@ -34,8 +37,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const tableBody = document.getElementById("lineasBody");
     const totalElement = document.getElementById("albaranTotalValue");
     const lineasJsonInput = document.getElementById("lineasJson");
+    const pedidoClienteSelect = document.getElementById("pedido_cliente");
+    const clienteSelect = document.getElementById("cliente_id");
+    const otInput = document.getElementById("ot");
 
-    if (!articuloInput || !descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput || !addButton || !tableBody || !totalElement || !lineasJsonInput) {
+    if (!tableBody || !totalElement || !lineasJsonInput) {
         return;
     }
 
@@ -67,6 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         precio_unitario: precioUnitario,
                         margen,
                         total,
+                        selected: pedidoMode ? linea.selected !== false : true,
                     };
                 })
                 .filter((linea) => linea.descripcion !== "");
@@ -79,10 +86,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const lineasFromDataset = parseLineas(root.dataset.initialLineas ?? "[]");
 
     let lineas = lineasFromInput.length > 0 ? lineasFromInput : lineasFromDataset;
+    let activePedidoKey = null;
     let selectedIndex = -1;
 
     const autosizeDescripcion = () => {
-        if (descripcionInput.tagName !== "TEXTAREA") {
+        if (!descripcionInput || descripcionInput.tagName !== "TEXTAREA") {
             return;
         }
 
@@ -91,6 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const resetInputs = () => {
+        if (!articuloInput || !descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput) {
+            return;
+        }
+
         articuloInput.value = "";
         descripcionInput.value = "";
         cantidadInput.value = "1";
@@ -102,11 +114,15 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const syncHiddenField = () => {
-        lineasJsonInput.value = JSON.stringify(lineas);
+        const payload = pedidoMode
+            ? lineas.filter((linea) => linea.selected !== false)
+            : lineas;
+
+        lineasJsonInput.value = JSON.stringify(payload);
     };
 
     const updateTotal = () => {
-        const total = lineas.reduce((acc, linea) => acc + clampNumber(linea.total), 0);
+        const total = lineas.reduce((acc, linea) => acc + (pedidoMode && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
         totalElement.textContent = `${euroFormatter.format(round2(total))} €`;
     };
 
@@ -122,9 +138,74 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    const setPedidoMode = (enabled) => {
+        pedidoMode = !!enabled;
+
+        // Hide or show the linea input row
+        const lineaInputRow = document.querySelector('.linea-input-row');
+        if (lineaInputRow) {
+            lineaInputRow.style.display = pedidoMode ? 'none' : '';
+        }
+
+        // Disable side add/edit/delete when in pedidoMode
+        if (addButton) addButton.disabled = pedidoMode;
+        if (editButton) editButton.disabled = pedidoMode || editButton.disabled;
+        if (deleteButton) deleteButton.disabled = pedidoMode || deleteButton.disabled;
+
+        // Update table header to reflect pedido mode columns
+        const headerRow = document.querySelector('.lineas-table thead tr');
+        if (headerRow) {
+            if (pedidoMode) {
+                headerRow.innerHTML = `
+                    <th>Código ref.</th>
+                    <th>Descripcion</th>
+                    <th>Cantidad</th>
+                    <th>Medida</th>
+                    <th>P. unitario</th>
+                    <th>Margen</th>
+                    <th>Total</th>
+                    <th style="width: 7rem">Incluir</th>
+                `;
+            } else {
+                headerRow.innerHTML = `
+                    <th>Linea</th>
+                    <th>Código ref.</th>
+                    <th>Descripcion</th>
+                    <th>Cantidad</th>
+                    <th>Medida</th>
+                    <th>P. unitario</th>
+                    <th>Margen</th>
+                    <th>Total</th>
+                    <th>Accion</th>
+                `;
+            }
+        }
+
+        // Ensure selection note exists when in pedidoMode
+        if (pedidoMode) {
+            let note = document.querySelector('.albaran-selection-note');
+            if (!note) {
+                note = document.createElement('div');
+                note.className = 'albaran-selection-note';
+                note.innerHTML = '<i class="fas fa-circle-info" aria-hidden="true"></i> Marca los artículos que quieres incluir en este albarán. Los no marcados quedarán fuera del documento.';
+                const articulosCard = document.querySelector('.albaran-card h2');
+                if (articulosCard && articulosCard.textContent && articulosCard.textContent.trim().toUpperCase().includes('ARTICULOS')) {
+                    articulosCard.parentElement.insertBefore(note, articulosCard.parentElement.querySelector('.linea-input-row') || articulosCard.parentElement.querySelector('.table-responsive'));
+                } else {
+                    root.insertBefore(note, root.firstChild);
+                }
+            }
+        } else {
+            const note = document.querySelector('.albaran-selection-note');
+            if (note && note.parentElement) note.parentElement.removeChild(note);
+        }
+
+        renderRows();
+    };
+
     const renderRows = () => {
         if (lineas.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="9" class="lineas-empty">No hay lineas añadidas.</td></tr>';
+            tableBody.innerHTML = `<tr><td colspan="${pedidoMode ? 8 : 9}" class="lineas-empty">${pedidoMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
             selectedIndex = -1;
             setSideButtonsState();
             syncHiddenField();
@@ -137,6 +218,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 const isSelected = index === selectedIndex;
                 const medida = String(linea.medida ?? "").trim();
                 const totalLinea = clampNumber(linea.total);
+                const checked = linea.selected !== false;
+
+                if (pedidoMode) {
+                    return `
+                        <tr data-index="${index}"${checked ? ' class="is-selected"' : ' class="is-deselected"'}>
+                            <td>${linea.articulo ? `<strong>${linea.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
+                            <td>${linea.descripcion}</td>
+                            <td>${euroFormatter.format(linea.cantidad)}</td>
+                            <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
+                            <td>${euroFormatter.format(linea.precio_unitario)} €</td>
+                            <td>${euroFormatter.format(linea.margen)} %</td>
+                            <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
+                            <td>
+                                <label class="albaran-line-check">
+                                    <input type="checkbox" class="albaran-line-check__input" data-action="toggle-selected" data-index="${index}" ${checked ? 'checked' : ''}>
+                                </label>
+                            </td>
+                        </tr>
+                    `;
+                }
 
                 return `
                     <tr data-index="${index}"${isSelected ? ' class="is-selected"' : ""}>
@@ -168,6 +269,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const saveCurrentInputs = () => {
+        if (pedidoMode) {
+            return;
+        }
+
         const articulo = articuloInput.value.trim();
         const descripcion = descripcionInput.value.trim();
         const cantidad = round2(cantidadInput.value);
@@ -205,22 +310,170 @@ document.addEventListener("DOMContentLoaded", () => {
         renderRows();
     };
 
-    addButton.addEventListener("click", saveCurrentInputs);
+    if (addButton) {
+        addButton.addEventListener("click", saveCurrentInputs);
+    }
 
-    [cantidadInput, precioInput, margenInput].forEach((input) => {
-        input.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                saveCurrentInputs();
-            }
+    if (!pedidoMode && cantidadInput && precioInput && margenInput) {
+        [cantidadInput, precioInput, margenInput].forEach((input) => {
+            input.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    saveCurrentInputs();
+                }
+            });
         });
-    });
+    }
 
-    descripcionInput.addEventListener("input", autosizeDescripcion);
+    if (descripcionInput) {
+        descripcionInput.addEventListener("input", autosizeDescripcion);
+    }
+
+    const syncPedidoClienteFields = () => {
+        if (!pedidoClienteSelect || !clienteSelect || !otInput) {
+            return;
+        }
+
+        let selectedOption = pedidoClienteSelect.selectedOptions && pedidoClienteSelect.selectedOptions.length > 0
+            ? pedidoClienteSelect.selectedOptions[0]
+            : null;
+
+        // Fallback: if Select2 is active it may not expose selectedOptions the same way
+        if (!selectedOption && window.jQuery && window.jQuery.fn.select2 && window.jQuery(pedidoClienteSelect).data('select2')) {
+            try {
+                const sd = window.jQuery(pedidoClienteSelect).select2('data');
+                if (Array.isArray(sd) && sd.length > 0) {
+                    const first = sd[0];
+                    if (first && first.element) {
+                        selectedOption = first.element;
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        console.debug('[albaranes] syncPedidoClienteFields called', { selectedOption });
+
+        if (!selectedOption || !selectedOption.value) {
+            clienteSelect.value = "";
+            otInput.value = "";
+            setPedidoMode(false);
+            return;
+        }
+
+        let clienteId = selectedOption?.dataset?.clienteId || "";
+        let ot = selectedOption?.dataset?.ot || "";
+        const pedidoId = selectedOption?.dataset?.pedidoId || null;
+        const pedidoKey = pedidoId || selectedOption?.value || '';
+
+        console.debug('[albaranes] resolved clienteId, ot, pedidoId', { clienteId, ot, pedidoId });
+
+        const applyFields = (data) => {
+            if (pedidoKey !== activePedidoKey) {
+                return;
+            }
+
+            const cId = data.id_cliente ?? data.id ?? clienteId ?? "";
+            const cOt = data.ot ?? ot ?? "";
+
+            if (clienteSelect) {
+                if (window.jQuery && window.jQuery.fn.select2 && window.jQuery(clienteSelect).data('select2')) {
+                    window.jQuery(clienteSelect).val(String(cId)).trigger('change');
+                } else {
+                    clienteSelect.value = String(cId);
+                    clienteSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+
+            otInput.value = cOt;
+
+            const hasLineas = Array.isArray(data.lineas) || Array.isArray(data.lista_articulos);
+            const rawLineas = Array.isArray(data.lineas)
+                ? data.lineas
+                : (Array.isArray(data.lista_articulos) ? data.lista_articulos : []);
+
+            if (hasLineas) {
+                if (rawLineas.length > 0) {
+                    // Convert raw lineas to the internal linea shape and mark selected=true
+                    lineas = rawLineas
+                        .filter((l) => l && typeof l === 'object' && (l.descripcion || l.descripcion === 0))
+                        .map((l) => ({
+                            articulo_id: l.articulo_id ?? null,
+                            articulo: String(l.articulo ?? '').trim(),
+                            descripcion: String(l.descripcion ?? '').trim(),
+                            cantidad: round2(l.cantidad ?? 0),
+                            medida: String(l.medida ?? l.unidad ?? '').trim(),
+                            precio_unitario: round2(l.precio_unitario ?? l.precio ?? 0),
+                            margen: round2(l.margen ?? 0),
+                            total: round2(l.total ?? ((l.cantidad ?? 0) * (l.precio_unitario ?? l.precio ?? 0) * (1 + ((l.margen ?? 0) / 100)))),
+                            selected: true,
+                        }));
+                } else {
+                    lineas = [];
+                }
+
+                renderRows();
+            }
+        };
+
+        activePedidoKey = pedidoKey;
+        lineas = [];
+        setPedidoMode(true);
+
+        // Apply cliente/ot from option immediately
+        if (clienteId || ot) {
+            applyFields({ id_cliente: clienteId, ot });
+        }
+
+        // Otherwise try to fetch via AJAX using pedido_id or numero
+        const params = pedidoId ? `?pedido_id=${encodeURIComponent(pedidoId)}` : `?numero=${encodeURIComponent(selectedOption?.value || '')}`;
+        fetch(`/pedidos-clientes/data${params}`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then((resp) => {
+                if (!resp.ok) throw resp;
+                return resp.json();
+            })
+            .then((data) => {
+                applyFields(data || {});
+            })
+            .catch((err) => {
+                console.debug('[albaranes] pedido data fetch failed', err);
+            });
+    };
+
+    if (pedidoClienteSelect && window.jQuery && typeof window.jQuery.fn.select2 === "function") {
+        const $pc = window.jQuery(pedidoClienteSelect);
+        $pc.select2({
+            theme: "bootstrap4",
+            width: "100%",
+            placeholder: pedidoClienteSelect.dataset.placeholder || "Selecciona pedido...",
+            allowClear: true,
+            minimumResultsForSearch: 0,
+        });
+
+        $pc.on('select2:select select2:unselect select2:clear', syncPedidoClienteFields);
+        $pc.on('change', syncPedidoClienteFields);
+
+        // Trigger once to populate initial values from a preselected option
+        $pc.trigger('change');
+    }
+
+    if (pedidoClienteSelect) {
+        pedidoClienteSelect.addEventListener("change", syncPedidoClienteFields);
+        syncPedidoClienteFields();
+    }
 
     tableBody.addEventListener("click", (event) => {
+        const checkboxTarget = event.target.closest('input[data-action="toggle-selected"]');
         const target = event.target.closest("button[data-action]");
         const row = event.target.closest("tr[data-index]");
+
+        if (pedidoMode && checkboxTarget) {
+            return;
+        }
 
         if (row) {
             selectedIndex = Number(row.dataset.index);
@@ -229,6 +482,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target) {
             const index = Number(target.dataset.index);
             const action = target.dataset.action;
+
+            if (pedidoMode && action === "toggle-selected") {
+                lineas[index].selected = target.checked;
+                renderRows();
+                return;
+            }
 
             if (action === "delete") {
                 lineas.splice(index, 1);
@@ -261,7 +520,29 @@ document.addEventListener("DOMContentLoaded", () => {
         renderRows();
     });
 
-    if (editButton) {
+    tableBody.addEventListener("change", (event) => {
+        const target = event.target;
+
+        if (!pedidoMode || !(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.matches('input[data-action="toggle-selected"]')) {
+            const index = Number(target.dataset.index);
+            if (index < 0 || index >= lineas.length) {
+                return;
+            }
+
+            lineas[index].selected = target.checked;
+            renderRows();
+        }
+    });
+
+    if (pedidoMode && !addButton && !articuloInput && !descripcionInput) {
+        selectedIndex = -1;
+    }
+
+    if (editButton && !pedidoMode) {
         editButton.addEventListener("click", () => {
             if (selectedIndex < 0 || selectedIndex >= lineas.length) {
                 return;
@@ -280,7 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (deleteButton) {
+    if (deleteButton && !pedidoMode) {
         deleteButton.addEventListener("click", () => {
             if (selectedIndex < 0 || selectedIndex >= lineas.length) {
                 return;

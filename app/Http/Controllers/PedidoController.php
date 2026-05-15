@@ -480,6 +480,84 @@ class PedidoController extends Controller
         ]);
     }
 
+    /**
+     * Devuelve datos JSON útiles sobre un pedido para autocompletar formularios.
+     */
+    public function data(Request $request)
+    {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        $pedido = null;
+        $pedidoId = (int) $request->query('pedido_id', 0);
+        $numero = trim((string) $request->query('numero', ''));
+
+        if ($pedidoId > 0) {
+            $pedido = PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->find($pedidoId);
+        }
+
+        if (!$pedido && $numero !== '') {
+            $pedido = PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->where('numero_pedido', $numero)->first();
+        }
+
+        if (!$pedido) {
+            return response()->json(['error' => 'Pedido no encontrado'], 404);
+        }
+
+        $rawLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
+
+        $lineas = collect($rawLineas)
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(function (array $linea) use ($proyectoId) {
+                $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
+                if ($numeroReferencia === '') {
+                    return null;
+                }
+
+                $articulo = Articulo::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('numero_referencia', $numeroReferencia)
+                    ->where(function ($query) {
+                        $query->where('facturado', false)
+                            ->orWhereNull('facturado');
+                    })
+                    ->first();
+
+                if (!$articulo) {
+                    return null;
+                }
+
+                $cantidad = round(max(0, (float) ($linea['cantidad'] ?? $articulo->cantidad ?? 0)), 2);
+                $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
+                $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));
+                $medida = $medida !== '' ? $medida : null;
+                $descripcion = trim((string) ($linea['descripcion'] ?? $articulo->descripcion ?? ''));
+                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+
+                return [
+                    'articulo_id' => $articulo->id,
+                    'articulo' => $numeroReferencia,
+                    'descripcion' => $descripcion,
+                    'cantidad' => $cantidad,
+                    'medida' => $medida,
+                    'precio_unitario' => $precioUnitario,
+                    'margen' => $margen,
+                    'total' => $total,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return response()->json([
+            'id' => $pedido->id,
+            'numero_pedido' => $pedido->numero_pedido,
+            'id_cliente' => $pedido->id_cliente,
+            'ot' => $pedido->ot,
+            'lineas' => $lineas,
+        ]);
+    }
+
     public function albaranesCliente(PedidoCliente $pedidoCliente)
     {
         // Try to get proyecto from session, fallback to pedido's proyecto

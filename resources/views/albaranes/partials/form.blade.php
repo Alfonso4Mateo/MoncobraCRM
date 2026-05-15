@@ -4,6 +4,8 @@
     $pedidoContext = $pedidoContext ?? null;
     $lineasDesdeController = $lineasIniciales ?? [];
     $pedidoDefaults = $pedidoDefaults ?? [];
+    $pedidosClientes = $pedidosClientes ?? collect();
+    $pedidoMode = $pedidoContext !== null;
 
     $clienteIdDefault = old('cliente_id', $pedidoDefaults['cliente_id'] ?? $pedidoContext?->id_cliente ?? '');
     $pedidoClienteDefault = old('pedido_cliente', $pedidoDefaults['pedido_cliente'] ?? $pedidoContext?->numero_pedido ?? '');
@@ -53,7 +55,7 @@
     $lineasJsonInicial = json_encode($lineasIniciales, JSON_UNESCAPED_UNICODE);
 @endphp
 
-<section class="albaran-form-ui" data-albaran-form data-initial-lineas="{{ e($lineasJsonInicial) }}">
+<section class="albaran-form-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-initial-lineas="{{ e($lineasJsonInicial) }}">
     <header class="albaran-form-topbar">
         <nav class="albaran-breadcrumbs" aria-label="breadcrumb">
             <a href="{{ route('dashboard') }}">Inicio</a>
@@ -99,7 +101,7 @@
                 <div class="albaran-grid cols-3">
                     <div class="field-group">
                         <label for="documento">Documento</label>
-                        <input type="text" id="documento" name="documento" value="{{ old('documento') }}" required>
+                        <input type="text" id="documento" name="documento" value="Albarán" readonly>
                     </div>
 
                     <div class="field-group">
@@ -131,7 +133,27 @@
 
                     <div class="field-group">
                         <label for="pedido_cliente">Pedido cliente</label>
-                        <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ $pedidoClienteDefault }}">
+                        <select id="pedido_cliente" name="pedido_cliente" data-placeholder="Busca por número, cliente u OT...">
+                            <option value="">Selecciona pedido...</option>
+                            @foreach ($pedidosClientes as $pedido)
+                                @php
+                                    $pedidoLabel = trim(
+                                        ($pedido->numero_pedido ?: 'Pedido sin número') . ' | ' .
+                                        ($pedido->cliente?->empresa_nombre ?: 'Sin cliente') .
+                                        ($pedido->ot ? ' | OT ' . $pedido->ot : '')
+                                    );
+                                @endphp
+                                <option
+                                    value="{{ $pedido->numero_pedido }}"
+                                    data-pedido-id="{{ $pedido->id }}"
+                                    data-cliente-id="{{ $pedido->id_cliente }}"
+                                    data-ot="{{ $pedido->ot }}"
+                                    @selected((string) $pedidoClienteDefault === (string) $pedido->numero_pedido)
+                                >
+                                    {{ $pedidoLabel }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div class="field-group col-span-2">
@@ -148,36 +170,43 @@
 
             <article class="albaran-card">
                 <h2>ARTICULOS</h2>
-                <div class="linea-input-row">
-                    <div class="field-group flex-1">
-                        <label for="linea_articulo">Código referencia</label>
-                        <input type="text" id="linea_articulo" placeholder="Código o referencia">
+                @if ($pedidoMode)
+                    <div class="albaran-selection-note">
+                        <i class="fas fa-circle-info" aria-hidden="true"></i>
+                        Marca los artículos que quieres incluir en este albarán. Los no marcados quedarán fuera del documento.
                     </div>
-                    <div class="field-group flex-2">
-                        <label for="linea_descripcion">Descripcion</label>
-                        <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
+                @else
+                    <div class="linea-input-row">
+                        <div class="field-group flex-1">
+                            <label for="linea_articulo">Código referencia</label>
+                            <input type="text" id="linea_articulo" placeholder="Código o referencia">
+                        </div>
+                        <div class="field-group flex-2">
+                            <label for="linea_descripcion">Descripcion</label>
+                            <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_cantidad">Cantidad</label>
+                            <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_medida">Medida</label>
+                            <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_precio">P. unitario</label>
+                            <input type="number" id="linea_precio" value="0" min="0" step="0.01">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_margen">Margen (%)</label>
+                            <input type="number" id="linea_margen" value="0" min="0" step="0.01">
+                        </div>
+                        <button type="button" class="btn-add-linea" id="btnAddLinea">
+                            <i class="fas fa-plus"></i>
+                            Agregar
+                        </button>
                     </div>
-                    <div class="field-group flex-1">
-                        <label for="linea_cantidad">Cantidad</label>
-                        <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
-                    </div>
-                    <div class="field-group flex-1">
-                        <label for="linea_medida">Medida</label>
-                        <input type="text" id="linea_medida" placeholder="u, kg, m...">
-                    </div>
-                    <div class="field-group flex-1">
-                        <label for="linea_precio">P. unitario</label>
-                        <input type="number" id="linea_precio" value="0" min="0" step="0.01">
-                    </div>
-                    <div class="field-group flex-1">
-                        <label for="linea_margen">Margen (%)</label>
-                        <input type="number" id="linea_margen" value="0" min="0" step="0.01">
-                    </div>
-                    <button type="button" class="btn-add-linea" id="btnAddLinea">
-                        <i class="fas fa-plus"></i>
-                        Agregar
-                    </button>
-                </div>
+                @endif
             </article>
 
             <article class="albaran-card albaran-lineas-card">
@@ -185,20 +214,31 @@
                     <table class="table lineas-table">
                         <thead>
                             <tr>
-                                <th>Linea</th>
-                                <th>Código ref.</th>
-                                <th>Descripcion</th>
-                                <th>Cantidad</th>
-                                <th>Medida</th>
-                                <th>P. unitario</th>
-                                <th>Margen</th>
-                                <th>Total</th>
-                                <th>Accion</th>
+                                @if ($pedidoMode)
+                                    <th>Código ref.</th>
+                                    <th>Descripcion</th>
+                                    <th>Cantidad</th>
+                                    <th>Medida</th>
+                                    <th>P. unitario</th>
+                                    <th>Margen</th>
+                                    <th>Total</th>
+                                    <th style="width: 7rem">Incluir</th>
+                                @else
+                                    <th>Linea</th>
+                                    <th>Código ref.</th>
+                                    <th>Descripcion</th>
+                                    <th>Cantidad</th>
+                                    <th>Medida</th>
+                                    <th>P. unitario</th>
+                                    <th>Margen</th>
+                                    <th>Total</th>
+                                    <th>Accion</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody id="lineasBody">
                             <tr>
-                                <td colspan="9" class="lineas-empty">No hay lineas añadidas.</td>
+                                <td colspan="{{ $pedidoMode ? 8 : 9 }}" class="lineas-empty">No hay lineas añadidas.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -216,16 +256,18 @@
         </div>
 
         <aside class="albaran-side-col">
-            <div class="side-card actions-row">
-                <button type="button" id="btnEditLinea" class="side-btn side-btn-neutral" disabled>
-                    <i class="far fa-edit"></i>
-                    Editar
-                </button>
-                <button type="button" id="btnDeleteLinea" class="side-btn side-btn-danger" disabled>
-                    <i class="far fa-trash-alt"></i>
-                    Eliminar
-                </button>
-            </div>
+            @unless ($pedidoMode)
+                <div class="side-card actions-row">
+                    <button type="button" id="btnEditLinea" class="side-btn side-btn-neutral" disabled>
+                        <i class="far fa-edit"></i>
+                        Editar
+                    </button>
+                    <button type="button" id="btnDeleteLinea" class="side-btn side-btn-danger" disabled>
+                        <i class="far fa-trash-alt"></i>
+                        Eliminar
+                    </button>
+                </div>
+            @endunless
 
             <div class="side-card actions-row">
                 <button type="submit" class="side-btn side-btn-primary">

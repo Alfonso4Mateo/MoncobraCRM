@@ -82,7 +82,7 @@
                         type="text"
                         name="buscar"
                         value="{{ $buscar }}"
-                        placeholder="Buscar por Nº albarán, presupuesto, OT, fecha, cliente, título, pedido, total o estado..."
+                        placeholder="Buscar por Nº albarán, documento, OT, fecha, cliente, título, pedido, total o estado..."
                         aria-label="Buscar albaranes"
                     >
                 </div>
@@ -106,7 +106,7 @@
                     <thead>
                         <tr>
                             <th>Nº Albarán</th>
-                            <th>Nº Presupuesto</th>
+                            <th>Nº Documento</th>
                             <th>OT Asociada</th>
                             <th>Fecha Entrega</th>
                             <th>Cliente</th>
@@ -123,7 +123,6 @@
                                 $estado = in_array((string) $albaran->estado, ['pendiente', 'recibido', 'entregado'], true)
                                     ? (string) $albaran->estado
                                     : 'pendiente';
-                                $presupuestoNumero = trim((string) ($albaran->documento ?? ''));
                                 $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
                                 $total = (float) ($albaran->ui_total ?? 0);
                             @endphp
@@ -133,19 +132,7 @@
                                         {{ $albaran->numero }}
                                     </a>
                                 </td>
-                                <td>
-                                    @if ($albaran->ui_presupuesto_id)
-                                        <a href="{{ route('presupuestos.show', $albaran->ui_presupuesto_id) }}" class="code-link">
-                                            {{ $presupuestoNumero }}
-                                        </a>
-                                    @elseif ($presupuestoNumero !== '')
-                                        <a href="{{ route('presupuestos.index', ['search' => $presupuestoNumero]) }}" class="code-link">
-                                            {{ $presupuestoNumero }}
-                                        </a>
-                                    @else
-                                        <span class="muted">-</span>
-                                    @endif
-                                </td>
+                                <td>{{ $albaran->numero ?: '-' }}</td>
                                 <td>
                                     <span class="ot-pill">{{ $albaran->ot ?: 'Sin OT' }}</span>
                                 </td>

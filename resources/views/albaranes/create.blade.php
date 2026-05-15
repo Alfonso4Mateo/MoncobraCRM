@@ -17,9 +17,12 @@
 @endsection
 
 @section('css')
+    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
     @vite(['resources/css/albaranes-form.css'])
 @endsection
 
 @section('js')
+    <script src="{{ asset('vendor/select2/js/select2.full.min.js') }}"></script>
     @vite(['resources/js/albaranes-form.js'])
 @endsection

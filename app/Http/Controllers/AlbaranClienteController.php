@@ -170,6 +170,11 @@ class AlbaranClienteController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
+        $pedidosClientes = PedidoCliente::query()
+            ->with('cliente')
+            ->where('proyecto_id', $proyectoId)
+            ->orderByDesc('id')
+            ->get(['id', 'numero_pedido', 'id_cliente', 'ot']);
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
         $lineasIniciales = $pedidoContext ? $this->buildLineasInicialesFromPedido($pedidoContext, $proyectoId) : [];
         $pedidoDefaults = [
@@ -179,7 +184,7 @@ class AlbaranClienteController extends Controller
             'pedido_id' => $pedidoContext?->id,
         ];
 
-        return view('albaranes.create', compact('clientes', 'pedidoContext', 'lineasIniciales', 'pedidoDefaults'));
+        return view('albaranes.create', compact('clientes', 'pedidosClientes', 'pedidoContext', 'lineasIniciales', 'pedidoDefaults'));
     }
 
     public function store(Request $request)
@@ -187,7 +192,6 @@ class AlbaranClienteController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'documento' => 'required|string',
             'numero' => 'required|string',
             'fecha' => 'required|date',
             'cliente_id' => [
@@ -205,6 +209,7 @@ class AlbaranClienteController extends Controller
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]');
 
         $validated['proyecto_id'] = $proyectoId;
+        $validated['documento'] = 'Albarán';
         $validated['estado'] = $validated['estado'] ?? 'pendiente';
         $validated['lista_articulos'] = $lineas === [] ? null : $lineas;
         $validated['total'] = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
