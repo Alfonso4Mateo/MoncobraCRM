@@ -186,8 +186,11 @@
                                         <td>
                                             <div class="inventory-variant">
                                                 @if($producto->atributos_variante && count($producto->atributos_variante) > 0)
-                                                    @foreach($producto->atributos_variante as $tipo => $valor)
-                                                        <span class="inventory-variant-badge">{{ $tipo }}: {{ $valor }}</span>
+                                                    @foreach($producto->atributos_variante ?? [] as $tipo => $valor)
+                                                        @php
+                                                            $valores = is_array($valor) ? array_filter($valor, fn ($item) => $item !== null && $item !== '') : [$valor];
+                                                        @endphp
+                                                        <span class="inventory-variant-badge">{{ $tipo }}: {{ implode(', ', $valores) }}</span>
                                                     @endforeach
                                                 @else
                                                     <span class="inventory-pill muted">Sin variante</span>

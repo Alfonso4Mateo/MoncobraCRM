@@ -33,6 +33,7 @@ class InventarioVariante extends Model
         'almacen',
         'stock_minimo',
         'nivel_critico',
+        'tipos_atributos',
     ];
 
     /**

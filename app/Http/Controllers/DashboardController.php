@@ -83,8 +83,8 @@ class DashboardController extends Controller
         $totalPedidos = $countFromFirstAvailableTable(['pedidos_clientes', 'pedidos']);
         $pedidosHoy = $countFromFirstAvailableTable(['pedidos_clientes', 'pedidos'], $todayConstraint);
 
-        $totalDocumentos = $countFromFirstAvailableTable(['documentos', 'historicos']);
-        $documentosHoy = $countFromFirstAvailableTable(['documentos', 'historicos'], $todayConstraint);
+        $totalDocumentos = $countFromFirstAvailableTable(['documentos']);
+        $documentosHoy = $countFromFirstAvailableTable(['documentos'], $todayConstraint);
 
         $totalProyectos = Proyecto::count();
         $asignacionesProyecto = $countFromFirstAvailableTable(['proyecto_user']);
@@ -194,26 +194,11 @@ class DashboardController extends Controller
             'icon' => 'fas fa-folder-open',
             'tone' => 'documentos',
             'description' => 'Acceso al historico documental del sistema.',
-            'route' => route('historico.index'),
+            'route' => route('documentos.index'),
             'cta' => 'Ver documentos',
             'metrics' => [
                 ['label' => 'Registros', 'value' => $totalDocumentos],
                 ['label' => 'Actualizados hoy', 'value' => $documentosHoy],
-            ],
-        ];
-
-        $dashboardPanels[] = [
-            'id' => 'bolsa',
-            'category' => 'FINANZAS',
-            'title' => 'Bolsa de Clientes',
-            'icon' => 'fas fa-wallet',
-            'tone' => 'bolsa',
-            'description' => 'Resumen rapido de proyectos y asignaciones activas.',
-            'route' => route('bolsa.index'),
-            'cta' => 'Abrir bolsa',
-            'metrics' => [
-                ['label' => 'Proyectos', 'value' => $totalProyectos],
-                ['label' => 'Asignaciones', 'value' => $asignacionesProyecto],
             ],
         ];
 

@@ -78,7 +78,10 @@
                             @foreach($inventario->atributos_variante as $tipo => $valor)
                                 <div class="field-group">
                                     <label>{{ $tipo }}</label>
-                                    <div class="field-read">{{ $valor }}</div>
+                                    @php
+                                        $valores = is_array($valor) ? array_filter($valor, fn ($item) => $item !== null && $item !== '') : [$valor];
+                                    @endphp
+                                    <div class="field-read">{{ implode(', ', $valores) }}</div>
                                 </div>
                             @endforeach
                         @else
@@ -129,6 +132,12 @@
                     <p>* Vista de solo lectura.</p>
                     <div class="item-footer-actions">
                         <a href="{{ route('inventario.index') }}" class="btn-footer-cancel">Cancelar</a>
+                        @if($inventario->inventario_variante_id)
+                            <a href="{{ route('inventario.item.create', ['variante_id' => $inventario->inventario_variante_id]) }}" class="btn-footer-save" style="background:#0f172a;color:#fff;">
+                                <i class="fas fa-plus"></i>
+                                Añadir variante
+                            </a>
+                        @endif
                         <a href="{{ route('inventario.edit', $inventario->id) }}" class="btn-footer-save">
                             <i class="fas fa-edit"></i>
                             Editar

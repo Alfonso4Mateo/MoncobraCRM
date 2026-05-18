@@ -75,13 +75,13 @@
                     <aside class="item-section-label">
                         <span>SECCION 1.5</span>
                         <h2>Variantes Dinámicas del Producto</h2>
-                        <p>Define los tipos de variantes (Talla, Color, Material, etc.) y sus valores específicos.</p>
+                        <p>Define los tipos de variantes (Talla, Color, Material, etc.) y añade tantos valores como necesites por cada tipo.</p>
                     </aside>
 
                     <div class="item-section-fields fields-1">
                         <div class="field-group field-full">
                             <label for="tipos_atributos">Tipos de variantes</label>
-                            <input id="tipos_atributos" name="tipos_atributos" type="text" value="{{ old('tipos_atributos', json_encode($inventario->variante?->tipos_atributos ?? []) !== '[]' ? implode(', ', $inventario->variante?->tipos_atributos ?? []) : '') }}" placeholder="Ejem: Talla, Color, Material (separados por coma)" class="@error('tipos_atributos') is-invalid @enderror">
+                            <input id="tipos_atributos" name="tipos_atributos" type="text" value="{{ old('tipos_atributos', implode(', ', $inventario->variante?->tipos_atributos ?? [])) }}" placeholder="Ejem: Talla, Color, Material (separados por coma)" class="@error('tipos_atributos') is-invalid @enderror">
                             <small style="color: #666; display: block; margin-top: 0.5rem;">Especifica los tipos de variantes que tendrá este producto, separados por coma.</small>
                         </div>
 
@@ -145,37 +145,137 @@
 @section('js')
     <script>
         (function () {
+            const valoresIniciales = @json(old('atributos_variante', $inventario->atributos_variante ?? []));
+
             // Generar campos dinámicos para variantes
             const tiposAtributosInput = document.getElementById('tipos_atributos');
             const atributosContainer = document.getElementById('atributos-container');
 
+            const parseTipos = (value) => {
+                return String(value || '')
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter((item) => item.length > 0);
+            };
+
+            const collectCurrentValues = () => {
+                const valores = {};
+
+                atributosContainer.querySelectorAll('[data-variant-type]').forEach((group) => {
+                    const tipo = group.dataset.variantType || '';
+                    const inputs = group.querySelectorAll('input[data-variant-value]');
+                    const values = Array.from(inputs)
+                        .map((input) => input.value.trim())
+                        .filter((input) => input.length > 0);
+
+                    if (tipo && values.length > 0) {
+                        valores[tipo] = values;
+                    }
+                });
+
+                return valores;
+            };
+
+            const createValueRow = (tipo, value = '') => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.gap = '0.75rem';
+                row.style.alignItems = 'center';
+                row.style.marginTop = '0.5rem';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.name = `atributos_variante[${tipo}][]`;
+                input.placeholder = `Valor para ${tipo}`;
+                input.value = value;
+                input.dataset.variantValue = '1';
+                input.style.flex = '1';
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.textContent = 'Eliminar';
+                removeButton.style.border = '1px solid #d0d7de';
+                removeButton.style.background = '#fff';
+                removeButton.style.borderRadius = '8px';
+                removeButton.style.padding = '0.55rem 0.85rem';
+
+                removeButton.addEventListener('click', () => {
+                    row.remove();
+
+                    const list = row.parentElement;
+                    if (list && list.children.length === 0) {
+                        list.appendChild(createValueRow(tipo));
+                    }
+                });
+
+                row.appendChild(input);
+                row.appendChild(removeButton);
+
+                return row;
+            };
+
+            const createVariantGroup = (tipo, values = []) => {
+                const group = document.createElement('div');
+                group.className = 'field-group field-full';
+                group.dataset.variantType = tipo;
+                group.style.padding = '1rem';
+                group.style.border = '1px solid #e5e7eb';
+                group.style.borderRadius = '12px';
+                group.style.background = '#fff';
+
+                const header = document.createElement('div');
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.alignItems = 'center';
+                header.style.gap = '1rem';
+
+                const label = document.createElement('label');
+                label.textContent = `Valor - ${tipo}`;
+                label.style.margin = '0';
+                label.style.fontWeight = '700';
+
+                const addButton = document.createElement('button');
+                addButton.type = 'button';
+                addButton.textContent = 'Añadir valor';
+                addButton.style.border = '1px solid #0f172a';
+                addButton.style.background = '#0f172a';
+                addButton.style.color = '#fff';
+                addButton.style.borderRadius = '8px';
+                addButton.style.padding = '0.55rem 0.85rem';
+
+                const list = document.createElement('div');
+
+                addButton.addEventListener('click', () => {
+                    list.appendChild(createValueRow(tipo));
+                });
+
+                const initialValues = Array.isArray(values) && values.length > 0 ? values : [''];
+                initialValues.forEach((value) => {
+                    list.appendChild(createValueRow(tipo, value));
+                });
+
+                header.appendChild(label);
+                header.appendChild(addButton);
+                group.appendChild(header);
+                group.appendChild(list);
+
+                return group;
+            };
+
             const generarCamposAtributos = () => {
                 const valor = tiposAtributosInput.value.trim();
+                const valoresActuales = collectCurrentValues();
                 atributosContainer.innerHTML = '';
 
                 if (!valor) return;
 
-                // Parsear tipos de atributos (separados por coma)
-                const tipos = valor.split(',')
-                    .map(t => t.trim())
-                    .filter(t => t.length > 0);
+                const tipos = parseTipos(valor);
 
                 if (tipos.length === 0) return;
 
-                // Crear campos para cada tipo
                 tipos.forEach(tipo => {
-                    const fieldGroup = document.createElement('div');
-                    fieldGroup.className = 'field-group';
-                    const valorActual = {{ json_encode($inventario->atributos_variante ?? []) }};
-                    const valor = valorActual[tipo] || '';
-                    
-                    fieldGroup.innerHTML = `
-                        <label for="atributo_${tipo}">Valor - ${tipo}</label>
-                        <input id="atributo_${tipo}" name="atributos_variante[${tipo}]" type="text" 
-                            placeholder="Ejem: ${tipo === 'Talla' ? 'M, L, XL' : tipo === 'Color' ? 'Rojo, Azul' : 'especifica un valor'}"
-                            value="${valor}">
-                    `;
-                    atributosContainer.appendChild(fieldGroup);
+                    const valoresTipo = valoresActuales[tipo] || valoresIniciales[tipo] || [];
+                    atributosContainer.appendChild(createVariantGroup(tipo, valoresTipo));
                 });
             };
 
