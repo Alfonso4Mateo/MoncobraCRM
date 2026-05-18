@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 .filter((linea) => linea && typeof linea === "object")
                 .map((linea) => {
                     const cantidad = round2(linea.cantidad);
+                    const cantidadMax = Math.max(cantidad, round2(linea.cantidad_max ?? linea.cantidad));
                     const precioUnitario = round2(linea.precio_unitario ?? linea.precio);
                     const margen = round2(linea.margen);
                     const total = round2(cantidad * precioUnitario * (1 + margen / 100));
@@ -69,6 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         articulo: String(linea.articulo ?? "").trim(),
                         descripcion: String(linea.descripcion ?? "").trim(),
                         cantidad,
+                        cantidad_max: cantidadMax,
                         medida: String(linea.medida ?? linea.unidad ?? "").trim(),
                         precio_unitario: precioUnitario,
                         margen,
@@ -136,6 +138,30 @@ document.addEventListener("DOMContentLoaded", () => {
         if (deleteButton) {
             deleteButton.disabled = !hasSelection;
         }
+    };
+
+    const resolveCantidadMax = (linea) => {
+        const current = round2(linea?.cantidad ?? 0);
+        const maxValue = round2(linea?.cantidad_max ?? linea?.cantidad ?? 0);
+
+        return Math.max(current, maxValue);
+    };
+
+    const updateLineaCantidad = (index, rawValue) => {
+        const linea = lineas[index];
+        if (!linea) {
+            return;
+        }
+
+        const maxCantidad = resolveCantidadMax(linea);
+        let cantidad = round2(rawValue);
+
+        if (Number.isFinite(maxCantidad)) {
+            cantidad = Math.min(cantidad, maxCantidad);
+        }
+
+        linea.cantidad = cantidad;
+        linea.total = round2(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
     };
 
     const setPedidoMode = (enabled) => {
@@ -219,13 +245,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 const medida = String(linea.medida ?? "").trim();
                 const totalLinea = clampNumber(linea.total);
                 const checked = linea.selected !== false;
+                const maxCantidad = resolveCantidadMax(linea);
+                const qtyValue = Number.isFinite(linea.cantidad) ? linea.cantidad : 0;
 
                 if (pedidoMode) {
                     return `
                         <tr data-index="${index}"${checked ? ' class="is-selected"' : ' class="is-deselected"'}>
                             <td>${linea.articulo ? `<strong>${linea.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
                             <td>${linea.descripcion}</td>
-                            <td>${euroFormatter.format(linea.cantidad)}</td>
+                            <td>
+                                <input type="number" class="albaran-line-qty" data-action="edit-cantidad" data-index="${index}" min="0" step="0.01" max="${maxCantidad}" value="${qtyValue}" ${checked ? '' : 'disabled'}>
+                            </td>
                             <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
                             <td>${euroFormatter.format(linea.precio_unitario)} €</td>
                             <td>${euroFormatter.format(linea.margen)} %</td>
@@ -398,17 +428,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Convert raw lineas to the internal linea shape and mark selected=true
                     lineas = rawLineas
                         .filter((l) => l && typeof l === 'object' && (l.descripcion || l.descripcion === 0))
-                        .map((l) => ({
-                            articulo_id: l.articulo_id ?? null,
-                            articulo: String(l.articulo ?? '').trim(),
-                            descripcion: String(l.descripcion ?? '').trim(),
-                            cantidad: round2(l.cantidad ?? 0),
-                            medida: String(l.medida ?? l.unidad ?? '').trim(),
-                            precio_unitario: round2(l.precio_unitario ?? l.precio ?? 0),
-                            margen: round2(l.margen ?? 0),
-                            total: round2(l.total ?? ((l.cantidad ?? 0) * (l.precio_unitario ?? l.precio ?? 0) * (1 + ((l.margen ?? 0) / 100)))),
-                            selected: true,
-                        }));
+                        .map((l) => {
+                            const cantidad = round2(l.cantidad ?? 0);
+                            const cantidadMax = Math.max(cantidad, round2(l.cantidad_max ?? l.cantidad ?? 0));
+                            const precioUnitario = round2(l.precio_unitario ?? l.precio ?? 0);
+                            const margen = round2(l.margen ?? 0);
+                            const total = round2(l.total ?? (cantidad * precioUnitario * (1 + (margen / 100))));
+
+                            return {
+                                articulo_id: l.articulo_id ?? null,
+                                articulo: String(l.articulo ?? '').trim(),
+                                descripcion: String(l.descripcion ?? '').trim(),
+                                cantidad,
+                                cantidad_max: cantidadMax,
+                                medida: String(l.medida ?? l.unidad ?? '').trim(),
+                                precio_unitario: precioUnitario,
+                                margen,
+                                total,
+                                selected: true,
+                            };
+                        });
                 } else {
                     lineas = [];
                 }
@@ -468,10 +507,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tableBody.addEventListener("click", (event) => {
         const checkboxTarget = event.target.closest('input[data-action="toggle-selected"]');
+        const qtyTarget = event.target.closest('input[data-action="edit-cantidad"]');
         const target = event.target.closest("button[data-action]");
         const row = event.target.closest("tr[data-index]");
 
-        if (pedidoMode && checkboxTarget) {
+        if (pedidoMode && (checkboxTarget || qtyTarget)) {
             return;
         }
 
@@ -524,6 +564,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const target = event.target;
 
         if (!pedidoMode || !(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.matches('input[data-action="edit-cantidad"]')) {
+            const index = Number(target.dataset.index);
+            if (index < 0 || index >= lineas.length) {
+                return;
+            }
+
+            updateLineaCantidad(index, target.value);
+            renderRows();
             return;
         }
 

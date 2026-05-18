@@ -526,7 +526,13 @@ class PedidoController extends Controller
                     return null;
                 }
 
-                $cantidad = round(max(0, (float) ($linea['cantidad'] ?? $articulo->cantidad ?? 0)), 2);
+                $pedidoCantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
+                $articuloCantidad = round(max(0, (float) ($articulo->cantidad ?? 0)), 2);
+                $cantidad = $pedidoCantidad > 0 ? min($pedidoCantidad, $articuloCantidad) : $articuloCantidad;
+
+                if ($cantidad <= 0) {
+                    return null;
+                }
                 $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
                 $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
                 $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));

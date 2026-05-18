@@ -222,17 +222,33 @@ class AlbaranClienteController extends Controller
         $albaran = AlbaranCliente::create($validated);
         $this->syncPedidoClienteLink($albaran, $proyectoId);
 
-        $articuloIdsFacturados = collect($lineas)
-            ->pluck('articulo_id')
-            ->filter(fn ($value) => (int) $value > 0)
-            ->unique()
-            ->values();
+        $consumos = collect($lineas)
+            ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
+            ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
+            ->map(fn ($items) => round($items->sum(fn ($linea) => (float) ($linea['cantidad'] ?? 0)), 2));
 
-        if ($articuloIdsFacturados->isNotEmpty()) {
-            Articulo::query()
+        if ($consumos->isNotEmpty()) {
+            $articulos = Articulo::query()
                 ->where('proyecto_id', $proyectoId)
-                ->whereIn('id', $articuloIdsFacturados)
-                ->update(['facturado' => true]);
+                ->whereIn('id', $consumos->keys())
+                ->get();
+
+            foreach ($articulos as $articulo) {
+                $consumo = (float) ($consumos[$articulo->id] ?? 0);
+                if ($consumo <= 0) {
+                    continue;
+                }
+
+                $cantidadActual = (float) ($articulo->cantidad ?? 0);
+                $restante = round(max(0, $cantidadActual - $consumo), 2);
+                $precioUnitario = (float) ($articulo->precio_unitario ?? 0);
+                $margen = (float) ($articulo->margen ?? 0);
+
+                $articulo->cantidad = $restante;
+                $articulo->facturado = $restante <= 0;
+                $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+                $articulo->save();
+            }
         }
 
         return redirect()->route('albaranes.index')->with('success', 'Albarán creado');
@@ -289,7 +305,13 @@ class AlbaranClienteController extends Controller
                     return null;
                 }
 
-                $cantidad = round(max(0, (float) ($linea['cantidad'] ?? $articulo->cantidad ?? 0)), 2);
+                $pedidoCantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
+                $articuloCantidad = round(max(0, (float) ($articulo->cantidad ?? 0)), 2);
+                $cantidad = $pedidoCantidad > 0 ? min($pedidoCantidad, $articuloCantidad) : $articuloCantidad;
+
+                if ($cantidad <= 0) {
+                    return null;
+                }
                 $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
                 $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
                 $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));

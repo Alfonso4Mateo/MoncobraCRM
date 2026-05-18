@@ -225,6 +225,23 @@
     accent-color: #1f74dd;
 }
 
+.albaran-line-qty {
+    width: 5.5rem;
+    height: 2rem;
+    border: 1px solid #d6dfeb;
+    border-radius: 0.42rem;
+    background: #f9fbfe;
+    color: #2f4662;
+    font-size: 0.82rem;
+    padding: 0 0.4rem;
+    text-align: right;
+}
+
+.albaran-line-qty:disabled {
+    background: #f1f4f8;
+    color: #7a8ea8;
+}
+
 .lineas-table tbody td:last-child {
     text-align: center;
 }
@@ -285,7 +302,7 @@
 }
 
 .lineas-table tbody td:nth-child(3) {
-    white-space: normal;
+    white-space: pre-line;
     overflow-wrap: anywhere;
     min-width: 220px;
 }

@@ -345,6 +345,12 @@
     vertical-align: middle;
 }
 
+.presupuesto-items-table tbody td:nth-child(2) {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .presupuesto-items-table tbody tr:hover td {
     background: #f9fcff;
 }
