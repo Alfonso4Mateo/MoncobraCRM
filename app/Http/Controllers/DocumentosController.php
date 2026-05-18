@@ -87,8 +87,8 @@ class DocumentosController extends Controller
             'albaranes' => ['label' => 'Albaranes', 'icon' => 'fa-file-lines'],
             'presupuestos' => ['label' => 'Presupuestos', 'icon' => 'fa-file-invoice'],
             'pedidos' => ['label' => 'Pedidos', 'icon' => 'fa-cart-shopping'],
-            'entradas' => ['label' => 'Registro entrada', 'icon' => 'fa-truck-ramp-box'],
-            'salidas' => ['label' => 'Registro salida', 'icon' => 'fa-arrow-up-from-box'],
+            'entradas' => ['label' => 'Registro entrada', 'icon' => 'fa-truck'],
+            'salidas' => ['label' => 'Registro salida', 'icon' => 'fa-box-open'],
             'traslados' => ['label' => 'Traslados', 'icon' => 'fa-shuffle'],
         ];
     }
@@ -462,7 +462,7 @@ class DocumentosController extends Controller
         return [
             ['label' => 'Ver PDF', 'icon' => 'fa-file-pdf', 'url' => route('albaranes.pdf', $albaran)],
             ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('albaranes.pdf.file', $albaran)],
-            ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('albaranes.pantalla-roja', $albaran)],
+            ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('albaranes.edit', $albaran)],
         ];
     }
 

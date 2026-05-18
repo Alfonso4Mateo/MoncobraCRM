@@ -76,6 +76,8 @@ Route::middleware('auth')->group(function () {
     Route::get('albaranes/{albaran}/pdf/file', [AlbaranClienteController::class, 'streamPdf'])->name('albaranes.pdf.file');
     Route::get('albaranes/{albaran}/pdf/download', [AlbaranClienteController::class, 'downloadPdf'])->name('albaranes.pdf.download');
     Route::get('albaranes/{albaran}/preview', [AlbaranClienteController::class, 'preview'])->name('albaranes.preview');
+    Route::get('albaranes/{albaran}/editar', [AlbaranClienteController::class, 'edit'])->name('albaranes.edit');
+    Route::put('albaranes/{albaran}', [AlbaranClienteController::class, 'update'])->name('albaranes.update');
     Route::get('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'pantallaRoja'])->name('albaranes.pantalla-roja');
     Route::put('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'updatePantallaRoja'])->name('albaranes.pantalla-roja.update');
     Route::patch('albaranes/{albaran}/estado', [AlbaranClienteController::class, 'updateEstado'])->name('albaranes.estado.update');

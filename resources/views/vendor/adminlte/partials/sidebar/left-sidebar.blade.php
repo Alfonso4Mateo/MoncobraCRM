@@ -53,7 +53,7 @@
     {{-- Sidebar menu --}}
     <div class="sidebar">
         <nav class="pt-2 d-flex flex-column h-100">
-            <ul class="nav nav-pills nav-sidebar flex-column flex-grow-1 sidebar-main-menu {{ config('adminlte.classes_sidebar_nav', '') }}"
+            <ul class="nav nav-pills nav-sidebar flex-column sidebar-main-menu sidebar-main-menu-split {{ config('adminlte.classes_sidebar_nav', '') }}"
                 data-widget="treeview" role="menu"
                 @if(config('adminlte.sidebar_nav_animation_speed') != 300)
                     data-animation-speed="{{ config('adminlte.sidebar_nav_animation_speed') }}"
@@ -103,7 +103,7 @@
             </ul>
 
             @if(count($toolsMenu) > 0)
-                <ul class="nav nav-pills nav-sidebar flex-column sidebar-tools-menu {{ config('adminlte.classes_sidebar_nav', '') }}"
+                <ul class="nav nav-pills nav-sidebar flex-column sidebar-tools-menu sidebar-tools-menu-split {{ config('adminlte.classes_sidebar_nav', '') }}"
                     data-widget="treeview" role="menu"
                     @if(config('adminlte.sidebar_nav_animation_speed') != 300)
                         data-animation-speed="{{ config('adminlte.sidebar_nav_animation_speed') }}"
@@ -119,3 +119,52 @@
     </div>
 
 </aside>
+<style>
+    .main-sidebar .sidebar {
+        height: 100%;
+    }
+
+    .main-sidebar .sidebar .os-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .main-sidebar .sidebar .os-viewport,
+    .main-sidebar .sidebar .os-content {
+        height: 100% !important;
+    }
+
+    .main-sidebar .sidebar .os-content > nav {
+        flex: 1 1 auto;
+    }
+
+    .main-sidebar .sidebar > nav {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .main-sidebar .sidebar-main-menu-split {
+        flex: 0 0 auto;
+        height: 80% !important;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .main-sidebar .sidebar-tools-menu-split {
+        flex: 0 0 auto;
+        height: 20% !important;
+        min-height: 0;
+        overflow-y: auto;
+        margin-top: 0.65rem;
+        padding-top: 0.85rem;
+        border-top: 2px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .main-sidebar .sidebar-main-menu-split + .sidebar-tools-menu-split {
+        margin-top: auto;
+    }
+</style>

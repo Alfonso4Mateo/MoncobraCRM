@@ -478,8 +478,25 @@ body,
 }
 
 .docs-line-item strong {
-    display: block;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    text-overflow: ellipsis;
     margin-bottom: 2px;
+}
+
+/* Allow flex children to shrink and force long descriptions to wrap */
+.docs-line-item > div {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.docs-line-item strong,
+.docs-line-item span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .docs-line-item span {
@@ -488,8 +505,13 @@ body,
 }
 
 .docs-line-total {
+    flex: 0 0 auto;
+    min-width: 84px;
+    margin-left: auto;
+    text-align: right;
     font-weight: 800;
     color: var(--docs-primary-dark);
+    white-space: nowrap;
 }
 
 .docs-empty-lineas {

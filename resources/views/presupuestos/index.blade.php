@@ -43,22 +43,43 @@
 
         <div class="presupuestos-filters-card">
             <form method="GET" action="{{ route('presupuestos.index') }}" class="presupuestos-search-form">
-                    <div class="presupuestos-search-copy">
+                <div class="presupuestos-search-copy">
                     <span class="presupuestos-search-label">Buscador</span>
-                    <h2>Encuentra presupuestos por cliente, OT o fecha</h2>
-                    <p>Escribe un texto, una OT, un cliente o una fecha para localizar el registro.</p>
+                    <h2>Encuentra presupuestos por numero, cliente, OT, fecha o estado</h2>
+                    <p>Usa texto libre y combina rango de fechas con estado para acotar resultados.</p>
                 </div>
 
-                <div class="presupuestos-search-controls">
+                <div class="presupuestos-search-grid">
                     <div class="presupuestos-input-group">
                         <i class="fas fa-search"></i>
                         <input
                             type="search"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por cliente, OT o fecha"
+                            placeholder="Buscar por numero, cliente, OT"
                             autocomplete="off"
                         >
+                    </div>
+
+                    <div class="presupuestos-filter-field">
+                        <label for="fecha_desde">Desde</label>
+                        <input type="date" id="fecha_desde" name="fecha_desde" value="{{ $fechaDesde ?? '' }}">
+                    </div>
+
+                    <div class="presupuestos-filter-field">
+                        <label for="fecha_hasta">Hasta</label>
+                        <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ $fechaHasta ?? '' }}">
+                    </div>
+
+                    <div class="presupuestos-filter-field">
+                        <label for="estado">Estado</label>
+                        <select id="estado" name="estado">
+                            <option value="todos" {{ ($estado ?? 'todos') === 'todos' ? 'selected' : '' }}>Todos</option>
+                            <option value="pendiente" {{ ($estado ?? '') === 'pendiente' ? 'selected' : '' }}>Pendiente</option>
+                            <option value="aceptado" {{ ($estado ?? '') === 'aceptado' ? 'selected' : '' }}>Aceptado</option>
+                            <option value="rechazado" {{ ($estado ?? '') === 'rechazado' ? 'selected' : '' }}>Rechazado</option>
+                            <option value="pendiente pedido" {{ ($estado ?? '') === 'pendiente pedido' ? 'selected' : '' }}>Pendiente pedido</option>
+                        </select>
                     </div>
 
                     <div class="presupuestos-actions">
@@ -66,7 +87,7 @@
                             Buscar
                         </button>
 
-                        @if($search !== '')
+                        @if($search !== '' || !empty($fechaDesde) || !empty($fechaHasta) || (($estado ?? 'todos') !== 'todos'))
                             <a href="{{ route('presupuestos.index') }}" class="presupuestos-reset-btn">
                                 Limpiar
                             </a>

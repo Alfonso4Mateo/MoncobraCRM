@@ -22,6 +22,13 @@ class PresupuestoController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
         $search = trim((string) $request->input('search', ''));
+        $fechaDesde = trim((string) $request->input('fecha_desde', ''));
+        $fechaHasta = trim((string) $request->input('fecha_hasta', ''));
+        $estado = trim((string) $request->input('estado', 'todos'));
+
+        if (!in_array($estado, ['todos', 'pendiente', 'aceptado', 'rechazado', 'pendiente pedido'], true)) {
+            $estado = 'todos';
+        }
 
         $presupuestosQuery = Presupuesto::with('cliente')
             ->where('proyecto_id', $proyectoId);
@@ -50,13 +57,25 @@ class PresupuestoController extends Controller
             });
         }
 
+        if ($fechaDesde !== '') {
+            $presupuestosQuery->whereDate('fecha', '>=', $fechaDesde);
+        }
+
+        if ($fechaHasta !== '') {
+            $presupuestosQuery->whereDate('fecha', '<=', $fechaHasta);
+        }
+
+        if ($estado !== 'todos') {
+            $presupuestosQuery->where('estado', $estado);
+        }
+
         $presupuestos = $presupuestosQuery
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
 
-        return view('presupuestos.index', compact('presupuestos', 'search'));
+        return view('presupuestos.index', compact('presupuestos', 'search', 'fechaDesde', 'fechaHasta', 'estado'));
     }
 
     public function create(Request $request)
@@ -395,6 +414,30 @@ class PresupuestoController extends Controller
         ]);
 
         $this->syncArticulosFromLineas($proyectoId, $articulosNormalizados);
+
+        // Regenerate stored PDF copy after updating the presupuesto so preview shows current data
+        try {
+            // Ensure we have the latest model state
+            $presupuesto->refresh();
+
+            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
+                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                Storage::disk('public')->put($filePath, $pdf->output());
+                $presupuesto->update(['archivo_pdf' => $filePath]);
+            } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                $html = view('presupuestos.pdf', compact('presupuesto'))->render();
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                Storage::disk('public')->put($filePath, $dompdf->output());
+                $presupuesto->update(['archivo_pdf' => $filePath]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Artículos del presupuesto actualizados');
     }

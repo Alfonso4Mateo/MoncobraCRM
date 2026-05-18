@@ -364,9 +364,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        let selectedOption = pedidoClienteSelect.selectedOptions && pedidoClienteSelect.selectedOptions.length > 0
-            ? pedidoClienteSelect.selectedOptions[0]
-            : null;
+        // Handle both <select> (create) and <input> (pantalla-roja) for pedido_cliente.
+        let selectedOption = null;
+        const isInputField = pedidoClienteSelect.tagName === 'INPUT' || pedidoClienteSelect.tagName === 'TEXTAREA';
+
+        if (isInputField) {
+            const rawVal = String(pedidoClienteSelect.value || '').trim();
+            if (rawVal === '') {
+                // If empty input, do not clear existing cliente/ot values; just disable pedido mode.
+                clienteSelect.value = clienteSelect.value || '';
+                otInput.value = otInput.value || '';
+                setPedidoMode(false);
+                return;
+            }
+
+            // Create a minimal selectedOption-like object for downstream logic
+            selectedOption = { value: rawVal, dataset: {} };
+        } else {
+            selectedOption = pedidoClienteSelect.selectedOptions && pedidoClienteSelect.selectedOptions.length > 0
+                ? pedidoClienteSelect.selectedOptions[0]
+                : null;
+        }
 
         // Fallback: if Select2 is active it may not expose selectedOptions the same way
         if (!selectedOption && window.jQuery && window.jQuery.fn.select2 && window.jQuery(pedidoClienteSelect).data('select2')) {

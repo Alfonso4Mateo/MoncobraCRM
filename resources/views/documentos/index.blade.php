@@ -6,6 +6,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     @vite(['resources/css/documentos-index.css'])
 @endsection
 
@@ -30,7 +31,7 @@
                     class="docs-type-card {{ $tipoActual === $key ? 'is-active' : '' }}"
                 >
                     <span class="docs-type-icon">
-                        <i class="fas {{ $tipo['icon'] }}" aria-hidden="true"></i>
+                        <i class="fas {{ $tipo['icon'] ?? 'fa-file' }}" aria-hidden="true"></i>
                     </span>
                     <div>
                         <span class="docs-type-label">{{ $tipo['label'] }}</span>
@@ -201,7 +202,7 @@
                                         href="{{ $accion['url'] }}"
                                         class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
                                     >
-                                        <i class="fas {{ $accion['icon'] }}"></i>
+                                        <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
                                         {{ $accion['label'] }}
                                     </a>
                                 @endforeach

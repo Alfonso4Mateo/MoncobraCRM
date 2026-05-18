@@ -9,3 +9,24 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Sidebar split ratio for AdminLTE custom menu blocks */
+.main-sidebar .sidebar > nav {
+    min-height: 0;
+}
+
+.main-sidebar .sidebar-main-menu-split {
+    flex: 0 0 70%;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.main-sidebar .sidebar-tools-menu-split {
+    flex: 0 0 30%;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.main-sidebar .sidebar-main-menu-split + .sidebar-tools-menu-split {
+    margin-top: auto;
+}

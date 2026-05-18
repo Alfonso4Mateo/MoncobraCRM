@@ -164,7 +164,7 @@
                                         <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán">
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
-                                        <a href="{{ route('albaranes.pantalla-roja', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
+                                        <a href="{{ route('albaranes.edit', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
                                             <i class="fas fa-pen"></i>
                                         </a>
 

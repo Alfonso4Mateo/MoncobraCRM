@@ -70,7 +70,7 @@
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--paid">
                     <div class="albaran-pago-info">
-                        <span class="albaran-pago-label">Total Pagado (Albaranes)</span>
+                        <span class="albaran-pago-label">Total Facturado (Albaranes)</span>
                         <strong class="albaran-pago-amount">€{{ number_format((float) $totalAlbaranes, 2, ',', '.') }}</strong>
                     </div>
                 </div>
@@ -96,7 +96,7 @@
                 <div class="progress-bar-container">
                     <div class="progress-bar-fill" style="width: {{ $porcentajePagado }}%"></div>
                 </div>
-                <span class="progress-text">{{ number_format($porcentajePagado, 1, ',', '.') }}% Pagado</span>
+                <span class="progress-text">{{ number_format($porcentajePagado, 1, ',', '.') }}% Facturado</span>
             </div>
         </article>
 

@@ -118,24 +118,24 @@ class ClienteController extends Controller
             abort(404);
         }
 
+        $historialActivo = (string) request('historial', 'presupuestos');
+
+        if (!in_array($historialActivo, ['presupuestos', 'pedidos', 'albaranes'], true)) {
+            $historialActivo = 'presupuestos';
+        }
+
+        $busqueda = trim((string) request('busqueda', ''));
+        $fechaDesde = trim((string) request('fecha_desde', ''));
+        $fechaHasta = trim((string) request('fecha_hasta', ''));
         $estadoFiltro = (string) request('estado', 'todos');
         $hoy = now();
         $limitePendiente = $hoy->copy()->subDays(15)->toDateString();
         $limiteEntregado = $hoy->copy()->subDays(45)->toDateString();
 
-        $presupuestosQuery = $cliente->presupuestos()
-            ->orderByDesc('fecha')
-            ->orderByDesc('id');
-
-        if ($estadoFiltro === 'pendiente') {
-            $presupuestosQuery->whereDate('fecha', '>=', $limitePendiente);
-        } elseif ($estadoFiltro === 'recibido') {
-            $presupuestosQuery->whereBetween('fecha', [$limiteEntregado, $hoy->copy()->subDays(16)->toDateString()]);
-        } elseif ($estadoFiltro === 'entregado') {
-            $presupuestosQuery->whereDate('fecha', '<', $limiteEntregado);
-        }
-
-        $presupuestos = $presupuestosQuery->paginate(5)->withQueryString();
+        $pedidosPorNumero = $cliente->pedidosClientes()
+            ->whereNotNull('numero_pedido')
+            ->get()
+            ->keyBy(fn (PedidoCliente $pedido) => trim((string) $pedido->numero_pedido));
 
         $pedidosPorOt = PedidoCliente::query()
             ->where('id_cliente', $cliente->id)
@@ -174,33 +174,183 @@ class ClienteController extends Controller
             return $hayValores ? round($total, 2) : null;
         };
 
-        $presupuestos->getCollection()->transform(function ($presupuesto) use ($hoy, $pedidosPorOt, $resolverTotalDesdeArticulos) {
-            $dias = $presupuesto->fecha ? $presupuesto->fecha->diffInDays($hoy) : 999;
+        $presupuestos = null;
+        $pedidos = null;
+        $albaranes = null;
 
-            if ($dias <= 15) {
-                $presupuesto->ui_estado = 'pendiente';
-                $presupuesto->ui_estado_label = 'PENDIENTE';
-            } elseif ($dias <= 45) {
-                $presupuesto->ui_estado = 'recibido';
-                $presupuesto->ui_estado_label = 'RECIBIDO';
-            } else {
-                $presupuesto->ui_estado = 'entregado';
-                $presupuesto->ui_estado_label = 'ENTREGADO';
+        if ($historialActivo === 'presupuestos') {
+            $presupuestosQuery = $cliente->presupuestos()
+                ->orderByDesc('fecha')
+                ->orderByDesc('id');
+
+            if ($busqueda !== '') {
+                $presupuestosQuery->where(function ($query) use ($busqueda) {
+                    $query->where('numero', 'like', '%' . $busqueda . '%')
+                        ->orWhere('ot', 'like', '%' . $busqueda . '%')
+                        ->orWhere('titulo', 'like', '%' . $busqueda . '%')
+                        ->orWhere('documento', 'like', '%' . $busqueda . '%')
+                        ->orWhere('id', 'like', '%' . $busqueda . '%');
+                });
             }
 
-            $total = null;
-            $ot = trim((string) ($presupuesto->ot ?? ''));
-
-            if ($ot !== '' && $pedidosPorOt->has($ot)) {
-                $total = $resolverTotalDesdeArticulos($pedidosPorOt->get($ot)?->lista_articulos);
+            if ($fechaDesde !== '') {
+                $presupuestosQuery->whereDate('fecha', '>=', $fechaDesde);
             }
 
-            $presupuesto->ui_total = $total;
+            if ($fechaHasta !== '') {
+                $presupuestosQuery->whereDate('fecha', '<=', $fechaHasta);
+            }
 
-            return $presupuesto;
-        });
+            if ($estadoFiltro === 'pendiente') {
+                $presupuestosQuery->whereDate('fecha', '>=', $limitePendiente);
+            } elseif ($estadoFiltro === 'recibido') {
+                $presupuestosQuery->whereBetween('fecha', [$limiteEntregado, $hoy->copy()->subDays(16)->toDateString()]);
+            } elseif ($estadoFiltro === 'entregado') {
+                $presupuestosQuery->whereDate('fecha', '<', $limiteEntregado);
+            }
 
-        return view('clientes.show', compact('cliente', 'presupuestos', 'estadoFiltro'));
+            $presupuestos = $presupuestosQuery->paginate(5)->withQueryString();
+
+            $presupuestos->getCollection()->transform(function ($presupuesto) use ($hoy, $pedidosPorOt, $resolverTotalDesdeArticulos) {
+                $dias = $presupuesto->fecha ? $presupuesto->fecha->diffInDays($hoy) : 999;
+
+                if ($dias <= 15) {
+                    $presupuesto->ui_estado = 'pendiente';
+                    $presupuesto->ui_estado_label = 'PENDIENTE';
+                } elseif ($dias <= 45) {
+                    $presupuesto->ui_estado = 'recibido';
+                    $presupuesto->ui_estado_label = 'RECIBIDO';
+                } else {
+                    $presupuesto->ui_estado = 'entregado';
+                    $presupuesto->ui_estado_label = 'ENTREGADO';
+                }
+
+                $total = null;
+                $ot = trim((string) ($presupuesto->ot ?? ''));
+
+                if ($ot !== '' && $pedidosPorOt->has($ot)) {
+                    $total = $resolverTotalDesdeArticulos($pedidosPorOt->get($ot)?->lista_articulos);
+                }
+
+                $presupuesto->ui_total = $total;
+
+                return $presupuesto;
+            });
+        } elseif ($historialActivo === 'pedidos') {
+            $pedidos = $cliente->pedidosClientes()
+                ->with('presupuesto')
+                ->withCount('albaranes')
+                ->orderByDesc('fecha_pedido')
+                ->orderByDesc('id')
+                ;
+
+            if ($busqueda !== '') {
+                $pedidos->where(function ($query) use ($busqueda) {
+                    $query->where('numero_pedido', 'like', '%' . $busqueda . '%')
+                        ->orWhere('ot', 'like', '%' . $busqueda . '%')
+                        ->orWhere('estado', 'like', '%' . $busqueda . '%')
+                        ->orWhere('lista_articulos', 'like', '%' . $busqueda . '%')
+                        ->orWhere('id', 'like', '%' . $busqueda . '%')
+                        ->orWhereHas('presupuesto', function ($query) use ($busqueda) {
+                            $query->where('numero', 'like', '%' . $busqueda . '%')
+                                ->orWhere('titulo', 'like', '%' . $busqueda . '%')
+                                ->orWhere('documento', 'like', '%' . $busqueda . '%');
+                        });
+                });
+            }
+
+            if ($fechaDesde !== '') {
+                $pedidos->whereDate('fecha_pedido', '>=', $fechaDesde);
+            }
+
+            if ($fechaHasta !== '') {
+                $pedidos->whereDate('fecha_pedido', '<=', $fechaHasta);
+            }
+
+            if ($estadoFiltro !== 'todos') {
+                $pedidos->where('estado', $estadoFiltro);
+            }
+
+            $pedidos = $pedidos->paginate(5)->withQueryString();
+
+            $pedidos->getCollection()->transform(function ($pedido) use ($resolverTotalDesdeArticulos) {
+                $estado = trim((string) ($pedido->estado ?? 'pendiente'));
+                $estado = $estado !== '' ? $estado : 'pendiente';
+
+                $pedido->ui_estado = $estado;
+                $pedido->ui_estado_label = match ($estado) {
+                    'facturado' => 'FACTURADO',
+                    'facturado_parcial' => 'FACTURADO PARCIAL',
+                    'pendiente' => 'PENDIENTE',
+                    default => strtoupper(str_replace('_', ' ', $estado)),
+                };
+                $pedido->ui_presupuesto_numero = $pedido->presupuesto?->numero;
+                $pedido->ui_albaranes_count = (int) ($pedido->albaranes_count ?? 0);
+                $pedido->ui_total = $pedido->total !== null
+                    ? (float) $pedido->total
+                    : $resolverTotalDesdeArticulos(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : null);
+
+                return $pedido;
+            });
+        } else {
+            $albaranes = $cliente->albaranes()
+                ->orderByDesc('fecha')
+                ->orderByDesc('id');
+
+            if ($busqueda !== '') {
+                $albaranes->where(function ($query) use ($busqueda) {
+                    $query->where('numero', 'like', '%' . $busqueda . '%')
+                        ->orWhere('documento', 'like', '%' . $busqueda . '%')
+                        ->orWhere('ot', 'like', '%' . $busqueda . '%')
+                        ->orWhere('pedido_cliente', 'like', '%' . $busqueda . '%')
+                        ->orWhere('titulo', 'like', '%' . $busqueda . '%')
+                        ->orWhere('estado', 'like', '%' . $busqueda . '%')
+                        ->orWhere('lista_articulos', 'like', '%' . $busqueda . '%')
+                        ->orWhere('id', 'like', '%' . $busqueda . '%');
+                });
+            }
+
+            if ($fechaDesde !== '') {
+                $albaranes->whereDate('fecha', '>=', $fechaDesde);
+            }
+
+            if ($fechaHasta !== '') {
+                $albaranes->whereDate('fecha', '<=', $fechaHasta);
+            }
+
+            if ($estadoFiltro !== 'todos') {
+                $albaranes->where('estado', $estadoFiltro);
+            }
+
+            $albaranes = $albaranes->paginate(5)->withQueryString();
+
+            $albaranes->getCollection()->transform(function ($albaran) use ($pedidosPorNumero) {
+                $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
+                $pedidoRelacionado = $pedidoNumero !== '' ? $pedidosPorNumero->get($pedidoNumero) : null;
+                $estado = trim((string) ($albaran->estado ?? 'pendiente'));
+                $estado = $estado !== '' ? $estado : 'pendiente';
+
+                $albaran->ui_estado = $estado;
+                $albaran->ui_estado_label = strtoupper(str_replace('_', ' ', $estado));
+                $albaran->ui_pedido_id = $pedidoRelacionado?->id;
+                $albaran->ui_pedido_numero = $pedidoRelacionado?->numero_pedido ?: ($pedidoNumero !== '' ? $pedidoNumero : null);
+                $albaran->ui_total = $albaran->total !== null ? (float) $albaran->total : null;
+
+                return $albaran;
+            });
+        }
+
+        return view('clientes.show', compact(
+            'cliente',
+            'presupuestos',
+            'pedidos',
+            'albaranes',
+            'estadoFiltro',
+            'busqueda',
+            'fechaDesde',
+            'fechaHasta',
+            'historialActivo'
+        ));
     }
 
     /**

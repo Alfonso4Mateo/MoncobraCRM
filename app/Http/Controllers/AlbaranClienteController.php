@@ -442,6 +442,11 @@ class AlbaranClienteController extends Controller
 
     public function pantallaRoja(AlbaranCliente $albaran)
     {
+        return $this->edit($albaran);
+    }
+
+    public function edit(AlbaranCliente $albaran)
+    {
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
@@ -455,10 +460,15 @@ class AlbaranClienteController extends Controller
             $clientes->prepend($albaran->cliente);
         }
 
-        return view('albaranes.pantalla-roja', compact('albaran', 'clientes'));
+        return view('albaranes.edit', compact('albaran', 'clientes'));
     }
 
     public function updatePantallaRoja(Request $request, AlbaranCliente $albaran)
+    {
+        return $this->update($request, $albaran);
+    }
+
+    public function update(Request $request, AlbaranCliente $albaran)
     {
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
@@ -479,7 +489,11 @@ class AlbaranClienteController extends Controller
             'pedido_cliente' => 'nullable|string|max:255',
             'titulo' => 'nullable|string|max:255',
             'estado' => ['required', Rule::in(['pendiente', 'recibido', 'entregado'])],
+            'lineas_json' => 'nullable|json',
         ]);
+
+        $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]');
+        $total = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
 
         $albaran->update([
             'documento' => $validated['documento'],
@@ -490,12 +504,37 @@ class AlbaranClienteController extends Controller
             'pedido_cliente' => $validated['pedido_cliente'] ?? null,
             'titulo' => $validated['titulo'] ?? null,
             'estado' => $validated['estado'],
+            'lista_articulos' => $lineas === [] ? null : $lineas,
+            'total' => round($total, 2),
         ]);
 
         $this->syncPedidoClienteLink($albaran, $proyectoId);
 
+        // Regenerate stored PDF after updating so preview shows current data
+        try {
+            $albaran->refresh();
+
+            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('albaranes.pdf', ['albaran' => $albaran]);
+                $filePath = 'albaranes/albaran-' . $albaran->id . '.pdf';
+                Storage::disk('public')->put($filePath, $pdf->output());
+                $albaran->forceFill(['archivo_pdf' => $filePath])->save();
+            } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                $html = view('albaranes.pdf', ['albaran' => $albaran])->render();
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+                $filePath = 'albaranes/albaran-' . $albaran->id . '.pdf';
+                Storage::disk('public')->put($filePath, $dompdf->output());
+                $albaran->forceFill(['archivo_pdf' => $filePath])->save();
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return redirect()
-            ->route('albaranes.pantalla-roja', $albaran)
+            ->route('albaranes.edit', $albaran)
             ->with('success', 'Albarán actualizado correctamente.');
     }
 

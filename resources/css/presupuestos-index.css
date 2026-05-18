@@ -124,6 +124,13 @@ body,
   align-items: center;
 }
 
+.presupuestos-search-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
 .presupuestos-input-group {
   display: flex;
   align-items: center;
@@ -154,6 +161,38 @@ body,
   background: transparent;
   color: var(--pres-text);
   font-size: .95rem;
+}
+
+.presupuestos-filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.presupuestos-filter-field label {
+  color: #64748b;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.presupuestos-filter-field input,
+.presupuestos-filter-field select {
+  min-height: 48px;
+  border: 1px solid var(--pres-border);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--pres-text);
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.presupuestos-filter-field input:focus,
+.presupuestos-filter-field select:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, .45);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .08);
 }
 
 .presupuestos-actions {
@@ -568,6 +607,12 @@ body,
   box-shadow: var(--pres-shadow);
 }
 
+@media (max-width: 1200px) {
+  .presupuestos-search-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, .9fr) minmax(140px, .9fr);
+  }
+}
+
 @media (max-width: 991.98px) {
   .presupuestos-header,
   .presupuestos-card__header,
@@ -583,6 +628,10 @@ body,
 
   .presupuestos-card__header {
     display: grid;
+  }
+
+  .presupuestos-search-grid {
+    grid-template-columns: 1fr;
   }
 
   .presupuestos-actions {
