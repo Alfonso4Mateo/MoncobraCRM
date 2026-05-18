@@ -108,9 +108,14 @@
                             <input id="referencia_proveedor" name="referencia_proveedor" type="text" value="{{ old('referencia_proveedor', $varianteBase->referencia_proveedor ?? '') }}" placeholder="REF-8829-00" class="@error('referencia_proveedor') is-invalid @enderror">
                         </div>
 
+                        <div class="field-group">
+                            <label for="nombre">Nombre del producto</label>
+                            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $varianteBase->descripcion ?? '') }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
+                        </div>
+
                         <div class="field-group field-full">
                             <label for="descripcion">Descripcion del item</label>
-                            <textarea id="descripcion" name="descripcion" rows="1" maxlength="1000" placeholder="Nombre descriptivo completo del material o pieza industrial" class="input-auto-grow @error('descripcion') is-invalid @enderror" required>{{ old('descripcion', $varianteBase->descripcion ?? '') }}</textarea>
+                            <textarea id="descripcion" name="descripcion" rows="1" maxlength="1000" placeholder="Descripcion larga o detalles técnicos (opcional)" class="input-auto-grow @error('descripcion') is-invalid @enderror">{{ old('descripcion', $varianteBase->descripcion ?? '') }}</textarea>
                         </div>
                         <div class="field-group">
                             <label for="clase_id">Clase del producto</label>

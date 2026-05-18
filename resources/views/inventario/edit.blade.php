@@ -51,9 +51,14 @@
                             <input id="referencia_proveedor" name="referencia_proveedor" type="text" value="{{ old('referencia_proveedor', $inventario->referencia_proveedor) }}" placeholder="REF-8829-00" class="@error('referencia_proveedor') is-invalid @enderror">
                         </div>
 
+                        <div class="field-group">
+                            <label for="nombre">Nombre del producto</label>
+                            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $inventario->nombre ?? $inventario->descripcion) }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
+                        </div>
+
                         <div class="field-group field-full">
                             <label for="descripcion">Descripcion del item</label>
-                            <input id="descripcion" name="descripcion" type="text" value="{{ old('descripcion', $inventario->descripcion) }}" placeholder="Nombre descriptivo completo del material o pieza industrial" class="@error('descripcion') is-invalid @enderror" required>
+                            <input id="descripcion" name="descripcion" type="text" value="{{ old('descripcion', $inventario->descripcion) }}" placeholder="Descripcion larga o detalles técnicos" class="@error('descripcion') is-invalid @enderror">
                         </div>
 
                         <div class="field-group">
@@ -193,7 +198,7 @@
 
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
-                removeButton.textContent = 'Eliminar';
+                removeButton.innerHTML = '<i class="fas fa-trash"></i> Eliminar';
                 removeButton.style.border = '1px solid #d0d7de';
                 removeButton.style.background = '#fff';
                 removeButton.style.borderRadius = '8px';
@@ -236,7 +241,7 @@
 
                 const addButton = document.createElement('button');
                 addButton.type = 'button';
-                addButton.textContent = 'Añadir valor';
+                addButton.innerHTML = '<i class="fas fa-plus"></i> Añadir valor';
                 addButton.style.border = '1px solid #0f172a';
                 addButton.style.background = '#0f172a';
                 addButton.style.color = '#fff';

@@ -7,6 +7,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/inventario-salida.css'])
+    <style>
+        .row-error { outline: 2px solid #f87171; background: #fff6f6; }
+        #client-errors { display: none; }
+        #client-errors.is-visible { display: block; }
+    </style>
 @endsection
 
 @section('content')
@@ -28,6 +33,15 @@
             <h1>Registro de Salida</h1>
             <p>Control de egresos de materiales y componentes industriales.</p>
         </section>
+
+        <div id="client-errors" class="stock-out-alert" role="alert" aria-hidden="true"></div>
+
+        <style>
+            .stock-out-alert { display:none; background:#fff4f4; border:1px solid #f5c6cb; padding:0.75rem; border-radius:4px; margin-bottom:0.75rem; }
+            .stock-out-alert.is-visible { display:block; }
+            .item-row.row-error { background:#fff6f6; border-left:4px solid #e3342f; }
+            .item-row .is-invalid { border-color:#e3342f; }
+        </style>
 
         @if ($errors->any())
             <div class="stock-out-alert" role="alert">
@@ -100,6 +114,15 @@
                                 </div>
                             </div>
                         </article>
+
+                        <div id="items-section-top" style="margin-top:0.75rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                                <small>Agrega las filas que quieras; se enviarán como <strong>items[]</strong></small>
+                                <button type="button" id="add-item-btn" class="btn-pdf btn-pdf--small" title="Añadir producto"> <i class="fas fa-plus"></i> Añadir producto</button>
+                            </div>
+
+                            <div id="items-container" style="margin-top:0.75rem;"></div>
+                        </div>
                     </article>
 
                     <article class="out-card">
@@ -152,7 +175,7 @@
                         </div>
 
                         <div class="pdf-action-stack">
-                            <button type="button" class="btn-pdf" data-pdf-open aria-controls="salida-pdf-modal">Ver PDF</button>
+                            <button type="button" class="btn-pdf" data-pdf-open aria-controls="salida-pdf-modal" onclick="openSalidaPdf && openSalidaPdf()">Ver PDF</button>
                             <button type="button" class="btn-pdf btn-pdf--print" data-pdf-print>Imprimir</button>
                             <button type="submit" class="btn-pdf btn-pdf--save" name="guardar_documento" value="1">Guardar documento</button>
                         </div>
@@ -250,25 +273,20 @@
                                         <tr>
                                             <td>
                                                 <textarea
-                                                    name="pdf_articulo_1"
-                                                    data-sync="producto_busqueda"
+                                                    data-pdf-line="1"
                                                     class="pdf-cell-input pdf-auto-grow"
                                                     placeholder="Nombre del producto"
-                                                >{{ old('producto_busqueda') }}</textarea>
+                                                    readonly
+                                                ></textarea>
                                             </td>
                                             <td>
-                                                <textarea
-                                                    name="pdf_cantidad_1"
-                                                    data-sync="cantidad_retirar"
-                                                    class="pdf-cell-input pdf-cell-input--center pdf-auto-grow"
-                                                    placeholder="Cantidad"
-                                                >{{ old('cantidad_retirar', 1) }}</textarea>
+                                                <textarea data-pdf-line="1-qty" class="pdf-cell-input pdf-cell-input--center pdf-auto-grow" placeholder="Cantidad" readonly></textarea>
                                             </td>
                                         </tr>
                                         @for ($i = 2; $i <= 10; $i++)
                                             <tr>
-                                                <td><textarea name="pdf_articulo_{{ $i }}" class="pdf-cell-input pdf-auto-grow" placeholder=""></textarea></td>
-                                                <td><textarea name="pdf_cantidad_{{ $i }}" class="pdf-cell-input pdf-cell-input--center pdf-auto-grow" placeholder=""></textarea></td>
+                                                <td><textarea data-pdf-line="{{ $i }}" class="pdf-cell-input pdf-auto-grow" placeholder="" readonly></textarea></td>
+                                                <td><textarea data-pdf-line="{{ $i }}-qty" class="pdf-cell-input pdf-cell-input--center pdf-auto-grow" placeholder="" readonly></textarea></td>
                                             </tr>
                                         @endfor
                                     </tbody>
@@ -305,7 +323,9 @@
         $catalogoSalidaJs = $catalogo
             ->map(function ($item) {
                 return [
+                    'id' => (int) $item->id,
                     'codigo' => (string) $item->codigo,
+                    'nombre' => (string) ($item->nombre ?? ''),
                     'descripcion' => (string) $item->descripcion,
                     'stock_actual' => (int) ($item->stock_actual ?? 0),
                 ];
@@ -318,7 +338,6 @@
             const catalogo = @json($catalogoSalidaJs);
             const productoInput = document.getElementById('producto_busqueda');
             const suggestionsDropdown = document.getElementById('producto-suggestions');
-            const codigoInput = document.getElementById('codigo');
             const cantidadInput = document.getElementById('cantidad_retirar');
             const qtyPreview = document.getElementById('qty-preview');
             const selectedName = document.getElementById('selected-product-name');
@@ -332,6 +351,33 @@
             const autoGrowAreas = document.querySelectorAll('.pdf-auto-grow');
             const formAutoGrowAreas = document.querySelectorAll('.input-auto-grow');
 
+            const showClientErrors = (errors) => {
+                const container = document.getElementById('client-errors');
+                if (!container) return;
+                container.innerHTML = `<strong>Errores:</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+                container.classList.add('is-visible');
+                // clear previous highlights
+                document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
+                // highlight rows where qty > maxStock
+                const rows = document.querySelectorAll('.item-row');
+                rows.forEach(row => {
+                    const qtyEl = row.querySelector('input[data-item-qty]');
+                    if (!qtyEl) return;
+                    const maxStock = parseInt(qtyEl.dataset.maxStock || qtyEl.max || '0', 10) || 0;
+                    const qty = parseInt(qtyEl.value || '0', 10) || 0;
+                    if (maxStock > 0 && qty > maxStock) row.classList.add('row-error');
+                });
+                container.scrollIntoView({behavior: 'smooth', block: 'center'});
+            };
+
+            const clearClientErrors = () => {
+                const container = document.getElementById('client-errors');
+                if (!container) return;
+                container.innerHTML = '';
+                container.classList.remove('is-visible');
+                document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
+            };
+
             const normalize = (value) => String(value || '').trim().toLowerCase();
 
             const findProducto = () => {
@@ -341,7 +387,9 @@
                 }
 
                 return catalogo.find((item) => {
-                    return normalize(item.codigo) === search || normalize(item.descripcion) === search;
+                    return normalize(item.codigo) === search
+                        || normalize(item.descripcion) === search
+                        || normalize(item.nombre) === search;
                 }) || null;
             };
 
@@ -349,7 +397,9 @@
                 if (!query) return [];
                 const normalized = normalize(query);
                 return catalogo.filter((item) => {
-                    return normalize(item.codigo).includes(normalized) || normalize(item.descripcion).includes(normalized);
+                    return normalize(item.codigo).includes(normalized)
+                        || normalize(item.descripcion).includes(normalized)
+                        || normalize(item.nombre).includes(normalized);
                 }).slice(0, 8);
             };
 
@@ -400,21 +450,29 @@
                 const producto = findProducto();
 
                 if (!producto) {
-                    codigoInput.value = '';
+                    selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
                     selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
                     selectedCode.textContent = 'SKU: -';
                     selectedStock.textContent = '0';
+                    // clear limits
+                    if (cantidadInput) { cantidadInput.removeAttribute('max'); }
                     return;
                 }
-
-                codigoInput.value = producto.codigo;
                 selectedName.textContent = producto.descripcion;
                 selectedCode.textContent = `SKU: ${producto.codigo}`;
                 selectedStock.textContent = producto.stock_actual;
+                // set limits on single-quantity input
+                if (cantidadInput) {
+                    cantidadInput.max = producto.stock_actual;
+                    if (parseInt(cantidadInput.value || '0', 10) > producto.stock_actual) {
+                        cantidadInput.value = producto.stock_actual;
+                    }
+                }
             };
 
             productoInput.addEventListener('change', hydrateProduct);
             productoInput.addEventListener('input', () => {
+                clearClientErrors();
                 renderSuggestions();
                 hydrateProduct();
             });
@@ -429,9 +487,76 @@
 
             if (pdfOpenButton && pdfModal) {
                 const openModal = () => {
+                    populatePdfPreview();
                     pdfModal.classList.add('is-open');
                     pdfModal.setAttribute('aria-hidden', 'false');
                     document.body.classList.add('pdf-modal-open');
+                };
+
+                const populatePdfPreview = () => {
+                    const lines = Array.from(pdfModal.querySelectorAll('textarea[data-pdf-line]'));
+                    lines.forEach(t => t.value = '');
+                    const itemsContainerLocal = document.getElementById('items-container');
+                    const rows = itemsContainerLocal ? itemsContainerLocal.querySelectorAll('.item-row') : [];
+
+                    const errors = [];
+
+                    if (rows.length > 0) {
+                        rows.forEach((row, rIdx) => {
+                            const qtyEl = row.querySelector('input[type="number"]');
+                            const qty = parseInt(qtyEl?.value || '0', 10) || 0;
+                            let maxStock = 0;
+                            if (qtyEl) {
+                                maxStock = parseInt(qtyEl.dataset.maxStock || qtyEl.max || '0', 10) || 0;
+                            }
+                            // try to resolve by hidden inventario_id if needed
+                            if (maxStock === 0) {
+                                const codeEl = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
+                                if (codeEl && codeEl.value) {
+                                    const found = catalogo.find(i => String(i.id) === String(codeEl.value));
+                                    if (found) maxStock = found.stock_actual || 0;
+                                }
+                            }
+                            if (maxStock > 0 && qty > maxStock) {
+                                errors.push(`Stock insuficiente en fila ${rIdx + 1}: solicitado ${qty}, disponible ${maxStock}`);
+                            }
+                        });
+                    } else {
+                        const prod = findProducto();
+                        const singleQty = parseInt(cantidadInput.value || '0', 10) || 0;
+                        if (prod && singleQty > (prod.stock_actual || 0)) {
+                            errors.push(`Stock insuficiente para ${prod.descripcion} (máx ${prod.stock_actual || 0}).`);
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        showClientErrors(errors);
+                        return false;
+                    }
+
+                    // if validation passed, populate fields
+                    if (rows.length > 0) {
+                        let idx = 1;
+                        rows.forEach(row => {
+                            const prodText = (row.querySelector('textarea') || {}).value || '';
+                            const qty = (row.querySelector('input[type="number"]') || {}).value || '';
+                            const lineEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}"]`);
+                            const qtyEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}-qty"]`);
+                            if (lineEl) lineEl.value = prodText;
+                            if (qtyEl) qtyEl.value = qty;
+                            idx++;
+                        });
+                    } else {
+                        const prod = findProducto();
+                        const prodName = prod ? prod.descripcion : (productoInput.value || '');
+                        const qty = cantidadInput.value || '';
+                        const lineEl = pdfModal.querySelector('textarea[data-pdf-line="1"]');
+                        const qtyEl = pdfModal.querySelector('textarea[data-pdf-line="1-qty"]');
+                        if (lineEl) lineEl.value = prodName;
+                        if (qtyEl) qtyEl.value = qty;
+                    }
+
+                    return true;
                 };
 
                 const closeModal = () => {
@@ -442,9 +567,21 @@
 
                 const triggerPrint = () => {
                     if (!pdfModal.classList.contains('is-open')) {
+                        // validate and open
+                        if (!populatePdfPreview()) return;
                         openModal();
                     }
                     setTimeout(() => window.print(), 0);
+                };
+
+                // Expose a safe global opener as a fallback for the button
+                window.openSalidaPdf = () => {
+                    try {
+                        if (!populatePdfPreview()) return;
+                        openModal();
+                    } catch (err) {
+                        console.warn('No se pudo abrir la vista previa del PDF', err);
+                    }
                 };
 
                 pdfOpenButton.addEventListener('click', openModal);
@@ -526,6 +663,226 @@
 
             hydrateProduct();
             updateSummary();
+
+            // Dynamic items list (items[])
+            (function () {
+                const itemsContainer = document.getElementById('items-container');
+                const addItemBtn = document.getElementById('add-item-btn');
+                let nextIndex = 0;
+
+                const recalcQtyPreview = () => {
+                    const qtyEls = itemsContainer.querySelectorAll('input[data-item-qty]');
+                    let total = 0;
+                    qtyEls.forEach((el) => { total += parseInt(el.value || '0', 10) || 0; });
+                    if (total === 0) {
+                        // fallback to single quantity
+                        const single = parseInt(cantidadInput.value || '0', 10) || 0;
+                        qtyPreview.textContent = `-${Math.max(1, single)}`;
+                    } else {
+                        qtyPreview.textContent = `-${total}`;
+                    }
+                };
+
+                const createRow = (index, product = '', qty = 1) => {
+                    const row = document.createElement('div');
+                    row.className = 'item-row';
+                    row.style.display = 'flex';
+                    row.style.gap = '0.5rem';
+                    row.style.alignItems = 'center';
+                    row.style.marginTop = '0.5rem';
+
+                    const prod = document.createElement('textarea');
+                    prod.name = `items[${index}][producto_busqueda]`;
+                    prod.placeholder = 'SKU o descripción';
+                    prod.rows = 1;
+                    prod.className = 'input-auto-grow';
+                    prod.style.flex = '1';
+                    // if product is an object (selected), fill and lock the textarea and add hidden codigo
+                    if (product && typeof product === 'object') {
+                        prod.value = product.descripcion || product.nombre || '';
+                        prod.readOnly = true;
+                    } else {
+                        prod.value = product || '';
+                    }
+
+                    const qtyInput = document.createElement('input');
+                    qtyInput.type = 'number';
+                    qtyInput.min = '1';
+                    qtyInput.step = '1';
+                    qtyInput.value = qty || 1;
+                    qtyInput.name = `items[${index}][cantidad]`;
+                    qtyInput.dataset.itemQty = '1';
+                    qtyInput.style.width = '5.5rem';
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    removeBtn.className = 'btn-mini btn-danger';
+
+                    const suggestions = document.createElement('div');
+                    suggestions.className = 'autocomplete-dropdown';
+                    suggestions.style.position = 'relative';
+
+                    prod.addEventListener('input', () => {
+                        const query = prod.value.trim();
+                        if (!query) { suggestions.classList.remove('is-open'); suggestions.innerHTML = ''; recalcQtyPreview(); return; }
+                        const similares = findSimilarProductos(query);
+                        if (similares.length === 0) { suggestions.classList.remove('is-open'); suggestions.innerHTML = ''; return; }
+                        suggestions.innerHTML = similares.map((item, idx) => `
+                            <div class="autocomplete-item" data-index="${idx}" role="option">
+                                <strong>${item.codigo}</strong>
+                                <small>${item.descripcion}</small>
+                            </div>
+                        `).join('');
+                        suggestions.classList.add('is-open');
+                        suggestions.querySelectorAll('.autocomplete-item').forEach((it) => {
+                            it.addEventListener('click', () => {
+                                const si = parseInt(it.dataset.index, 10);
+                                const selected = similares[si];
+                                prod.value = selected.descripcion;
+                                // attach a hidden input to store codigo for server-side resolution
+                                let hidden = row.querySelector('input[type="hidden"][name="items[' + index + '][inventario_id]"]');
+                                if (!hidden) {
+                                    hidden = document.createElement('input');
+                                    hidden.type = 'hidden';
+                                    hidden.name = `items[${index}][inventario_id]`;
+                                    row.appendChild(hidden);
+                                }
+                                hidden.value = selected.id;
+
+                                // set max allowed on qty input according to stock
+                                if (qtyInput) {
+                                    qtyInput.max = selected.stock_actual;
+                                    qtyInput.dataset.maxStock = selected.stock_actual;
+                                    if (parseInt(qtyInput.value || '0', 10) > selected.stock_actual) {
+                                        qtyInput.value = selected.stock_actual;
+                                    }
+                                }
+
+                                suggestions.classList.remove('is-open');
+                                suggestions.innerHTML = '';
+                                recalcQtyPreview();
+                            });
+                        });
+                    });
+
+                    qtyInput.addEventListener('input', () => {
+                        const maxStock = parseInt(qtyInput.dataset.maxStock || qtyInput.max || '0', 10) || 0;
+                        if (maxStock > 0 && parseInt(qtyInput.value || '0', 10) > maxStock) {
+                            qtyInput.classList.add('is-invalid');
+                        } else {
+                            qtyInput.classList.remove('is-invalid');
+                        }
+                        recalcQtyPreview();
+                    });
+                    removeBtn.addEventListener('click', () => { row.remove(); recalcQtyPreview(); });
+
+                    row.appendChild(prod);
+                    row.appendChild(qtyInput);
+                    row.appendChild(removeBtn);
+                    row.appendChild(suggestions);
+
+                    // if product is object, also add hidden codigo input and set qty max
+                    if (product && typeof product === 'object') {
+                        let hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = `items[${index}][inventario_id]`;
+                        hidden.value = product.id || '';
+                        row.appendChild(hidden);
+
+                        if (qtyInput) {
+                            qtyInput.max = product.stock_actual || ''; 
+                            qtyInput.dataset.maxStock = product.stock_actual || 0;
+                        }
+                    }
+
+                    return row;
+                };
+
+                // Load old items if present
+                const oldItems = @json(old('items', []));
+                if (Array.isArray(oldItems) && oldItems.length > 0) {
+                    oldItems.forEach((it) => {
+                        let prod = it.producto_busqueda ?? '';
+                        if (it.inventario_id) {
+                            const found = catalogo.find(i => String(i.id) === String(it.inventario_id));
+                            if (found) prod = found;
+                        }
+                        const r = createRow(nextIndex++, prod, it.cantidad ?? 1);
+                        itemsContainer.appendChild(r);
+                    });
+                }
+
+                addItemBtn.addEventListener('click', () => {
+                    clearClientErrors();
+                    const prod = findProducto();
+                    const qty = parseInt(cantidadInput.value || '0', 10) || 0;
+                    const clientErrors = [];
+                    if (!prod) {
+                        clientErrors.push('Selecciona un producto válido arriba antes de añadir.');
+                    }
+                    if (qty < 1) {
+                        clientErrors.push('Introduce una cantidad válida antes de añadir.');
+                    }
+                    if (clientErrors.length) {
+                        showClientErrors(clientErrors);
+                        return;
+                    }
+
+                    itemsContainer.appendChild(createRow(nextIndex++, prod, qty));
+                    recalcQtyPreview();
+                });
+
+                // Form submit client-side validation: ensure no requested qty exceeds available stock
+                const stockForm = document.getElementById('stock-out-form');
+                stockForm.addEventListener('submit', (e) => {
+                    const rows = itemsContainer.querySelectorAll('.item-row');
+                    const errors = [];
+
+                    rows.forEach((row) => {
+                        const qtyEl = row.querySelector('input[data-item-qty]');
+                        const codeEl = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
+                        const prodText = row.querySelector('textarea');
+                        const qty = parseInt(qtyEl?.value || '0', 10) || 0;
+                        if (qty < 1) {
+                            errors.push('Cantidad inválida en una de las filas.');
+                            return;
+                        }
+
+                        let maxStock = 0;
+                        if (codeEl && codeEl.value) {
+                            const found = catalogo.find(i => String(i.id) === String(codeEl.value) || i.codigo === codeEl.value);
+                            if (found) maxStock = found.stock_actual || 0;
+                        } else {
+                            const found = catalogo.find(i => normalize(i.descripcion) === normalize(prodText.value) || normalize(i.codigo) === normalize(prodText.value) || normalize(i.nombre) === normalize(prodText.value));
+                            if (found) maxStock = found.stock_actual || 0;
+                        }
+
+                        if (maxStock > 0 && qty > maxStock) {
+                            errors.push(`Stock insuficiente para ${prodText.value} (máx ${maxStock}).`);
+                        }
+                    });
+
+                    // Single product check if no items[] used
+                    if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('textarea').value.trim() === '')) {
+                        const singleQty = parseInt(cantidadInput.value || '0', 10) || 0;
+                        const prod = findProducto();
+                        if (prod && singleQty > (prod.stock_actual || 0)) {
+                            errors.push(`Stock insuficiente para ${prod.descripcion} (máx ${(prod.stock_actual || 0)}).`);
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        e.preventDefault();
+                        showClientErrors(errors);
+                        return false;
+                    }
+                });
+
+                // Recalculate when single quantity changes too
+                cantidadInput.addEventListener('input', recalcQtyPreview);
+                recalcQtyPreview();
+            })();
         })();
     </script>
 @endsection

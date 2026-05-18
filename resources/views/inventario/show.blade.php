@@ -37,6 +37,11 @@
                             <div class="field-read">{{ $inventario->referencia_proveedor }}</div>
                         </div>
 
+                        <div class="field-group">
+                            <label>Nombre</label>
+                            <div class="field-read">{{ $inventario->nombre ?? $inventario->descripcion }}</div>
+                        </div>
+
                         <div class="field-group field-full">
                             <label>Descripcion del item</label>
                             <div class="field-read">{{ $inventario->descripcion }}</div>

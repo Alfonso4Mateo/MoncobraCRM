@@ -8,6 +8,7 @@ use App\Models\EntradaStock;
 use App\Models\Inventario;
 use App\Models\SalidaStock;
 use App\Models\TrasladoStock;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -29,9 +30,14 @@ class InventarioController extends Controller
 
         $baseQuery = Inventario::query()
             ->where('proyecto_id', $proyectoId)
-            ->with('claseRelacion')
+            ->with(['claseRelacion', 'variante'])
             ->when($descripcion !== '', function ($query) use ($descripcion) {
-                $query->where('descripcion', 'like', '%' . $descripcion . '%');
+                $query->where(function ($q) use ($descripcion) {
+                    $q->where('codigo', 'like', '%' . $descripcion . '%')
+                      ->orWhere('nombre', 'like', '%' . $descripcion . '%')
+                      ->orWhere('descripcion', 'like', '%' . $descripcion . '%')
+                      ->orWhere('referencia_proveedor', 'like', '%' . $descripcion . '%');
+                });
             })
             ->when($claseId !== null && $claseId !== '', function ($query) use ($claseId) {
                 $query->where('clase_id', $claseId);
@@ -45,11 +51,38 @@ class InventarioController extends Controller
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
 
-        $inventarios = (clone $baseQuery)
+        // Paginate by parent groups (not by child rows), so each page shows 8 parent items.
+        $inventarioAgrupado = (clone $baseQuery)
             ->orderBy('codigo')
             ->orderBy('id')
-            ->paginate(7)
-            ->withQueryString();
+            ->get()
+            ->groupBy(function (Inventario $item) {
+                $varianteId = (int) ($item->inventario_variante_id ?? 0);
+
+                return $varianteId > 0 ? 'variante_' . $varianteId : 'item_' . (int) $item->id;
+            })
+            ->map(function ($grupo) {
+                return collect($grupo)->sortBy('id')->values();
+            })
+            ->values();
+
+        $perPage = 8;
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $totalGrupos = $inventarioAgrupado->count();
+        $gruposPagina = $inventarioAgrupado
+            ->slice(($currentPage - 1) * $perPage, $perPage)
+            ->values();
+
+        $inventarios = new LengthAwarePaginator(
+            $gruposPagina,
+            $totalGrupos,
+            $perPage,
+            $currentPage,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
 
         $totalProductos = (clone $baseQuery)->count();
         $nivelCritico = (clone $baseQuery)->whereColumn('stock_actual', '<=', 'nivel_critico')->count();
@@ -179,7 +212,7 @@ class InventarioController extends Controller
             ->orderBy('descripcion')
             ->orderBy('codigo')
             ->limit(30)
-            ->get(['codigo', 'descripcion', 'almacen', 'ubicacion', 'stock_actual']);
+            ->get(['id', 'codigo', 'descripcion', 'nombre', 'almacen', 'ubicacion', 'stock_actual']);
 
         $proveedores = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -272,9 +305,13 @@ class InventarioController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'producto_busqueda' => 'required|string|max:1000',
+            'producto_busqueda' => 'nullable|string|max:1000',
             'codigo' => 'nullable|string|max:255',
-            'cantidad_retirar' => 'required|integer|min:1',
+            'cantidad_retirar' => 'nullable|integer|min:1',
+            'items' => 'nullable|array',
+            'items.*.inventario_id' => 'nullable|integer',
+            'items.*.producto_busqueda' => 'nullable|string|max:1000',
+            'items.*.cantidad' => 'nullable|integer|min:1',
             'ot' => 'nullable|string|max:255',
             'solicitante' => 'nullable|string|max:255',
             'pdf_delegacion' => 'nullable|string|max:255',
@@ -284,54 +321,35 @@ class InventarioController extends Controller
             'pdf_observaciones' => 'nullable|string|max:2000',
         ]);
 
-        $codigo = trim((string) ($validated['codigo'] ?? ''));
-        $busqueda = trim((string) $validated['producto_busqueda']);
-        $cantidad = (int) $validated['cantidad_retirar'];
+        $itemsToProcess = [];
 
-        $producto = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->where(function ($query) use ($codigo, $busqueda) {
-                if ($codigo !== '') {
-                    $query->orWhere('codigo', $codigo);
+        if (!empty($validated['items']) && is_array($validated['items'])) {
+            foreach ($validated['items'] as $it) {
+                $busqueda = trim((string) ($it['producto_busqueda'] ?? ''));
+                $cantidad = isset($it['cantidad']) ? (int) $it['cantidad'] : 0;
+                if ($busqueda !== '' && $cantidad > 0) {
+                    $itemsToProcess[] = ['busqueda' => $busqueda, 'cantidad' => $cantidad];
                 }
-
-                $query->orWhere('descripcion', $busqueda)
-                    ->orWhere('codigo', $busqueda);
-            })
-            ->first();
-
-        if (!$producto) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'producto_busqueda' => 'No se encontró el item en inventario para registrar la salida.',
-                ]);
+            }
         }
 
-        if ((int) $producto->stock_actual < $cantidad) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'cantidad_retirar' => 'Stock insuficiente para completar la salida solicitada.',
-                ]);
+        // Do not fallback to legacy pdf_articulo_* fields; require items[] or single producto_busqueda
+
+        if (empty($itemsToProcess) && trim((string) $request->input('producto_busqueda', '')) !== '') {
+            $itemsToProcess[] = [
+                'busqueda' => trim((string) $request->input('producto_busqueda', '')),
+                'cantidad' => (int) $request->input('cantidad_retirar', 0),
+            ];
+        }
+
+        if (empty($itemsToProcess)) {
+            return back()->withInput()->withErrors(['producto_busqueda' => 'No se especificaron items para la salida.']);
         }
 
         $numeroSalida = 'SL-' . now()->format('Ymd-His-u');
-        $lineasDocumento = [];
-
-        for ($i = 1; $i <= 10; $i++) {
-            $articulo = trim((string) $request->input('pdf_articulo_' . $i, ''));
-            $cantidadLinea = trim((string) $request->input('pdf_cantidad_' . $i, ''));
-
-            if ($articulo === '' && $cantidadLinea === '') {
-                continue;
-            }
-
-            $lineasDocumento[] = [
-                'articulo' => $articulo,
-                'cantidad' => $cantidadLinea,
-            ];
-        }
+        $lineasDocumento = array_map(function ($it) {
+            return ['articulo' => $it['busqueda'], 'cantidad' => $it['cantidad']];
+        }, $itemsToProcess);
 
         $documentoMeta = [
             'nombre' => 'EPI_' . $numeroSalida . '.pdf',
@@ -353,41 +371,98 @@ class InventarioController extends Controller
 
         $guardarDocumento = $request->boolean('guardar_documento');
         $documentoMeta = $guardarDocumento ? $documentoMeta : null;
+
+        // Resolve products existence (prefer inventario_id when provided) but defer stock validation to transactional lock
+        $resolved = [];
+        foreach ($itemsToProcess as $it) {
+            $busqueda = $it['busqueda'];
+            $inventarioId = isset($it['inventario_id']) ? (int) $it['inventario_id'] : null;
+
+            $producto = null;
+            if ($inventarioId && $inventarioId > 0) {
+                $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $inventarioId)->first();
+            }
+
+            if (!$producto) {
+                $producto = Inventario::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where(function ($query) use ($busqueda) {
+                        $query->where('descripcion', $busqueda)
+                            ->orWhere('codigo', $busqueda);
+                    })
+                    ->first();
+            }
+
+            if (!$producto) {
+                return back()->withInput()->withErrors(['producto_busqueda' => "No se encontró el item: {$busqueda}"]);
+            }
+
+            $resolved[] = ['producto' => $producto, 'cantidad' => (int) $it['cantidad']];
+        }
+
+        // Aggregate quantities by producto id to handle duplicate rows
+        $agg = [];
+        foreach ($resolved as $r) {
+            $id = (int) $r['producto']->id;
+            if (!isset($agg[$id])) {
+                $agg[$id] = ['producto' => $r['producto'], 'cantidad' => 0];
+            }
+            $agg[$id]['cantidad'] += (int) $r['cantidad'];
+        }
+
         $salida = null;
 
-        DB::transaction(function () use ($proyectoId, $producto, $cantidad, $validated, $numeroSalida, $documentoMeta, &$salida) {
-            $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
-            $producto->save();
+        try {
+            DB::transaction(function () use ($proyectoId, $agg, $validated, $numeroSalida, $documentoMeta, &$salida) {
+                $itemsForSalida = [];
 
-            $salida = SalidaStock::create([
-                'proyecto_id' => $proyectoId,
-                'numero_salida' => $numeroSalida,
-                'fecha' => now(),
-                'solicitante' => $validated['solicitante'] ?? null,
-                'ot' => $validated['ot'] ?? null,
-                'almacen_origen' => $producto->almacen,
-                'items' => [
-                    [
+                foreach ($agg as $id => $entry) {
+                    // lock the row for update
+                    $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $id)->lockForUpdate()->first();
+                    $cantidad = (int) $entry['cantidad'];
+
+                    if (!$producto) {
+                        throw new \RuntimeException("No se encontró el item con id {$id} durante la transacción.");
+                    }
+
+                    if ((int) $producto->stock_actual < $cantidad) {
+                        throw new \RuntimeException("Stock insuficiente para {$producto->codigo} ({$producto->descripcion})");
+                    }
+
+                    $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
+                    $producto->save();
+
+                    $itemsForSalida[] = [
                         'inventario_id' => (int) $producto->id,
                         'codigo' => (string) $producto->codigo,
                         'descripcion' => (string) $producto->descripcion,
                         'cantidad' => (int) $cantidad,
-                    ],
-                ],
-                'documento_meta' => !empty($documentoMeta) ? $documentoMeta : null,
-                'estado' => 'aceptado',
-            ]);
-        });
+                        'almacen_origen' => (string) $producto->almacen,
+                        'almacen_actual' => (string) ($producto->almacen ?? ''),
+                    ];
+                }
 
-        if ($guardarDocumento && $salida) {
-            return redirect()
-                ->route('inventario.salida.documento', $salida)
-                ->with('success', 'Salida registrada y documento guardado correctamente.');
+                $salida = SalidaStock::create([
+                    'proyecto_id' => $proyectoId,
+                    'numero_salida' => $numeroSalida,
+                    'fecha' => now(),
+                    'solicitante' => $validated['solicitante'] ?? null,
+                    'ot' => $validated['ot'] ?? null,
+                    'almacen_origen' => count($itemsForSalida) === 1 ? $itemsForSalida[0]['almacen_origen'] : 'Varios',
+                    'items' => $itemsForSalida,
+                    'documento_meta' => !empty($documentoMeta) ? $documentoMeta : null,
+                    'estado' => 'aceptado',
+                ]);
+            });
+        } catch (\RuntimeException $ex) {
+            return back()->withInput()->withErrors(['cantidad_retirar' => $ex->getMessage()]);
         }
 
-        return redirect()
-            ->route('inventario.index')
-            ->with('success', 'Salida de stock registrada correctamente.');
+        if ($guardarDocumento && $salida) {
+            return redirect()->route('inventario.salida.documento', $salida)->with('success', 'Salida registrada y documento guardado correctamente.');
+        }
+
+        return redirect()->route('inventario.index')->with('success', 'Salida de stock registrada correctamente.');
     }
 
     public function showSalidaDocumento(SalidaStock $salida)
@@ -644,7 +719,8 @@ class InventarioController extends Controller
 
         $validated = $request->validate([
             'codigo' => 'required|string|max:255',
-            'descripcion' => 'required|string',
+            'nombre' => 'nullable|string|max:255',
+            'descripcion' => 'nullable|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
             'ubicacion' => 'nullable|string|max:255',
@@ -664,6 +740,11 @@ class InventarioController extends Controller
         ]);
 
         $validated['proyecto_id'] = $proyectoId;
+
+        // Prefer 'nombre' as the main descripción if provided
+        if (!empty($validated['nombre'])) {
+            $validated['descripcion'] = $validated['nombre'];
+        }
 
         // Parsear tipos de atributos si viene como string JSON
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
@@ -686,7 +767,8 @@ class InventarioController extends Controller
                     'codigo' => $validated['codigo'],
                 ],
                 [
-                    'descripcion' => $validated['descripcion'],
+                    'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                    'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? null,
                     'referencia_proveedor' => $validated['referencia_proveedor'],
                     'clase_id' => $validated['clase_id'],
                     'ubicacion' => $validated['ubicacion'],
@@ -699,7 +781,8 @@ class InventarioController extends Controller
         }
 
         $variante->update([
-            'descripcion' => $validated['descripcion'],
+            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? $variante->nombre,
+            'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? $variante->descripcion,
             'referencia_proveedor' => $validated['referencia_proveedor'],
             'clase_id' => $validated['clase_id'],
             'ubicacion' => $validated['ubicacion'],
@@ -720,7 +803,8 @@ class InventarioController extends Controller
                         'proyecto_id' => $proyectoId,
                         'inventario_variante_id' => $variante->id,
                         'codigo' => $codigoItem,
-                        'descripcion' => $this->buildVariantDescription($validated['descripcion'], $atributos),
+                        'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                        'descripcion' => $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos),
                         'referencia_proveedor' => $validated['referencia_proveedor'],
                         'clase_id' => $validated['clase_id'],
                         'ubicacion' => $validated['ubicacion'],
@@ -742,6 +826,7 @@ class InventarioController extends Controller
             'proyecto_id' => $proyectoId,
             'inventario_variante_id' => $variante->id,
             'codigo' => $codigoItem,
+            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
             'descripcion' => $validated['descripcion'],
             'referencia_proveedor' => $validated['referencia_proveedor'],
             'clase_id' => $validated['clase_id'],
