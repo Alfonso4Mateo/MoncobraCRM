@@ -521,20 +521,54 @@ class AlbaranClienteController extends Controller
         try {
             $albaran->refresh();
 
+            $filePathWith = 'albaranes/albaran-' . $albaran->id . '.pdf';
+            $filePathWithout = 'albaranes/albaran-' . $albaran->id . '-sin-presupuesto.pdf';
+
+            $presupuesto = Presupuesto::query()
+                ->where('proyecto_id', $albaran->proyecto_id)
+                ->where('numero', trim((string) $albaran->documento))
+                ->first();
+
             if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('albaranes.pdf', ['albaran' => $albaran]);
-                $filePath = 'albaranes/albaran-' . $albaran->id . '.pdf';
-                Storage::disk('public')->put($filePath, $pdf->output());
-                $albaran->forceFill(['archivo_pdf' => $filePath])->save();
+                $pdfWith = \Barryvdh\DomPDF\Facade\Pdf::loadView('albaranes.pdf', [
+                    'albaran' => $albaran,
+                    'with_presupuesto' => true,
+                    'presupuesto' => $presupuesto,
+                ]);
+                Storage::disk('public')->put($filePathWith, $pdfWith->output());
+
+                $pdfWithout = \Barryvdh\DomPDF\Facade\Pdf::loadView('albaranes.pdf', [
+                    'albaran' => $albaran,
+                    'with_presupuesto' => false,
+                    'presupuesto' => null,
+                ]);
+                Storage::disk('public')->put($filePathWithout, $pdfWithout->output());
+
+                $albaran->forceFill(['archivo_pdf' => $filePathWith])->save();
             } elseif (class_exists(\Dompdf\Dompdf::class)) {
-                $html = view('albaranes.pdf', ['albaran' => $albaran])->render();
-                $dompdf = new \Dompdf\Dompdf();
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->loadHtml($html);
-                $dompdf->render();
-                $filePath = 'albaranes/albaran-' . $albaran->id . '.pdf';
-                Storage::disk('public')->put($filePath, $dompdf->output());
-                $albaran->forceFill(['archivo_pdf' => $filePath])->save();
+                $htmlWith = view('albaranes.pdf', [
+                    'albaran' => $albaran,
+                    'with_presupuesto' => true,
+                    'presupuesto' => $presupuesto,
+                ])->render();
+                $dompdfWith = new \Dompdf\Dompdf();
+                $dompdfWith->setPaper('A4', 'portrait');
+                $dompdfWith->loadHtml($htmlWith);
+                $dompdfWith->render();
+                Storage::disk('public')->put($filePathWith, $dompdfWith->output());
+
+                $htmlWithout = view('albaranes.pdf', [
+                    'albaran' => $albaran,
+                    'with_presupuesto' => false,
+                    'presupuesto' => null,
+                ])->render();
+                $dompdfWithout = new \Dompdf\Dompdf();
+                $dompdfWithout->setPaper('A4', 'portrait');
+                $dompdfWithout->loadHtml($htmlWithout);
+                $dompdfWithout->render();
+                Storage::disk('public')->put($filePathWithout, $dompdfWithout->output());
+
+                $albaran->forceFill(['archivo_pdf' => $filePathWith])->save();
             }
         } catch (\Throwable $e) {
             report($e);
@@ -667,7 +701,7 @@ class AlbaranClienteController extends Controller
         $basePdfPath = $this->resolvePdfPath($albaran);
         $pdfPath = $this->resolvePdfVariantPath($albaran, $withPresupuesto, $basePdfPath);
 
-        if ($withPresupuesto && $pdfPath && $disk->exists($pdfPath)) {
+        if (!$withPresupuesto && $pdfPath && $disk->exists($pdfPath)) {
             return [$pdfPath, null, basename($pdfPath)];
         }
 
