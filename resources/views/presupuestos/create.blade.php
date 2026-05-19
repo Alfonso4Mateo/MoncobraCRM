@@ -76,6 +76,16 @@
                         <input type="text" id="ot" name="ot" value="{{ old('ot') }}" placeholder="Referencia OT" class="@error('ot') is-invalid @enderror" maxlength="255">
                     </div>
 
+                    <div class="field-group">
+                        <label for="validez_oferta">Validez oferta</label>
+                        <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
+                    </div>
+
+                    <div class="field-group field-full">
+                        <label for="exclusiones">Exclusiones</label>
+                        <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', 'Cualquier concepto no descrito en la oferta') }}</textarea>
+                    </div>
+
                     <div class="field-group field-full">
                         <label for="archivo_pdf">Archivo PDF {{ $isCarga ? '(obligatorio)' : '(opcional)' }}</label>
                         <input type="file" id="archivo_pdf" name="archivo_pdf" accept="application/pdf" class="@error('archivo_pdf') is-invalid @enderror" {{ $isCarga ? 'required' : '' }}>

@@ -32,6 +32,8 @@ class Presupuesto extends Model
         'proyecto_id',
         'titulo',
         'ot',
+        'validez_oferta',
+        'exclusiones',
         'total',
         'estado',
         'archivo_pdf',

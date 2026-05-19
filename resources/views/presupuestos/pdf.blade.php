@@ -11,11 +11,11 @@
         /* RESET BÁSICO */
         html, body { margin: 20px; padding: 20px; font-family: Arial, Helvetica, sans-serif; color: #17385d; }
         
-        /* EL BODY ACTÚA COMO CONTENEDOR RELATIVO PARA EL PIE */
+        /* EL BODY VUELVE A TENER SU MARGEN DE SEGURIDAD PARA EL PIE */
         body {
             position: relative;
-            /* Dejamos un margen inferior inmenso para que la tabla nunca pise el total */
-            padding-bottom: 180px; 
+            /* Si vas a escribir textos muy grandes en el pie, puedes subir este valor (ej. 150px) */
+            padding-bottom: 120px; 
             box-sizing: border-box;
             min-height: 100%;
         }
@@ -32,20 +32,54 @@
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
         /* TABLA DE ARTÍCULOS */
-        .doc-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; table-layout: fixed; }
+        .doc-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            font-size: 12px; 
+            table-layout: fixed;
+            border-bottom: 1px solid #7db0e4; 
+        }
         .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
-        .doc-table td { border: 1px solid #7db0e4; padding: 8px; vertical-align: top; word-wrap: break-word; }
+        .doc-table td { 
+            border-left: 1px solid #7db0e4; 
+            border-right: 1px solid #7db0e4; 
+            border-top: none;
+            border-bottom: none;
+            padding: 8px; 
+            vertical-align: top; 
+            word-wrap: break-word; 
+        }
 
-        /* BLOQUE DE TOTALES ANCLADO AL FONDO */
-        .summary-block {
+        /* BLOQUE DEL TOTAL (Flujo natural debajo de la tabla) */
+        .total-block {
+            width: 100%;
+            margin-top: 10px;
+        }
+        .total-box { background: #2a6fb0; color: #fff; padding: 4px 18px; border-radius: 5px; margin-top: 4px; display: inline-block; font-size: 14px;}
+        
+        /* BLOQUE DE VALIDEZ Y EXCLUSIONES (Anclado al fondo) */
+        .footer-bottom {
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
             width: 100%;
         }
-        .total-box { background: #2a6fb0; color: #fff; padding: 4px 18px; border-radius: 5px; margin-top: 4px; display: inline-block; font-size: 14px;}
-        .footer-box { border: 1px solid #223f5a; padding: 8px; background: #fff; font-size: 13px;}
+        /* NUEVA CLASE: Fuerza a la tabla del pie a respetar su ancho */
+        .footer-table {
+            width: 100%;
+            table-layout: fixed; 
+        }
+        .footer-box { 
+            border: 1px solid #223f5a; 
+            padding: 8px; 
+            background: #fff; 
+            font-size: 13px;
+            /* NUEVAS REGLAS: Obligan al texto a saltar de línea */
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -133,8 +167,9 @@
         <thead>
             <tr>
                 <th width="6%">Pos.</th>
-                <th width="54%">Descripción</th>
+                <th width="44%">Descripción</th>
                 <th width="10%" style="text-align:right;">Cant.</th>
+                <th width="10%" style="text-align:center;">Ud.</th>
                 <th width="15%" style="text-align:right;">Precio</th>
                 <th width="15%" style="text-align:right;">Total</th>
             </tr>
@@ -152,17 +187,18 @@
                 <tr>
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                    <td align="right">{{ number_format($cantidad, 2, ',', '.') }}{{ $medida ? ' ' . e($medida) : '' }}</td>
-                    <td align="right">{{ number_format($precioConMargen, 2, ',', '.') }}</td>
-                    <td align="right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }}</td>
+                    <td align="right">{{ number_format($cantidad, 2, ',', '.') }}</td>
+                    <td align="center">{{ $medida ? e($medida) : '' }}</td>
+                    <td align="right">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
+                    <td align="right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }} €</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
     @endif
 
-    <div class="summary-block">
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
+    <div class="total-block">
+        <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td align="right">
                      <div style="display: inline-block; text-align: right; width: 160px;">
@@ -174,17 +210,19 @@
                 </td>
             </tr>
         </table>
+    </div>
 
-        <table width="100%" cellpadding="0" cellspacing="0">
+    <div class="footer-bottom">
+        <table class="footer-table" cellpadding="0" cellspacing="0">
             <tr>
                 <td width="48%" class="footer-box" valign="top">
                     <strong>Validez oferta:</strong><br>
-                    <span class="muted" style="display:block; margin-top:4px;">30 días</span>
+                    <span class="muted" style="display:block; margin-top:4px;">{{ $presupuesto->validez_oferta ?? '30 días' }}</span>
                 </td>
                 <td width="4%"></td>
                 <td width="48%" class="footer-box" valign="top">
                     <strong>Exclusiones:</strong><br>
-                    <span class="muted" style="display:block; margin-top:4px;">Cualquier concepto no descrito en la oferta</span>
+                    <span class="muted" style="display:block; margin-top:4px;">{{ $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta' }}</span>
                 </td>
             </tr>
         </table>

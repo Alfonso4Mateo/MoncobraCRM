@@ -114,6 +114,8 @@ class PresupuestoController extends Controller
             ],
             'titulo' => 'nullable|string|max:255',
             'ot' => 'nullable|string|max:255',
+            'validez_oferta' => 'nullable|string|max:255',
+            'exclusiones' => 'nullable|string|max:2000',
             'archivo_pdf' => [$archivoPdfRule, 'file', 'mimes:pdf', 'max:10240'],
             'lista_articulos' => 'nullable|json',
         ]);
@@ -371,6 +373,8 @@ class PresupuestoController extends Controller
         // En edición solo se permite cambiar los artículos
         $validated = $request->validate([
             'lista_articulos' => 'nullable|json',
+            'validez_oferta' => 'nullable|string|max:255',
+            'exclusiones' => 'nullable|string|max:2000',
         ]);
 
         $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
@@ -411,6 +415,8 @@ class PresupuestoController extends Controller
         $presupuesto->update([
             'lista_articulos' => $articulosNormalizados ?: null,
             'total' => round($totalComputed, 2),
+            'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
+            'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
         ]);
 
         $this->syncArticulosFromLineas($proyectoId, $articulosNormalizados);

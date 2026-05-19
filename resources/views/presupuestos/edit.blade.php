@@ -140,6 +140,18 @@
                     </div>
                 </section>
 
+                <section class="presupuesto-extra-fields" style="margin-top:12px;">
+                    <div class="field-group">
+                        <label for="validez_oferta">Validez oferta</label>
+                        <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', $presupuesto->validez_oferta ?? '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
+                    </div>
+
+                    <div class="field-group field-full">
+                        <label for="exclusiones">Exclusiones</label>
+                        <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta') }}</textarea>
+                    </div>
+                </section>
+
                 <footer class="presupuesto-actions">
                     <div class="presupuesto-actions-left">
                         <button type="button" id="btn_eliminar_item" class="btn-neutral btn-eliminar" disabled>
