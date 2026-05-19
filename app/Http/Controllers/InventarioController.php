@@ -6,6 +6,7 @@ use App\Models\Almacen;
 use App\Models\Clase;
 use App\Models\EntradaStock;
 use App\Models\Inventario;
+use App\Models\Personal;
 use App\Models\SalidaStock;
 use App\Models\TrasladoStock;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -297,7 +298,18 @@ class InventarioController extends Controller
             ->limit(2)
             ->get(['codigo', 'descripcion', 'updated_at', 'stock_actual']);
 
-        return view('inventario.salida', compact('catalogo', 'salidasRecientes'));
+        $solicitantes = Personal::query()
+            ->orderBy('name')
+            ->orderBy('apellido')
+            ->get(['name', 'apellido'])
+            ->map(function (Personal $persona) {
+                return trim((string) $persona->name . ' ' . (string) $persona->apellido);
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes'));
     }
 
     public function storeSalida(Request $request)

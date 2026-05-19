@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Personal;
+use App\Models\SalidaStock;
 use App\Models\Proyecto;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -106,47 +107,88 @@ class PersonalController extends Controller
     {
         $personal->load('proyectos');
 
-        $datosCompletos = [
-            ['fecha' => now()->subDays(3), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7732', 'cantidad' => 1, 'articulo' => 'Casco de Seguridad'],
-            ['fecha' => now()->subDays(6), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7650', 'cantidad' => 2, 'articulo' => 'Guantes de Protección'],
-            ['fecha' => now()->subDays(10), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'REPOSICIÓN', 'cantidad' => 5, 'articulo' => 'Arnés de Seguridad'],
-            ['fecha' => now()->subDays(14), 'estado' => 'Pendiente', 'estado_clase' => 'profile-chip profile-chip--pending', 'ot' => 'OT-7621', 'cantidad' => 1, 'articulo' => 'Cinturón de Trabajo'],
-            ['fecha' => now()->subDays(18), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7589', 'cantidad' => 3, 'articulo' => 'Zapatos de Seguridad'],
-            ['fecha' => now()->subDays(22), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7512', 'cantidad' => 2, 'articulo' => 'Gafas de Protección'],
-            ['fecha' => now()->subDays(26), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7445', 'cantidad' => 1, 'articulo' => 'Mascarilla FFP2'],
-            ['fecha' => now()->subDays(30), 'estado' => 'Entregado', 'estado_clase' => 'profile-chip profile-chip--ok', 'ot' => 'OT-7321', 'cantidad' => 4, 'articulo' => 'Chaleco Reflectante'],
-        ];
+        $nombreCompleto = trim(preg_replace('/\s+/', ' ', trim((string) $personal->name . ' ' . (string) $personal->apellido)));
+        $nombreNormalizado = mb_strtolower($nombreCompleto);
 
-        $fechaDesde = $request->input('fecha_desde');
-        $fechaHasta = $request->input('fecha_hasta');
-        $articuloBuscar = $request->input('articulo');
+        $salidasQuery = SalidaStock::query()
+            ->orderByDesc('fecha')
+            ->orderByDesc('id');
 
-        $datosFiltrados = array_filter($datosCompletos, function ($item) use ($fechaDesde, $fechaHasta, $articuloBuscar) {
-            $fecha = $item['fecha'];
+        $salidas = $salidasQuery
+            ->get()
+            ->filter(function (SalidaStock $salida) use ($nombreNormalizado) {
+                $solicitante = trim((string) ($salida->solicitante ?? ''));
 
-            if ($fechaDesde && $fecha < \Carbon\Carbon::parse($fechaDesde)->startOfDay()) {
-                return false;
+                if ($solicitante === '') {
+                    return false;
+                }
+
+                return mb_strtolower(preg_replace('/\s+/', ' ', $solicitante)) === $nombreNormalizado;
+            })
+            ->filter(function (SalidaStock $salida) use ($request) {
+                $fechaDesde = $request->input('fecha_desde');
+                $fechaHasta = $request->input('fecha_hasta');
+
+                if ($fechaDesde && $salida->fecha < \Carbon\Carbon::parse($fechaDesde)->startOfDay()) {
+                    return false;
+                }
+
+                if ($fechaHasta && $salida->fecha > \Carbon\Carbon::parse($fechaHasta)->endOfDay()) {
+                    return false;
+                }
+
+                $articuloBuscar = trim((string) $request->input('articulo'));
+                if ($articuloBuscar !== '') {
+                    $articulos = collect((array) $salida->items)
+                        ->map(fn ($item) => trim((string) ($item['descripcion'] ?? $item['articulo'] ?? $item['nombre'] ?? '')))
+                        ->filter()
+                        ->implode(' ');
+
+                    if (stripos($articulos, $articuloBuscar) === false) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            ->take(8)
+            ->values();
+
+        $historicoSalidas = $salidas->flatMap(function (SalidaStock $salida) {
+            $items = collect((array) $salida->items)
+                ->filter(fn ($item) => is_array($item))
+                ->map(function (array $item) {
+                    $descripcion = trim((string) ($item['descripcion'] ?? $item['articulo'] ?? $item['nombre'] ?? ''));
+                    $cantidad = (float) ($item['cantidad'] ?? 0);
+
+                    return [
+                        'descripcion' => $descripcion,
+                        'cantidad' => $cantidad,
+                    ];
+                })
+                ->filter(fn (array $item) => $item['descripcion'] !== '')
+                ->values();
+
+            if ($items->isEmpty()) {
+                $items = collect([['descripcion' => 'Salida de inventario', 'cantidad' => 1]]);
             }
-            if ($fechaHasta && $fecha > \Carbon\Carbon::parse($fechaHasta)->endOfDay()) {
-                return false;
-            }
-            if ($articuloBuscar && stripos($item['articulo'], $articuloBuscar) === false) {
-                return false;
-            }
 
-            return true;
-        });
+            return $items->map(function (array $item) use ($salida) {
+                $estadoRaw = (string) ($salida->estado ?: 'Pendiente');
+                $estadoNormalizado = mb_strtolower($estadoRaw);
 
-        $historicoSalidas = array_map(function ($item) {
-            return (object) [
-                'fecha' => $item['fecha']->format('d M Y'),
-                'articulo' => $item['articulo'],
-                'cantidad' => $item['cantidad'],
-                'ot' => $item['ot'],
-                'estado' => $item['estado'],
-                'estado_clase' => $item['estado_clase'],
-            ];
-        }, array_slice($datosFiltrados, 0, 8));
+                return (object) [
+                    'fecha' => optional($salida->fecha)->format('d M Y'),
+                    'articulo' => $item['descripcion'],
+                    'cantidad' => $item['cantidad'],
+                    'ot' => $salida->ot ?: '—',
+                    'estado' => ucfirst($estadoNormalizado === 'aceptado' ? 'entregado' : $estadoNormalizado),
+                    'estado_clase' => $estadoNormalizado === 'aceptado' || $estadoNormalizado === 'entregado'
+                        ? 'profile-chip profile-chip--ok'
+                        : 'profile-chip profile-chip--pending',
+                ];
+            });
+        })->take(8)->values()->all();
 
         $tallas = [
             ['label' => 'Camiseta', 'value' => $personal->camiseta ?: '—', 'icon' => 'fa-shirt'],
