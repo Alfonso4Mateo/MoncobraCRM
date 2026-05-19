@@ -97,11 +97,20 @@
         </div>
 
         <div class="albaran-preview-actions">
-            <a href="{{ $pdfUrl }}" class="albaran-preview-btn albaran-preview-btn--solid" target="_blank" rel="noopener">
+            <button type="button" id="btn-with-presupuesto" class="albaran-preview-btn albaran-preview-btn--solid" onclick="setPreview(true)">
                 <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                Con Valorciación
+            </button>
+            <button type="button" id="btn-without-presupuesto" class="albaran-preview-btn" onclick="setPreview(false)">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                Sin Valorciación
+            </button>
+
+            <a id="open-pdf-link" href="{{ $pdfUrlWithPresupuesto }}" class="albaran-preview-btn" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt" aria-hidden="true"></i>
                 Abrir PDF
             </a>
-            <a href="{{ $downloadUrl }}" class="albaran-preview-btn" target="_blank" rel="noopener">
+            <a id="download-pdf-link" href="{{ $downloadUrlWithPresupuesto }}" class="albaran-preview-btn" target="_blank" rel="noopener">
                 <i class="fas fa-download" aria-hidden="true"></i>
                 Descargar
             </a>
@@ -122,16 +131,41 @@
         <iframe
             id="albaran-preview-frame"
             class="albaran-preview-frame"
-            src="{{ $pdfUrl }}"
+            src="{{ $pdfUrlWithPresupuesto }}"
             title="Vista previa del albarán"
         ></iframe>
     </section>
 
     <script>
+        function setPreview(withPresupuesto) {
+            const frame = document.getElementById('albaran-preview-frame');
+            const openLink = document.getElementById('open-pdf-link');
+            const downloadLink = document.getElementById('download-pdf-link');
+            const withUrl = @json($pdfUrlWithPresupuesto);
+            const withoutUrl = @json($pdfUrlWithoutPresupuesto);
+            const withDownload = @json($downloadUrlWithPresupuesto);
+            const withoutDownload = @json($downloadUrlWithoutPresupuesto);
+
+            if (withPresupuesto) {
+                frame.src = withUrl;
+                openLink.href = withUrl;
+                downloadLink.href = withDownload;
+                document.getElementById('btn-with-presupuesto').classList.add('albaran-preview-btn--solid');
+                document.getElementById('btn-without-presupuesto').classList.remove('albaran-preview-btn--solid');
+            } else {
+                frame.src = withoutUrl;
+                openLink.href = withoutUrl;
+                downloadLink.href = withoutDownload;
+                document.getElementById('btn-with-presupuesto').classList.remove('albaran-preview-btn--solid');
+                document.getElementById('btn-without-presupuesto').classList.add('albaran-preview-btn--solid');
+            }
+        }
+
         function printPreviewPdf() {
             const frame = document.getElementById('albaran-preview-frame');
             if (!frame || !frame.contentWindow) {
-                window.open(@json($pdfUrl), '_blank', 'noopener');
+                const openLink = document.getElementById('open-pdf-link');
+                window.open(openLink.href, '_blank', 'noopener');
                 return;
             }
 
@@ -139,7 +173,8 @@
                 frame.contentWindow.focus();
                 frame.contentWindow.print();
             } catch (error) {
-                window.open(@json($pdfUrl), '_blank', 'noopener');
+                const openLink = document.getElementById('open-pdf-link');
+                window.open(openLink.href, '_blank', 'noopener');
             }
         }
     </script>

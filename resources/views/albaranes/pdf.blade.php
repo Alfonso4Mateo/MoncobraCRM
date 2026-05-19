@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Cambiado el título a Albarán -->
     <title>Albarán {{ $albaran->numero ?? '' }}</title>
     <style>
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
@@ -12,13 +11,9 @@
         /* RESET BÁSICO */
         html, body { margin: 20px; padding: 20px; font-family: Arial, Helvetica, sans-serif; color: #17385d; }
         
-        /* EL BODY ACTÚA COMO CONTENEDOR RELATIVO PARA EL PIE */
+        /* EL BODY VUELVE A LA NORMALIDAD (Sin rellenos forzados) */
         body {
-            position: relative;
-            /* Dejamos un margen inferior inmenso para que la tabla nunca pise el total */
-            padding-bottom: 180px; 
             box-sizing: border-box;
-            min-height: 100%;
         }
 
         /* ESTILOS DE TEXTO Y CAJAS */
@@ -32,21 +27,32 @@
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
-        /* TABLA DE ARTÍCULOS */
-        .doc-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; table-layout: fixed; }
+        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES */
+        .doc-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            font-size: 12px; 
+            table-layout: fixed;
+            border-bottom: 1px solid #7db0e4; /* Cierra la tabla por abajo */
+        }
         .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
-        .doc-table td { border: 1px solid #7db0e4; padding: 8px; vertical-align: top; word-wrap: break-word; }
+        .doc-table td { 
+            border-left: 1px solid #7db0e4; 
+            border-right: 1px solid #7db0e4; 
+            border-top: none;
+            border-bottom: none;
+            padding: 8px; 
+            vertical-align: top; 
+            word-wrap: break-word; 
+        }
 
-        /* BLOQUE DE TOTALES ANCLADO AL FONDO */
-        .summary-block {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+        /* BLOQUE DEL TOTAL (Flujo natural debajo de la tabla) */
+        .total-block {
             width: 100%;
+            margin-top: 10px;
         }
         .total-box { background: #2a6fb0; color: #fff; padding: 4px 18px; border-radius: 5px; margin-top: 4px; display: inline-block; font-size: 14px;}
-        .footer-box { border: 1px solid #223f5a; padding: 8px; background: #fff; font-size: 13px;}
     </style>
 </head>
 <body>
@@ -64,6 +70,26 @@
             </td>
         </tr>
     </table>
+
+    @if (!empty($with_presupuesto) && !empty($presupuesto))
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 18px;">
+            <tr>
+                <td width="100%" valign="top">
+                    <div class="box-header">PRESUPUESTO ASOCIADO</div>
+                    <div class="box-body">
+                        <strong>Nº:</strong> {{ $presupuesto->numero ?? '' }} &nbsp;&nbsp;
+                        <strong>Fecha:</strong> {{ optional($presupuesto->fecha)->format('d/m/Y') ?? '' }}<br>
+                        @if(!empty($presupuesto->validez_oferta))
+                            <div style="margin-top:8px;"><strong>Validez de la oferta:</strong> {{ $presupuesto->validez_oferta }}</div>
+                        @endif
+                        @if(!empty($presupuesto->exclusiones))
+                            <div style="margin-top:8px;"><strong>Exclusiones:</strong><br>{!! nl2br(e($presupuesto->exclusiones)) !!}</div>
+                        @endif
+                    </div>
+                </td>
+            </tr>
+        </table>
+    @endif
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
         <tr>
@@ -88,7 +114,6 @@
                             <div>CIF</div>
                         </td>
                         <td width="70%" class="client-content" valign="top">
-                            <!-- Cambiado $presupuesto por $albaran -->
                             <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($albaran->cliente)->empresa_nombre }}</div>
                             <div class="muted" style="margin-bottom: 8px;">{{ optional($albaran->cliente)->direccion ?? '' }}</div>
                             <div style="font-weight:bold;">{{ optional($albaran->cliente)->cif ?? '' }}</div>
@@ -101,28 +126,29 @@
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
         <tr>
-            <td width="32%" valign="top">
+            <td width="23.5%" valign="top">
                 <div class="meta-header">DOCUMENTO</div>
-                <!-- Cambiado $presupuesto por $albaran -->
-                <div class="meta-body">{{ $albaran->documento }}</div>
+                <div class="meta-body">Albarán</div>
             </td>
-            <td width="2%"></td>
-            <td width="32%" valign="top">
+            
+            <td width="2%"></td> <td width="23.5%" valign="top">
                 <div class="meta-header">NÚMERO</div>
-                <!-- Cambiado $presupuesto por $albaran -->
-                <div class="meta-body">{{ $albaran->numero }}</div>
+                <div class="meta-body">{{ $albaran->numero ?? '' }}</div>
             </td>
-            <td width="2%"></td>
-            <td width="32%" valign="top">
+            
+            <td width="2%"></td> <td width="23.5%" valign="top">
                 <div class="meta-header">FECHA</div>
-                <!-- Cambiado $presupuesto por $albaran -->
-                <div class="meta-body">{{ optional($albaran->fecha)->format('d/m/Y') ?? $albaran->fecha }}</div>
+                <div class="meta-body">{{ optional($albaran->fecha)->format('d/m/Y') ?? ($albaran->fecha ?? '') }}</div>
+            </td>
+
+            <td width="2%"></td> <td width="23.5%" valign="top">
+                <div class="meta-header">Nº DE PEDIDO</div>
+                <div class="meta-body">{{ $albaran->pedido_cliente ?? '' }}</div>
             </td>
         </tr>
     </table>
 
     @php
-        // Cambiado $presupuesto por $albaran
         $lineasValidas = collect((array) $albaran->lista_articulos)->filter(function ($line) {
             if (!is_array($line)) { return false; }
             $descripcion = trim((string) ($line['descripcion'] ?? ''));
@@ -135,53 +161,60 @@
     @endphp
 
     @if ($lineasValidas->isNotEmpty())
-    <table class="doc-table">
-        <thead>
-            <tr>
-                <th width="6%">Pos.</th>
-                <th width="54%">Descripción</th>
-                <th width="10%" style="text-align:right;">Cant.</th>
-                <th width="15%" style="text-align:right;">Precio</th>
-                <th width="15%" style="text-align:right;">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($lineasValidas as $i => $line)
-                @php
-                    $cantidad = (float) ($line['cantidad'] ?? 0);
-                    $precioUnitario = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
-                    $margen = (float) ($line['margen'] ?? 0);
-                    $precioConMargen = isset($line['precio_con_margen']) ? (float) $line['precio_con_margen'] : ($precioUnitario * (1 + ($margen / 100)));
-                    $medida = $line['medida'] ?? ($line['unidad'] ?? null);
-                    $medida = is_string($medida) ? trim($medida) : $medida;
-                @endphp
+        <table class="doc-table">
+            <thead>
                 <tr>
-                    <td>{{ $i + 1 }}</td>
-                    <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                    <td align="right">{{ number_format($cantidad, 2, ',', '.') }}{{ $medida ? ' ' . e($medida) : '' }}</td>
-                    <td align="right">{{ number_format($precioConMargen, 2, ',', '.') }}</td>
-                    <td align="right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }}</td>
+                    <th width="6%">Pos.</th>
+                    <th width="{{ !empty($with_presupuesto) ? '44%' : '70%' }}">Descripción</th>
+                    <th width="10%" style="text-align:right;">Cant.</th>
+                    <th width="10%" style="text-align:center;">Ud.</th>
+                    @if (!empty($with_presupuesto))
+                        <th width="15%" style="text-align:right;">Precio</th>
+                        <th width="15%" style="text-align:right;">Total</th>
+                    @endif
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach($lineasValidas as $i => $line)
+                    @php
+                        $cantidad = (float) ($line['cantidad'] ?? 0);
+                        $precioUnitario = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
+                        $margen = (float) ($line['margen'] ?? 0);
+                        $precioConMargen = isset($line['precio_con_margen']) ? (float) $line['precio_con_margen'] : ($precioUnitario * (1 + ($margen / 100)));
+                        $medida = $line['medida'] ?? ($line['unidad'] ?? null);
+                        $medida = is_string($medida) ? trim($medida) : $medida;
+                    @endphp
+                    <tr>
+                        <td>{{ $i + 1 }}</td>
+                        <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
+                        <td align="right">{{ number_format($cantidad, 2, ',', '.') }}</td>
+                        <td align="center">{{ $medida ? e($medida) : '' }}</td>
+                        @if (!empty($with_presupuesto))
+                            <td align="right">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
+                            <td align="right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }} €</td>
+                        @endif
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
     @endif
 
-    <div class="summary-block">
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
-            <tr>
-                <td align="right">
-                     <div style="display: inline-block; text-align: right; width: 160px;">
-                         <strong style="color: #6b7b8f; font-size: 13px;">Total:</strong><br>
-                        <div class="total-box" style="display: block; text-align: center;">
-                            <!-- Cambiado $presupuesto por $albaran -->
-                            {{ number_format((float) $albaran->total ?? 0, 2, ',', '.') }} €
+    @if (!empty($with_presupuesto))
+        <div class="total-block">
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
+                <tr>
+                    <td align="right">
+                         <div style="display: inline-block; text-align: right; width: 160px;">
+                             <strong style="color: #6b7b8f; font-size: 13px;">Total:</strong><br>
+                            <div class="total-box" style="display: block; text-align: center;">
+                                {{ number_format((float) $albaran->total ?? 0, 2, ',', '.') }} €
+                             </div>
                          </div>
-                     </div>
-                </td>
-            </tr>
-        </table>
-    </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    @endif
 
 </body>
 </html>

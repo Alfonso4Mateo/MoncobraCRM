@@ -256,6 +256,7 @@
             const medidaInput = document.getElementById('line_medida');
             const precioInput = document.getElementById('line_precio');
             const margenInput = document.getElementById('line_margen');
+            const numeroPedidoInput = document.getElementById('numero_pedido');
             const presupuestoSelect = document.getElementById('presupuesto_id');
             const clienteSelect = document.getElementById('id_cliente');
             const hiddenLines = document.getElementById('pedido_lista_articulos');
@@ -374,6 +375,17 @@
                     clienteSelect.value = String(presupuesto.cliente_id);
                 }
 
+                // If the presupuesto contains a predefined pedido number, copy it
+                if (presupuesto.numero_pedido) {
+                    numeroPedidoInput.value = presupuesto.numero_pedido;
+                    numeroPedidoInput.readOnly = true;
+                    numeroPedidoInput.title = 'Bloqueado: proviene del presupuesto (doble clic para desbloquear)';
+                } else {
+                    // ensure unlocked if presupuesto has no numero_pedido
+                    numeroPedidoInput.readOnly = false;
+                    numeroPedidoInput.removeAttribute('title');
+                }
+
                 if (!Array.isArray(presupuesto.lineas) || presupuesto.lineas.length === 0) {
                     return;
                 }
@@ -434,6 +446,26 @@
             });
 
             presupuestoSelect.addEventListener('change', refreshFromBudgetSelection);
+
+            // When presupuesto selection changes to none, unlock the pedido number
+            presupuestoSelect.addEventListener('change', () => {
+                if (!presupuestoSelect.value) {
+                    numeroPedidoInput.readOnly = false;
+                    numeroPedidoInput.removeAttribute('title');
+                } else {
+                    const p = findPresupuesto(presupuestoSelect.value);
+                    if (!p || !p.numero_pedido) {
+                        numeroPedidoInput.readOnly = false;
+                        numeroPedidoInput.removeAttribute('title');
+                    }
+                }
+            });
+
+            // Allow user to unlock the field with a double click
+            numeroPedidoInput.addEventListener('dblclick', () => {
+                numeroPedidoInput.readOnly = false;
+                numeroPedidoInput.removeAttribute('title');
+            });
 
             addLineButton.addEventListener('click', addLine);
 

@@ -192,6 +192,10 @@
                                             <i class="fas fa-eye"></i>
                                         </a>
 
+                                        <a href="{{ route('pedidos-clientes.preview', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar PDF del pedido" title="Previsualizar PDF del pedido">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+
                                         @php
                                             $dropdownId = 'pedido-estado-dropdown-' . $pedido->id;
                                         @endphp
