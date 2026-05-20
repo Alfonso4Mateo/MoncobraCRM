@@ -1,10 +1,10 @@
 @extends('adminlte::page')
 
-@section('title', 'Ajustar correlativo - Presupuestos')
+@section('title', 'Ajustar correlativo - Pedidos clientes')
 
 @section('content')
     <section class="container mt-4">
-        <h1>Ajustar número correlativo de presupuestos</h1>
+        <h1>Ajustar número correlativo de pedidos de clientes</h1>
 
         <div class="card mt-3">
             <div class="card-body">
@@ -13,12 +13,12 @@
                 @if($override)
                     <p>Override actual fijado por administrador: <strong>{{ $override }}</strong></p>
                 @endif
-                <form action="{{ route('presupuestos.correlativo.update') }}" method="POST">
+                <form action="{{ route('pedidos-clientes.correlativo.update') }}" method="POST">
                     @csrf
                     <div class="form-group">
                         <label for="formato">Formato base</label>
-                        <input type="text" id="formato" name="formato" class="form-control" value="{{ old('formato', $formatoActual) }}" placeholder="PRES-2026-0000" required>
-                        <small class="form-text text-muted">Puedes usar letras, números y guiones, pero debe terminar en <strong>-0000</strong>. Ejemplo: <strong>PRES-2026-0000</strong>.</small>
+                        <input type="text" id="formato" name="formato" class="form-control" value="{{ old('formato', $formatoActual) }}" placeholder="PC-2026-000" required>
+                        <small class="form-text text-muted">Debe terminar en ceros (ej. <strong>PC-2026-000</strong> o <strong>PC-2026-0000</strong> según el formato configurado).</small>
                         @error('formato')
                             <div class="text-danger">{{ $message }}</div>
                         @enderror
@@ -32,7 +32,7 @@
                         @enderror
                     </div>
                     <div class="mt-3">
-                        <a href="{{ route('presupuestos.index') }}" class="btn btn-secondary">Cancelar</a>
+                        <a href="{{ route('pedidos-clientes.index') }}" class="btn btn-secondary">Cancelar</a>
                         <button type="submit" class="btn btn-primary">Fijar</button>
                     </div>
                 </form>

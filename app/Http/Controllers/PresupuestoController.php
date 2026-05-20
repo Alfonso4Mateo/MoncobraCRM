@@ -82,7 +82,7 @@ class PresupuestoController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
-        $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
+        $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId)['numero'];
 
         $clienteSeleccionadoId = (int) $request->query('cliente_id', 0);
         if ($clienteSeleccionadoId > 0 && !$clientes->contains('id', $clienteSeleccionadoId)) {
@@ -106,7 +106,12 @@ class PresupuestoController extends Controller
 
         $validated = $request->validate([
             'documento' => 'required|string|max:50',
-            'numero' => 'required|string|max:50',
+            'numero' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('presupuestos', 'numero')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+            ],
             'fecha' => 'required|date',
             'cliente_id' => [
                 'required',
@@ -120,8 +125,21 @@ class PresupuestoController extends Controller
             'lista_articulos' => 'nullable|json',
         ]);
 
+        $numeroManual = trim((string) ($validated['numero'] ?? ''));
+        $correlativoActual = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
+        $formatoActual = $correlativoActual['formato'];
+        $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
+        $correlativoFinal = $correlativoActual['correlativo'];
+
+        $manualCorrelativo = $this->extractCorrelativoFromNumero($formatoActual, $numeroFinal);
+        if ($manualCorrelativo !== null) {
+            $correlativoFinal = $manualCorrelativo;
+        }
+
+        $validated['numero'] = $numeroFinal;
+
         $validated['proyecto_id'] = $proyectoId;
-        $validated['numero_correlativo'] = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
+        $validated['numero_correlativo'] = $correlativoFinal;
 
         if ($request->hasFile('archivo_pdf')) {
             $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('presupuestos', 'public');
@@ -174,6 +192,9 @@ class PresupuestoController extends Controller
 
         $presupuesto = Presupuesto::create($validated);
         $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
+
+        $siguienteCorrelativo = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+        $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
 
         // Attempt to generate and store a PDF copy of the presupuesto if a PDF library is available
         try {
@@ -274,7 +295,7 @@ class PresupuestoController extends Controller
         }
 
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
-        $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
+        $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId)['numero'];
 
         if ($presupuesto->cliente && !$clientes->contains('id', $presupuesto->cliente_id)) {
             $clientes->prepend($presupuesto->cliente);
@@ -291,15 +312,17 @@ class PresupuestoController extends Controller
         }
 
         $proyectoId = $this->resolveActiveProyectoId($request);
-        $max = Presupuesto::where('proyecto_id', $proyectoId)->max('numero_correlativo');
+        $formatoActual = $this->getCorrelativoFormato($proyectoId);
+        $max = $this->maxCorrelativoForFormato($proyectoId, $formatoActual);
         $override = DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', 'presupuestos_next_correlativo')
             ->value('valor');
 
         $suggested = max(($max ?? 0) + 1, (int) ($override ?? 0));
+        $ejemplo = $this->formatCorrelativoNumero($formatoActual, $suggested);
 
-        return view('presupuestos.correlativo', compact('max', 'override', 'suggested'));
+        return view('presupuestos.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo'));
     }
 
     public function updateCorrelativo(Request $request)
@@ -310,37 +333,24 @@ class PresupuestoController extends Controller
         }
 
         $proyectoId = $this->resolveActiveProyectoId($request);
-        $max = Presupuesto::where('proyecto_id', $proyectoId)->max('numero_correlativo');
 
         $validated = $request->validate([
+            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0000$/'],
             'next' => ['required', 'integer', 'min:1'],
         ]);
 
+        $formato = trim((string) $validated['formato']);
         $next = (int) $validated['next'];
+        $max = $this->maxCorrelativoForFormato($proyectoId, $formato);
 
         if ($next <= ($max ?? 0)) {
             return back()->withErrors(['next' => 'El número debe ser mayor que el máximo correlativo existente (' . ($max ?? 0) . ').']);
         }
 
-        $exists = DB::table('contadores')
-            ->where('proyecto_id', $proyectoId)
-            ->where('clave', 'presupuestos_next_correlativo')
-            ->exists();
+        $this->setCorrelativoFormato($proyectoId, $formato);
+        $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $next);
 
-        if ($exists) {
-            DB::table('contadores')
-                ->where('proyecto_id', $proyectoId)
-                ->where('clave', 'presupuestos_next_correlativo')
-                ->update(['valor' => $next]);
-        } else {
-            DB::table('contadores')->insert([
-                'proyecto_id' => $proyectoId,
-                'clave' => 'presupuestos_next_correlativo',
-                'valor' => $next,
-            ]);
-        }
-
-        return redirect()->route('presupuestos.index')->with('success', 'Siguiente número correlativo fijado en ' . $next);
+        return redirect()->route('presupuestos.index')->with('success', 'Correlativo actualizado. Siguiente número: ' . $this->formatCorrelativoNumero($formato, $next));
     }
 
     public function updateEstado(Request $request, Presupuesto $presupuesto)
@@ -460,31 +470,148 @@ class PresupuestoController extends Controller
         return redirect()->route('presupuestos.index')->with('success', 'Presupuesto eliminado');
     }
 
-    private function nextNumeroPresupuestoCorrelativo(int $proyectoId): string
+    private function nextNumeroPresupuestoCorrelativo(int $proyectoId, bool $consume = false): array
     {
-        $maxNumero = Presupuesto::where('proyecto_id', $proyectoId)
-            ->pluck('numero_correlativo')
-            ->filter(fn ($numero) => is_numeric($numero))
-            ->map(fn ($numero) => (int) $numero)
-            ->max();
+        $formato = $this->getCorrelativoFormato($proyectoId);
+        $maxNumero = $this->maxCorrelativoForFormato($proyectoId, $formato);
 
         $override = DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', 'presupuestos_next_correlativo')
             ->value('valor');
 
-        if ($override !== null && is_numeric($override) && (int) $override > ($maxNumero ?? 0)) {
-            // Reserve the override value and increment it so next call uses the following
-            $next = (int) $override;
-            DB::table('contadores')
-                ->where('proyecto_id', $proyectoId)
-                ->where('clave', 'presupuestos_next_correlativo')
-                ->update(['valor' => $next + 1]);
+        $next = ($maxNumero ?? 0) + 1;
 
-            return (string) $next;
+        if ($override !== null && is_numeric($override) && (int) $override > 0) {
+            $next = max($next, (int) $override);
         }
 
-        return (string) (($maxNumero ?? 0) + 1);
+        if ($consume) {
+            $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $next + 1);
+        }
+
+        return [
+            'formato' => $formato,
+            'correlativo' => $next,
+            'numero' => $this->formatCorrelativoNumero($formato, $next),
+        ];
+    }
+
+    private function getCorrelativoFormato(int $proyectoId): string
+    {
+        $storedKey = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', 'like', 'presupuestos_formato_correlativo:%')
+            ->orderByDesc('id')
+            ->value('clave');
+
+        $formato = '';
+
+        if (is_string($storedKey) && str_starts_with($storedKey, 'presupuestos_formato_correlativo:')) {
+            $formato = trim((string) substr($storedKey, strlen('presupuestos_formato_correlativo:')));
+        }
+
+        if ($formato === '' || !preg_match('/^.+-0000$/', $formato)) {
+            return 'PRES-' . now()->format('Y') . '-0000';
+        }
+
+        return $formato;
+    }
+
+    private function maxCorrelativoForFormato(int $proyectoId, string $formato): int
+    {
+        $prefix = substr($formato, 0, -4);
+        $regex = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
+
+        $numeros = Presupuesto::where('proyecto_id', $proyectoId)
+            ->where('numero', 'like', $prefix . '%')
+            ->pluck('numero');
+
+        $max = 0;
+
+        foreach ($numeros as $numero) {
+            if (!is_string($numero)) {
+                continue;
+            }
+
+            if (preg_match($regex, $numero, $matches) === 1) {
+                $value = (int) $matches[1];
+                $max = max($max, $value);
+            }
+        }
+
+        return $max;
+    }
+
+    private function formatCorrelativoNumero(string $formato, int $correlativo): string
+    {
+        $prefix = substr($formato, 0, -4);
+
+        return $prefix . str_pad((string) max(0, $correlativo), 4, '0', STR_PAD_LEFT);
+    }
+
+    private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
+    {
+        $prefix = substr($formato, 0, -4);
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
+
+        if (preg_match($pattern, $numero, $matches) !== 1) {
+            return null;
+        }
+
+        return (int) $matches[1];
+    }
+
+    private function setCorrelativoFormato(int $proyectoId, string $formato): void
+    {
+        $clave = 'presupuestos_formato_correlativo:' . $formato;
+
+        DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', 'like', 'presupuestos_formato_correlativo:%')
+            ->where('clave', '!=', $clave)
+            ->delete();
+
+        $exists = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', $clave)
+            ->exists();
+
+        if ($exists) {
+            DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', $clave)
+                ->update(['valor' => 1]);
+            return;
+        }
+
+        DB::table('contadores')->insert([
+            'proyecto_id' => $proyectoId,
+            'clave' => $clave,
+            'valor' => 1,
+        ]);
+    }
+
+    private function setContadorValue(int $proyectoId, string $clave, $valor): void
+    {
+        $exists = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', $clave)
+            ->exists();
+
+        if ($exists) {
+            DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', $clave)
+                ->update(['valor' => $valor]);
+            return;
+        }
+
+        DB::table('contadores')->insert([
+            'proyecto_id' => $proyectoId,
+            'clave' => $clave,
+            'valor' => $valor,
+        ]);
     }
 
     private function renderPdfResponse(Presupuesto $presupuesto, bool $download)

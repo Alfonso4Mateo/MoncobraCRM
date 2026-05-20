@@ -13,10 +13,19 @@
             <p>Trazabilidad completa desde presupuesto hasta albarán.</p>
         </div>
 
-        <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            Nuevo Pedido
-        </a>
+        <div class="pedidos-clientes-header__actions">
+            @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                <a href="{{ route('pedidos-clientes.correlativo.edit') }}" class="pedidos-clientes-create-btn pedidos-clientes-create-btn--muted">
+                    <i class="fas fa-hashtag" aria-hidden="true"></i>
+                    Ajustar correlativo
+                </a>
+            @endif
+
+            <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                Nuevo Pedido
+            </a>
+        </div>
     </div>
 @endsection
 

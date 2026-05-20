@@ -39,6 +39,12 @@
                 <button type="button" class="toolbar-icon-btn" aria-label="Configuración">
                     <i class="fas fa-cog"></i>
                 </button>
+                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                    <a href="{{ route('albaranes.correlativo.edit') }}" class="toolbar-main-btn toolbar-main-btn--muted" title="Ajustar correlativo de albaranes">
+                        Ajustar correlativo
+                        <i class="fas fa-hashtag"></i>
+                    </a>
+                @endif
                 <a href="{{ route('albaranes.create') }}" class="toolbar-main-btn">
                     Crear Albarán
                     <i class="fas fa-plus"></i>

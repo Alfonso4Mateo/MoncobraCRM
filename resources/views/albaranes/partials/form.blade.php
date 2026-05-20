@@ -106,7 +106,8 @@
 
                     <div class="field-group">
                         <label for="numero">Numero</label>
-                        <input type="text" id="numero" name="numero" value="{{ old('numero') }}" required>
+                        <input type="text" id="numero" name="numero" value="{{ old('numero', $numeroAlbaranAuto ?? '') }}">
+                        <small class="pdf-help">Puedes cambiarlo manualmente. Si lo dejas vacío, se usará el siguiente número automático.</small>
                     </div>
 
                     <div class="field-group">
@@ -177,10 +178,6 @@
                     </div>
                 @else
                     <div class="linea-input-row">
-                        <div class="field-group flex-1">
-                            <label for="linea_articulo">Código referencia</label>
-                            <input type="text" id="linea_articulo" placeholder="Código o referencia">
-                        </div>
                         <div class="field-group flex-2">
                             <label for="linea_descripcion">Descripcion</label>
                             <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
@@ -215,7 +212,7 @@
                         <thead>
                             <tr>
                                 @if ($pedidoMode)
-                                    <th>Código ref.</th>
+                                    <th>Línea</th>
                                     <th>Descripcion</th>
                                     <th>Cantidad</th>
                                     <th>Medida</th>
@@ -224,8 +221,7 @@
                                     <th>Total</th>
                                     <th style="width: 7rem">Incluir</th>
                                 @else
-                                    <th>Linea</th>
-                                    <th>Código ref.</th>
+                                    <th>Línea</th>
                                     <th>Descripcion</th>
                                     <th>Cantidad</th>
                                     <th>Medida</th>
@@ -238,7 +234,7 @@
                         </thead>
                         <tbody id="lineasBody">
                             <tr>
-                                <td colspan="{{ $pedidoMode ? 8 : 9 }}" class="lineas-empty">No hay lineas añadidas.</td>
+                                <td colspan="8" class="lineas-empty">No hay lineas añadidas.</td>
                             </tr>
                         </tbody>
                     </table>

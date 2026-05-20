@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let pedidoMode = root.dataset.pedidoMode === "1";
 
-    const articuloInput = document.getElementById("linea_articulo");
+    // `linea_articulo` eliminado de las vistas de creación; no lo buscamos.
     const descripcionInput = document.getElementById("linea_descripcion");
     const cantidadInput = document.getElementById("linea_cantidad");
     const precioInput = document.getElementById("linea_precio");
@@ -101,11 +101,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const resetInputs = () => {
-        if (!articuloInput || !descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput) {
+        if (!descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput) {
             return;
         }
 
-        articuloInput.value = "";
         descripcionInput.value = "";
         cantidadInput.value = "1";
         medidaInput.value = "";
@@ -180,10 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update table header to reflect pedido mode columns
         const headerRow = document.querySelector('.lineas-table thead tr');
-        if (headerRow) {
+            if (headerRow) {
             if (pedidoMode) {
                 headerRow.innerHTML = `
-                    <th>Código ref.</th>
+                    <th>Línea</th>
                     <th>Descripcion</th>
                     <th>Cantidad</th>
                     <th>Medida</th>
@@ -195,7 +194,6 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 headerRow.innerHTML = `
                     <th>Linea</th>
-                    <th>Código ref.</th>
                     <th>Descripcion</th>
                     <th>Cantidad</th>
                     <th>Medida</th>
@@ -231,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const renderRows = () => {
         if (lineas.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="${pedidoMode ? 8 : 9}" class="lineas-empty">${pedidoMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="8" class="lineas-empty">${pedidoMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
             selectedIndex = -1;
             setSideButtonsState();
             syncHiddenField();
@@ -251,7 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (pedidoMode) {
                     return `
                         <tr data-index="${index}"${checked ? ' class="is-selected"' : ' class="is-deselected"'}>
-                            <td>${linea.articulo ? `<strong>${linea.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
+                            <td>${String(index + 1).padStart(2, '0')}</td>
                             <td>${linea.descripcion}</td>
                             <td>
                                 <input type="number" class="albaran-line-qty" data-action="edit-cantidad" data-index="${index}" min="0" step="0.01" max="${maxCantidad}" value="${qtyValue}" ${checked ? '' : 'disabled'}>
@@ -271,8 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 return `
                     <tr data-index="${index}"${isSelected ? ' class="is-selected"' : ""}>
-                        <td>${index + 1}</td>
-                        <td>${linea.articulo ? `<strong>${linea.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
+                        <td>${String(index + 1).padStart(2, '0')}</td>
                         <td>${linea.descripcion}</td>
                         <td>${euroFormatter.format(linea.cantidad)}</td>
                         <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
@@ -303,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const articulo = articuloInput.value.trim();
+        const articulo = '';
         const descripcion = descripcionInput.value.trim();
         const cantidad = round2(cantidadInput.value);
         const medida = medidaInput.value.trim();
@@ -561,7 +558,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 selectedIndex = index;
-                articuloInput.value = linea.articulo ?? "";
                 descripcionInput.value = linea.descripcion;
                 cantidadInput.value = String(linea.cantidad);
                 medidaInput.value = linea.medida ?? "";
@@ -607,7 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    if (pedidoMode && !addButton && !articuloInput && !descripcionInput) {
+    if (pedidoMode && !addButton && !descripcionInput) {
         selectedIndex = -1;
     }
 
@@ -618,7 +614,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const linea = lineas[selectedIndex];
-            articuloInput.value = linea.articulo ?? "";
             descripcionInput.value = linea.descripcion;
             cantidadInput.value = String(linea.cantidad);
             medidaInput.value = linea.medida ?? "";

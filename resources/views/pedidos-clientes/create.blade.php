@@ -3,6 +3,8 @@
 @section('title', 'Crear Nuevo Pedido - MoncobraCRM')
 
 @section('css')
+    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
     @vite(['resources/css/pedidos-clientes-create.css'])
 @endsection
 
@@ -87,7 +89,7 @@
 
                     <div class="pedido-trace-box">
                         <label for="presupuesto_id">Cambiar presupuesto</label>
-                        <select id="presupuesto_id" name="presupuesto_id" class="pedido-select">
+                        <select id="presupuesto_id" name="presupuesto_id" class="pedido-select pedido-select--search">
                             <option value="">Sin presupuesto</option>
                             @foreach ($presupuestos as $presupuesto)
                                 <option value="{{ $presupuesto->id }}" {{ $presupuestoSeleccionadoId === (string) $presupuesto->id ? 'selected' : '' }}>
@@ -98,8 +100,8 @@
                     </div>
 
                     <div class="pedido-trace-box">
-                        <label for="referencia_manual">Referencia manual</label>
-                        <input type="text" id="referencia_manual" name="referencia_manual" class="pedido-input" value="{{ $referenciaManual }}" placeholder="Introduce una referencia interna">
+                        <label for="referencia_manual">Pedido-Cliente</label>
+                        <input type="text" id="referencia_manual" name="referencia_manual" class="pedido-input" value="{{ $referenciaManual }}" placeholder="Introduce el Código del pedido de cliente">
                     </div>
                 </div>
             </article>
@@ -116,20 +118,21 @@
                 <div class="pedido-form-grid pedido-form-grid--four">
                     <div class="pedido-field pedido-field--wide">
                         <label for="id_cliente">Cliente</label>
-                        <select id="id_cliente" name="id_cliente" class="pedido-select" required>
-                            <option value="">Selecciona un cliente</option>
+                        <select id="id_cliente" name="id_cliente" class="pedido-select" required {{ $presupuestoSeleccionadoId !== '' ? 'disabled' : '' }}>
+                               <option value="">Selecciona un cliente</option>
                             @foreach ($clientes as $cliente)
                                 <option value="{{ $cliente->id }}" {{ $clienteSeleccionadoId === (string) $cliente->id ? 'selected' : '' }}>
                                     {{ $cliente->empresa_nombre }}
                                 </option>
                             @endforeach
                         </select>
+                            <input type="hidden" id="id_cliente_locked" name="id_cliente" value="{{ $clienteSeleccionadoId }}" {{ $presupuestoSeleccionadoId !== '' ? '' : 'disabled' }}>
                     </div>
 
                     <div class="pedido-field">
                         <label for="numero_pedido">Número de pedido</label>
-                        <input type="text" id="numero_pedido" name="numero_pedido" class="pedido-input" value="{{ $numeroPedido }}" required>
-                        <small class="pedido-help">Se propone automáticamente.</small>
+                        <input type="text" id="numero_pedido" name="numero_pedido" class="pedido-input" value="{{ $numeroPedido }}">
+                        <small class="pedido-help">Puedes cambiarlo manualmente. Si lo dejas vacío, se usará el siguiente correlativo automático.</small>
                     </div>
 
                     <div class="pedido-field">
@@ -160,10 +163,7 @@
 
                 <div class="pedido-line-editor">
                     <div class="pedido-form-grid pedido-form-grid--line">
-                        <div class="pedido-field">
-                            <label for="line_articulo">Código referencia</label>
-                            <input type="text" id="line_articulo" class="pedido-input" placeholder="Código o referencia">
-                        </div>
+                        <!-- Campo 'Código referencia' eliminado según petición: se mostrará Línea en la tabla -->
                         <div class="pedido-field pedido-field--wide">
                             <label for="line_descripcion">Descripción</label>
                             <input type="text" id="line_descripcion" class="pedido-input" placeholder="Descripción del artículo o servicio">
@@ -191,7 +191,7 @@
                     <table class="pedido-table">
                         <thead>
                             <tr>
-                                <th style="width: 14%">Código ref.</th>
+                                <th style="width: 6%">Línea</th>
                                 <th>Descripción</th>
                                 <th style="width: 10%">Cant.</th>
                                 <th style="width: 10%">Medida</th>
@@ -245,12 +245,12 @@
 @endsection
 
 @section('js')
+    <script src="{{ asset('vendor/select2/js/select2.full.min.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('pedido-cliente-form');
             const body = document.getElementById('pedido-lines-body');
             const addLineButton = document.getElementById('pedido-add-line');
-            const articuloInput = document.getElementById('line_articulo');
             const descripcionInput = document.getElementById('line_descripcion');
             const cantidadInput = document.getElementById('line_cantidad');
             const medidaInput = document.getElementById('line_medida');
@@ -259,6 +259,8 @@
             const numeroPedidoInput = document.getElementById('numero_pedido');
             const presupuestoSelect = document.getElementById('presupuesto_id');
             const clienteSelect = document.getElementById('id_cliente');
+            const clienteLockedInput = document.getElementById('id_cliente_locked');
+            const otInput = document.getElementById('ot');
             const hiddenLines = document.getElementById('pedido_lista_articulos');
             const hiddenState = document.getElementById('pedido_estado');
             const hiddenTotal = document.getElementById('pedido_total');
@@ -309,6 +311,38 @@
 
             const findPresupuesto = (presupuestoId) => presupuestos.find((presupuesto) => String(presupuesto.id) === String(presupuestoId));
 
+            const syncClienteHidden = (clienteId) => {
+                const value = String(clienteId ?? '').trim();
+                clienteLockedInput.value = value;
+            };
+
+            const lockCliente = (clienteId) => {
+                syncClienteHidden(clienteId);
+                clienteLockedInput.disabled = false;
+                clienteSelect.disabled = true;
+            };
+
+            const unlockCliente = () => {
+                clienteSelect.disabled = false;
+                clienteLockedInput.disabled = true;
+                clienteLockedInput.value = '';
+            };
+
+            const syncClienteFromSelect = () => {
+                if (!clienteSelect.disabled) {
+                    syncClienteHidden(clienteSelect.value);
+                }
+            };
+
+            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
+                window.jQuery(presupuestoSelect).select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    placeholder: 'Buscar presupuesto',
+                    allowClear: true,
+                });
+            }
+
             const items = normalizeLines(initialLines);
 
             const syncHidden = () => {
@@ -334,9 +368,7 @@
 
                 body.innerHTML = items.map((item, index) => `
                     <tr>
-                        <td>
-                            ${item.articulo ? `<strong>${item.articulo}</strong>` : '<span class="text-muted">-</span>'}
-                        </td>
+                        <td>${String(index + 1).padStart(2, '0')}</td>
                         <td>${item.descripcion || '<span class="text-muted">Sin descripción</span>'}</td>
                         <td>${moneyFormatter.format(parseValue(item.cantidad))}</td>
                         <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
@@ -356,35 +388,40 @@
             };
 
             const resetLineForm = () => {
-                articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 medidaInput.value = '';
                 precioInput.value = '0';
                 margenInput.value = '0';
-                articuloInput.focus();
+                descripcionInput.focus();
             };
 
             const applyPresupuesto = (presupuestoId) => {
+                if (!presupuestoId) {
+                    unlockCliente();
+                    syncClienteFromSelect();
+                    return;
+                }
+
                 const presupuesto = findPresupuesto(presupuestoId);
                 if (!presupuesto) {
+                    unlockCliente();
+                    syncClienteFromSelect();
                     return;
                 }
 
                 if (presupuesto.cliente_id) {
                     clienteSelect.value = String(presupuesto.cliente_id);
+                    lockCliente(presupuesto.cliente_id);
+                } else {
+                    unlockCliente();
                 }
 
-                // If the presupuesto contains a predefined pedido number, copy it
-                if (presupuesto.numero_pedido) {
-                    numeroPedidoInput.value = presupuesto.numero_pedido;
-                    numeroPedidoInput.readOnly = true;
-                    numeroPedidoInput.title = 'Bloqueado: proviene del presupuesto (doble clic para desbloquear)';
-                } else {
-                    // ensure unlocked if presupuesto has no numero_pedido
-                    numeroPedidoInput.readOnly = false;
-                    numeroPedidoInput.removeAttribute('title');
+                if (presupuesto.ot !== null && presupuesto.ot !== undefined) {
+                    otInput.value = String(presupuesto.ot);
                 }
+
+                syncClienteHidden(clienteSelect.value);
 
                 if (!Array.isArray(presupuesto.lineas) || presupuesto.lineas.length === 0) {
                     return;
@@ -396,18 +433,11 @@
             };
 
             const addLine = () => {
-                const articulo = articuloInput.value.trim();
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, parseValue(cantidadInput.value));
                 const medida = medidaInput.value.trim();
                 const precioUnitario = Math.max(0, parseValue(precioInput.value));
                 const margen = Math.max(0, parseValue(margenInput.value));
-
-                if (!articulo) {
-                    window.alert('Completa el código referencia antes de añadir la línea.');
-                    articuloInput.focus();
-                    return;
-                }
 
                 if (!descripcion) {
                     window.alert('Completa la descripción antes de añadir la línea.');
@@ -418,7 +448,7 @@
                 const total = computeTotal(cantidad, precioUnitario, margen);
 
                 items.push({
-                    articulo,
+                    articulo: '',
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
@@ -435,37 +465,28 @@
                 applyPresupuesto(presupuestoSelect.value);
             };
 
-            articuloInput.addEventListener('input', () => {
-                addLineButton.disabled = articuloInput.value.trim().length === 0;
+            const refreshFromBudgetSelectionDeferred = () => {
+                window.requestAnimationFrame(refreshFromBudgetSelection);
+            };
+
+            descripcionInput.addEventListener('input', () => {
+                addLineButton.disabled = descripcionInput.value.trim().length === 0;
             });
 
             [cantidadInput, precioInput, margenInput].forEach((input) => {
                 input.addEventListener('input', () => {
-                    addLineButton.disabled = articuloInput.value.trim().length === 0;
+                    addLineButton.disabled = descripcionInput.value.trim().length === 0;
                 });
             });
 
-            presupuestoSelect.addEventListener('change', refreshFromBudgetSelection);
+            clienteSelect.addEventListener('change', syncClienteFromSelect);
 
-            // When presupuesto selection changes to none, unlock the pedido number
-            presupuestoSelect.addEventListener('change', () => {
-                if (!presupuestoSelect.value) {
-                    numeroPedidoInput.readOnly = false;
-                    numeroPedidoInput.removeAttribute('title');
-                } else {
-                    const p = findPresupuesto(presupuestoSelect.value);
-                    if (!p || !p.numero_pedido) {
-                        numeroPedidoInput.readOnly = false;
-                        numeroPedidoInput.removeAttribute('title');
-                    }
-                }
-            });
+            presupuestoSelect.addEventListener('change', refreshFromBudgetSelectionDeferred);
+            presupuestoSelect.addEventListener('input', refreshFromBudgetSelectionDeferred);
 
-            // Allow user to unlock the field with a double click
-            numeroPedidoInput.addEventListener('dblclick', () => {
-                numeroPedidoInput.readOnly = false;
-                numeroPedidoInput.removeAttribute('title');
-            });
+            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
+                window.jQuery(presupuestoSelect).on('select2:select select2:clear change', refreshFromBudgetSelectionDeferred);
+            }
 
             addLineButton.addEventListener('click', addLine);
 
@@ -487,16 +508,27 @@
             });
 
             renderRows();
-            addLineButton.disabled = articuloInput.value.trim().length === 0;
+            addLineButton.disabled = descripcionInput.value.trim().length === 0;
 
             if (presupuestoSelect.value) {
-                applyPresupuesto(presupuestoSelect.value);
+                refreshFromBudgetSelectionDeferred();
+            } else {
+                unlockCliente();
+                syncClienteFromSelect();
             }
 
             form.addEventListener('submit', () => {
                 const button = document.activeElement;
                 if (button && button.dataset && button.dataset.estado) {
                     hiddenState.value = button.dataset.estado;
+                }
+
+                if (clienteSelect.disabled) {
+                    clienteLockedInput.disabled = false;
+                    syncClienteHidden(clienteSelect.value);
+                } else {
+                    clienteLockedInput.disabled = true;
+                    syncClienteFromSelect();
                 }
 
                 syncHidden();

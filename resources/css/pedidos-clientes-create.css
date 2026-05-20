@@ -179,7 +179,7 @@ body {
 }
 
 .pedido-form-grid--line {
-    grid-template-columns: 0.9fr 1.6fr 0.55fr 0.6fr 0.7fr 0.6fr 0.6fr;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.6fr) minmax(0, 0.75fr) minmax(0, 0.8fr) minmax(0, 0.7fr) auto;
     align-items: end;
 }
 
@@ -252,6 +252,17 @@ body {
     outline: none;
     border-color: rgba(31, 79, 130, 0.55);
     box-shadow: 0 0 0 0.2rem rgba(31, 79, 130, 0.12);
+}
+
+.pedido-select:disabled {
+    background: #f3f6fb;
+    color: var(--pedido-muted);
+    cursor: not-allowed;
+    opacity: 0.92;
+}
+
+.pedido-field--wide .pedido-select:disabled {
+    pointer-events: none;
 }
 
 .pedido-input--readonly,
@@ -337,6 +348,13 @@ body {
     border-bottom: 1px solid var(--pedido-border);
 }
 
+.pedido-table thead th:nth-child(1),
+.pedido-table tbody td:nth-child(1) {
+    width: 64px;
+    text-align: center;
+    white-space: nowrap;
+}
+
 .pedido-table tbody td {
     padding: 0.72rem 0.85rem;
     border-bottom: 1px solid #eef3f8;
@@ -348,11 +366,21 @@ body {
     overflow-wrap: anywhere;
     word-break: break-word;
     line-height: 1.35;
+    min-width: 280px;
 }
 
 .pedido-table tbody td:nth-child(2) strong {
     display: block;
     margin-bottom: 0.15rem;
+}
+
+.pedido-table tbody td:nth-child(3),
+.pedido-table tbody td:nth-child(4),
+.pedido-table tbody td:nth-child(5),
+.pedido-table tbody td:nth-child(6),
+.pedido-table tbody td:nth-child(7),
+.pedido-table tbody td:nth-child(8) {
+    white-space: nowrap;
 }
 
 .pedido-table tbody tr:last-child td {

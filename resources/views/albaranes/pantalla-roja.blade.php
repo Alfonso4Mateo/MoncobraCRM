@@ -101,10 +101,7 @@
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
                         <div class="line-row">
-                            <div class="field flex-1">
-                                <label for="linea_articulo">Código referencia</label>
-                                <input type="text" id="linea_articulo" placeholder="Código o referencia">
-                            </div>
+                            <!-- Campo 'Código referencia' eliminado; se usa columna 'Línea' numerada -->
                             <div class="field flex-3">
                                 <label for="linea_descripcion">Descripción</label>
                                 <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
@@ -135,7 +132,6 @@
                                 <thead>
                                     <tr>
                                         <th>Línea</th>
-                                        <th>Código ref.</th>
                                         <th>Descripción</th>
                                         <th>Cantidad</th>
                                         <th>Medida</th>

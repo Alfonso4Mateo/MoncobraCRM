@@ -99,11 +99,11 @@
         <div class="albaran-preview-actions">
             <button type="button" id="btn-with-presupuesto" class="albaran-preview-btn albaran-preview-btn--solid" onclick="setPreview(true)">
                 <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                Con Valorciación
+                Con Valoración
             </button>
             <button type="button" id="btn-without-presupuesto" class="albaran-preview-btn" onclick="setPreview(false)">
                 <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                Sin Valorciación
+                Sin Valoración
             </button>
 
             <a id="open-pdf-link" href="{{ $pdfUrlWithPresupuesto }}" class="albaran-preview-btn" target="_blank" rel="noopener">

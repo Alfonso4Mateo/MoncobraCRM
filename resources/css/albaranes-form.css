@@ -195,6 +195,31 @@
     gap: 0.65rem;
 }
 
+.linea-input-row .field-group:first-child {
+    flex: 2.2;
+    min-width: 18rem;
+}
+
+.linea-input-row .field-group:nth-child(2) {
+    flex: 1.2;
+    min-width: 7rem;
+}
+
+.linea-input-row .field-group:nth-child(3) {
+    flex: 1.2;
+    min-width: 7rem;
+}
+
+.linea-input-row .field-group:nth-child(4) {
+    flex: 1.2;
+    min-width: 7rem;
+}
+
+.linea-input-row .field-group:nth-child(5) {
+    flex: 1.1;
+    min-width: 7rem;
+}
+
 .albaran-selection-note {
     display: flex;
     align-items: center;
@@ -301,10 +326,25 @@
     padding: 0.65rem 0.6rem;
 }
 
-.lineas-table tbody td:nth-child(3) {
+.lineas-table tbody td:nth-child(2) {
     white-space: pre-line;
     overflow-wrap: anywhere;
-    min-width: 220px;
+    min-width: 260px;
+    line-height: 1.35;
+}
+
+.lineas-table tbody td:nth-child(1) {
+    width: 56px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.lineas-table tbody td:nth-child(3),
+.lineas-table tbody td:nth-child(4),
+.lineas-table tbody td:nth-child(5),
+.lineas-table tbody td:nth-child(6),
+.lineas-table tbody td:nth-child(7) {
+    white-space: nowrap;
 }
 
 .lineas-table tbody tr.is-selected td {

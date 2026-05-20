@@ -172,9 +172,15 @@
                                         <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
                                             <i class="fas fa-pen"></i>
                                         </a>
-                                        <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
-                                            <i class="fas fa-cart-plus"></i>
-                                        </a>
+                                        @if(in_array($estado, ['pendiente', 'pendiente pedido'], true))
+                                            <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
+                                                <i class="fas fa-cart-plus"></i>
+                                            </a>
+                                        @else
+                                            <button type="button" class="presupuesto-action-btn presupuesto-action-btn--order" disabled title="No es posible crear pedido desde un presupuesto {{ $estado }}">
+                                                <i class="fas fa-cart-plus"></i>
+                                            </button>
+                                        @endif
 
                                         @php
                                             $dropdownId = 'presupuesto-estado-dropdown-' . $presupuesto->id;

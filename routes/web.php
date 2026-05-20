@@ -89,6 +89,12 @@ Route::middleware('auth')->group(function () {
     // Ajuste de correlativo de presupuestos (solo admin/superadmin)
     Route::get('presupuestos/correlativo/editar', [PresupuestoController::class, 'editCorrelativo'])->name('presupuestos.correlativo.edit');
     Route::post('presupuestos/correlativo', [PresupuestoController::class, 'updateCorrelativo'])->name('presupuestos.correlativo.update');
+    // Ajuste de correlativo de albaranes (solo admin/superadmin)
+    Route::get('albaranes/correlativo/editar', [AlbaranClienteController::class, 'editCorrelativo'])->name('albaranes.correlativo.edit');
+    Route::post('albaranes/correlativo', [AlbaranClienteController::class, 'updateCorrelativo'])->name('albaranes.correlativo.update');
+    // Ajuste de correlativo de pedidos de cliente (solo admin/superadmin)
+    Route::get('pedidos-clientes/correlativo/editar', [PedidoController::class, 'editCorrelativo'])->name('pedidos-clientes.correlativo.edit');
+    Route::post('pedidos-clientes/correlativo', [PedidoController::class, 'updateCorrelativo'])->name('pedidos-clientes.correlativo.update');
     Route::patch('presupuestos/{presupuesto}/estado', [PresupuestoController::class, 'updateEstado'])->name('presupuestos.estado.update');
     Route::resource('bolsa', BolsaController::class);
     Route::resource('proveedores', ProveedorController::class);

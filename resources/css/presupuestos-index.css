@@ -499,6 +499,29 @@ body,
   color: var(--pres-primary);
 }
 
+/* Disabled action button appearance */
+.presupuesto-action-btn[disabled],
+.presupuesto-action-btn[aria-disabled="true"] {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  transform: none !important;
+}
+
+.presupuesto-action-btn[disabled]:hover,
+.presupuesto-action-btn[aria-disabled="true"]:hover {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+/* Prevent hover transform for disabled buttons */
+.presupuesto-action-btn[disabled] i,
+.presupuesto-action-btn[aria-disabled="true"] i {
+  color: #9ca3af;
+}
+
 .presupuesto-estado-form {
   margin: 0;
 }

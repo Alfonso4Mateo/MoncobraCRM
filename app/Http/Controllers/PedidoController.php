@@ -9,6 +9,7 @@ use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class PedidoController extends Controller
@@ -57,7 +58,8 @@ class PedidoController extends Controller
         if ($desde !== '') {
             try {
                 $pedidosQuery->whereDate('fecha_pedido', '>=', Carbon::parse($desde)->toDateString());
-            } catch (\Throwable $exception) {
+            }
+            catch (\Throwable $exception) {
                 // Ignore invalid dates.
             }
         }
@@ -194,6 +196,7 @@ class PedidoController extends Controller
     public function createCliente(Request $request)
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
+        $presupuestoEstadosPermitidos = ['pendiente', 'pendiente pedido'];
 
         $clientes = Cliente::query()
             ->where('proyecto_id', $proyectoId)
@@ -202,6 +205,7 @@ class PedidoController extends Controller
 
         $presupuestos = Presupuesto::query()
             ->where('proyecto_id', $proyectoId)
+            ->whereIn('estado', $presupuestoEstadosPermitidos)
             ->with('cliente')
             ->orderByDesc('fecha')
             ->orderByDesc('id')
@@ -230,7 +234,7 @@ class PedidoController extends Controller
             $clienteSeleccionadoId = (int) $clienteSeleccionado->id;
         }
 
-        $numeroPedidoAuto = $this->resolveNextPedidoClienteNumber($proyectoId);
+        $numeroPedidoAuto = $this->resolveNextPedidoClienteNumber($proyectoId)['numero'];
         $fechaPedido = (string) $request->query('fecha_pedido', now()->toDateString());
 
         $lineasInicialesRaw = is_array($presupuestoSeleccionado?->lista_articulos)
@@ -268,6 +272,7 @@ class PedidoController extends Controller
                 'cliente_id' => $presupuesto->cliente_id,
                 'numero' => $presupuesto->numero,
                 'titulo' => $presupuesto->titulo,
+                'ot' => $presupuesto->ot,
                 'cliente_nombre' => $presupuesto->cliente?->empresa_nombre,
                 'lineas' => collect($lineas)
                     ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
@@ -316,7 +321,12 @@ class PedidoController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'numero_pedido' => 'required|string|max:80',
+            'numero_pedido' => [
+                'nullable',
+                'string',
+                'max:80',
+                Rule::unique('pedidos_clientes', 'numero_pedido')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+            ],
             'fecha_pedido' => 'required|date',
             'id_cliente' => [
                 'required',
@@ -324,7 +334,14 @@ class PedidoController extends Controller
                 'exists:clientes,id',
             ],
             'ot' => 'nullable|string|max:100',
-            'presupuesto_id' => 'nullable|integer|exists:presupuestos,id',
+            'presupuesto_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('presupuestos', 'id')->where(function ($query) use ($proyectoId) {
+                    $query->where('proyecto_id', $proyectoId)
+                        ->whereIn('estado', ['pendiente', 'pendiente pedido']);
+                }),
+            ],
             'estado' => 'nullable|string|max:30',
             'total' => 'nullable|numeric|min:0',
             'lista_articulos' => 'nullable|json',
@@ -335,17 +352,32 @@ class PedidoController extends Controller
             ->where('id', $validated['id_cliente'])
             ->exists();
 
+        $presupuestoId = null;
+        if (!empty($validated['presupuesto_id'])) {
+            $presupuesto = Presupuesto::query()
+                ->where('proyecto_id', $proyectoId)
+                ->where('id', $validated['presupuesto_id'])
+                ->first();
+
+            if ($presupuesto) {
+                $presupuestoId = $presupuesto->id;
+                $validated['id_cliente'] = (int) $presupuesto->cliente_id;
+                $clienteValido = Cliente::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('id', $validated['id_cliente'])
+                    ->exists();
+            }
+        }
+
         if (!$clienteValido) {
             abort(404);
         }
 
-        $presupuestoId = null;
-        if (!empty($validated['presupuesto_id'])) {
-            $presupuestoId = Presupuesto::query()
-                ->where('proyecto_id', $proyectoId)
-                ->where('id', $validated['presupuesto_id'])
-                ->value('id');
-        }
+        $correlativoActual = $this->resolveNextPedidoClienteNumber($proyectoId);
+        $numeroManual = trim((string) ($validated['numero_pedido'] ?? ''));
+        $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
+        $manualCorrelativo = $this->extractCorrelativoFromNumero($correlativoActual['formato'], $numeroFinal);
+        $validated['numero_pedido'] = $numeroFinal;
 
         $lineas = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
         $lineas = is_array($lineas) ? $lineas : [];
@@ -377,20 +409,35 @@ class PedidoController extends Controller
 
         $total = (float) collect($lineas)->sum('total');
 
-        PedidoCliente::create([
-            'id_cliente' => $validated['id_cliente'],
-            'proyecto_id' => $proyectoId,
-            'numero_pedido' => $validated['numero_pedido'],
-            'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
-            'ot' => $validated['ot'] ?? null,
-            'presupuesto_id' => $presupuestoId,
-            'albaran_id' => null,
-            'estado' => $validated['estado'] ?? 'pendiente',
-            'total' => round($total, 2),
-            'lista_articulos' => $lineas ?: null,
-        ]);
+        DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas, $correlativoActual, $manualCorrelativo) {
+            PedidoCliente::create([
+                'id_cliente' => $validated['id_cliente'],
+                'proyecto_id' => $proyectoId,
+                'numero_pedido' => $validated['numero_pedido'],
+                'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
+                'ot' => $validated['ot'] ?? null,
+                'presupuesto_id' => $presupuestoId,
+                'albaran_id' => null,
+                'estado' => $validated['estado'] ?? 'pendiente',
+                'total' => round($total, 2),
+                'lista_articulos' => $lineas ?: null,
+            ]);
 
-        $this->syncArticulosFromLineas($proyectoId, $lineas);
+            if ($presupuestoId !== null) {
+                Presupuesto::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('id', $presupuestoId)
+                    ->update([
+                        'estado' => 'aceptado',
+                    ]);
+            }
+
+            $nextValue = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+            $this->setContadorValue($proyectoId, 'pedidos_next_correlativo', $nextValue);
+            $this->setCorrelativoFormato($proyectoId, $correlativoActual['formato'], 'pedidos_formato_correlativo');
+
+            $this->syncArticulosFromLineas($proyectoId, $lineas);
+        });
 
         return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente creado correctamente');
     }
@@ -478,6 +525,58 @@ class PedidoController extends Controller
             'pdfUrl' => route('pedidos-clientes.pdf', $pedidoCliente),
             'downloadUrl' => route('pedidos-clientes.pdf.download', $pedidoCliente),
         ]);
+    }
+
+    public function editCorrelativo(Request $request)
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
+            abort(403);
+        }
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        $formatoActual = $this->getCorrelativoFormato($proyectoId, 'pedidos_formato_correlativo', function () {
+            return 'PC-' . now()->format('Y') . '-000';
+        });
+
+        $max = $this->maxCorrelativoForPrefix($proyectoId, $formatoActual);
+        $override = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', 'pedidos_next_correlativo')
+            ->value('valor');
+
+        $suggested = max(($max ?? 0) + 1, (int) ($override ?? 0));
+        $ejemplo = $this->formatCorrelativoNumero($formatoActual, $suggested);
+
+        return view('pedidos-clientes.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo'));
+    }
+
+    public function updateCorrelativo(Request $request)
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
+            abort(403);
+        }
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        $validated = $request->validate([
+            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0+$/'],
+            'next' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $formato = trim((string) $validated['formato']);
+        $next = (int) $validated['next'];
+        $max = $this->maxCorrelativoForPrefix($proyectoId, $formato);
+
+        if ($next <= ($max ?? 0)) {
+            return back()->withErrors(['next' => 'El número debe ser mayor que el máximo correlativo existente (' . ($max ?? 0) . ').']);
+        }
+
+        $this->setCorrelativoFormato($proyectoId, $formato, 'pedidos_formato_correlativo');
+        $this->setContadorValue($proyectoId, 'pedidos_next_correlativo', $next);
+
+        return redirect()->route('pedidos-clientes.index')->with('success', 'Correlativo de pedidos actualizado. Siguiente número: ' . $this->formatCorrelativoNumero($formato, $next));
     }
 
     /**
@@ -672,13 +771,145 @@ class PedidoController extends Controller
         //
     }
 
-    private function resolveNextPedidoClienteNumber(int $proyectoId): string
+    private function resolveNextPedidoClienteNumber(int $proyectoId): array
     {
-        $nextIndex = (int) PedidoCliente::query()
-            ->where('proyecto_id', $proyectoId)
-            ->count() + 1;
+        $formato = $this->getCorrelativoFormato($proyectoId, 'pedidos_formato_correlativo', function () {
+            return 'PC-' . now()->format('Y') . '-000';
+        });
 
-        return sprintf('PC-%s-%03d', now()->format('Y'), $nextIndex);
+        $nextIndex = $this->getContadorValue($proyectoId, 'pedidos_next_correlativo');
+
+        if ($nextIndex <= 0) {
+            $nextIndex = $this->maxCorrelativoForPrefix($proyectoId, $formato) + 1;
+            $this->setContadorValue($proyectoId, 'pedidos_next_correlativo', $nextIndex);
+            $this->setCorrelativoFormato($proyectoId, $formato, 'pedidos_formato_correlativo');
+        }
+
+        return [
+            'formato' => $formato,
+            'correlativo' => $nextIndex,
+            'numero' => $this->formatCorrelativoNumero($formato, $nextIndex),
+        ];
+    }
+
+    private function getCorrelativoFormato(int $proyectoId, string $claveBase, callable $fallback): string
+    {
+        $storedKey = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', 'like', $claveBase . ':%')
+            ->orderByDesc('id')
+            ->value('clave');
+
+        if (is_string($storedKey) && str_starts_with($storedKey, $claveBase . ':')) {
+            return substr($storedKey, strlen($claveBase) + 1);
+        }
+
+        $formato = (string) $fallback();
+        $this->setCorrelativoFormato($proyectoId, $formato, $claveBase);
+
+        return $formato;
+    }
+
+    private function setCorrelativoFormato(int $proyectoId, string $formato, string $claveBase): void
+    {
+        $clave = $claveBase . ':' . $formato;
+
+        DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', 'like', $claveBase . ':%')
+            ->where('clave', '!=', $clave)
+            ->delete();
+
+        $exists = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', $clave)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        DB::table('contadores')->insert([
+            'proyecto_id' => $proyectoId,
+            'clave' => $clave,
+            'valor' => 1,
+        ]);
+    }
+
+    private function getContadorValue(int $proyectoId, string $clave): int
+    {
+        return (int) DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', $clave)
+            ->value('valor');
+    }
+
+    private function setContadorValue(int $proyectoId, string $clave, int $valor): void
+    {
+        $exists = DB::table('contadores')
+            ->where('proyecto_id', $proyectoId)
+            ->where('clave', $clave)
+            ->exists();
+
+        if ($exists) {
+            DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', $clave)
+                ->update(['valor' => $valor]);
+            return;
+        }
+
+        DB::table('contadores')->insert([
+            'proyecto_id' => $proyectoId,
+            'clave' => $clave,
+            'valor' => $valor,
+        ]);
+    }
+
+    private function formatCorrelativoNumero(string $formato, int $correlativo): string
+    {
+        $parts = preg_match('/^(.*?)(0+)$/', $formato, $matches) === 1 ? $matches : null;
+
+        if (!$parts) {
+            return $formato . $correlativo;
+        }
+
+        return $parts[1] . str_pad((string) $correlativo, strlen($parts[2]), '0', STR_PAD_LEFT);
+    }
+
+    private function maxCorrelativoForPrefix(int $proyectoId, string $formato): int
+    {
+        $prefix = preg_match('/^(.*?)(0+)$/', $formato, $matches) === 1 ? $matches[1] : $formato;
+        $digits = preg_match('/^(.*?)(0+)$/', $formato, $matches) === 1 ? strlen($matches[2]) : 3;
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{' . $digits . '})$/';
+
+        $max = 0;
+        foreach (PedidoCliente::query()->where('proyecto_id', $proyectoId)->pluck('numero_pedido') as $numero) {
+            if (!is_string($numero)) {
+                continue;
+            }
+
+            if (preg_match($pattern, $numero, $match) === 1) {
+                $max = max($max, (int) $match[1]);
+            }
+        }
+
+        return $max;
+    }
+
+    private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
+    {
+        if (!preg_match('/^(.*?)(0+)$/', $formato, $matches)) {
+            return null;
+        }
+
+        $pattern = '/^' . preg_quote($matches[1], '/') . '(\d{' . strlen($matches[2]) . '})$/';
+
+        if (preg_match($pattern, $numero, $match) !== 1) {
+            return null;
+        }
+
+        return (int) $match[1];
     }
 
     private function renderPdfResponse(PedidoCliente $pedido, bool $download)

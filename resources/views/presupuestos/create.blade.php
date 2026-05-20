@@ -46,7 +46,8 @@
 
                     <div class="field-group">
                         <label for="numero">Numero</label>
-                        <input type="text" id="numero" name="numero" value="{{ old('numero', $siguienteNumero ?? '') }}" placeholder="{{ $siguienteNumero ?? '' }}" class="@error('numero') is-invalid @enderror" maxlength="50" required>
+                        <input type="text" id="numero" name="numero" value="{{ old('numero', $siguienteNumero ?? '') }}" placeholder="{{ $siguienteNumero ?? '' }}" class="@error('numero') is-invalid @enderror" maxlength="50">
+                        <small class="pdf-help">Puedes modificarlo manualmente. Si lo dejas vacío, se usará el siguiente correlativo automático.</small>
                     </div>
 
                     <div class="field-group">
@@ -95,62 +96,78 @@
 
                 <section class="items-builder" aria-labelledby="items-builder-title">
                     <header class="items-builder-head">
-                        <h3 id="items-builder-title">Datos del item</h3>
+                        <div class="items-builder-head__copy">
+                            <span class="items-builder-eyebrow">Artículos</span>
+                            <h3 id="items-builder-title">Compón las líneas del presupuesto</h3>
+                        </div>
                         <button type="button" id="btn_agregar_item" class="btn-agregar-item">
-                            Agregar
+                            Agregar línea
                         </button>
                     </header>
 
-                    <div class="items-form-grid">
-                        <div class="field-group">
-                            <label for="item_articulo">Código referencia</label>
-                            <input type="text" id="item_articulo" placeholder="Codigo o referencia">
+                    <div class="items-builder-body">
+                        <div class="items-builder-summary">
+                            <div class="items-builder-summary__card">
+                                <span>Bloque principal</span>
+                                <strong>Descripción</strong>
+                                <p>Usa la descripción como campo principal y completa el resto de datos en la misma franja visual.</p>
+                            </div>
+                            <div class="items-builder-summary__card items-builder-summary__card--soft">
+                                <span>Salida</span>
+                                <strong>Línea numerada</strong>
+                                <p>La tabla inferior ordena automáticamente cada elemento como 01, 02, 03 para facilitar la lectura.</p>
+                            </div>
                         </div>
-                        <div class="field-group field-span-3">
-                            <label for="item_descripcion">Descripcion</label>
-                            <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
-                        </div>
-                        <div class="field-group">
-                            <label for="item_cantidad">Cantidad</label>
-                            <input type="number" id="item_cantidad" min="0" step="0.01" value="1">
-                        </div>
-                        <div class="field-group">
-                            <label for="item_medida">Medida</label>
-                            <input type="text" id="item_medida" placeholder="u, kg, m...">
-                        </div>
-                        <div class="field-group">
-                            <label for="item_precio_unitario">Precio unitario</label>
-                            <input type="number" id="item_precio_unitario" min="0" step="0.01" value="0">
-                        </div>
-                        <div class="field-group field-group-margen">
-                            <label for="item_margen">Margen (%)</label>
-                            <input type="number" id="item_margen" min="0" step="0.01" value="0">
-                        </div>
-                    </div>
 
-                    <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', '[]') }}'>
+                        <div class="items-form-grid">
+                            <div class="field-group field-span-3">
+                                <label for="item_descripcion">Descripción</label>
+                                <textarea id="item_descripcion" rows="3" placeholder="Descripción detallada del material o servicio"></textarea>
+                            </div>
+                            <div class="field-group">
+                                <label for="item_cantidad">Cantidad</label>
+                                <input type="number" id="item_cantidad" min="0" step="0.01" value="1">
+                            </div>
+                            <div class="field-group">
+                                <label for="item_medida">Medida</label>
+                                <input type="text" id="item_medida" placeholder="u, kg, m...">
+                            </div>
+                            <div class="field-group">
+                                <label for="item_precio_unitario">Precio unitario</label>
+                                <input type="number" id="item_precio_unitario" min="0" step="0.01" value="0">
+                            </div>
+                            <div class="field-group field-group-margen">
+                                <label for="item_margen">Margen (%)</label>
+                                <input type="number" id="item_margen" min="0" step="0.01" value="0">
+                            </div>
+                        </div>
 
-                    <div class="items-table-wrap">
-                        <table class="items-table" aria-label="Listado de items del presupuesto">
-                            <thead>
-                                <tr>
-                                    <th>Línea</th>
-                                    <th>Código ref.</th>
-                                    <th>Descripción</th>
-                                    <th>Cantidad</th>
-                                    <th>Medida</th>
-                                    <th>P. unitario</th>
-                                    <th>Margen</th>
-                                    <th>Total</th>
-                                    <th class="actions-col"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="items_tbody">
-                                <tr class="items-empty-row">
-                                    <td colspan="9">No hay items agregados.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div class="items-builder-actionbar">
+                            <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', '[]') }}'>
+                            <div class="items-builder-actionbar__hint">La tabla inferior mostrará la línea numerada y el detalle del artículo.</div>
+                        </div>
+
+                        <div class="items-table-wrap">
+                            <table class="items-table" aria-label="Listado de items del presupuesto">
+                                <thead>
+                                    <tr>
+                                        <th>Línea</th>
+                                        <th>Descripción</th>
+                                        <th>Cantidad</th>
+                                        <th>Medida</th>
+                                        <th>P. unitario</th>
+                                        <th>Margen</th>
+                                        <th>Total</th>
+                                        <th class="actions-col"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items_tbody">
+                                    <tr class="items-empty-row">
+                                        <td colspan="8">No hay items agregados.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -202,7 +219,6 @@
             const subtotalEl = document.getElementById('items_subtotal');
             const totalEl = document.getElementById('items_total');
 
-            const articuloInput = document.getElementById('item_articulo');
             const descripcionInput = document.getElementById('item_descripcion');
             const cantidadInput = document.getElementById('item_cantidad');
             const medidaInput = document.getElementById('item_medida');
@@ -258,7 +274,6 @@
             let editingIndex = null;
 
             const resetItemForm = () => {
-                articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 medidaInput.value = '';
@@ -337,7 +352,6 @@
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.articulo ? `<strong>${item.articulo}</strong>` : '<span class="text-muted">-</span>'}</td>
                         <td>${item.descripcion}</td>
                         <td style="text-align:right">${eur.format(safeNumber(item.cantidad))}</td>
                         <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
@@ -362,7 +376,6 @@
 
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
-                const articulo = articuloInput.value.trim();
                 const cantidad = Math.max(0, safeNumber(cantidadInput.value));
                 const medida = String(medidaInput.value || '').trim();
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
@@ -376,7 +389,7 @@
                 const total = cantidad * precioUnitario * (1 + (margen / 100));
 
                 const payload = {
-                    articulo,
+                    articulo: '',
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
@@ -395,7 +408,6 @@
 
                 editingIndex = null;
                 addButton.textContent = 'Agregar';
-                articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 medidaInput.value = '';
