@@ -174,6 +174,23 @@
                                             <i class="fas fa-pen"></i>
                                         </a>
 
+                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+                                            <button
+                                                type="button"
+                                                class="presupuesto-action-btn presupuesto-action-btn--danger"
+                                                data-delete-albaran
+                                                data-delete-url="{{ route('albaranes.destroy', $albaran) }}"
+                                                data-albaran-numero="{{ $albaran->numero }}"
+                                                data-pedido-numero="{{ $albaran->ui_pedido_numero ?? '' }}"
+                                                data-pedido-id="{{ $albaran->ui_pedido_id ?? '' }}"
+                                                data-pedido-albaranes-count="{{ (int) ($albaran->ui_pedido_albaranes_count ?? 0) }}"
+                                                aria-label="Eliminar albarán"
+                                                title="Eliminar albarán"
+                                            >
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        @endif
+
                                         @php
                                             $dropdownId = 'albaran-estado-dropdown-' . $albaran->id;
                                         @endphp
@@ -224,9 +241,105 @@
                 @endif
             </footer>
         </article>
+
+        <form id="albaran-delete-form" method="POST" class="d-none">
+            @csrf
+            @method('DELETE')
+        </form>
+
+        <div class="modal fade albaran-delete-modal" id="albaranDeleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered albaran-delete-modal__dialog" role="document">
+                <div class="modal-content albaran-delete-modal__content">
+                    <div class="modal-header albaran-delete-modal__header">
+                        <div class="albaran-delete-modal__title-wrap">
+                            <span class="albaran-delete-modal__icon albaran-delete-modal__icon--danger">
+                                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                            </span>
+                            <div>
+                                <h5 class="modal-title">Eliminar albarán</h5>
+                                <p class="albaran-delete-modal__subtitle">Revisa el impacto antes de confirmar.</p>
+                            </div>
+                        </div>
+                        <button type="button" class="close albaran-delete-modal__close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body albaran-delete-modal__body">
+                        <p id="albaranDeleteConfirmMessage" class="albaran-delete-modal__message mb-0"></p>
+                    </div>
+                    <div class="modal-footer albaran-delete-modal__footer">
+                        <button type="button" class="btn albaran-delete-modal__btn albaran-delete-modal__btn--ghost" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn albaran-delete-modal__btn albaran-delete-modal__btn--danger" id="albaranDeleteConfirmButton">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 @endsection
 
 @section('css')
     @vite(['resources/css/albaranes-clientes-index.css'])
+@endsection
+
+@section('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const deleteForm = document.getElementById('albaran-delete-form');
+            const confirmModal = document.getElementById('albaranDeleteConfirmModal');
+            const confirmMessage = document.getElementById('albaranDeleteConfirmMessage');
+            const confirmButton = document.getElementById('albaranDeleteConfirmButton');
+
+            let currentDeleteUrl = '';
+
+            const showModal = (modalElement) => {
+                if (!modalElement) {
+                    return;
+                }
+
+                if (window.$ && typeof window.$(modalElement).modal === 'function') {
+                    window.$(modalElement).modal('show');
+                    return;
+                }
+
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.setAttribute('aria-modal', 'true');
+            };
+
+            document.querySelectorAll('[data-delete-albaran]').forEach((button) => {
+                button.addEventListener('click', function () {
+                    currentDeleteUrl = this.getAttribute('data-delete-url') || '';
+                    const albaranNumero = this.getAttribute('data-albaran-numero') || '';
+                    const pedidoNumero = this.getAttribute('data-pedido-numero') || '';
+                    const pedidoId = this.getAttribute('data-pedido-id') || '';
+                    const pedidoAlbaranesCount = Number.parseInt(this.getAttribute('data-pedido-albaranes-count') || '0', 10);
+
+                    if (pedidoId !== '' && pedidoNumero !== '') {
+                        const remainingAfterDelete = Math.max(0, pedidoAlbaranesCount - 1);
+                        const nextState = remainingAfterDelete > 0 ? 'facturado parcial' : 'pendiente';
+                        const detail = remainingAfterDelete > 0
+                            ? `Si lo borras, el pedido ${pedidoNumero} seguirá teniendo ${remainingAfterDelete} albarán/es y pasará a estado ${nextState}.`
+                            : `Si lo borras, el pedido ${pedidoNumero} pasará a estado ${nextState}.`;
+
+                        confirmMessage.textContent = `¿Estás seguro de que quieres borrar el albarán ${albaranNumero}? ${detail}`;
+                    } else {
+                        confirmMessage.textContent = `¿Estás seguro de que quieres borrar el albarán ${albaranNumero}? Esta acción no se puede deshacer.`;
+                    }
+
+                    showModal(confirmModal);
+                });
+            });
+
+            if (confirmButton) {
+                confirmButton.addEventListener('click', function () {
+                    if (!currentDeleteUrl || !deleteForm) {
+                        return;
+                    }
+
+                    deleteForm.setAttribute('action', currentDeleteUrl);
+                    deleteForm.submit();
+                });
+            }
+        });
+    </script>
 @endsection

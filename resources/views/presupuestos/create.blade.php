@@ -32,18 +32,13 @@
             <form action="{{ route('presupuestos.store') }}" method="POST" enctype="multipart/form-data" novalidate>
                 @csrf
                 <input type="hidden" name="modo" value="{{ $modo }}">
+                <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
 
                 @if ($volverACliente && $clienteSeleccionadoId)
                     <input type="hidden" name="redirect_cliente_id" value="{{ $clienteSeleccionadoId }}">
                 @endif
 
                 <div class="presupuesto-grid">
-                    <div class="field-group">
-                        <label>Documento</label>
-                        <div class="documento-display"><strong>Presupuesto</strong></div>
-                        <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
-                    </div>
-
                     <div class="field-group">
                         <label for="numero">Numero</label>
                         <input type="text" id="numero" name="numero" value="{{ old('numero', $siguienteNumero ?? '') }}" placeholder="{{ $siguienteNumero ?? '' }}" class="@error('numero') is-invalid @enderror" maxlength="50">
@@ -96,29 +91,13 @@
 
                 <section class="items-builder" aria-labelledby="items-builder-title">
                     <header class="items-builder-head">
-                        <div class="items-builder-head__copy">
-                            <span class="items-builder-eyebrow">Artículos</span>
-                            <h3 id="items-builder-title">Compón las líneas del presupuesto</h3>
-                        </div>
+                        <span class="items-builder-eyebrow" id="items-builder-title">Artículos</span>
                         <button type="button" id="btn_agregar_item" class="btn-agregar-item">
                             Agregar línea
                         </button>
                     </header>
 
                     <div class="items-builder-body">
-                        <div class="items-builder-summary">
-                            <div class="items-builder-summary__card">
-                                <span>Bloque principal</span>
-                                <strong>Descripción</strong>
-                                <p>Usa la descripción como campo principal y completa el resto de datos en la misma franja visual.</p>
-                            </div>
-                            <div class="items-builder-summary__card items-builder-summary__card--soft">
-                                <span>Salida</span>
-                                <strong>Línea numerada</strong>
-                                <p>La tabla inferior ordena automáticamente cada elemento como 01, 02, 03 para facilitar la lectura.</p>
-                            </div>
-                        </div>
-
                         <div class="items-form-grid">
                             <div class="field-group field-span-3">
                                 <label for="item_descripcion">Descripción</label>
@@ -126,7 +105,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_cantidad">Cantidad</label>
-                                <input type="number" id="item_cantidad" min="0" step="0.01" value="1">
+                                <input type="number" id="item_cantidad" min="0" step="0.01" placeholder="1">
                             </div>
                             <div class="field-group">
                                 <label for="item_medida">Medida</label>
@@ -134,18 +113,15 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_precio_unitario">Precio unitario</label>
-                                <input type="number" id="item_precio_unitario" min="0" step="0.01" value="0">
+                                <input type="number" id="item_precio_unitario" min="0" step="0.01" placeholder="0">
                             </div>
                             <div class="field-group field-group-margen">
                                 <label for="item_margen">Margen (%)</label>
-                                <input type="number" id="item_margen" min="0" step="0.01" value="0">
+                                <input type="number" id="item_margen" min="0" step="0.01" placeholder="0">
                             </div>
                         </div>
 
-                        <div class="items-builder-actionbar">
-                            <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', '[]') }}'>
-                            <div class="items-builder-actionbar__hint">La tabla inferior mostrará la línea numerada y el detalle del artículo.</div>
-                        </div>
+                        <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', '[]') }}'>
 
                         <div class="items-table-wrap">
                             <table class="items-table" aria-label="Listado de items del presupuesto">
@@ -161,12 +137,9 @@
                                         <th class="actions-col"></th>
                                     </tr>
                                 </thead>
-                                <tbody id="items_tbody">
-                                    <tr class="items-empty-row">
-                                        <td colspan="8">No hay items agregados.</td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="items_tbody"></tbody>
                             </table>
+                            <div class="items-empty-state" id="items_empty_state">No hay items agregados.</div>
                         </div>
                     </div>
                 </section>
@@ -224,6 +197,7 @@
             const medidaInput = document.getElementById('item_medida');
             const precioInput = document.getElementById('item_precio_unitario');
             const margenInput = document.getElementById('item_margen');
+            const emptyState = document.getElementById('items_empty_state');
             const addButton = document.getElementById('btn_agregar_item');
             const editButton = document.getElementById('btn_editar_item');
             const deleteButton = document.getElementById('btn_eliminar_item');
@@ -275,10 +249,10 @@
 
             const resetItemForm = () => {
                 descripcionInput.value = '';
-                cantidadInput.value = '1';
+                cantidadInput.value = '';
                 medidaInput.value = '';
-                precioInput.value = '0';
-                margenInput.value = '0';
+                precioInput.value = '';
+                margenInput.value = '';
                 editingIndex = null;
                 addButton.textContent = 'Agregar';
             };
@@ -295,12 +269,11 @@
                     return;
                 }
 
-                articuloInput.value = item.articulo || '';
                 descripcionInput.value = item.descripcion || '';
-                cantidadInput.value = String(item.cantidad ?? 1);
+                cantidadInput.value = String(item.cantidad ?? '');
                 medidaInput.value = String(item.medida ?? item.unidad ?? '');
-                precioInput.value = String(item.precio_unitario ?? 0);
-                margenInput.value = String(item.margen ?? 0);
+                precioInput.value = String(item.precio_unitario ?? '');
+                margenInput.value = String(item.margen ?? '');
                 editingIndex = index;
                 addButton.textContent = 'Actualizar';
                 descripcionInput.focus();
@@ -342,12 +315,15 @@
 
             const renderRows = () => {
                 if (items.length === 0) {
-                    tbody.innerHTML = '<tr class="items-empty-row"><td colspan="9">No hay items agregados.</td></tr>';
+                    tbody.innerHTML = '';
+                    emptyState.hidden = false;
                     renderTotals();
                     syncHidden();
                     setButtonsState();
                     return;
                 }
+
+                emptyState.hidden = true;
 
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
@@ -409,10 +385,10 @@
                 editingIndex = null;
                 addButton.textContent = 'Agregar';
                 descripcionInput.value = '';
-                cantidadInput.value = '1';
+                cantidadInput.value = '';
                 medidaInput.value = '';
-                precioInput.value = '0';
-                margenInput.value = '0';
+                precioInput.value = '';
+                margenInput.value = '';
 
                 renderRows();
             });

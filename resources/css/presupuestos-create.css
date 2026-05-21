@@ -150,73 +150,16 @@
     gap: 0.8rem;
 }
 
-.items-builder-head__copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.12rem;
-}
-
 .items-builder-eyebrow {
     color: #2a87e2;
-    font-size: 0.62rem;
+    font-size: 0.8rem;
     font-weight: 800;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-}
-
-.items-builder-head h3 {
-    margin: 0;
-    color: #234467;
-    font-size: 0.84rem;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    font-weight: 800;
 }
 
 .items-builder-body {
     padding: 0.95rem;
-}
-
-.items-builder-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 0.9rem;
-}
-
-.items-builder-summary__card {
-    border: 1px solid #dce5f1;
-    border-radius: 0.55rem;
-    background: linear-gradient(180deg, #f8fbff 0%, #f2f6fb 100%);
-    padding: 0.8rem 0.85rem;
-}
-
-.items-builder-summary__card--soft {
-    background: linear-gradient(180deg, #edf4fb 0%, #e7eef8 100%);
-}
-
-.items-builder-summary__card span {
-    display: block;
-    color: #7990a8;
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
-.items-builder-summary__card strong {
-    display: block;
-    margin-top: 0.18rem;
-    color: #203750;
-    font-size: 0.92rem;
-    font-weight: 800;
-}
-
-.items-builder-summary__card p {
-    margin: 0.35rem 0 0;
-    color: #61758d;
-    font-size: 0.74rem;
-    line-height: 1.45;
 }
 
 .items-form-grid {
@@ -232,20 +175,6 @@
 
 .field-group-margen {
     min-width: 110px;
-}
-
-.items-builder-actionbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.85rem;
-    margin-top: 0.8rem;
-}
-
-.items-builder-actionbar__hint {
-    color: #6f8298;
-    font-size: 0.72rem;
-    font-weight: 600;
 }
 
 .btn-agregar-item {
@@ -279,6 +208,17 @@
     border: 1px solid #d6dee8;
     border-radius: 0.62rem;
     overflow: hidden;
+}
+
+.items-empty-state {
+    margin-top: 0.65rem;
+    border: 1px dashed #d6dee8;
+    border-radius: 0.62rem;
+    padding: 0.95rem 1rem;
+    color: #8d9cb0;
+    font-size: 0.78rem;
+    text-align: center;
+    background: #fbfdff;
 }
 
 .items-table th,
@@ -397,12 +337,6 @@
 
 .btn-remove-item:hover {
     background: #ffecee;
-}
-
-.items-empty-row td {
-    text-align: center;
-    color: #8d9cb0;
-    padding: 1rem;
 }
 
 .presupuesto-actions {
@@ -525,10 +459,6 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .items-builder-summary {
-        grid-template-columns: 1fr;
-    }
-
     .items-form-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -566,8 +496,7 @@
         grid-template-columns: 1fr;
     }
 
-    .items-builder-head,
-    .items-builder-actionbar {
+    .items-builder-head {
         flex-direction: column;
         align-items: stretch;
     }

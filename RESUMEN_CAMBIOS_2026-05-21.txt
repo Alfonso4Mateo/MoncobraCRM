@@ -1,0 +1,30 @@
+RESUMEN MUY CORTO (21-05-2026)
+Proyecto: MoncobraCRM
+
+1) Integridad de datos
+- Se reforzo la regla 1 presupuesto = 1 pedido cliente (modelo + validaciones + BD).
+- En crear pedido cliente, solo se permiten presupuestos en estado pendiente.
+
+2) Pedidos y albaranes
+- Se activaron soft deletes en pedidos_clientes y albaranes_clientes.
+- Se corrigio el borrado de albaranes (error Not Found de ruta) y sus redirecciones.
+
+3) Estados automaticos
+- El estado del pedido cliente ahora se recalcula al crear/editar/borrar albaranes vinculados:
+  pendiente / facturado_parcial / facturado.
+
+4) Lineas de albaran
+- Se quito dependencia del codigo de referencia antiguo.
+- En edicion, se mantienen lineas del albaran y se controlan maximos para evitar sobre-facturacion.
+
+5) UX/UI
+- Mejora de formulario de crear pedido (descripcion adaptable y mejor escritura).
+- Mejora de modales/botones de acciones destructivas.
+- Rediseño simple y unificado de pantallas de correlativos.
+
+6) Correcciones clave
+- Corregido preview de PDF de albaran (variable faltante).
+- Al editar un albaran, ahora vuelve a la pantalla anterior (return_to).
+
+Nota para equipo:
+El foco del dia fue: mas consistencia de negocio, menos errores en flujos de albaranes/pedidos y mejora de usabilidad.

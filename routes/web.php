@@ -81,7 +81,9 @@ Route::middleware('auth')->group(function () {
     Route::get('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'pantallaRoja'])->name('albaranes.pantalla-roja');
     Route::put('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'updatePantallaRoja'])->name('albaranes.pantalla-roja.update');
     Route::patch('albaranes/{albaran}/estado', [AlbaranClienteController::class, 'updateEstado'])->name('albaranes.estado.update');
-    Route::resource('albaranes', AlbaranClienteController::class)->except(['edit', 'update']);
+    Route::resource('albaranes', AlbaranClienteController::class)
+        ->parameters(['albaranes' => 'albaran'])
+        ->except(['edit', 'update']);
     Route::get('presupuestos/{presupuesto}/preview', [PresupuestoController::class, 'preview'])->name('presupuestos.preview');
     Route::get('presupuestos/{presupuesto}/pdf', [PresupuestoController::class, 'viewPdf'])->name('presupuestos.pdf');
     Route::get('presupuestos/{presupuesto}/pdf/download', [PresupuestoController::class, 'downloadPdf'])->name('presupuestos.pdf.download');
@@ -107,6 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::get('pedidos-clientes/{pedidoCliente}/pdf', [PedidoController::class, 'viewPdf'])->name('pedidos-clientes.pdf');
     Route::get('pedidos-clientes/{pedidoCliente}/pdf/download', [PedidoController::class, 'downloadPdf'])->name('pedidos-clientes.pdf.download');
     Route::patch('pedidos-clientes/{pedidoCliente}/estado', [PedidoController::class, 'updateEstado'])->name('pedidos-clientes.estado.update');
+    Route::delete('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'destroyCliente'])->name('pedidos-clientes.destroy');
     Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pedidos-clientes.data');
     Route::get('pedidos-clientes/{pedidoCliente}/albaranes', [PedidoController::class, 'albaranesCliente'])->name('pedidos-clientes.albaranes');
     Route::get('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'showCliente'])->name('pedidos-clientes.show');

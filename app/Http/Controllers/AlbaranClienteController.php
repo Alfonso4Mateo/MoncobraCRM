@@ -103,6 +103,7 @@ class AlbaranClienteController extends Controller
         $pedidos = PedidoCliente::query()
             ->where('proyecto_id', $proyectoId)
             ->whereIn('numero_pedido', $albaranes->getCollection()->pluck('pedido_cliente')->filter()->map(fn ($item) => trim((string) $item))->unique())
+            ->withCount('albaranes')
             ->get(['id', 'numero_pedido'])
             ->keyBy(fn (PedidoCliente $pedido) => trim((string) $pedido->numero_pedido));
 
@@ -119,6 +120,8 @@ class AlbaranClienteController extends Controller
                 ? $totalAlbaran
                 : ($presupuestoRelacionado ? (float) $presupuestoRelacionado->total : 0);
             $albaran->ui_pedido_id = $pedidoRelacionado?->id;
+            $albaran->ui_pedido_numero = $pedidoNumero;
+            $albaran->ui_pedido_albaranes_count = (int) ($pedidoRelacionado?->albaranes_count ?? 0);
             $albaran->estado = $albaran->estado ?: 'pendiente';
 
             return $albaran;
@@ -237,6 +240,7 @@ class AlbaranClienteController extends Controller
         $this->setContadorValue($proyectoId, 'albaranes_next_correlativo', $nextValue);
         $this->setCorrelativoFormato($proyectoId, $correlativoActual['formato'], 'albaranes_formato_correlativo');
         $this->syncPedidoClienteLink($albaran, $proyectoId);
+        $this->syncPedidoEstadoFromAlbaran($albaran, $proyectoId, $lineas);
 
         $consumos = collect($lineas)
             ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
@@ -300,55 +304,7 @@ class AlbaranClienteController extends Controller
     {
         $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
 
-        return collect($lineas)
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(function (array $linea) use ($proyectoId) {
-                $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
-                if ($numeroReferencia === '') {
-                    return null;
-                }
-
-                $articulo = Articulo::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('numero_referencia', $numeroReferencia)
-                    ->where(function ($query) {
-                        $query->where('facturado', false)
-                            ->orWhereNull('facturado');
-                    })
-                    ->first();
-
-                if (!$articulo) {
-                    return null;
-                }
-
-                $pedidoCantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
-                $articuloCantidad = round(max(0, (float) ($articulo->cantidad ?? 0)), 2);
-                $cantidad = $pedidoCantidad > 0 ? min($pedidoCantidad, $articuloCantidad) : $articuloCantidad;
-
-                if ($cantidad <= 0) {
-                    return null;
-                }
-                $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
-                $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
-                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));
-                $medida = $medida !== '' ? $medida : null;
-                $descripcion = trim((string) ($linea['descripcion'] ?? $articulo->descripcion ?? ''));
-                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
-
-                return [
-                    'articulo_id' => $articulo->id,
-                    'articulo' => $numeroReferencia,
-                    'descripcion' => $descripcion,
-                    'cantidad' => $cantidad,
-                    'medida' => $medida,
-                    'precio_unitario' => $precioUnitario,
-                    'margen' => $margen,
-                    'total' => $total,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+        return $this->normalizePedidoLineas($lineas);
     }
 
     public function show(AlbaranCliente $albaran)
@@ -357,7 +313,7 @@ class AlbaranClienteController extends Controller
         $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
-            abort(404);
+            return redirect()->route('albaranes.index')->with('error', 'No se pudo eliminar el albarán seleccionado.');
         }
 
         return view('albaranes.preview', [
@@ -547,6 +503,8 @@ class AlbaranClienteController extends Controller
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
+        $pedidoAnterior = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
         }
@@ -564,6 +522,7 @@ class AlbaranClienteController extends Controller
             'titulo' => 'nullable|string|max:255',
             'estado' => ['required', Rule::in(['pendiente', 'recibido', 'entregado'])],
             'lineas_json' => 'nullable|json',
+            'return_to' => 'nullable|string|max:2048',
         ]);
 
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]');
@@ -583,6 +542,12 @@ class AlbaranClienteController extends Controller
         ]);
 
         $this->syncPedidoClienteLink($albaran, $proyectoId);
+        $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
+        $this->recalculatePedidosEstadoFromAlbaran($proyectoId, array_filter([
+            $pedidoAnterior,
+            $pedidoActual,
+        ]), $albaran);
 
         // Regenerate stored PDF after updating so preview shows current data
         try {
@@ -641,9 +606,14 @@ class AlbaranClienteController extends Controller
             report($e);
         }
 
-        return redirect()
-            ->route('albaranes.edit', $albaran)
-            ->with('success', 'Albarán actualizado correctamente.');
+        $returnTo = trim((string) ($validated['return_to'] ?? ''));
+        $appUrl = rtrim((string) config('app.url'), '/');
+
+        if ($returnTo !== '' && $appUrl !== '' && str_starts_with($returnTo, $appUrl)) {
+            return redirect($returnTo)->with('success', 'Albarán actualizado correctamente.');
+        }
+
+        return redirect()->route('albaranes.index')->with('success', 'Albarán actualizado correctamente.');
     }
 
     public function updateEstado(Request $request, AlbaranCliente $albaran)
@@ -675,12 +645,45 @@ class AlbaranClienteController extends Controller
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
+        $user = request()->user();
+        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
+            abort(403);
+        }
+
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
         }
 
-        $albaran->delete();
-        return redirect()->route('albaranes.index')->with('success', 'Albarán eliminado');
+        $pedidoRelacionado = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
+        DB::transaction(function () use ($albaran, $proyectoId) {
+            $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
+            if ($pedido) {
+                $remainingAlbaranes = $pedido->albaranes()
+                    ->where('albaranes_clientes.id', '!=', $albaran->id)
+                    ->orderByDesc('fecha')
+                    ->orderByDesc('id')
+                    ->get();
+
+                $pedido->forceFill([
+                    'estado' => $remainingAlbaranes->count() > 0 ? 'facturado_parcial' : 'pendiente',
+                    'albaran_id' => $remainingAlbaranes->first()?->id,
+                ])->save();
+
+                $albaran->pedidosClientes()->detach($pedido->id);
+            } else {
+                $albaran->pedidosClientes()->detach();
+            }
+
+            $albaran->delete();
+        });
+
+        if ($pedidoRelacionado) {
+            $this->recalculatePedidoEstado($pedidoRelacionado, $proyectoId);
+        }
+
+        return redirect()->route('albaranes.index')->with('success', 'Albarán eliminado correctamente');
     }
 
     private function resolveNextAlbaranClienteNumber(int $proyectoId): array
@@ -1024,5 +1027,147 @@ class AlbaranClienteController extends Controller
         if ($pedido && empty($pedido->albaran_id)) {
             $pedido->forceFill(['albaran_id' => $albaran->id])->save();
         }
+    }
+
+    private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array $lineasDelAlbaran = []): void
+    {
+        $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        $lineasPedido = $pedido
+            ? collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
+                ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+                ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+                ->filter()
+                ->values()
+            : collect();
+
+        $lineasAlbaran = collect($lineasDelAlbaran !== [] ? $lineasDelAlbaran : (is_array($albaran->lista_articulos) ? $albaran->lista_articulos : []))
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+            ->filter()
+            ->values();
+
+        if (!$pedido || $lineasPedido->isEmpty() || $lineasAlbaran->isEmpty() || $lineasAlbaran->intersect($lineasPedido)->isEmpty()) {
+            return;
+        }
+
+        $this->recalculatePedidoEstado($pedido, $proyectoId);
+    }
+
+    private function recalculatePedidoEstado(PedidoCliente $pedido, int $proyectoId): void
+    {
+        $pedido = PedidoCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['albaranesPivot', 'albaran', 'albaranes'])
+            ->find($pedido->id) ?? $pedido;
+
+        $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
+        $lineasPedido = collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+            ->filter()
+            ->values();
+
+        $albaranes = collect($pedido->albaranesPivot ?? [])
+            ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
+            ->merge($pedido->albaranes ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
+            ->unique('id')
+            ->filter(fn (AlbaranCliente $albaran) => $this->albaranAportaPedido($albaran, $lineasPedido));
+
+        $totalFacturado = round((float) $albaranes->sum(function (AlbaranCliente $albaran) {
+            return (float) ($albaran->total ?? 0);
+        }), 2);
+
+        $nuevoEstado = 'pendiente';
+        if ($pedidoTotal > 0 && $totalFacturado > 0) {
+            $nuevoEstado = $totalFacturado >= $pedidoTotal ? 'facturado' : 'facturado_parcial';
+        }
+
+        $pedido->forceFill([
+            'estado' => $nuevoEstado,
+        ])->save();
+    }
+
+    private function recalculatePedidosEstadoFromAlbaran(int $proyectoId, array $pedidos, AlbaranCliente $albaran): void
+    {
+        foreach (collect($pedidos)->filter() as $pedido) {
+            if ($pedido instanceof PedidoCliente) {
+                $this->recalculatePedidoEstado($pedido, $proyectoId);
+            }
+        }
+    }
+
+    private function normalizePedidoLineas(array $lineas): array
+    {
+        return collect($lineas)
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(function (array $linea) {
+                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
+                $margen = max(0, (float) ($linea['margen'] ?? 0));
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
+
+                return [
+                    'articulo_id' => isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null,
+                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
+                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                    'cantidad' => round($cantidad, 2),
+                    'medida' => $medida,
+                    'precio_unitario' => round($precioUnitario, 2),
+                    'margen' => round($margen, 2),
+                    'total' => round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function normalizePedidoLineaSignature(array $linea): string
+    {
+        $descripcion = mb_strtolower(trim((string) ($linea['descripcion'] ?? '')));
+        $medida = mb_strtolower(trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))));
+
+        return $descripcion . '|' . $medida;
+    }
+
+    private function albaranAportaPedido(AlbaranCliente $albaran, $lineasPedido): bool
+    {
+        $lineasAlbaran = collect(is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [])
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+            ->filter()
+            ->values();
+
+        if ($lineasPedido instanceof \Illuminate\Support\Collection) {
+            $lineasPedido = $lineasPedido->values();
+        } else {
+            $lineasPedido = collect($lineasPedido)->values();
+        }
+
+        if ($lineasPedido->isEmpty() || $lineasAlbaran->isEmpty()) {
+            return false;
+        }
+
+        return $lineasAlbaran->intersect($lineasPedido)->isNotEmpty();
+    }
+
+    private function resolvePedidoFromAlbaran(AlbaranCliente $albaran, int $proyectoId): ?PedidoCliente
+    {
+        $pedido = $albaran->pedidosClientes()->first();
+
+        if ($pedido && (int) $pedido->proyecto_id === $proyectoId) {
+            return $pedido;
+        }
+
+        $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
+        if ($pedidoNumero === '') {
+            return null;
+        }
+
+        return PedidoCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero_pedido', $pedidoNumero)
+            ->first();
     }
 }

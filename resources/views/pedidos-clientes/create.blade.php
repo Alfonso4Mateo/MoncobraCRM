@@ -166,7 +166,7 @@
                         <!-- Campo 'Código referencia' eliminado según petición: se mostrará Línea en la tabla -->
                         <div class="pedido-field pedido-field--wide">
                             <label for="line_descripcion">Descripción</label>
-                            <input type="text" id="line_descripcion" class="pedido-input" placeholder="Descripción del artículo o servicio">
+                            <textarea id="line_descripcion" class="pedido-input pedido-textarea" rows="2" placeholder="Descripción del artículo o servicio"></textarea>
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_cantidad">Cantidad</label>
@@ -277,6 +277,11 @@
             const parseValue = (value) => {
                 const numeric = Number.parseFloat(String(value).replace(',', '.'));
                 return Number.isFinite(numeric) ? numeric : 0;
+            };
+
+            const autoResizeDescripcion = () => {
+                descripcionInput.style.height = 'auto';
+                descripcionInput.style.height = `${descripcionInput.scrollHeight}px`;
             };
 
             const formatMoney = (value) => `${moneyFormatter.format(value)} €`;
@@ -393,6 +398,7 @@
                 medidaInput.value = '';
                 precioInput.value = '0';
                 margenInput.value = '0';
+                autoResizeDescripcion();
                 descripcionInput.focus();
             };
 
@@ -471,6 +477,22 @@
 
             descripcionInput.addEventListener('input', () => {
                 addLineButton.disabled = descripcionInput.value.trim().length === 0;
+                autoResizeDescripcion();
+            });
+
+            descripcionInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Tab') {
+                    return;
+                }
+
+                event.preventDefault();
+                const start = descripcionInput.selectionStart ?? 0;
+                const end = descripcionInput.selectionEnd ?? 0;
+                const insertion = '    ';
+
+                descripcionInput.value = `${descripcionInput.value.slice(0, start)}${insertion}${descripcionInput.value.slice(end)}`;
+                descripcionInput.selectionStart = descripcionInput.selectionEnd = start + insertion.length;
+                descripcionInput.dispatchEvent(new Event('input', { bubbles: true }));
             });
 
             [cantidadInput, precioInput, margenInput].forEach((input) => {
@@ -509,6 +531,7 @@
 
             renderRows();
             addLineButton.disabled = descripcionInput.value.trim().length === 0;
+            autoResizeDescripcion();
 
             if (presupuestoSelect.value) {
                 refreshFromBudgetSelectionDeferred();

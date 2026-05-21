@@ -3,12 +3,6 @@
 @section('title', 'Gestión de Clientes - MoncobraCRM')
 
 @section('content')
-    @php
-        $iconosIndustria = ['fa-building', 'fa-bolt', 'fa-industry', 'fa-city', 'fa-warehouse'];
-        $sectores = ['SECTOR INDUSTRIAL', 'SERVICIOS TÉCNICOS', 'INGENIERÍA Y MANTENIMIENTO', 'INFRAESTRUCTURA', 'ENERGÍA Y UTILITIES'];
-        $roles = ['DIRECCIÓN TÉCNICA', 'GESTIÓN DE CUENTAS', 'OPERACIONES', 'ADMINISTRACIÓN', 'COMPRAS'];
-    @endphp
-
     <section class="clientes-ui">
         @if (session('success'))
             <div class="clientes-success" role="status">
@@ -68,37 +62,51 @@
                             <th>CIF / Ident.</th>
                             <th>Sede Principal</th>
                             <th>Persona de Contacto</th>
-                            <th>OTS Activas</th>
+                            <th>OTS Asignadas</th>
                             <th class="text-right">Gestión</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($clientes as $cliente)
                             @php
-                                $key = $cliente->id % count($iconosIndustria);
                                 $otsActivas = (int) $cliente->albaranes_count + (int) $cliente->presupuestos_count + (int) $cliente->pedidos_clientes_count;
-                                $contacto = $cliente->persona_contacto ?: 'Sin asignar';
+                                $contacto = trim((string) $cliente->email);
+                                $contactoEtiqueta = 'Correo';
+
+                                if ($contacto === '') {
+                                    $contacto = trim((string) $cliente->telefono);
+                                    $contactoEtiqueta = 'Teléfono';
+                                }
+
+                                if ($contacto === '') {
+                                    $contacto = trim((string) $cliente->persona_contacto);
+                                    $contactoEtiqueta = 'Persona de contacto';
+                                }
+
+                                if ($contacto === '') {
+                                    $contacto = 'Sin asignar';
+                                    $contactoEtiqueta = null;
+                                }
+
                                 $favoritoActivo = (bool) $cliente->favorito;
                             @endphp
                             <tr>
                                 <td>
                                     <div class="cliente-main">
-                                        <span class="cliente-avatar" aria-hidden="true">
-                                            <i class="fas {{ $iconosIndustria[$key] }}"></i>
-                                        </span>
                                         <div>
                                             <a href="{{ route('clientes.show', $cliente->id) }}" class="cliente-name-link">
                                                 <div class="cliente-name">{{ $cliente->empresa_nombre }}</div>
                                             </a>
-                                            <div class="cliente-meta">{{ $sectores[$key] }}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="cliente-cif">{{ $cliente->cif_nif }}</td>
                                 <td class="cliente-location">{{ $cliente->localidad ?: 'Sin localidad' }}</td>
                                 <td>
+                                    @if ($contactoEtiqueta)
+                                        <div class="cliente-contact-label">{{ $contactoEtiqueta }}</div>
+                                    @endif
                                     <div class="cliente-contact">{{ $contacto }}</div>
-                                    <div class="cliente-meta">{{ $roles[$key] }}</div>
                                 </td>
                                 <td>
                                     <span class="cliente-ots">{{ $otsActivas }}</span>

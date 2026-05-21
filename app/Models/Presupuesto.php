@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Presupuesto extends Model
 {
@@ -71,8 +71,16 @@ class Presupuesto extends Model
     /**
      * Get the customer orders linked to this presupuesto.
      */
-    public function pedidosClientes(): HasMany
+    public function pedidoCliente(): HasOne
     {
-        return $this->hasMany(PedidoCliente::class, 'presupuesto_id');
+        return $this->hasOne(PedidoCliente::class, 'presupuesto_id');
+    }
+
+    /**
+     * Compatibilidad con código anterior que esperaba el nombre plural.
+     */
+    public function pedidosClientes(): HasOne
+    {
+        return $this->pedidoCliente();
     }
 }

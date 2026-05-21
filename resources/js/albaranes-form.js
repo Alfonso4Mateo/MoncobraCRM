@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let pedidoMode = root.dataset.pedidoMode === "1";
+    const isExistingEditForm = !Object.prototype.hasOwnProperty.call(root.dataset, 'pedidoMode');
 
     // `linea_articulo` eliminado de las vistas de creación; no lo buscamos.
     const descripcionInput = document.getElementById("linea_descripcion");
@@ -88,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const lineasFromDataset = parseLineas(root.dataset.initialLineas ?? "[]");
 
     let lineas = lineasFromInput.length > 0 ? lineasFromInput : lineasFromDataset;
+    const editBaseLineas = isExistingEditForm ? lineas.map((linea) => ({ ...linea })) : [];
     let activePedidoKey = null;
     let selectedIndex = -1;
 
@@ -127,8 +129,89 @@ document.addEventListener("DOMContentLoaded", () => {
         totalElement.textContent = `${euroFormatter.format(round2(total))} €`;
     };
 
+    const lineSignature = (linea) => {
+        const descripcion = String(linea?.descripcion ?? '').trim().toLowerCase();
+        const medida = String(linea?.medida ?? linea?.unidad ?? '').trim().toLowerCase();
+
+        return `${descripcion}|${medida}`;
+    };
+
+    const sumPedidoLineasBySignature = (rawLineas) => {
+        const grouped = new Map();
+
+        rawLineas.forEach((linea) => {
+            if (!linea || typeof linea !== 'object') {
+                return;
+            }
+
+            const descripcion = String(linea.descripcion ?? '').trim();
+            if (descripcion === '') {
+                return;
+            }
+
+            const signature = lineSignature(linea);
+            const current = grouped.get(signature) || {
+                articulo_id: linea.articulo_id ?? null,
+                articulo: String(linea.articulo ?? '').trim(),
+                descripcion,
+                cantidad: 0,
+                medida: String(linea.medida ?? linea.unidad ?? '').trim(),
+                precio_unitario: round2(linea.precio_unitario ?? linea.precio ?? 0),
+                margen: round2(linea.margen ?? 0),
+                total: 0,
+            };
+
+            current.cantidad = round2(current.cantidad + round2(linea.cantidad ?? 0));
+            current.total = round2(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
+            grouped.set(signature, current);
+        });
+
+        return Array.from(grouped.values());
+    };
+
+    const mergeEditLines = (pedidoLineas) => {
+        const pedidoMap = new Map();
+        pedidoLineas.forEach((linea) => {
+            pedidoMap.set(lineSignature(linea), linea);
+        });
+
+        const merged = [];
+
+        editBaseLineas.forEach((baseLine) => {
+            const signature = lineSignature(baseLine);
+            const pedidoLine = pedidoMap.get(signature);
+            const orderedQuantity = round2(pedidoLine?.cantidad ?? baseLine.cantidad ?? 0);
+            const currentQuantity = round2(baseLine.cantidad ?? 0);
+
+            merged.push({
+                ...baseLine,
+                cantidad: currentQuantity,
+                cantidad_max: Math.max(currentQuantity, orderedQuantity),
+                selected: true,
+                locked: false,
+            });
+        });
+
+        pedidoLineas.forEach((linea) => {
+            const signature = lineSignature(linea);
+            if (merged.some((item) => lineSignature(item) === signature)) {
+                return;
+            }
+
+            merged.push({
+                ...linea,
+                cantidad: 0,
+                cantidad_max: round2(linea.cantidad ?? 0),
+                selected: false,
+                locked: true,
+            });
+        });
+
+        return merged;
+    };
+
     const setSideButtonsState = () => {
-        const hasSelection = selectedIndex >= 0 && selectedIndex < lineas.length;
+        const hasSelection = selectedIndex >= 0 && selectedIndex < lineas.length && !lineas[selectedIndex]?.locked;
 
         if (editButton) {
             editButton.disabled = !hasSelection;
@@ -243,16 +326,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 const medida = String(linea.medida ?? "").trim();
                 const totalLinea = clampNumber(linea.total);
                 const checked = linea.selected !== false;
+                const locked = linea.locked === true;
                 const maxCantidad = resolveCantidadMax(linea);
                 const qtyValue = Number.isFinite(linea.cantidad) ? linea.cantidad : 0;
+                const rowClass = locked ? 'is-locked' : (checked ? 'is-selected' : 'is-deselected');
 
                 if (pedidoMode) {
                     return `
-                        <tr data-index="${index}"${checked ? ' class="is-selected"' : ' class="is-deselected"'}>
+                        <tr data-index="${index}" class="${rowClass}">
                             <td>${String(index + 1).padStart(2, '0')}</td>
                             <td>${linea.descripcion}</td>
                             <td>
-                                <input type="number" class="albaran-line-qty" data-action="edit-cantidad" data-index="${index}" min="0" step="0.01" max="${maxCantidad}" value="${qtyValue}" ${checked ? '' : 'disabled'}>
+                                <input type="number" class="albaran-line-qty" data-action="edit-cantidad" data-index="${index}" min="0" step="0.01" max="${maxCantidad}" value="${qtyValue}" ${(checked && !locked) ? '' : 'disabled'}>
                             </td>
                             <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
                             <td>${euroFormatter.format(linea.precio_unitario)} €</td>
@@ -260,7 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
                             <td>
                                 <label class="albaran-line-check">
-                                    <input type="checkbox" class="albaran-line-check__input" data-action="toggle-selected" data-index="${index}" ${checked ? 'checked' : ''}>
+                                    <input type="checkbox" class="albaran-line-check__input" data-action="toggle-selected" data-index="${index}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}>
                                 </label>
                             </td>
                         </tr>
@@ -437,33 +522,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const rawLineas = Array.isArray(data.lineas)
                 ? data.lineas
                 : (Array.isArray(data.lista_articulos) ? data.lista_articulos : []);
+            const normalizedPedidoLineas = sumPedidoLineasBySignature(rawLineas);
 
             if (hasLineas) {
                 if (rawLineas.length > 0) {
-                    // Convert raw lineas to the internal linea shape and mark selected=true
-                    lineas = rawLineas
-                        .filter((l) => l && typeof l === 'object' && (l.descripcion || l.descripcion === 0))
-                        .map((l) => {
-                            const cantidad = round2(l.cantidad ?? 0);
-                            const cantidadMax = Math.max(cantidad, round2(l.cantidad_max ?? l.cantidad ?? 0));
-                            const precioUnitario = round2(l.precio_unitario ?? l.precio ?? 0);
-                            const margen = round2(l.margen ?? 0);
-                            const total = round2(l.total ?? (cantidad * precioUnitario * (1 + (margen / 100))));
-
-                            return {
-                                articulo_id: l.articulo_id ?? null,
-                                articulo: String(l.articulo ?? '').trim(),
-                                descripcion: String(l.descripcion ?? '').trim(),
-                                cantidad,
-                                cantidad_max: cantidadMax,
-                                medida: String(l.medida ?? l.unidad ?? '').trim(),
-                                precio_unitario: precioUnitario,
-                                margen,
-                                total,
-                                selected: true,
-                            };
-                        });
-                } else {
+                    lineas = isExistingEditForm
+                        ? mergeEditLines(normalizedPedidoLineas)
+                        : normalizedPedidoLineas.map((l) => ({
+                            ...l,
+                            cantidad_max: Math.max(round2(l.cantidad ?? 0), round2(l.cantidad_max ?? l.cantidad ?? 0)),
+                            selected: true,
+                        }));
+                } else if (!isExistingEditForm) {
                     lineas = [];
                 }
 
@@ -472,7 +542,9 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         activePedidoKey = pedidoKey;
-        lineas = [];
+        if (!isExistingEditForm) {
+            lineas = [];
+        }
         setPedidoMode(true);
 
         // Apply cliente/ot from option immediately

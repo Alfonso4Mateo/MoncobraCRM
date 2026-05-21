@@ -56,6 +56,16 @@
             </div>
         @endif
 
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-triangle-exclamation"></i>
+                {{ session('error') }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        @endif
+
         <section class="pedidos-clientes-stats">
             <article class="pedido-stat-card pedido-stat-card--blue">
                 <div class="pedido-stat-card__icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></div>
@@ -232,6 +242,22 @@
                                                 </form>
                                             </div>
                                         </div>
+
+                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+                                            <button
+                                                type="button"
+                                                class="presupuesto-action-btn presupuesto-action-btn--danger"
+                                                data-delete-pedido
+                                                data-delete-url="{{ route('pedidos-clientes.destroy', $pedido) }}"
+                                                data-pedido-numero="{{ $pedido->numero_pedido }}"
+                                                data-presupuesto-numero="{{ $pedido->ui_presupuesto_numero ?? 'Sin presupuesto' }}"
+                                                data-albaranes-count="{{ $albaranesCount }}"
+                                                aria-label="Eliminar pedido"
+                                                title="Eliminar pedido"
+                                            >
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -254,5 +280,126 @@
                 {{ $pedidos->links() }}
             </div>
         </article>
+
+        <form id="pedido-delete-form" method="POST" class="d-none">
+            @csrf
+            @method('DELETE')
+        </form>
+
+        <div class="modal fade pedido-delete-modal pedido-delete-modal--blocked" id="pedidoDeleteBlockedModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered pedido-delete-modal__dialog" role="document">
+                <div class="modal-content pedido-delete-modal__content">
+                    <div class="modal-header pedido-delete-modal__header">
+                        <div class="pedido-delete-modal__title-wrap">
+                            <span class="pedido-delete-modal__icon pedido-delete-modal__icon--blocked">
+                                <i class="fas fa-ban" aria-hidden="true"></i>
+                            </span>
+                            <div>
+                                <h5 class="modal-title">No se puede borrar el pedido</h5>
+                                <p class="pedido-delete-modal__subtitle">El pedido tiene albaranes asociados.</p>
+                            </div>
+                        </div>
+                        <button type="button" class="close pedido-delete-modal__close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body pedido-delete-modal__body">
+                        <p class="pedido-delete-modal__message mb-0" id="pedidoDeleteBlockedMessage"></p>
+                    </div>
+                    <div class="modal-footer pedido-delete-modal__footer">
+                        <button type="button" class="btn pedido-delete-modal__btn pedido-delete-modal__btn--primary" data-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade pedido-delete-modal pedido-delete-modal--confirm" id="pedidoDeleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered pedido-delete-modal__dialog" role="document">
+                <div class="modal-content pedido-delete-modal__content">
+                    <div class="modal-header pedido-delete-modal__header">
+                        <div class="pedido-delete-modal__title-wrap">
+                            <span class="pedido-delete-modal__icon pedido-delete-modal__icon--danger">
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                            </span>
+                            <div>
+                                <h5 class="modal-title">Eliminar pedido</h5>
+                                <p class="pedido-delete-modal__subtitle">Acción irreversible con reactivación del presupuesto.</p>
+                            </div>
+                        </div>
+                        <button type="button" class="close pedido-delete-modal__close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body pedido-delete-modal__body">
+                        <p id="pedidoDeleteConfirmMessage" class="pedido-delete-modal__message mb-0"></p>
+                    </div>
+                    <div class="modal-footer pedido-delete-modal__footer">
+                        <button type="button" class="btn pedido-delete-modal__btn pedido-delete-modal__btn--ghost" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn pedido-delete-modal__btn pedido-delete-modal__btn--danger" id="pedidoDeleteConfirmButton">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
+@endsection
+
+@section('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const deleteForm = document.getElementById('pedido-delete-form');
+            const confirmModal = document.getElementById('pedidoDeleteConfirmModal');
+            const blockedModal = document.getElementById('pedidoDeleteBlockedModal');
+            const confirmMessage = document.getElementById('pedidoDeleteConfirmMessage');
+            const blockedMessage = document.getElementById('pedidoDeleteBlockedMessage');
+            const confirmButton = document.getElementById('pedidoDeleteConfirmButton');
+
+            let currentDeleteUrl = '';
+
+            const showModal = (modalElement) => {
+                if (!modalElement) {
+                    return;
+                }
+
+                if (window.$ && typeof window.$(modalElement).modal === 'function') {
+                    window.$(modalElement).modal('show');
+                    return;
+                }
+
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.setAttribute('aria-modal', 'true');
+            };
+
+            document.querySelectorAll('[data-delete-pedido]').forEach((button) => {
+                button.addEventListener('click', function () {
+                    const deleteUrl = this.getAttribute('data-delete-url') || '';
+                    const pedidoNumero = this.getAttribute('data-pedido-numero') || '';
+                    const presupuestoNumero = this.getAttribute('data-presupuesto-numero') || 'Sin presupuesto';
+                    const albaranesCount = Number.parseInt(this.getAttribute('data-albaranes-count') || '0', 10);
+
+                    currentDeleteUrl = deleteUrl;
+
+                    if (albaranesCount > 0) {
+                        blockedMessage.textContent = `Este pedido tiene ${albaranesCount} albarán/es asignado/s y no podrá ser borrado.`;
+                        showModal(blockedModal);
+                        return;
+                    }
+
+                    confirmMessage.textContent = `¿Seguro que quieres borrar este pedido? El presupuesto ${presupuestoNumero} pasará a estado pendiente.`;
+                    showModal(confirmModal);
+                });
+            });
+
+            if (confirmButton) {
+                confirmButton.addEventListener('click', function () {
+                    if (!currentDeleteUrl || !deleteForm) {
+                        return;
+                    }
+
+                    deleteForm.setAttribute('action', currentDeleteUrl);
+                    deleteForm.submit();
+                });
+            }
+        });
+    </script>
 @endsection

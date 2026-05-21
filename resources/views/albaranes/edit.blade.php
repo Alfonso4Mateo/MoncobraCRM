@@ -48,6 +48,7 @@
         <form action="{{ route('albaranes.update', $albaran) }}" method="POST" class="layout-grid-form">
             @csrf
             @method('PUT')
+            <input type="hidden" name="return_to" value="{{ old('return_to', url()->previous()) }}">
 
             <div class="layout-grid">
                 <main class="main-col">

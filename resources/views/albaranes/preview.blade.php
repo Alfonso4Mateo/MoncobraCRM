@@ -89,6 +89,13 @@
     </style>
 @endsection
 
+@php
+    $pdfUrlWithPresupuesto = $pdfUrlWithPresupuesto ?? route('albaranes.pdf.file', $albaran);
+    $pdfUrlWithoutPresupuesto = $pdfUrlWithoutPresupuesto ?? route('albaranes.pdf.file', $albaran) . '?with_presupuesto=0';
+    $downloadUrlWithPresupuesto = $downloadUrlWithPresupuesto ?? route('albaranes.pdf.download', $albaran);
+    $downloadUrlWithoutPresupuesto = $downloadUrlWithoutPresupuesto ?? route('albaranes.pdf.download', $albaran) . '?with_presupuesto=0';
+@endphp
+
 @section('content_header')
     <div class="albaran-preview-toolbar">
         <div>

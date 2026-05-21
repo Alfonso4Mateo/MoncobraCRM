@@ -29,7 +29,7 @@
 
         <section class="cliente-show-head">
             <div>
-                <h1>Historial de Presupuesto: {{ $cliente->empresa_nombre }}</h1>
+                <h1>Historial del Cliente: {{ $cliente->empresa_nombre }}</h1>
                 <p>Gestión integral del flujo de pedidos y trazabilidad de fabricación.</p>
             </div>
             <div class="cliente-show-actions">
@@ -47,7 +47,7 @@
         <article class="cliente-show-card">
             <header class="cliente-show-card-head">
                 <div class="cliente-show-card-copy">
-                    <h2>Historial del cliente</h2>
+                    <h2>Selector de Historial</h2>
                     <p>Alterna entre presupuestos, pedidos y albaranes asociados al cliente seleccionado.</p>
                 </div>
 

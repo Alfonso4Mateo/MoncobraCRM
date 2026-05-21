@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PedidoController extends Controller
 {
@@ -196,7 +197,7 @@ class PedidoController extends Controller
     public function createCliente(Request $request)
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
-        $presupuestoEstadosPermitidos = ['pendiente', 'pendiente pedido'];
+        $presupuestoEstadosPermitidos = ['pendiente'];
 
         $clientes = Cliente::query()
             ->where('proyecto_id', $proyectoId)
@@ -206,6 +207,7 @@ class PedidoController extends Controller
         $presupuestos = Presupuesto::query()
             ->where('proyecto_id', $proyectoId)
             ->whereIn('estado', $presupuestoEstadosPermitidos)
+            ->whereDoesntHave('pedidoCliente')
             ->with('cliente')
             ->orderByDesc('fecha')
             ->orderByDesc('id')
@@ -241,26 +243,7 @@ class PedidoController extends Controller
             ? $presupuestoSeleccionado->lista_articulos
             : [];
 
-        $lineasIniciales = collect($lineasInicialesRaw)
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(function (array $linea) {
-                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
-                $margen = max(0, (float) ($linea['margen'] ?? 0));
-                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
-
-                return [
-                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                    'cantidad' => round($cantidad, 2),
-                    'medida' => trim((string) ($linea['medida'] ?? $linea['unidad'] ?? '')),
-                    'precio_unitario' => round($precioUnitario, 2),
-                    'margen' => round($margen, 2),
-                    'total' => round($total, 2),
-                ];
-            })
-            ->values()
-            ->all();
+        $lineasIniciales = $this->normalizePedidoLineas($lineasInicialesRaw);
 
         $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 2);
         $totalPedido = $baseImponible;
@@ -274,26 +257,7 @@ class PedidoController extends Controller
                 'titulo' => $presupuesto->titulo,
                 'ot' => $presupuesto->ot,
                 'cliente_nombre' => $presupuesto->cliente?->empresa_nombre,
-                'lineas' => collect($lineas)
-                    ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-                    ->map(function (array $linea) {
-                        $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                        $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? 0));
-                        $margen = max(0, (float) ($linea['margen'] ?? 0));
-                        $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
-
-                        return [
-                            'articulo' => trim((string) ($linea['articulo'] ?? '')),
-                            'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                            'cantidad' => round($cantidad, 2),
-                            'medida' => trim((string) ($linea['medida'] ?? $linea['unidad'] ?? '')),
-                            'precio_unitario' => round($precioUnitario, 2),
-                            'margen' => round($margen, 2),
-                            'total' => round($total, 2),
-                        ];
-                    })
-                    ->values()
-                    ->all(),
+                'lineas' => $this->normalizePedidoLineas($lineas),
             ];
         })->values()->all();
 
@@ -339,7 +303,10 @@ class PedidoController extends Controller
                 'integer',
                 Rule::exists('presupuestos', 'id')->where(function ($query) use ($proyectoId) {
                     $query->where('proyecto_id', $proyectoId)
-                        ->whereIn('estado', ['pendiente', 'pendiente pedido']);
+                        ->where('estado', 'pendiente');
+                }),
+                Rule::unique('pedidos_clientes', 'presupuesto_id')->where(function ($query) use ($proyectoId) {
+                    $query->where('proyecto_id', $proyectoId);
                 }),
             ],
             'estado' => 'nullable|string|max:30',
@@ -410,6 +377,32 @@ class PedidoController extends Controller
         $total = (float) collect($lineas)->sum('total');
 
         DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas, $correlativoActual, $manualCorrelativo) {
+            if ($presupuestoId !== null) {
+                $presupuestoBloqueado = Presupuesto::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('id', $presupuestoId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$presupuestoBloqueado) {
+                    throw ValidationException::withMessages([
+                        'presupuesto_id' => 'El presupuesto seleccionado no está disponible.',
+                    ]);
+                }
+
+                $pedidoExistente = PedidoCliente::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('presupuesto_id', $presupuestoId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($pedidoExistente) {
+                    throw ValidationException::withMessages([
+                        'presupuesto_id' => 'Este presupuesto ya tiene un pedido asignado.',
+                    ]);
+                }
+            }
+
             PedidoCliente::create([
                 'id_cliente' => $validated['id_cliente'],
                 'proyecto_id' => $proyectoId,
@@ -604,55 +597,7 @@ class PedidoController extends Controller
 
         $rawLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
 
-        $lineas = collect($rawLineas)
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(function (array $linea) use ($proyectoId) {
-                $numeroReferencia = trim((string) ($linea['articulo'] ?? ''));
-                if ($numeroReferencia === '') {
-                    return null;
-                }
-
-                $articulo = Articulo::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('numero_referencia', $numeroReferencia)
-                    ->where(function ($query) {
-                        $query->where('facturado', false)
-                            ->orWhereNull('facturado');
-                    })
-                    ->first();
-
-                if (!$articulo) {
-                    return null;
-                }
-
-                $pedidoCantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
-                $articuloCantidad = round(max(0, (float) ($articulo->cantidad ?? 0)), 2);
-                $cantidad = $pedidoCantidad > 0 ? min($pedidoCantidad, $articuloCantidad) : $articuloCantidad;
-
-                if ($cantidad <= 0) {
-                    return null;
-                }
-                $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? $linea['precio'] ?? $articulo->precio_unitario ?? 0)), 2);
-                $margen = round(max(0, (float) ($linea['margen'] ?? $articulo->margen ?? 0)), 2);
-                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? $articulo->medida ?? '')));
-                $medida = $medida !== '' ? $medida : null;
-                $descripcion = trim((string) ($linea['descripcion'] ?? $articulo->descripcion ?? ''));
-                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
-
-                return [
-                    'articulo_id' => $articulo->id,
-                    'articulo' => $numeroReferencia,
-                    'descripcion' => $descripcion,
-                    'cantidad' => $cantidad,
-                    'medida' => $medida,
-                    'precio_unitario' => $precioUnitario,
-                    'margen' => $margen,
-                    'total' => $total,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+        $lineas = $this->normalizePedidoLineas($rawLineas);
 
         return response()->json([
             'id' => $pedido->id,
@@ -660,7 +605,35 @@ class PedidoController extends Controller
             'id_cliente' => $pedido->id_cliente,
             'ot' => $pedido->ot,
             'lineas' => $lineas,
+            'lista_articulos' => $lineas,
         ]);
+    }
+
+    private function normalizePedidoLineas(array $lineas): array
+    {
+        return collect($lineas)
+            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+            ->map(function (array $linea) {
+                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
+                $margen = max(0, (float) ($linea['margen'] ?? 0));
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
+                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+
+                return [
+                    'articulo_id' => isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null,
+                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
+                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                    'cantidad' => round($cantidad, 2),
+                    'medida' => $medida,
+                    'precio_unitario' => round($precioUnitario, 2),
+                    'margen' => round($margen, 2),
+                    'total' => $total,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function albaranesCliente(PedidoCliente $pedidoCliente)
@@ -769,6 +742,55 @@ class PedidoController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    public function destroyCliente(Request $request, PedidoCliente $pedidoCliente)
+    {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        $user = $request->user();
+        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
+            abort(403);
+        }
+
+        if ((int) $pedidoCliente->proyecto_id !== (int) $proyectoId) {
+            abort(404);
+        }
+
+        $pedidoCliente->loadMissing(['presupuesto', 'albaran', 'albaranes', 'albaranesPivot']);
+
+        $albaranesVinculados = collect()
+            ->merge($pedidoCliente->albaran?->id ? collect([$pedidoCliente->albaran]) : collect())
+            ->merge($pedidoCliente->albaranes ?? collect())
+            ->merge($pedidoCliente->albaranesPivot ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $pedidoCliente->proyecto_id) === (int) $pedidoCliente->proyecto_id)
+            ->unique('id')
+            ->values();
+
+        if ($albaranesVinculados->isNotEmpty()) {
+            return back()->with('error', 'Este pedido tiene ' . $albaranesVinculados->count() . ' albarán/es asignado/s y no puede ser borrado.');
+        }
+
+        DB::transaction(function () use ($pedidoCliente) {
+            $presupuestoId = $pedidoCliente->presupuesto_id;
+
+            if ($presupuestoId) {
+                Presupuesto::query()
+                    ->where('id', $presupuestoId)
+                    ->update([
+                        'estado' => 'pendiente',
+                    ]);
+            }
+
+            $pedidoCliente->update([
+                'presupuesto_id' => null,
+                'albaran_id' => null,
+            ]);
+
+            $pedidoCliente->delete();
+        });
+
+        return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido eliminado correctamente. El presupuesto volvió a estado pendiente.');
     }
 
     private function resolveNextPedidoClienteNumber(int $proyectoId): array

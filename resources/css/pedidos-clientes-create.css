@@ -246,6 +246,14 @@ body {
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.pedido-textarea {
+    resize: none;
+    overflow: hidden;
+    min-height: 3.1rem;
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+
 .pedido-select:focus,
 .pedido-input:focus,
 .pedido-table-input:focus {

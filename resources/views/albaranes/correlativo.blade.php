@@ -2,41 +2,59 @@
 
 @section('title', 'Ajustar correlativo - Albaranes')
 
-@section('content')
-    <section class="container mt-4">
-        <h1>Ajustar número correlativo de albaranes</h1>
+@section('css')
+    @vite(['resources/css/correlativos.css'])
+@endsection
 
-        <div class="card mt-3">
-            <div class="card-body">
-                <p>Formato actual: <strong>{{ $formatoActual }}</strong></p>
-                <p>Máximo correlativo usado con este formato: <strong>{{ $max ?? '0' }}</strong></p>
-                @if($override)
-                    <p>Override actual fijado por administrador: <strong>{{ $override }}</strong></p>
-                @endif
-                <form action="{{ route('albaranes.correlativo.update') }}" method="POST">
-                    @csrf
-                    <div class="form-group">
-                        <label for="formato">Formato base</label>
-                        <input type="text" id="formato" name="formato" class="form-control" value="{{ old('formato', $formatoActual) }}" placeholder="ALB-2026-000" required>
-                        <small class="form-text text-muted">Debe terminar en ceros (ej. <strong>ALB-2026-000</strong> o <strong>ALB-2026-0000</strong> según el formato configurado).</small>
-                        @error('formato')
-                            <div class="text-danger">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="form-group mt-3">
-                        <label for="next">Siguiente número correlativo</label>
-                        <input type="number" id="next" name="next" class="form-control" min="1" value="{{ old('next', $suggested) }}" required>
-                        <small class="form-text text-muted">Vista previa con configuración actual: <strong>{{ $ejemplo }}</strong>.</small>
-                        @error('next')
-                            <div class="text-danger">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="mt-3">
-                        <a href="{{ route('albaranes.index') }}" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-primary">Fijar</button>
-                    </div>
-                </form>
+@section('content')
+    <section class="corr-page">
+        <header class="corr-hero">
+            <p class="corr-eyebrow">Ajustes avanzados</p>
+            <h1 class="corr-title">Correlativo de albaranes</h1>
+            <p class="corr-subtitle">Configura el prefijo y el siguiente número para mantener un flujo ordenado de documentos de entrega.</p>
+        </header>
+
+        <article class="corr-card">
+            <div class="corr-stats">
+                <div class="corr-stat">
+                    <span class="corr-stat__label">Formato actual</span>
+                    <p class="corr-stat__value">{{ $formatoActual }}</p>
+                </div>
+                <div class="corr-stat">
+                    <span class="corr-stat__label">Máximo usado</span>
+                    <p class="corr-stat__value">{{ $max ?? '0' }}</p>
+                </div>
+                <div class="corr-stat">
+                    <span class="corr-stat__label">Override admin</span>
+                    <p class="corr-stat__value">{{ $override ?? 'Sin override' }}</p>
+                </div>
             </div>
-        </div>
+
+            <form action="{{ route('albaranes.correlativo.update') }}" method="POST" class="corr-form" novalidate>
+                @csrf
+                <div class="corr-field">
+                    <label for="formato" class="corr-label">Formato base</label>
+                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="ALB-2026-000" required>
+                    <p class="corr-help">Debe terminar en ceros, por ejemplo <strong>ALB-2026-000</strong> o <strong>ALB-2026-0000</strong>.</p>
+                    @error('formato')
+                        <p class="corr-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="corr-field">
+                    <label for="next" class="corr-label">Siguiente número correlativo</label>
+                    <input type="number" id="next" name="next" class="corr-input" min="1" value="{{ old('next', $suggested) }}" required>
+                    <p class="corr-help">Vista previa: <strong>{{ $ejemplo }}</strong>.</p>
+                    @error('next')
+                        <p class="corr-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="corr-actions">
+                    <a href="{{ route('albaranes.index') }}" class="corr-btn corr-btn--ghost">Cancelar</a>
+                    <button type="submit" class="corr-btn corr-btn--primary">Guardar ajuste</button>
+                </div>
+            </form>
+        </article>
     </section>
 @endsection
