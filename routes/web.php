@@ -76,7 +76,9 @@ Route::middleware('auth')->group(function () {
     Route::get('albaranes/{albaran}/pdf/file', [AlbaranClienteController::class, 'streamPdf'])->name('albaranes.pdf.file');
     Route::get('albaranes/{albaran}/pdf/download', [AlbaranClienteController::class, 'downloadPdf'])->name('albaranes.pdf.download');
     Route::get('albaranes/{albaran}/preview', [AlbaranClienteController::class, 'preview'])->name('albaranes.preview');
-    Route::get('albaranes/{albaran}/editar', [AlbaranClienteController::class, 'edit'])->name('albaranes.edit');
+    Route::get('albaranes/{albaran}/editar', [AlbaranClienteController::class, 'edit'])
+        ->whereNumber('albaran')
+        ->name('albaranes.edit');
     Route::put('albaranes/{albaran}', [AlbaranClienteController::class, 'update'])->name('albaranes.update');
     Route::get('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'pantallaRoja'])->name('albaranes.pantalla-roja');
     Route::put('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'updatePantallaRoja'])->name('albaranes.pantalla-roja.update');
@@ -94,9 +96,6 @@ Route::middleware('auth')->group(function () {
     // Ajuste de correlativo de albaranes (solo admin/superadmin)
     Route::get('albaranes/correlativo/editar', [AlbaranClienteController::class, 'editCorrelativo'])->name('albaranes.correlativo.edit');
     Route::post('albaranes/correlativo', [AlbaranClienteController::class, 'updateCorrelativo'])->name('albaranes.correlativo.update');
-    // Ajuste de correlativo de pedidos de cliente (solo admin/superadmin)
-    Route::get('pedidos-clientes/correlativo/editar', [PedidoController::class, 'editCorrelativo'])->name('pedidos-clientes.correlativo.edit');
-    Route::post('pedidos-clientes/correlativo', [PedidoController::class, 'updateCorrelativo'])->name('pedidos-clientes.correlativo.update');
     Route::patch('presupuestos/{presupuesto}/estado', [PresupuestoController::class, 'updateEstado'])->name('presupuestos.estado.update');
     Route::resource('bolsa', BolsaController::class);
     Route::resource('proveedores', ProveedorController::class);

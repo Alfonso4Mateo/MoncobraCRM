@@ -29,7 +29,7 @@
         $clienteSeleccionadoId = (string) old('id_cliente', $clienteSeleccionadoId ?? '');
         $presupuestoSeleccionadoId = (string) old('presupuesto_id', $presupuestoSeleccionadoId ?? '');
         $estadoActual = (string) old('estado', 'pendiente');
-        $numeroPedido = old('numero_pedido', $numeroPedidoAuto ?? '');
+        $numeroPedido = old('numero_pedido', '');
         $fechaPedido = old('fecha_pedido', $fechaPedido ?? now()->toDateString());
         $otPedido = old('ot', $presupuestoSeleccionado?->ot ?? null);
         $referenciaManual = old('referencia_manual');
@@ -112,7 +112,7 @@
                         <span class="pedido-card__eyebrow">Datos del pedido</span>
                         <h2>Cliente, número y fecha</h2>
                     </div>
-                    <span class="pedido-pill">Autogenerado</span>
+                    <span class="pedido-pill">Manual</span>
                 </div>
 
                 <div class="pedido-form-grid pedido-form-grid--four">
@@ -131,8 +131,8 @@
 
                     <div class="pedido-field">
                         <label for="numero_pedido">Número de pedido</label>
-                        <input type="text" id="numero_pedido" name="numero_pedido" class="pedido-input" value="{{ $numeroPedido }}">
-                        <small class="pedido-help">Puedes cambiarlo manualmente. Si lo dejas vacío, se usará el siguiente correlativo automático.</small>
+                        <input type="text" id="numero_pedido" name="numero_pedido" class="pedido-input" value="{{ $numeroPedido }}" required>
+                        <small class="pedido-help">Rellénalo manualmente con el número de referencia interna que quieras guardar.</small>
                     </div>
 
                     <div class="pedido-field">
@@ -170,7 +170,7 @@
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_cantidad">Cantidad</label>
-                            <input type="number" step="0.01" min="0" id="line_cantidad" class="pedido-input" value="1">
+                            <input type="number" step="0.01" min="0" max="1000000" id="line_cantidad" class="pedido-input" value="1">
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_medida">Medida</label>
@@ -178,11 +178,11 @@
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_precio">P. unitario</label>
-                            <input type="number" step="0.01" min="0" id="line_precio" class="pedido-input" value="0">
+                            <input type="number" step="0.01" min="0" max="1000000" id="line_precio" class="pedido-input" value="0">
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_margen">Margen</label>
-                            <input type="number" step="0.01" min="0" id="line_margen" class="pedido-input" value="0">
+                            <input type="number" step="0.01" min="0" max="1000" id="line_margen" class="pedido-input" value="0">
                         </div>
                     </div>
                 </div>

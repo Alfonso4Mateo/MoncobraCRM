@@ -90,9 +90,9 @@
 @endsection
 
 @php
-    $pdfUrlWithPresupuesto = $pdfUrlWithPresupuesto ?? route('albaranes.pdf.file', $albaran);
+    $pdfUrlWithPresupuesto = $pdfUrlWithPresupuesto ?? route('albaranes.pdf.file', $albaran) . '?with_presupuesto=1';
     $pdfUrlWithoutPresupuesto = $pdfUrlWithoutPresupuesto ?? route('albaranes.pdf.file', $albaran) . '?with_presupuesto=0';
-    $downloadUrlWithPresupuesto = $downloadUrlWithPresupuesto ?? route('albaranes.pdf.download', $albaran);
+    $downloadUrlWithPresupuesto = $downloadUrlWithPresupuesto ?? route('albaranes.pdf.download', $albaran) . '?with_presupuesto=1';
     $downloadUrlWithoutPresupuesto = $downloadUrlWithoutPresupuesto ?? route('albaranes.pdf.download', $albaran) . '?with_presupuesto=0';
 @endphp
 

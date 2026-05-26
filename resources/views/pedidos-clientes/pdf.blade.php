@@ -50,7 +50,29 @@
             width: 100%;
             margin-top: 10px;
         }
-        .total-box { background: #2a6fb0; color: #fff; padding: 4px 18px; border-radius: 5px; margin-top: 4px; display: inline-block; font-size: 14px;}
+        .total-box {
+            background: #2a6fb0;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 6px;
+            margin-top: 4px;
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: center;
+            gap: 6px;
+            max-width: 100%;
+            font-size: 14px;
+            line-height: 1.2;
+        }
+        .total-box__label {
+            font-weight: 700;
+        }
+        .total-box__value {
+            font-weight: 700;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
     </style>
 </head>
 <body>
@@ -171,12 +193,10 @@
         <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td align="right">
-                     <div style="display: inline-block; text-align: right; width: 160px;">
-                         <strong style="color: #6b7b8f; font-size: 13px;">Total:</strong><br>
-                        <div class="total-box" style="display: block; text-align: center;">
-                            {{ number_format((float) $pedido->total ?? 0, 2, ',', '.') }} €
-                         </div>
-                     </div>
+                    <div class="total-box">
+                        <span class="total-box__label">Total:</span>
+                        <span class="total-box__value">{{ number_format((float) $pedido->total ?? 0, 2, ',', '.') }} €</span>
+                    </div>
                 </td>
             </tr>
         </table>

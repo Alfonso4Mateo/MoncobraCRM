@@ -105,7 +105,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_cantidad">Cantidad</label>
-                                <input type="number" id="item_cantidad" min="0" step="0.01" placeholder="1">
+                                <input type="number" id="item_cantidad" min="0" max="1000000" step="0.01" placeholder="1">
                             </div>
                             <div class="field-group">
                                 <label for="item_medida">Medida</label>
@@ -113,11 +113,11 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_precio_unitario">Precio unitario</label>
-                                <input type="number" id="item_precio_unitario" min="0" step="0.01" placeholder="0">
+                                <input type="number" id="item_precio_unitario" min="0" max="1000000" step="0.01" placeholder="0">
                             </div>
                             <div class="field-group field-group-margen">
                                 <label for="item_margen">Margen (%)</label>
-                                <input type="number" id="item_margen" min="0" step="0.01" placeholder="0">
+                                <input type="number" id="item_margen" min="0" max="1000" step="0.01" placeholder="0">
                             </div>
                         </div>
 
@@ -207,11 +207,31 @@
                 maximumFractionDigits: 2,
             });
 
+            const MAX_CANTIDAD = 1000000;
+            const MAX_PRECIO = 1000000;
+            const MAX_MARGEN = 1000;
+
             const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
             const safeNumber = (value) => {
                 const numeric = Number.parseFloat(String(value).replace(',', '.'));
                 return Number.isFinite(numeric) ? numeric : 0;
+            };
+
+            const validateLineValues = (cantidad, precioUnitario, margen) => {
+                if (cantidad > MAX_CANTIDAD) {
+                    window.alert(`La cantidad no puede superar ${MAX_CANTIDAD}.`);
+                    return false;
+                }
+                if (precioUnitario > MAX_PRECIO) {
+                    window.alert(`El precio unitario no puede superar ${MAX_PRECIO}.`);
+                    return false;
+                }
+                if (margen > MAX_MARGEN) {
+                    window.alert(`El margen no puede superar ${MAX_MARGEN}%.`);
+                    return false;
+                }
+                return true;
             };
 
             const parseItems = () => {
@@ -359,6 +379,10 @@
 
                 if (!descripcion || cantidad <= 0) {
                     window.alert('Complete al menos la descripción y una cantidad mayor que cero.');
+                    return;
+                }
+
+                if (!validateLineValues(cantidad, precioUnitario, margen)) {
                     return;
                 }
 

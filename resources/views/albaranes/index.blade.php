@@ -33,12 +33,6 @@
 
         <header class="albaranes-toolbar">
             <div class="albaranes-toolbar-actions">
-                <button type="button" class="toolbar-icon-btn" aria-label="Notificaciones">
-                    <i class="fas fa-bell"></i>
-                </button>
-                <button type="button" class="toolbar-icon-btn" aria-label="Configuración">
-                    <i class="fas fa-cog"></i>
-                </button>
                 @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
                     <a href="{{ route('albaranes.correlativo.edit') }}" class="toolbar-main-btn toolbar-main-btn--muted" title="Ajustar correlativo de albaranes">
                         Ajustar correlativo
@@ -112,7 +106,7 @@
                     <thead>
                         <tr>
                             <th>Nº Albarán</th>
-                            <th>Nº Documento</th>
+                            <th>Nº Presupuesto</th>
                             <th>OT Asociada</th>
                             <th>Fecha Entrega</th>
                             <th>Cliente</th>
@@ -138,7 +132,15 @@
                                         {{ $albaran->numero }}
                                     </a>
                                 </td>
-                                <td>{{ $albaran->numero ?: '-' }}</td>
+                                <td>
+                                    @if (!empty($albaran->ui_presupuesto_id) && !empty($albaran->ui_presupuesto_numero))
+                                        <a href="{{ route('presupuestos.show', $albaran->ui_presupuesto_id) }}" class="code-link">
+                                            {{ $albaran->ui_presupuesto_numero }}
+                                        </a>
+                                    @else
+                                        <span class="muted">-</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="ot-pill">{{ $albaran->ot ?: 'Sin OT' }}</span>
                                 </td>

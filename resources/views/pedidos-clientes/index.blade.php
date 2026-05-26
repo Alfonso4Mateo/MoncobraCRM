@@ -14,13 +14,6 @@
         </div>
 
         <div class="pedidos-clientes-header__actions">
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
-                <a href="{{ route('pedidos-clientes.correlativo.edit') }}" class="pedidos-clientes-create-btn pedidos-clientes-create-btn--muted">
-                    <i class="fas fa-hashtag" aria-hidden="true"></i>
-                    Ajustar correlativo
-                </a>
-            @endif
-
             <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 Nuevo Pedido
@@ -144,7 +137,7 @@
                 <table class="table pedidos-clientes-table">
                     <thead>
                         <tr>
-                            <th>Nº Pedido</th>
+                            <th>Pedido-cliente</th>
                             <th>Presupuesto origen</th>
                             <th>Cliente</th>
                             <th>OT</th>
@@ -161,7 +154,7 @@
                                 $fechaPedido = optional($pedido->fecha_pedido);
                             @endphp
                             <tr>
-                                <td data-label="Nº Pedido">
+                                <td data-label="Pedido-cliente">
                                     <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link">
                                         {{ $pedido->numero_pedido }}
                                     </a>
@@ -199,7 +192,7 @@
 
                                     <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es" aria-label="Ver albarán/es">
                                         <i class="fas fa-file-invoice" aria-hidden="true"></i>
-                                        Ver albarán/es
+                                        Ver albarán/es ({{ $albaranesCount }})
                                     </a>
                                 </td>
                                 <td data-label="Total" class="text-right">

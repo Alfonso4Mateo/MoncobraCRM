@@ -12,9 +12,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class AlbaranClienteController extends Controller
 {
+    private const MAX_LINEAS = 500;
+    private const MAX_DESCRIPCION = 500;
+    private const MAX_ARTICULO = 100;
+    private const MAX_MEDIDA = 20;
+    private const MAX_CANTIDAD = 1000000;
+    private const MAX_PRECIO = 1000000;
+    private const MAX_MARGEN = 1000;
     public function __construct()
     {
         $this->middleware('auth');
@@ -22,7 +30,7 @@ class AlbaranClienteController extends Controller
 
     public function index(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $buscar = trim((string) $request->query('buscar', ''));
         $desde = trim((string) $request->query('desde', ''));
@@ -103,8 +111,9 @@ class AlbaranClienteController extends Controller
         $pedidos = PedidoCliente::query()
             ->where('proyecto_id', $proyectoId)
             ->whereIn('numero_pedido', $albaranes->getCollection()->pluck('pedido_cliente')->filter()->map(fn ($item) => trim((string) $item))->unique())
+            ->with(['presupuesto:id,numero'])
             ->withCount('albaranes')
-            ->get(['id', 'numero_pedido'])
+            ->get(['id', 'numero_pedido', 'presupuesto_id'])
             ->keyBy(fn (PedidoCliente $pedido) => trim((string) $pedido->numero_pedido));
 
         $albaranes->getCollection()->transform(function (AlbaranCliente $albaran) use ($presupuestos, $pedidos) {
@@ -115,7 +124,12 @@ class AlbaranClienteController extends Controller
             $pedidoRelacionado = $pedidoNumero !== '' ? $pedidos->get($pedidoNumero) : null;
             $totalAlbaran = round((float) ($albaran->total ?? 0), 2);
 
-            $albaran->ui_presupuesto_id = $presupuestoRelacionado?->id;
+            $pedidoPresupuesto = $pedidoRelacionado?->presupuesto;
+
+            $albaran->ui_presupuesto_id = $pedidoPresupuesto?->id
+                ?: $presupuestoRelacionado?->id;
+            $albaran->ui_presupuesto_numero = $pedidoPresupuesto?->numero
+                ?: ($presupuestoRelacionado?->numero ?? null);
             $albaran->ui_total = $totalAlbaran > 0
                 ? $totalAlbaran
                 : ($presupuestoRelacionado ? (float) $presupuestoRelacionado->total : 0);
@@ -172,7 +186,7 @@ class AlbaranClienteController extends Controller
 
     public function create(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $numeroAlbaranAuto = $this->resolveNextAlbaranClienteNumber($proyectoId)['numero'];
         $pedidosClientes = PedidoCliente::query()
@@ -194,7 +208,7 @@ class AlbaranClienteController extends Controller
 
     public function store(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
             'numero' => [
@@ -222,7 +236,9 @@ class AlbaranClienteController extends Controller
         $manualCorrelativo = $this->extractCorrelativoFromNumero($correlativoActual['formato'], $numeroFinal);
         $validated['numero'] = $numeroFinal;
 
-        $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]');
+        $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
+        $this->validateLineasPayload($lineasRaw);
+        $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
 
         $validated['proyecto_id'] = $proyectoId;
         $validated['documento'] = 'Albarán';
@@ -318,8 +334,10 @@ class AlbaranClienteController extends Controller
 
         return view('albaranes.preview', [
             'albaran' => $albaran,
-            'pdfUrl' => route('albaranes.pdf.file', $albaran),
-            'downloadUrl' => route('albaranes.pdf.download', $albaran),
+            'pdfUrlWithPresupuesto' => route('albaranes.pdf.file', $albaran) . '?with_presupuesto=1',
+            'pdfUrlWithoutPresupuesto' => route('albaranes.pdf.file', $albaran) . '?with_presupuesto=0',
+            'downloadUrlWithPresupuesto' => route('albaranes.pdf.download', $albaran) . '?with_presupuesto=1',
+            'downloadUrlWithoutPresupuesto' => route('albaranes.pdf.download', $albaran) . '?with_presupuesto=0',
         ]);
     }
 
@@ -449,11 +467,13 @@ class AlbaranClienteController extends Controller
             abort(403);
         }
 
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
             return 'ALB-' . now()->format('Y') . '-000';
         });
-        $max = $this->maxCorrelativoForPrefix($proyectoId, $formatoActual);
+        $statsFormato = $this->correlativoStatsForPrefix($proyectoId, $formatoActual);
+        $max = $statsFormato['max'];
+        $generadosConFormatoActual = $statsFormato['count'];
         $override = DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', 'albaranes_next_correlativo')
@@ -462,7 +482,7 @@ class AlbaranClienteController extends Controller
         $suggested = max(($max ?? 0) + 1, (int) ($override ?? 0));
         $ejemplo = $this->formatCorrelativoNumero($formatoActual, $suggested);
 
-        return view('albaranes.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo'));
+        return view('albaranes.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo', 'generadosConFormatoActual'));
     }
 
     public function updateCorrelativo(Request $request)
@@ -472,7 +492,7 @@ class AlbaranClienteController extends Controller
             abort(403);
         }
 
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
             'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0+$/'],
@@ -525,7 +545,9 @@ class AlbaranClienteController extends Controller
             'return_to' => 'nullable|string|max:2048',
         ]);
 
-        $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]');
+        $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
+        $this->validateLineasPayload($lineasRaw);
+        $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $total = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
 
         $albaran->update([
@@ -788,8 +810,18 @@ class AlbaranClienteController extends Controller
 
     private function maxCorrelativoForPrefix(int $proyectoId, string $formato): int
     {
+        return $this->correlativoStatsForPrefix($proyectoId, $formato)['max'];
+    }
+
+    /**
+     * Devuelve estadísticas del correlativo para el formato dado.
+     * - max: máximo índice numérico encontrado
+     * - count: cuántos albaranes encajan con el formato actual (prefijo + dígitos)
+     */
+    private function correlativoStatsForPrefix(int $proyectoId, string $formato): array
+    {
         if (preg_match('/^(.*?)(0+)$/', $formato, $matches) !== 1) {
-            return 0;
+            return ['max' => 0, 'count' => 0];
         }
 
         $prefix = $matches[1];
@@ -797,17 +829,25 @@ class AlbaranClienteController extends Controller
         $pattern = '/^' . preg_quote($prefix, '/') . '(\d{' . $digits . '})$/';
 
         $max = 0;
-        foreach (AlbaranCliente::query()->where('proyecto_id', $proyectoId)->pluck('numero') as $numero) {
+        $count = 0;
+
+        $numeros = AlbaranCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero', 'like', $prefix . '%')
+            ->pluck('numero');
+
+        foreach ($numeros as $numero) {
             if (!is_string($numero)) {
                 continue;
             }
 
             if (preg_match($pattern, $numero, $match) === 1) {
+                $count++;
                 $max = max($max, (int) $match[1]);
             }
         }
 
-        return $max;
+        return ['max' => $max, 'count' => $count];
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
@@ -830,9 +870,9 @@ class AlbaranClienteController extends Controller
         return strtolower((string) ($albaran->estado ?? '')) === 'entregado';
     }
 
-    private function normalizeLineas(?string $lineasJson): array
+    private function normalizeLineas(?string $lineasJson, ?array $decodedLineas = null): array
     {
-        $decoded = json_decode((string) ($lineasJson ?? '[]'), true);
+        $decoded = $decodedLineas ?? json_decode((string) ($lineasJson ?? '[]'), true);
         if (!is_array($decoded)) {
             return [];
         }
@@ -876,6 +916,34 @@ class AlbaranClienteController extends Controller
         }
 
         return $lineas;
+    }
+
+    private function decodeLineasJson(?string $lineasJson): array
+    {
+        $decoded = json_decode((string) ($lineasJson ?? '[]'), true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return collect($decoded)
+            ->filter(fn ($linea) => is_array($linea) && trim((string) ($linea['descripcion'] ?? '')) !== '')
+            ->values()
+            ->all();
+    }
+
+    private function validateLineasPayload(array $lineas): void
+    {
+        Validator::make(['lineas' => $lineas], [
+            'lineas' => ['array', 'max:' . self::MAX_LINEAS],
+            'lineas.*.descripcion' => ['required', 'string', 'max:' . self::MAX_DESCRIPCION],
+            'lineas.*.articulo' => ['nullable', 'string', 'max:' . self::MAX_ARTICULO],
+            'lineas.*.medida' => ['nullable', 'string', 'max:' . self::MAX_MEDIDA],
+            'lineas.*.unidad' => ['nullable', 'string', 'max:' . self::MAX_MEDIDA],
+            'lineas.*.cantidad' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_CANTIDAD],
+            'lineas.*.precio_unitario' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PRECIO],
+            'lineas.*.precio' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PRECIO],
+            'lineas.*.margen' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_MARGEN],
+        ])->validate();
     }
 
     private function resolvePdfPath(AlbaranCliente $albaran): ?string

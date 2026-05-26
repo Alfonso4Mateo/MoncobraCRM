@@ -112,7 +112,7 @@
 
                     <div class="field-group">
                         <label for="fecha">Fecha</label>
-                        <input type="date" id="fecha" name="fecha" value="{{ old('fecha') }}" required>
+                        <input type="date" id="fecha" name="fecha" value="{{ old('fecha', now()->format('Y-m-d')) }}" required>
                     </div>
 
                     <div class="field-group">
@@ -184,7 +184,7 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_cantidad">Cantidad</label>
-                            <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
+                            <input type="number" id="linea_cantidad" value="1" min="0" max="1000000" step="0.01">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_medida">Medida</label>
@@ -192,11 +192,11 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_precio">P. unitario</label>
-                            <input type="number" id="linea_precio" value="0" min="0" step="0.01">
+                            <input type="number" id="linea_precio" value="0" min="0" max="1000000" step="0.01">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_margen">Margen (%)</label>
-                            <input type="number" id="linea_margen" value="0" min="0" step="0.01">
+                            <input type="number" id="linea_margen" value="0" min="0" max="1000" step="0.01">
                         </div>
                         <button type="button" class="btn-add-linea" id="btnAddLinea">
                             <i class="fas fa-plus"></i>

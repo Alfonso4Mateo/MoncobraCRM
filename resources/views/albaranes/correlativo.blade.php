@@ -25,6 +25,10 @@
                     <p class="corr-stat__value">{{ $max ?? '0' }}</p>
                 </div>
                 <div class="corr-stat">
+                    <span class="corr-stat__label">Generados con este formato</span>
+                    <p class="corr-stat__value">{{ $generadosConFormatoActual ?? '0' }}</p>
+                </div>
+                <div class="corr-stat">
                     <span class="corr-stat__label">Override admin</span>
                     <p class="corr-stat__value">{{ $override ?? 'Sin override' }}</p>
                 </div>

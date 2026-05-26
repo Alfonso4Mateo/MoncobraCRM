@@ -203,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 cantidad: 0,
                 cantidad_max: round2(linea.cantidad ?? 0),
                 selected: false,
-                locked: true,
+                locked: false,
             });
         });
 

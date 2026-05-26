@@ -10,9 +10,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class PresupuestoController extends Controller
 {
+    private const MAX_LINEAS = 500;
+    private const MAX_DESCRIPCION = 500;
+    private const MAX_ARTICULO = 100;
+    private const MAX_MEDIDA = 20;
+    private const MAX_CANTIDAD = 1000000;
+    private const MAX_PRECIO = 10000000;
+    private const MAX_MARGEN = 100;
     public function __construct()
     {
         $this->middleware('auth');
@@ -20,7 +28,7 @@ class PresupuestoController extends Controller
 
     public function index(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $search = trim((string) $request->input('search', ''));
         $fechaDesde = trim((string) $request->input('fecha_desde', ''));
         $fechaHasta = trim((string) $request->input('fecha_hasta', ''));
@@ -80,7 +88,7 @@ class PresupuestoController extends Controller
 
     public function create(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId)['numero'];
 
@@ -98,7 +106,7 @@ class PresupuestoController extends Controller
 
     public function store(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $redirectClienteId = (int) $request->input('redirect_cliente_id', 0);
         $modo = (string) $request->input('modo', 'nuevo');
@@ -146,8 +154,15 @@ class PresupuestoController extends Controller
         }
 
         $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
-        $validated['lista_articulos'] = collect(is_array($listaArticulos) ? $listaArticulos : [])
+        $listaArticulos = is_array($listaArticulos) ? $listaArticulos : [];
+        $lineasFiltradas = collect($listaArticulos)
             ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
+            ->values()
+            ->all();
+
+        $this->validateLineasPayload($lineasFiltradas);
+
+        $validated['lista_articulos'] = collect($lineasFiltradas)
             ->map(function (array $item) {
                 $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
                 $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? ($item['precio'] ?? 0)));
@@ -282,7 +297,7 @@ class PresupuestoController extends Controller
 
     public function edit(Request $request, Presupuesto $presupuesto)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
             abort(404);
@@ -311,7 +326,7 @@ class PresupuestoController extends Controller
             abort(403);
         }
 
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId);
         $max = $this->maxCorrelativoForFormato($proyectoId, $formatoActual);
         $override = DB::table('contadores')
@@ -332,7 +347,7 @@ class PresupuestoController extends Controller
             abort(403);
         }
 
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
             'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0000$/'],
@@ -388,8 +403,15 @@ class PresupuestoController extends Controller
         ]);
 
         $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
-        $articulosNormalizados = collect(is_array($listaArticulos) ? $listaArticulos : [])
+        $listaArticulos = is_array($listaArticulos) ? $listaArticulos : [];
+        $lineasFiltradas = collect($listaArticulos)
             ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
+            ->values()
+            ->all();
+
+        $this->validateLineasPayload($lineasFiltradas);
+
+        $articulosNormalizados = collect($lineasFiltradas)
             ->map(function (array $item) {
                 $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
                 $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? 0));
@@ -516,6 +538,21 @@ class PresupuestoController extends Controller
         }
 
         return $formato;
+    }
+
+    private function validateLineasPayload(array $lineas): void
+    {
+        Validator::make(['lineas' => $lineas], [
+            'lineas' => ['array', 'max:' . self::MAX_LINEAS],
+            'lineas.*.descripcion' => ['required', 'string', 'max:' . self::MAX_DESCRIPCION],
+            'lineas.*.articulo' => ['nullable', 'string', 'max:' . self::MAX_ARTICULO],
+            'lineas.*.medida' => ['nullable', 'string', 'max:' . self::MAX_MEDIDA],
+            'lineas.*.unidad' => ['nullable', 'string', 'max:' . self::MAX_MEDIDA],
+            'lineas.*.cantidad' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_CANTIDAD],
+            'lineas.*.precio_unitario' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PRECIO],
+            'lineas.*.precio' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PRECIO],
+            'lineas.*.margen' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_MARGEN],
+        ])->validate();
     }
 
     private function maxCorrelativoForFormato(int $proyectoId, string $formato): int
