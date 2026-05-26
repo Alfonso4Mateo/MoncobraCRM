@@ -75,7 +75,15 @@
     @endif
 
     @php
-        $pedidosClientes = $presupuesto->pedidosClientes ?? collect();
+        $pedidosClientes = $presupuesto->pedidosClientes;
+
+        if ($pedidosClientes instanceof \Illuminate\Support\Collection) {
+            $pedidosClientes = $pedidosClientes;
+        } elseif ($pedidosClientes) {
+            $pedidosClientes = collect([$pedidosClientes]);
+        } else {
+            $pedidosClientes = collect();
+        }
     @endphp
 
     <section class="presupuesto-detail-shell">

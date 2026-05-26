@@ -286,7 +286,7 @@ class UserController extends Controller
             return true;
         });
 
-        // Construir historicoSalidas con datos filtrados
+        //  historicoSalidas con datos filtrados
         $historicoSalidas = array_map(function ($item) {
             return (object) [
                 'fecha' => $item['fecha']->format('d M Y'),
@@ -299,10 +299,10 @@ class UserController extends Controller
         }, array_slice($datosFiltrados, 0, 8));
 
         $tallas = [
-            ['label' => 'Camiseta', 'value' => $user->camiseta ?: '—', 'icon' => 'fa-shirt'],
-            ['label' => 'Chaqueta', 'value' => $user->chaqueta ?: '—', 'icon' => 'fa-jacket'],
-            ['label' => 'Sudadera', 'value' => $user->sudadera ?: '—', 'icon' => 'fa-hoodie'],
-            ['label' => 'Pantalón', 'value' => $user->pantalon ?: '—', 'icon' => 'fa-person'],
+            ['label' => 'Camiseta', 'value' => $user->camiseta ?: '—', 'icon' => 'fa-tshirt'],
+            ['label' => 'Chaquetón', 'value' => $user->chaqueta ?: '—', 'icon' => 'fa-vest'],
+            ['label' => 'Sudadera', 'value' => $user->sudadera ?: '—', 'icon' => 'fa-shirt'],
+            ['label' => 'Pantalón', 'value' => $user->pantalon ?: '—', 'icon' => 'fa-bridge'],
             ['label' => 'Calzado', 'value' => $user->calzado ?: '—', 'icon' => 'fa-shoe-prints'],
             ['label' => 'Casco', 'value' => $user->casco ?: '—', 'icon' => 'fa-hard-hat'],
             ['label' => 'Guantes', 'value' => $user->guantes ?: '—', 'icon' => 'fa-hand-paper'],
@@ -312,7 +312,7 @@ class UserController extends Controller
     }
 
     /**
-     * Mostrar formulario de edición de ficha de personal (pantalla dedicada)
+     * formulario de edición de ficha de personal 
      */
     public function personalEdit(User $user)
     {

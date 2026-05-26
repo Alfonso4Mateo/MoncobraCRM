@@ -257,7 +257,11 @@
                                         <td data-label="Cantidad"><strong class="profile-quantity">{{ $registro->cantidad }}</strong></td>
                                         <td data-label="OT relacionada"><span class="profile-chip profile-chip--muted">{{ $registro->ot }}</span></td>
                                         <td data-label="Estado"><span class="{{ $registro->estado_clase }}">{{ $registro->estado }}</span></td>
-                                        <td data-label="Acción"><a href="#" class="profile-icon-link" title="Ver detalle"><i class="far fa-eye"></i></a></td>
+                                        <td data-label="Acción">
+                                            <a href="{{ isset($registro->salida_id) ? route('inventario.salida.documento', $registro->salida_id) : '#' }}" class="profile-icon-link" title="Ver documento de salida">
+                                                <i class="far fa-eye"></i>
+                                            </a>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>

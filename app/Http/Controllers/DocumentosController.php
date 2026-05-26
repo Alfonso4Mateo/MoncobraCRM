@@ -179,7 +179,7 @@ class DocumentosController extends Controller
                         ['label' => 'OT', 'value' => $presupuesto->ot ?: '—'],
                         ['label' => 'Documento', 'value' => $presupuesto->documento ?: '—'],
                         ['label' => 'Numero', 'value' => $presupuesto->numero ?: '—'],
-                        ['label' => 'Pedido', 'value' => $presupuesto->pedidosClientes->isNotEmpty() ? $presupuesto->pedidosClientes->pluck('numero_pedido')->filter()->implode(', ') : '—'],
+                        ['label' => 'Pedido', 'value' => $presupuesto->pedidosClientes?->numero_pedido ?: '—'],
                     ],
                     'lineas' => $this->lineasFromArray($presupuesto->lista_articulos),
                     'acciones' => $this->accionesPresupuesto($presupuesto),
@@ -469,7 +469,7 @@ class DocumentosController extends Controller
     private function accionesPresupuesto(Presupuesto $presupuesto): array
     {
         return [
-            ['label' => 'Ver documento', 'icon' => 'fa-file-pdf', 'url' => route('presupuestos.preview', $presupuesto)],
+            ['label' => 'Ver documento', 'icon' => 'fa-file-pdf', 'url' => route('presupuestos.pdf', $presupuesto)],
             ['label' => 'Ver detalle', 'icon' => 'fa-eye', 'url' => route('presupuestos.show', $presupuesto)],
             ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('presupuestos.edit', $presupuesto)],
         ];

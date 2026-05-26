@@ -158,7 +158,7 @@
                                         <span class="muted">-</span>
                                     @endif
                                 </td>
-                                <td>{{ number_format($total, 0, ',', '.') }}€</td>
+                                <td>{{ number_format($total, 2, ',', '.') }}€</td>
                                 <td>
                                     <span class="estado-chip estado-{{ $estado }}">{{ strtoupper($estado) }}</span>
                                 </td>

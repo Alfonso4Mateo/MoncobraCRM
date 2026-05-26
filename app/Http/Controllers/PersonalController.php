@@ -178,6 +178,7 @@ class PersonalController extends Controller
                 $estadoNormalizado = mb_strtolower($estadoRaw);
 
                 return (object) [
+                    'salida_id' => $salida->id,
                     'fecha' => optional($salida->fecha)->format('d M Y'),
                     'articulo' => $item['descripcion'],
                     'cantidad' => $item['cantidad'],
@@ -191,10 +192,10 @@ class PersonalController extends Controller
         })->take(8)->values()->all();
 
         $tallas = [
-            ['label' => 'Camiseta', 'value' => $personal->camiseta ?: '—', 'icon' => 'fa-shirt'],
-            ['label' => 'Chaqueta', 'value' => $personal->chaqueta ?: '—', 'icon' => 'fa-jacket'],
-            ['label' => 'Sudadera', 'value' => $personal->sudadera ?: '—', 'icon' => 'fa-hoodie'],
-            ['label' => 'Pantalón', 'value' => $personal->pantalon ?: '—', 'icon' => 'fa-person'],
+            ['label' => 'Camiseta', 'value' => $personal->camiseta ?: '—', 'icon' => 'fa-tshirt'],
+            ['label' => 'Sudadera', 'value' => $personal->sudadera ?: '—', 'icon' => 'fa-tshirt'],
+            ['label' => 'Chaquetón', 'value' => $personal->chaqueta ?: '—', 'icon' => 'fa-vest'],
+            ['label' => 'Pantalón', 'value' => $personal->pantalon ?: '—', 'icon' => 'fa-bridge'],
             ['label' => 'Calzado', 'value' => $personal->calzado ?: '—', 'icon' => 'fa-shoe-prints'],
             ['label' => 'Casco', 'value' => $personal->casco ?: '—', 'icon' => 'fa-hard-hat'],
             ['label' => 'Guantes', 'value' => $personal->guantes ?: '—', 'icon' => 'fa-hand-paper'],
