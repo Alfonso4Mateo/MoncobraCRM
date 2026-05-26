@@ -12,6 +12,7 @@
 @section('content')
     @php
         $delegacion = $documento['delegacion'] ?? '';
+        $delegacion = $delegacion !== '' ? $delegacion : ($delegacionPrefill ?? '');
         $fecha = $documento['fecha'] ?? ($salida->fecha?->format('d/m/Y') ?? '');
         $trabajador = $documento['trabajador'] ?? ($salida->solicitante ?? '');
         $ficha = $documento['ficha'] ?? '';
@@ -36,7 +37,7 @@
         <article class="pdf-sheet">
             <div class="pdf-sheet__top">
                 <div class="pdf-logo">
-                    <img src="{{ asset('images/logo_h100.png') }}" alt="Moncobra">
+                    <img src="{{ asset('images/moncobra-1l.png') }}?v={{ @filemtime(public_path('images/moncobra-1l.png')) }}" alt="Moncobra">
                 </div>
                 <div class="pdf-title">
                     <span>EQUIPO DE PROTECCION PERSONAL (EPI'S)</span>

@@ -695,14 +695,21 @@ body.pdf-modal-open {
     margin-top: 0.25rem;
 }
 
+.sheet {
+    width: 100%;
+    box-sizing: border-box;
+}
 .pdf-sheet {
     background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
     border: 1px solid #2a3646;
     border-radius: 0.35rem;
-    padding: 1.1rem 1rem 1.2rem;
     color: #1d2f46;
     font-family: 'Manrope', 'Segoe UI', sans-serif;
     box-shadow: 0 20px 45px -35px rgba(10, 24, 44, 0.7);
+    width: auto; 
+    margin-right: 2px; 
+    padding: 1.1rem 1rem 1.2rem;
+    box-sizing: border-box;
 }
 
 .pdf-sheet__top {
@@ -714,9 +721,14 @@ body.pdf-modal-open {
     border-bottom: 1px solid #2a3646;
 }
 
+.pdf-logo {
+    min-width: 0; /* Obligatorio para que no rompa el Grid */
+}
+
 .pdf-logo img {
-    max-width: 100%;
-    max-height: 34px;
+    max-width: 140px !important; /* Tope estricto de ancho */
+    height: auto !important;
+    max-height: 34px !important;
     object-fit: contain;
 }
 
@@ -785,6 +797,8 @@ body.pdf-modal-open {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.68rem;
+    table-layout: fixed; 
+    word-wrap: break-word;
 }
 
 .pdf-table th,
@@ -942,6 +956,20 @@ body.pdf-modal-open {
         padding: 0;
     }
 
+    /* 🚀 EL TRUCO DEFINITIVO: RESETEAR ADMINLTE 🚀 */
+    /* Anulamos los márgenes de la barra lateral para que el PDF empiece en el borde real */
+    .wrapper, 
+    .content-wrapper, 
+    .main-header, 
+    .main-sidebar, 
+    .main-footer {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        position: static !important;
+        transform: none !important;
+    }
+
     .pdf-page,
     .pdf-modal,
     .pdf-modal__panel,
@@ -965,20 +993,24 @@ body.pdf-modal-open {
     }
 
     .pdf-modal {
-        position: fixed;
-        inset: 0;
+        position: absolute; 
+        top: 0;
+        left: 0;
         display: block;
         width: 100%;
-        height: 100%;
+        height: auto; 
         padding: 0;
+        margin: 0;
     }
 
     .pdf-page {
-        position: fixed;
-        inset: 0;
+        position: absolute; 
+        top: 0;
+        left: 0;
         padding: 0;
+        margin: 0;
         width: 100%;
-        height: 100%;
+        height: auto;
     }
 
     .pdf-modal__backdrop,
@@ -1007,9 +1039,14 @@ body.pdf-modal-open {
 
     .pdf-sheet {
         box-shadow: none;
-        border: 1px solid #2a3646;
-        margin: 0;
-        width: 100%;
+        border: 1px solid #2a3646 !important;
+        
+        /* El 98% centrado ahora funcionará perfecto al no tener el estorbo de AdminLTE */
+        width: 98% !important;
+        max-width: 98% !important;
+        margin: 0 auto !important; 
+        
+        padding: 1.1rem 1rem 1.2rem;
         height: auto;
         min-height: calc(297mm - 12mm);
         box-sizing: border-box;
@@ -1020,7 +1057,7 @@ body.pdf-modal-open {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
-
+    
     .pdf-legal {
         margin-top: auto;
     }

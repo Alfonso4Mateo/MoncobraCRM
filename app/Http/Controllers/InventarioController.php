@@ -7,6 +7,7 @@ use App\Models\Clase;
 use App\Models\EntradaStock;
 use App\Models\Inventario;
 use App\Models\Personal;
+use App\Models\Proyecto;
 use App\Models\SalidaStock;
 use App\Models\TrasladoStock;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -283,6 +284,7 @@ class InventarioController extends Controller
     public function createSalida()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
+        $delegacionPrefill = Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '';
         $solicitantePrefill = null;
         $personalId = (int) request()->query('personal_id', 0);
 
@@ -323,7 +325,7 @@ class InventarioController extends Controller
             ->unique()
             ->values();
 
-        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill'));
+        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill', 'delegacionPrefill'));
     }
 
     public function storeSalida(Request $request)
@@ -379,7 +381,7 @@ class InventarioController extends Controller
 
         $documentoMeta = [
             'nombre' => 'EPI_' . $numeroSalida . '.pdf',
-            'delegacion' => trim((string) $request->input('pdf_delegacion', '')),
+            'delegacion' => trim((string) $request->input('pdf_delegacion', Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '')),
             'fecha' => trim((string) $request->input('pdf_fecha', now()->format('d/m/Y'))),
             'trabajador' => trim((string) $request->input('pdf_trabajador', $validated['solicitante'] ?? '')),
             'ficha' => trim((string) $request->input('pdf_ficha', '')),
@@ -501,6 +503,7 @@ class InventarioController extends Controller
 
         $documento = (array) ($salida->documento_meta ?? []);
         $lineasDocumento = $documento['lineas'] ?? [];
+        $delegacionPrefill = trim((string) ($documento['delegacion'] ?? (Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '')));
 
         if (empty($lineasDocumento) && is_array($salida->items)) {
             $lineasDocumento = collect($salida->items)
@@ -521,6 +524,7 @@ class InventarioController extends Controller
             'salida' => $salida,
             'documento' => $documento,
             'lineasDocumento' => $lineasDocumento,
+            'delegacionPrefill' => $delegacionPrefill,
         ]);
     }
 
@@ -759,6 +763,7 @@ class InventarioController extends Controller
             'atributos_variante.*' => 'nullable|array',
             'atributos_variante.*.*' => 'nullable|string|max:255',
             'variantes' => 'nullable|array',
+            'variantes.*.activo' => 'nullable|boolean',
             'variantes.*.stock_actual' => 'nullable|integer|min:0',
             'variantes.*.atributos' => 'nullable|array',
             'variantes.*.atributos.*' => 'nullable|string|max:255',
@@ -806,11 +811,17 @@ class InventarioController extends Controller
             );
         }
 
+        $claseIdParaItems = !empty($validated['inventario_variante_id'])
+            ? (int) ($variante->clase_id ?? 0)
+            : ($validated['clase_id'] ?? null);
+
         $variante->update([
             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? $variante->nombre,
             'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? $variante->descripcion,
             'referencia_proveedor' => $validated['referencia_proveedor'],
-            'clase_id' => $validated['clase_id'],
+            'clase_id' => !empty($validated['inventario_variante_id'])
+                ? $variante->clase_id
+                : $validated['clase_id'],
             'ubicacion' => $validated['ubicacion'],
             'almacen' => $validated['almacen'],
             'stock_minimo' => $validated['stock_minimo'] ?? 0,
@@ -832,7 +843,7 @@ class InventarioController extends Controller
                         'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                         'descripcion' => $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos),
                         'referencia_proveedor' => $validated['referencia_proveedor'],
-                        'clase_id' => $validated['clase_id'],
+                        'clase_id' => $claseIdParaItems,
                         'ubicacion' => $validated['ubicacion'],
                         'almacen' => $validated['almacen'],
                         'stock_actual' => $stockActual,
@@ -855,7 +866,7 @@ class InventarioController extends Controller
             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
             'descripcion' => $validated['descripcion'],
             'referencia_proveedor' => $validated['referencia_proveedor'],
-            'clase_id' => $validated['clase_id'],
+            'clase_id' => $claseIdParaItems,
             'ubicacion' => $validated['ubicacion'],
             'almacen' => $validated['almacen'],
             'stock_actual' => (int) ($validated['stock_actual'] ?? 0),
@@ -1024,6 +1035,12 @@ class InventarioController extends Controller
 
         foreach ($value as $row) {
             if (!is_array($row)) {
+                continue;
+            }
+
+            $activo = filter_var($row['activo'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+            if ($activo === false) {
                 continue;
             }
 

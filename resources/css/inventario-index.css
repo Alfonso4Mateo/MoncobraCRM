@@ -406,11 +406,11 @@
 }
 
 .inventory-row-critico {
-    background: linear-gradient(90deg, rgba(255, 234, 234, 0.7), rgba(255, 255, 255, 0));
+    background: #ffecec;
 }
 
 .inventory-row-bajo {
-    background: linear-gradient(90deg, rgba(255, 244, 229, 0.62), rgba(255, 255, 255, 0));
+    background: #fff4e4;
 }
 
 .inventory-code {
@@ -473,6 +473,10 @@
 .inventory-stock-main {
     color: #163a63;
     font-size: 1rem;
+}
+
+.inventory-stock-bajo {
+    color: #b77b17;
 }
 
 .inventory-stock-critico {

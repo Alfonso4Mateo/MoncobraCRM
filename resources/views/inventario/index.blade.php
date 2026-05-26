@@ -20,6 +20,18 @@
             background: #f8fafc;
         }
 
+        .inventory-child-row.inventory-row-critico td {
+            background: #ffecec !important;
+        }
+
+        .inventory-child-row.inventory-row-bajo td {
+            background: #fff4e4 !important;
+        }
+
+        .inventory-child-row.inventory-row-optimo td {
+            background: #f8fafc !important;
+        }
+
         .inventory-child-marker {
             color: #94a3b8;
             font-weight: 700;
@@ -404,7 +416,7 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="inventory-stock inventory-stock-main">{{ number_format($stockActual, 0, ',', '.') }}</span>
+                                                <span class="inventory-stock inventory-stock-{{ $estado === 'bajo' ? 'bajo' : ($estado === 'critico' ? 'critico' : 'main') }}">{{ number_format($stockActual, 0, ',', '.') }}</span>
                                             </td>
                                             <td>
                                                 <span class="inventory-stock">{{ number_format($stockMinimo, 0, ',', '.') }}</span>

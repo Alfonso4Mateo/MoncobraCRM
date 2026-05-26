@@ -235,7 +235,7 @@
                         <article class="pdf-sheet">
                             <div class="pdf-sheet__top">
                                 <div class="pdf-logo">
-                                    <img src="{{ asset('images/logo_h100.png') }}" alt="Moncobra">
+                                    <img src="{{ asset('images/moncobra-1l.png') }}?v={{ @filemtime(public_path('images/moncobra-1l.png')) }}" alt="Moncobra">
                                 </div>
                                 <div class="pdf-title">
                                     <span>EQUIPO DE PROTECCION PERSONAL (EPI'S)</span>
@@ -247,7 +247,7 @@
                             <div class="pdf-meta-row">
                                 <div class="pdf-field pdf-field--wide">
                                     <label for="pdf_delegacion">DELEGACION:</label>
-                                    <input id="pdf_delegacion" name="pdf_delegacion" type="text" value="{{ old('pdf_delegacion') }}" placeholder="Delegacion">
+                                    <input id="pdf_delegacion" name="pdf_delegacion" type="text" value="{{ old('pdf_delegacion', $delegacionPrefill ?? '') }}" placeholder="Delegacion">
                                 </div>
                                 <div class="pdf-field">
                                     <label for="pdf_fecha">FECHA:</label>

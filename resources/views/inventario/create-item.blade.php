@@ -8,58 +8,361 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/inventario-item-create.css'])
     <style>
-        #variantes-container {
-            display: grid;
-            grid-template-columns: 5fr;
-            row-gap: 2rem;
-            column-gap: 15rem;
+        .variants-grid-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-end;
+            margin-top: 1rem;
+            padding: 1rem 1.1rem;
+            border: 1px solid #d7e1ee;
+            border-radius: 14px;
+            background: #f8fbff;
         }
 
-        @media (min-width: 640px) {
-            #variantes-container {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
+        .variants-grid-toolbar__group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-width: 220px;
         }
 
-        @media (min-width: 960px) {
-            #variantes-container {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
+        .variants-grid-toolbar__label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #73839a;
         }
 
-        @media (min-width: 1280px) {
-            #variantes-container {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-            }
+        .variants-grid-toolbar__inline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
         }
 
-        @media (min-width: 1600px) {
-            #variantes-container {
-                grid-template-columns: repeat(5, minmax(0, 1fr));
-            }
+        .variants-grid-toolbar__inline input {
+            width: 110px;
+            height: 40px;
+            border: 1px solid #d5dfec;
+            border-radius: 10px;
+            padding: 0 0.7rem;
+            font-weight: 700;
+            color: #0f2747;
+            background: #fff;
         }
 
-        #variantes-container > div {
-            min-width: 200px;
+        .variants-grid-toolbar__btn {
+            height: 40px;
+            padding: 0 0.9rem;
+            border-radius: 10px;
+            border: 1px solid #d5dfec;
+            background: #ffffff;
+            color: #173e67;
+            font-weight: 800;
+            font-size: 0.82rem;
+            cursor: pointer;
         }
 
-        #variantes-container input[data-stock-input] {
+        .variants-grid-toolbar__btn--primary {
+            background: #173e67;
+            border-color: #173e67;
+            color: #fff;
+        }
+
+        .variants-grid-toolbar__summary {
+            margin-left: auto;
+            padding: 0.8rem 0.95rem;
+            border-radius: 12px;
+            background: #fff;
+            border: 1px solid #dce6f4;
+            color: #173e67;
+            font-weight: 800;
+            min-width: 220px;
+        }
+
+        .variants-grid-shell {
+            margin-top: 1rem;
+            border: 1px solid #dce6f4;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .item-section--stacked {
+            display: block;
+        }
+
+        .item-section--stacked .item-section-label {
+            margin-bottom: 1rem;
+        }
+
+        .item-section--stacked .item-section-fields {
             width: 100%;
-            min-width: 150px;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        /* Constrain non-variant sections so text components don't stretch full width */
+        .item-section .section-content {
+            width: 100%;
+            max-width: 25rem;
+        }
+
+        .item-section--stacked .field-group.field-full,
+        .item-section--stacked .variants-grid-toolbar,
+        .item-section--stacked .variants-grid-shell,
+        .item-section--stacked #atributos-container {
+            width: 100%;
+        }
+
+        .item-section--stacked .variants-grid-table {
+            min-width: 100%;
+        }
+
+        .item-section-fields.fields-1.variants-grid-fields {
+            grid-template-columns: minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+        }
+
+        .variants-grid-fields {
+            grid-template-columns: minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+        }
+
+        .item-section-fields.fields-1.variants-grid-fields > * {
+            min-width: 0;
+        }
+
+        .variants-grid-fields > * {
+            min-width: 0;
+        }
+
+        .item-section-fields.fields-1.variants-grid-fields .variants-grid-toolbar,
+        .item-section-fields.fields-1.variants-grid-fields .variants-grid-shell {
+            width: 100%;
+        }
+
+        .variants-grid-fields .variants-grid-toolbar,
+        .variants-grid-fields .variants-grid-shell,
+        .variants-grid-fields #atributos-container {
+            width: 100%;
+        }
+
+        #variantes-container {
+            width: 100%;
+        }
+
+        .variants-grid-table {
+            width: 100%;
+            min-width: 980px;
+            margin: 0;
+            table-layout: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .variants-grid-table thead th {
+            background: #f7f9fc;
+            border-bottom: 1px solid #dce6f4 !important;
+            color: #7a8ca4;
+            font-size: 0.66rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 0.8rem 0.6rem !important;
+            white-space: nowrap;
+        }
+
+        .variants-grid-table thead th:nth-child(-n + 3),
+        .variants-grid-table tbody td:nth-child(-n + 3) {
+            min-width: 10.5rem;
+        }
+
+        .variants-grid-table thead th:nth-last-child(-n + 4),
+        .variants-grid-table tbody td:nth-last-child(-n + 4) {
+            min-width: 7.5rem;
+        }
+
+        .variants-grid-table tbody td {
+            border-top: 1px solid #eef3f8 !important;
+            padding: 0.75rem 0.6rem !important;
+            vertical-align: middle !important;
+            color: #213a57;
+            font-size: 0.84rem;
+            white-space: normal;
+        }
+
+        .variant-row-critico td {
+            background: #ffecec;
+        }
+
+        .variant-row-bajo td {
+            background: #fff4e4;
+        }
+
+        .variant-row-optimo td {
+            background: #ffffff;
+        }
+
+        .variant-row-inactive {
+            opacity: 0.58;
+        }
+
+        .variant-attribute-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 0;
+        }
+
+        .variant-attribute-name {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #7a8ca4;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .variant-attribute-value {
+            font-weight: 800;
+            color: #173e67;
+            word-break: break-word;
+        }
+
+        .variant-stock-input {
+            width: 100%;
+            min-width: 90px;
+            height: 38px;
+            border: 1px solid #d5dfec;
+            border-radius: 10px;
+            padding: 0 0.75rem;
+            font-weight: 800;
+            color: #173e67;
+            background: #fff;
             box-sizing: border-box;
         }
 
-        .variant-stock-row {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            width: 10px;
-            flex-wrap: wrap;
+        .variant-stock-input--critico {
+            color: #a13c3c;
         }
 
-        .variant-stock-row label {
-            min-width: 10px;
+        .variant-stock-input--bajo {
+            color: #b77b17;
+        }
+
+        .variant-state-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 5.25rem;
+            padding: 0.28rem 0.62rem;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .variant-state-chip--optimo {
+            background: #e7f9f0;
+            color: #1e8a58;
+        }
+
+        .variant-state-chip--bajo {
+            background: #fff3dd;
+            color: #b77b17;
+        }
+
+        .variant-state-chip--critico {
+            background: #ffe7e7;
+            color: #c43d3d;
+        }
+
+        .variant-action-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            justify-content: flex-end;
+        }
+
+        .variant-switch {
+            position: relative;
+            width: 46px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .variant-switch input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
             margin: 0;
+            cursor: pointer;
+        }
+
+        .variant-switch__track {
+            width: 100%;
+            height: 100%;
+            border-radius: 999px;
+            background: #d6deea;
+            transition: background 0.18s ease;
+        }
+
+        .variant-switch__thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 3px 8px rgba(15, 23, 42, 0.15);
+            transition: transform 0.18s ease;
+        }
+
+        .variant-switch input:checked + .variant-switch__track {
+            background: #173e67;
+        }
+
+        .variant-switch input:checked + .variant-switch__track + .variant-switch__thumb {
+            transform: translateX(20px);
+        }
+
+        .variant-row-inactive .variant-switch__track {
+            background: #f1b5b5;
+        }
+
+        .variant-mini-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: 1px solid #d5dfec;
+            background: #fff;
+            color: #8b97a8;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .variant-mini-btn:hover {
+            color: #b42318;
+            border-color: #f0c9c9;
+            background: #fff5f5;
+        }
+
+        .variants-grid-empty {
+            padding: 1rem;
+            text-align: center;
+            color: #6b7280;
+            font-weight: 700;
         }
     </style>
 @endsection
@@ -90,140 +393,14 @@
                     <input type="hidden" name="inventario_variante_id" value="{{ $varianteBase->id }}">
                 @endif
 
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 1</span>
-                        <h2>Datos Basicos</h2>
-                        <p>Identificacion fundamental del producto y vinculacion con proveedor oficial.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-2">
-                        <div class="field-group">
-                            <label for="codigo">Codigo del producto</label>
-                            <input id="codigo" name="codigo" type="text" value="{{ old('codigo', $varianteBase->codigo ?? '') }}" placeholder="Ejem: PRD-2024-X1" class="@error('codigo') is-invalid @enderror" required>
-                        </div>
-
-                        <div class="field-group">
-                            <label for="referencia_proveedor">Referencia proveedor</label>
-                            <input id="referencia_proveedor" name="referencia_proveedor" type="text" value="{{ old('referencia_proveedor', $varianteBase->referencia_proveedor ?? '') }}" placeholder="REF-8829-00" class="@error('referencia_proveedor') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="nombre">Nombre del producto</label>
-                            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $varianteBase->descripcion ?? '') }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
-                        </div>
-
-                        <div class="field-group field-full">
-                            <label for="descripcion">Descripcion del item</label>
-                            <textarea id="descripcion" name="descripcion" rows="1" maxlength="1000" placeholder="Descripcion larga o detalles técnicos (opcional)" class="input-auto-grow @error('descripcion') is-invalid @enderror">{{ old('descripcion', $varianteBase->descripcion ?? '') }}</textarea>
-                        </div>
-                        <div class="field-group">
-                            <label for="clase_id">Clase del producto</label>
-                            <select id="clase_id" name="clase_id" class="@error('clase_id') is-invalid @enderror">
-                                <option value="">-- Seleccionar una clase --</option>
-                                @foreach($clases as $id => $nombre)
-                                    <option value="{{ $id }}" @selected(old('clase_id', $varianteBase->clase_id ?? null) == $id)>{{ $nombre }}</option>
-                                @endforeach
-                            </select>
-                            @error('clase_id')
-                                <span class="invalid-feedback">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-                </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 1.5</span>
-                        <h2>Variantes Dinámicas del Producto</h2>
-                        <p>Define los tipos de variantes, añade varios valores por tipo y el sistema generará todas las combinaciones posibles.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-1">
-                        <div class="field-group field-full">
-                            <label for="tipos_atributos">Tipos de variantes</label>
-                            <input id="tipos_atributos" name="tipos_atributos" type="text" value="{{ old('tipos_atributos', implode(', ', $varianteBase?->tipos_atributos ?? array_keys($valoresIniciales ?? []))) }}" placeholder="Ejem: Talla, Color, Material (separados por coma)" class="@error('tipos_atributos') is-invalid @enderror">
-                            <small style="color: #666; display: block; margin-top: 0.5rem;">Especifica los tipos de variantes que tendrá este producto, separados por coma.</small>
-                        </div>
-
-                        <div id="atributos-container" class="field-group field-full" style="margin-top: 1rem;">
-                            <!-- Los campos de atributos se generarán dinámicamente con JavaScript -->
-                        </div>
-                    </div>
-                </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 2</span>
-                        <h2>Datos comunes de stock</h2>
-                        <p>Estos valores se aplicarán a todas las combinaciones generadas.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-2">
-                        <div class="field-group field-tight">
-                            <label for="stock_minimo">Minimo stock (alerta)</label>
-                            <input id="stock_minimo" name="stock_minimo" type="number" min="0" step="1" value="{{ old('stock_minimo', $varianteBase->stock_minimo ?? 10) }}" class="@error('stock_minimo') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group field-tight">
-                            <label for="nivel_critico">Stock critico</label>
-                            <input id="nivel_critico" name="nivel_critico" type="number" min="0" step="1" value="{{ old('nivel_critico', $varianteBase->nivel_critico ?? 5) }}" class="@error('nivel_critico') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="almacen">Almacen</label>
-                            <input id="almacen" name="almacen" type="text" value="{{ old('almacen', $varianteBase->almacen ?? '') }}" placeholder="Almacen Central" class="@error('almacen') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="ubicacion">Ubicacion</label>
-                            <input id="ubicacion" name="ubicacion" type="text" value="{{ old('ubicacion', $varianteBase->ubicacion ?? '') }}" placeholder="Pasillo 3 / Estanteria 12" class="@error('ubicacion') is-invalid @enderror">
-                        </div>
-                    </div>
-                </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 2.5</span>
-                        <h2>Combinaciones y stock individual</h2>
-                        <p>Cada combinación tendrá su propio stock. Ajusta aquí las unidades por talla, color o cualquier otro tipo de variante.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-1">
-                        <div id="variantes-container" class="field-group field-full" style="margin-top: 1rem;"></div>
-                        <div class="field-group field-full" style="margin-top: 1rem;">
-                            <strong>Total stock combinado: <span id="stock-total">0</span></strong>
-                        </div>
-                    </div>
-                </section>
-                
-                <footer class="item-form-footer">
-                    <p>* Todos los campos son obligatorios para el registro inicial.</p>
-                    <div class="item-footer-actions">
-                            <a href="{{ route('inventario.index') }}" class="btn-footer-cancel">Cancelar</a>
-                        <button type="submit" class="btn-footer-save">
-                            <i class="fas fa-save"></i>
-                            Guardar Producto
-                        </button>
-                    </div>
-                </footer>
+                @include('inventario.create-item.partials.section-basics')
+                @include('inventario.create-item.partials.section-variant-types')
+                @include('inventario.create-item.partials.section-stock')
+                @include('inventario.create-item.partials.section-variant-grid')
+                @include('inventario.create-item.partials.form-footer')
             </form>
 
-            <aside class="inventory-item-side">
-                <article class="side-card with-accent">
-                    <h3>Ultima accion</h3>
-                    @if ($ultimaAccion)
-                        <p>{{ $ultimaAccion->codigo }} - {{ $ultimaAccion->descripcion }}</p>
-                    @else
-                        <p>No hay registros previos en esta sesion.</p>
-                    @endif
-                </article>
-
-                <article class="side-card">
-                    <h3>Estado de conexion</h3>
-                    <p><i class="fas fa-circle"></i> Base de Datos: Sincronizada</p>
-                </article>
-            </aside>
+            @include('inventario.create-item.partials.sidebar')
         </div>
     </section>
 @endsection
@@ -237,7 +414,18 @@
             const tiposAtributosInput = document.getElementById('tipos_atributos');
             const atributosContainer = document.getElementById('atributos-container');
             const variantesContainer = document.getElementById('variantes-container');
+            const variantesHead = document.getElementById('variantes-head');
             const stockTotal = document.getElementById('stock-total');
+            const variantOrderPreview = document.getElementById('variant-order-preview');
+            const variantsSummary = document.getElementById('variants-summary');
+            const bulkStockValue = document.getElementById('bulk-stock-value');
+            const bulkApplyStock = document.getElementById('bulk-apply-stock');
+            const bulkSetZero = document.getElementById('bulk-set-zero');
+            const bulkActivateAll = document.getElementById('bulk-activate-all');
+            const bulkDeactivateAll = document.getElementById('bulk-deactivate-all');
+            const stockMinimoInput = document.getElementById('stock_minimo');
+            const nivelCriticoInput = document.getElementById('nivel_critico');
+            let tiposOrdenados = [];
 
             const parseTipos = (value) => String(value || '')
                 .split(',')
@@ -352,7 +540,7 @@
                 return row;
             };
 
-            const createVariantGroup = (tipo, values = [], onChange = null) => {
+            const createVariantGroup = (tipo, values = [], levelIndex = 0, onChange = null) => {
                 const group = document.createElement('div');
                 group.className = 'field-group field-full';
                 group.dataset.variantType = tipo;
@@ -368,7 +556,7 @@
                 header.style.gap = '1rem';
 
                 const label = document.createElement('label');
-                label.textContent = `Valores - ${tipo}`;
+                label.textContent = `Nivel ${levelIndex + 1} - ${tipo}`;
                 label.style.margin = '0';
                 label.style.fontWeight = '700';
 
@@ -403,8 +591,147 @@
                 return group;
             };
 
-            const generateCombinations = (valuesByType) => {
-                const types = Object.keys(valuesByType);
+            const renderTableHead = (types) => {
+                if (!variantesHead) {
+                    return;
+                }
+
+                variantesHead.innerHTML = '';
+
+                const row = document.createElement('tr');
+
+                types.forEach((tipo, index) => {
+                    const th = document.createElement('th');
+                    th.textContent = `Nivel ${index + 1} · ${tipo}`;
+                    row.appendChild(th);
+                });
+
+                ['Stock', 'Estado', 'Activo', 'Acciones'].forEach((label) => {
+                    const th = document.createElement('th');
+                    th.textContent = label;
+                    row.appendChild(th);
+                });
+
+                variantesHead.appendChild(row);
+            };
+
+            const getVariantThresholds = () => ({
+                minimum: parseInt(stockMinimoInput?.value || '0', 10) || 0,
+                critical: parseInt(nivelCriticoInput?.value || '0', 10) || 0,
+            });
+
+            const resolveVariantState = (stockValue) => {
+                const { minimum, critical } = getVariantThresholds();
+
+                if (stockValue <= critical) {
+                    return 'critico';
+                }
+
+                if (stockValue <= minimum) {
+                    return 'bajo';
+                }
+
+                return 'optimo';
+            };
+
+            const updateVariantsSummary = () => {
+                if (!variantsSummary) {
+                    return;
+                }
+
+                const rows = Array.from(variantesContainer.querySelectorAll('tr[data-combination-key]'));
+                const activeRows = rows.filter((row) => {
+                    const activeInput = row.querySelector('input[data-row-active]');
+                    return activeInput ? activeInput.value === '1' : true;
+                });
+
+                variantsSummary.textContent = `${activeRows.length} combinaciones activas · ${rows.length} combinaciones totales`;
+            };
+
+            const updateRowState = (row) => {
+                const stockInput = row.querySelector('input[data-stock-input]');
+                const stateChip = row.querySelector('[data-state-chip]');
+                const activeInput = row.querySelector('input[data-row-active]');
+                const isActive = activeInput ? activeInput.value === '1' : true;
+                const stockValue = parseInt(stockInput?.value || '0', 10) || 0;
+                const state = resolveVariantState(stockValue);
+
+                row.dataset.variantState = state;
+                row.classList.remove('variant-row-optimo', 'variant-row-bajo', 'variant-row-critico', 'variant-row-inactive');
+                row.classList.add(`variant-row-${state}`);
+
+                if (!isActive) {
+                    row.classList.add('variant-row-inactive');
+                }
+
+                if (stateChip) {
+                    stateChip.className = `variant-state-chip variant-state-chip--${state}`;
+                    stateChip.textContent = state === 'critico'
+                        ? 'Crítico'
+                        : (state === 'bajo' ? 'Reposición' : 'Óptimo');
+                }
+
+                if (stockInput) {
+                    stockInput.classList.remove('variant-stock-input--critico', 'variant-stock-input--bajo');
+                    if (state === 'critico') {
+                        stockInput.classList.add('variant-stock-input--critico');
+                    } else if (state === 'bajo') {
+                        stockInput.classList.add('variant-stock-input--bajo');
+                    }
+                }
+            };
+
+            const setRowActiveState = (row, active) => {
+                const activeInput = row.querySelector('input[data-row-active]');
+                const fieldInputs = row.querySelectorAll('[data-row-field]');
+                const toggleInput = row.querySelector('input[data-row-toggle]');
+
+                if (activeInput) {
+                    activeInput.value = active ? '1' : '0';
+                }
+
+                if (toggleInput) {
+                    toggleInput.checked = active;
+                }
+
+                fieldInputs.forEach((input) => {
+                    input.disabled = !active;
+                });
+
+                row.classList.toggle('variant-row-inactive', !active);
+                updateRowState(row);
+                updateVariantsSummary();
+            };
+
+            const setAllRowsActive = (active) => {
+                variantesContainer.querySelectorAll('tr[data-combination-key]').forEach((row) => {
+                    setRowActiveState(row, active);
+                });
+                updateTotalStock();
+            };
+
+            const applyBulkStock = (value) => {
+                const parsedValue = Math.max(0, parseInt(value || '0', 10) || 0);
+
+                variantesContainer.querySelectorAll('tr[data-combination-key]').forEach((row) => {
+                    const activeInput = row.querySelector('input[data-row-active]');
+                    const stockInput = row.querySelector('input[data-stock-input]');
+
+                    if (activeInput && activeInput.value !== '1') {
+                        return;
+                    }
+
+                    if (stockInput && !stockInput.disabled) {
+                        stockInput.value = String(parsedValue);
+                        stockInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+
+                updateTotalStock();
+            };
+
+            const generateCombinations = (valuesByType, orderedTypes = []) => {
+                const types = orderedTypes.length > 0 ? orderedTypes : Object.keys(valuesByType);
 
                 if (types.length === 0) {
                     return [];
@@ -434,6 +761,7 @@
 
             const updateTotalStock = () => {
                 const total = Array.from(variantesContainer.querySelectorAll('input[data-stock-input]'))
+                    .filter((input) => !input.disabled)
                     .reduce((sum, input) => sum + (parseInt(input.value || '0', 10) || 0), 0);
 
                 stockTotal.textContent = String(total);
@@ -441,106 +769,172 @@
 
             const renderCombinations = () => {
                 const valuesByType = collectTypeValues();
-                const types = Object.keys(valuesByType);
+                const types = tiposOrdenados.length > 0 ? tiposOrdenados : Object.keys(valuesByType);
                 const preservedStocks = collectCombinationStocks();
                 variantesContainer.innerHTML = '';
+                const emptyColspan = types.length + 4;
 
                 if (types.length === 0) {
-                    variantesContainer.innerHTML = '<div class="inventory-empty-mini">Define al menos un tipo de variante para generar combinaciones.</div>';
+                    variantesContainer.innerHTML = `<tr><td colspan="${emptyColspan}" class="variants-grid-empty">Define al menos un tipo de variante para generar combinaciones.</td></tr>`;
                     stockTotal.textContent = '0';
+                    updateVariantsSummary();
                     return;
                 }
 
-                const combinations = generateCombinations(valuesByType);
+                const combinations = generateCombinations(valuesByType, types);
 
                 if (combinations.length === 0) {
-                    variantesContainer.innerHTML = '<div class="inventory-empty-mini">Añade al menos un valor en cada tipo para generar combinaciones.</div>';
+                    variantesContainer.innerHTML = `<tr><td colspan="${emptyColspan}" class="variants-grid-empty">Añade al menos un valor en cada tipo para generar combinaciones.</td></tr>`;
                     stockTotal.textContent = '0';
+                    updateVariantsSummary();
                     return;
                 }
 
                 combinations.forEach((atributos, index) => {
                     const combinationKey = normalizeKey(atributos);
-                    const card = document.createElement('div');
-                    card.dataset.combinationKey = combinationKey;
-                    card.style.border = '1px solid #e5e7eb';
-                    card.style.borderRadius = '12px';
-                    card.style.padding = '1rem';
-                    card.style.background = '#fff';
+                    const stockValue = preservedStocks[combinationKey] ?? initialCombinationStocks[combinationKey] ?? '0';
+                    const row = document.createElement('tr');
+                    row.dataset.combinationKey = combinationKey;
+                    row.className = 'variant-row variant-row-optimo';
 
-                    const header = document.createElement('div');
-                    header.style.display = 'flex';
-                    header.style.justifyContent = 'space-between';
-                    header.style.alignItems = 'center';
-                    header.style.gap = '1rem';
-                    header.style.marginBottom = '0.85rem';
+                    types.forEach((tipo) => {
+                        const td = document.createElement('td');
+                        const cell = document.createElement('div');
+                        cell.className = 'variant-attribute-cell';
 
-                    const title = document.createElement('strong');
-                    title.textContent = Object.entries(atributos)
-                        .map(([tipo, valor]) => `${tipo}: ${valor}`)
-                        .join(' / ');
+                        const name = document.createElement('span');
+                        name.className = 'variant-attribute-name';
+                        name.textContent = tipo;
 
-                    const suffix = document.createElement('span');
-                    suffix.style.fontSize = '0.85rem';
-                    suffix.style.color = '#6b7280';
-                    suffix.textContent = `Combinación ${index + 1}`;
+                        const value = document.createElement('span');
+                        value.className = 'variant-attribute-value';
+                        value.textContent = atributos[tipo] ?? '—';
 
-                    header.appendChild(title);
-                    header.appendChild(suffix);
-                    card.appendChild(header);
-
-                    Object.entries(atributos).forEach(([tipo, valor]) => {
                         const hidden = document.createElement('input');
                         hidden.type = 'hidden';
                         hidden.name = `variantes[${index}][atributos][${tipo}]`;
-                        hidden.value = valor;
-                        card.appendChild(hidden);
+                        hidden.value = atributos[tipo] ?? '';
+                        hidden.dataset.rowField = '1';
+
+                        cell.appendChild(name);
+                        cell.appendChild(value);
+                        cell.appendChild(hidden);
+                        td.appendChild(cell);
+                        row.appendChild(td);
                     });
 
-                    const stockWrap = document.createElement('div');
-                    stockWrap.className = 'variant-stock-row';
-
-                    const stockLabel = document.createElement('label');
-                    stockLabel.textContent = 'Stock individual';
-                    stockLabel.style.margin = '0';
-                    stockLabel.style.minWidth = '140px';
-
+                    const stockTd = document.createElement('td');
                     const stockInput = document.createElement('input');
                     stockInput.type = 'number';
                     stockInput.min = '0';
                     stockInput.step = '1';
                     stockInput.name = `variantes[${index}][stock_actual]`;
                     stockInput.dataset.stockInput = '1';
-                    stockInput.value = preservedStocks[combinationKey] ?? initialCombinationStocks[combinationKey] ?? '0';
-                    stockInput.style.maxWidth = '100%';
+                    stockInput.dataset.rowField = '1';
+                    stockInput.value = stockValue;
+                    stockInput.className = 'variant-stock-input';
 
-                    stockInput.addEventListener('input', updateTotalStock);
+                    stockInput.addEventListener('input', () => {
+                        updateRowState(row);
+                        updateTotalStock();
+                    });
 
-                    stockWrap.appendChild(stockLabel);
-                    stockWrap.appendChild(stockInput);
-                    card.appendChild(stockWrap);
+                    stockTd.appendChild(stockInput);
+                    row.appendChild(stockTd);
 
-                    variantesContainer.appendChild(card);
+                    const stateTd = document.createElement('td');
+                    const stateChip = document.createElement('span');
+                    stateChip.dataset.stateChip = '1';
+                    stateTd.appendChild(stateChip);
+                    row.appendChild(stateTd);
+
+                    const activeTd = document.createElement('td');
+                    const activeWrapper = document.createElement('label');
+                    activeWrapper.className = 'variant-switch';
+
+                    const activeToggle = document.createElement('input');
+                    activeToggle.type = 'checkbox';
+                    activeToggle.checked = true;
+                    activeToggle.dataset.rowToggle = '1';
+
+                    const activeTrack = document.createElement('span');
+                    activeTrack.className = 'variant-switch__track';
+
+                    const activeThumb = document.createElement('span');
+                    activeThumb.className = 'variant-switch__thumb';
+
+                    activeToggle.addEventListener('change', () => {
+                        setRowActiveState(row, activeToggle.checked);
+                        updateTotalStock();
+                    });
+
+                    activeWrapper.appendChild(activeToggle);
+                    activeWrapper.appendChild(activeTrack);
+                    activeWrapper.appendChild(activeThumb);
+                    activeTd.appendChild(activeWrapper);
+
+                    const activeHidden = document.createElement('input');
+                    activeHidden.type = 'hidden';
+                    activeHidden.name = `variantes[${index}][activo]`;
+                    activeHidden.value = '1';
+                    activeHidden.dataset.rowActive = '1';
+                    activeTd.appendChild(activeHidden);
+                    row.appendChild(activeTd);
+
+                    const actionsTd = document.createElement('td');
+                    const actions = document.createElement('div');
+                    actions.className = 'variant-action-group';
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'variant-mini-btn';
+                    removeButton.innerHTML = '<i class="fas fa-trash"></i>';
+                    removeButton.title = 'Eliminar combinación';
+                    removeButton.addEventListener('click', () => {
+                        row.remove();
+                        updateTotalStock();
+                        updateVariantsSummary();
+                    });
+
+                    actions.appendChild(removeButton);
+                    actionsTd.appendChild(actions);
+                    row.appendChild(actionsTd);
+
+                    updateRowState(row);
+                    variantesContainer.appendChild(row);
                 });
 
                 updateTotalStock();
+                updateVariantsSummary();
             };
 
             const renderVariantTypes = () => {
                 const currentValues = collectTypeValues();
                 const tipos = parseTipos(tiposAtributosInput.value);
+                tiposOrdenados = tipos;
 
                 atributosContainer.innerHTML = '';
 
+                if (variantOrderPreview) {
+                    const previewText = tipos.length > 0 ? tipos.join(' → ') : '—';
+                    const previewSpan = variantOrderPreview.querySelector('span');
+                    if (previewSpan) {
+                        previewSpan.textContent = previewText;
+                    }
+                }
+
+                renderTableHead(tipos);
+
                 if (tipos.length === 0) {
-                    variantesContainer.innerHTML = '<div class="inventory-empty-mini">Escribe tipos de variantes para empezar a generar combinaciones.</div>';
+                    variantesContainer.innerHTML = `<tr><td colspan="${tipos.length + 4}" class="variants-grid-empty">Escribe tipos de variantes para empezar a generar combinaciones.</td></tr>`;
                     stockTotal.textContent = '0';
+                    updateVariantsSummary();
                     return;
                 }
 
-                tipos.forEach((tipo) => {
+                tipos.forEach((tipo, index) => {
                     const values = currentValues[tipo] || valoresIniciales[tipo] || [''];
-                    atributosContainer.appendChild(createVariantGroup(tipo, values, renderCombinations));
+                    atributosContainer.appendChild(createVariantGroup(tipo, values, index, renderCombinations));
                 });
 
                 renderCombinations();
@@ -560,6 +954,23 @@
             }
 
             tiposAtributosInput.addEventListener('input', renderVariantTypes);
+            if (bulkApplyStock) {
+                bulkApplyStock.addEventListener('click', () => applyBulkStock(bulkStockValue ? bulkStockValue.value : '0'));
+            }
+            if (bulkSetZero) {
+                bulkSetZero.addEventListener('click', () => {
+                    if (bulkStockValue) {
+                        bulkStockValue.value = '0';
+                    }
+                    applyBulkStock('0');
+                });
+            }
+            if (bulkActivateAll) {
+                bulkActivateAll.addEventListener('click', () => setAllRowsActive(true));
+            }
+            if (bulkDeactivateAll) {
+                bulkDeactivateAll.addEventListener('click', () => setAllRowsActive(false));
+            }
             renderVariantTypes();
         })();
     </script>
