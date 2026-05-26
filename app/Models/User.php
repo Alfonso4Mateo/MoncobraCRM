@@ -41,6 +41,7 @@ class User extends Authenticatable
         'activo',
         'ultimo_acceso',
         'dashboard_panel_order',
+        'personal_alerta_dias',
     ];
 
     /**
@@ -66,6 +67,7 @@ class User extends Authenticatable
             'activo' => 'boolean',
             'ultimo_acceso' => 'datetime',
             'dashboard_panel_order' => 'array',
+            'personal_alerta_dias' => 'integer',
         ];
     }
 

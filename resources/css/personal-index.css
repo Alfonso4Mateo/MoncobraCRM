@@ -234,6 +234,46 @@ body,
     align-items: center;
 }
 
+.personal-recognition-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 240px;
+}
+
+.personal-recognition-label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 800;
+    color: #8a98ad;
+}
+
+.personal-recognition-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e4ebf5;
+    background: #f7f9fc;
+    color: var(--personal-ink);
+}
+
+.personal-recognition-control i {
+    color: var(--personal-warning);
+}
+
+.personal-recognition-control select {
+    border: none;
+    background: transparent;
+    font-size: .88rem;
+    font-weight: 700;
+    color: var(--personal-ink);
+    outline: none;
+    min-width: 170px;
+}
+
 .personal-action-btn {
     display: inline-flex;
     align-items: center;
@@ -350,6 +390,14 @@ body,
     border-bottom: 1px solid #eef2f8;
 }
 
+.personal-row--alert {
+    background: #fff7e0;
+}
+
+.personal-row--alert:hover {
+    background: #fff1c2;
+}
+
 .personal-table tbody tr:hover {
     background: #fafcff;
 }
@@ -399,10 +447,30 @@ body,
     min-width: 0;
 }
 
+.personal-person-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .personal-person-copy strong {
     font-size: .92rem;
     font-weight: 800;
     color: var(--personal-ink);
+}
+
+.personal-alert-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffefc2;
+    color: #b87500;
+    border: 1px solid #f2d28a;
+    font-size: .75rem;
 }
 
 .personal-person-copy span,
@@ -626,6 +694,15 @@ body,
         align-items: flex-start;
     }
 
+    .personal-recognition-form {
+        width: 100%;
+    }
+
+    .personal-recognition-control,
+    .personal-recognition-control select {
+        width: 100%;
+    }
+
     .personal-table thead {
         display: none;
     }
@@ -637,6 +714,10 @@ body,
         border-radius: 14px;
         overflow: hidden;
         background: #fff;
+    }
+
+    .personal-table tbody tr.personal-row--alert {
+        background: #fff7e0;
     }
 
     .personal-table tbody td {

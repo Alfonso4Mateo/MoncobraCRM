@@ -49,6 +49,66 @@
             min-height: 100px;
         }
 
+        .profile-edit-form-group .is-invalid {
+            border-color: #e11d48;
+            background: #fff1f2;
+        }
+
+        .profile-edit-form-group .is-invalid:focus {
+            border-color: #be123c;
+            box-shadow: 0 0 0 3px rgba(225, 29, 72, .18);
+        }
+
+        .profile-edit-inline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profile-edit-inline input {
+            flex: 1;
+        }
+
+        .profile-edit-today-btn {
+            border: 1px solid var(--profile-line);
+            background: #f7f9fc;
+            color: var(--profile-ink);
+            font-weight: 700;
+            font-size: .8rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .18s ease;
+            white-space: nowrap;
+        }
+
+        .profile-edit-today-btn:hover {
+            border-color: var(--profile-primary);
+            color: var(--profile-primary);
+            box-shadow: 0 4px 10px rgba(23, 62, 103, .12);
+        }
+
+        .profile-alert {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: .9rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            margin-bottom: 16px;
+        }
+
+        .profile-alert-error {
+            background: #fff1f2;
+            color: #b91c1c;
+            border-color: #f5c2c7;
+        }
+
+        .profile-alert-error ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+            font-weight: 600;
+        }
+
         .profile-edit-two-cols {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -89,6 +149,17 @@
                 </button>
             </div>
         </header>
+
+        @if ($errors->any())
+            <div class="profile-alert profile-alert-error">
+                Hay errores en el formulario. Revisa los campos marcados:
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         <form id="personal-edit-form" action="{{ ($isCreate ?? false) ? route('personal.store') : route('personal.update', $personal->id) }}" method="POST">
             @csrf
@@ -135,27 +206,42 @@
                             <div style="flex: 1;">
                                 <div class="profile-edit-form-group">
                                     <label for="name">Nombre</label>
-                                    <input type="text" id="name" name="name" value="{{ old('name', $personal->name) }}">
+                                    <input type="text" id="name" name="name" value="{{ old('name', $personal->name) }}" class="@error('name') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="apellido">Apellido</label>
-                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $personal->apellido) }}">
+                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $personal->apellido) }}" class="@error('apellido') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="dni_nie">DNI / NIE</label>
-                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}">
+                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}" class="@error('dni_nie') is-invalid @enderror">
                                 </div>
                 
                                 <div class="profile-edit-form-group">
                                     <label for="departamento">Departamento</label>
-                                    <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $personal->departamento) }}">
+                                    <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $personal->departamento) }}" class="@error('departamento') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="telefono">Teléfono</label>
-                                    <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000">
+                                    <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000" class="@error('telefono') is-invalid @enderror">
+                                </div>
+
+                                <div class="profile-edit-two-cols">
+                                    <div class="profile-edit-form-group">
+                                        <label for="ultima_revision_medica">Última revisión médica</label>
+                                        <div class="profile-edit-inline">
+                                            <input type="date" id="ultima_revision_medica" name="ultima_revision_medica" value="{{ old('ultima_revision_medica', optional($personal->ultima_revision_medica)->format('Y-m-d')) }}" class="@error('ultima_revision_medica') is-invalid @enderror">
+                                            <button type="button" id="set-ultima-hoy" class="profile-edit-today-btn">Hoy</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="profile-edit-form-group">
+                                        <label for="proxima_revision_medica">Próxima revisión médica</label>
+                                        <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -174,7 +260,7 @@
                             <div class="profile-edit-two-cols">
                                 <div class="profile-edit-form-group">
                                     <label for="camiseta">Camiseta</label>
-                                    <select id="camiseta" name="camiseta">
+                                    <select id="camiseta" name="camiseta" class="@error('camiseta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) === $value)>{{ $label }}</option>
@@ -184,7 +270,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="chaqueta">Chaqueta</label>
-                                    <select id="chaqueta" name="chaqueta">
+                                    <select id="chaqueta" name="chaqueta" class="@error('chaqueta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) === $value)>{{ $label }}</option>
@@ -194,7 +280,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="sudadera">Sudadera</label>
-                                    <select id="sudadera" name="sudadera">
+                                    <select id="sudadera" name="sudadera" class="@error('sudadera') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) === $value)>{{ $label }}</option>
@@ -204,7 +290,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="pantalon">Pantalón</label>
-                                    <select id="pantalon" name="pantalon">
+                                    <select id="pantalon" name="pantalon" class="@error('pantalon') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) === $value)>{{ $label }}</option>
@@ -214,7 +300,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="calzado">Calzado Seguridad</label>
-                                    <select id="calzado" name="calzado">
+                                    <select id="calzado" name="calzado" class="@error('calzado') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) === $value)>{{ $label }}</option>
@@ -224,7 +310,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="guantes">Guantes</label>
-                                    <select id="guantes" name="guantes">
+                                    <select id="guantes" name="guantes" class="@error('guantes') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) === $value)>{{ $label }}</option>
@@ -234,7 +320,7 @@
 
                                 <div class="profile-edit-form-group">
                                     <label for="casco">Casco</label>
-                                    <select id="casco" name="casco">
+                                    <select id="casco" name="casco" class="@error('casco') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         <option value="Estándar" @selected(old('casco', $personal->casco) === 'Estándar')>Estándar</option>
                                     </select>
@@ -255,7 +341,7 @@
                         <div class="profile-card__body" style="padding: 20px;">
                             <div class="profile-edit-form-group">
                                 <label for="descripcion">Observaciones</label>
-                                <textarea id="descripcion" name="descripcion" placeholder="Añade información adicional, notas especiales, o comentarios...">{{ old('descripcion', $personal->descripcion ?? '') }}</textarea>
+                                <textarea id="descripcion" name="descripcion" placeholder="Añade información adicional, notas especiales, o comentarios..." class="@error('descripcion') is-invalid @enderror">{{ old('descripcion', $personal->descripcion ?? '') }}</textarea>
                             </div>
                         </div>
                     </article>
@@ -263,4 +349,52 @@
             </div>
         </form>
     </section>
+@endsection
+
+@section('js')
+    <script>
+        (function() {
+            const btnHoy = document.getElementById('set-ultima-hoy');
+            const ultimaInput = document.getElementById('ultima_revision_medica');
+            const proximaInput = document.getElementById('proxima_revision_medica');
+
+            if (!btnHoy || !ultimaInput || !proximaInput) return;
+
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const parseDate = (value) => {
+                if (!value) return null;
+                const parts = value.split('-').map(Number);
+                if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+                return new Date(parts[0], parts[1] - 1, parts[2]);
+            };
+
+            const setNextFrom = (date) => {
+                if (!date) {
+                    proximaInput.value = '';
+                    return;
+                }
+                const next = new Date(date);
+                next.setMonth(next.getMonth() + 12);
+                proximaInput.value = formatDate(next);
+            };
+
+            btnHoy.addEventListener('click', function() {
+                const today = new Date();
+
+                ultimaInput.value = formatDate(today);
+                setNextFrom(today);
+            });
+
+            ultimaInput.addEventListener('input', function() {
+                const parsed = parseDate(ultimaInput.value);
+                setNextFrom(parsed);
+            });
+        })();
+    </script>
 @endsection

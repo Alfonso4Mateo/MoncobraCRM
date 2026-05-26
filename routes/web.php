@@ -143,11 +143,13 @@ Route::middleware('auth')->group(function () {
     Route::post('users/{user}/change-role', [UserController::class, 'changeRole'])->name('users.changeRole');
     Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggleActive');
     // Personal (entidad independiente de usuarios)
+    Route::get('personal/tallas', [PersonalController::class, 'tallas'])->name('personal.tallas');
     Route::get('personal', [PersonalController::class, 'index'])->name('personal.index');
     Route::get('personal/crear', [PersonalController::class, 'create'])->name('personal.create');
     Route::post('personal', [PersonalController::class, 'store'])->name('personal.store');
     Route::get('personal/{personal}', [PersonalController::class, 'show'])->name('personal.show');
     Route::get('personal/{personal}/edit', [PersonalController::class, 'edit'])->name('personal.edit');
     Route::put('personal/{personal}', [PersonalController::class, 'update'])->name('personal.update');
+    Route::delete('personal/{personal}', [PersonalController::class, 'destroy'])->name('personal.destroy');
     
 });

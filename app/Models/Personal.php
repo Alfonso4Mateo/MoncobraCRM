@@ -30,11 +30,15 @@ class Personal extends Model
         'guantes',
         'telefono',
         'descripcion',
+        'ultima_revision_medica',
+        'proxima_revision_medica',
         'activo',
     ];
 
     protected $casts = [
         'activo' => 'boolean',
+        'ultima_revision_medica' => 'date',
+        'proxima_revision_medica' => 'date',
     ];
 
     public function proyectos(): BelongsToMany

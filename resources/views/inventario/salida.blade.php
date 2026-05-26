@@ -136,7 +136,7 @@
 
                             <div class="field-group">
                                 <label for="solicitante">Solicitante</label>
-                                <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', auth()->user()->name ?? '') }}" placeholder="Nombre del solicitante" list="solicitantes-list" autocomplete="off" class="@error('solicitante') is-invalid @enderror" data-sync="solicitante">
+                                <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', $solicitantePrefill ?? (auth()->user()->name ?? '')) }}" placeholder="Nombre del solicitante" list="solicitantes-list" autocomplete="off" class="@error('solicitante') is-invalid @enderror" data-sync="solicitante">
                             </div>
                         </div>
 
@@ -258,7 +258,7 @@
                             <div class="pdf-meta-row">
                                 <div class="pdf-field pdf-field--wide">
                                     <label for="pdf_trabajador">TRABAJADOR (NOMBRE Y APELLIDOS):</label>
-                                    <input id="pdf_trabajador" name="pdf_trabajador" type="text" data-sync="solicitante" list="solicitantes-list" autocomplete="off" value="{{ old('solicitante', auth()->user()->name ?? '') }}" placeholder="Nombre del trabajador">
+                                    <input id="pdf_trabajador" name="pdf_trabajador" type="text" data-sync="solicitante" list="solicitantes-list" autocomplete="off" value="{{ old('solicitante', $solicitantePrefill ?? (auth()->user()->name ?? '')) }}" placeholder="Nombre del trabajador">
                                 </div>
                                 <div class="pdf-field">
                                     <label for="pdf_ficha">FICHA N:</label>

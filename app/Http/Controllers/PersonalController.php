@@ -20,6 +20,15 @@ class PersonalController extends Controller
     {
         $query = (string) $request->input('q', '');
         $export = $request->input('export');
+        $user = $request->user();
+        $alertaDias = $request->has('alerta_dias')
+            ? (int) $request->input('alerta_dias', 0)
+            : (int) ($user?->personal_alerta_dias ?? 0);
+        $alertaDias = in_array($alertaDias, [0, 30, 60, 90, 120, 180], true) ? $alertaDias : 0;
+        if ($request->has('alerta_dias') && $user) {
+            $user->update(['personal_alerta_dias' => $alertaDias]);
+        }
+        $alertaLimite = $alertaDias > 0 ? now()->addDays($alertaDias)->endOfDay() : null;
 
         $buildQuery = function () use ($query) {
             $personalQuery = Personal::query()->with('proyectos');
@@ -64,12 +73,20 @@ class PersonalController extends Controller
         }
 
         $personals = $buildQuery()->paginate(12)->withQueryString();
+        $personals->getCollection()->transform(function (Personal $personal) use ($alertaLimite) {
+            $personal->alerta_revision_medica = $alertaLimite
+                ? ($personal->proxima_revision_medica && $personal->proxima_revision_medica->lte($alertaLimite))
+                : false;
+
+            return $personal;
+        });
         $personalTotal = Personal::count();
         $personalActivos = Personal::where('activo', true)->count();
 
         return view('personal.index', [
             'personals' => $personals,
             'query' => $query,
+            'alertaDias' => $alertaDias,
             'personalTotal' => $personalTotal,
             'personalActivos' => $personalActivos,
         ]);
@@ -100,7 +117,7 @@ class PersonalController extends Controller
             $personal->proyectos()->sync($proyectoIds);
         }
 
-        return redirect()->route('personal.show', $personal->id)->with('success', 'Trabajador creado correctamente.');
+        return redirect()->route('personal.index')->with('success', 'Trabajador creado correctamente.');
     }
 
     public function show(Personal $personal, Request $request)
@@ -232,6 +249,40 @@ class PersonalController extends Controller
         return redirect()->route('personal.show', $personal->id)->with('success', 'Ficha actualizada correctamente.');
     }
 
+    public function destroy(Personal $personal)
+    {
+        if (auth()->user()?->role !== 'superadmin') {
+            abort(403);
+        }
+
+        $personal->delete();
+
+        return redirect()->route('personal.index')->with('success', 'Trabajador eliminado correctamente.');
+    }
+
+    public function tallas(Request $request)
+    {
+        $query = (string) $request->input('q', '');
+
+        $personals = Personal::query()
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('apellido', 'like', "%{$query}%")
+                  ->orWhere('dni_nie', 'like', "%{$query}%")
+                  ->orWhere('departamento', 'like', "%{$query}%");
+            })
+            ->orderBy('name')
+            ->get();
+
+        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco'];
+
+        return view('personal.tallas', [
+            'personals' => $personals,
+            'query' => $query,
+            'columns' => $columns,
+        ]);
+    }
+
     private function validatePersonal(Request $request, ?int $ignoreId = null): array
     {
         $rules = [
@@ -254,6 +305,8 @@ class PersonalController extends Controller
             'guantes' => 'nullable|string|max:20',
             'telefono' => 'nullable|string|max:20',
             'descripcion' => 'nullable|string|max:500',
+            'ultima_revision_medica' => 'nullable|date',
+            'proxima_revision_medica' => 'nullable|date',
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
             'activo' => 'boolean',

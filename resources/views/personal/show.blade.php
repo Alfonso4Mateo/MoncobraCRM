@@ -85,6 +85,88 @@
             border-color: var(--profile-ink);
         }
 
+        .profile-action--danger {
+            background: #b91c1c;
+            color: #fff !important;
+            box-shadow: 0 10px 18px rgba(185, 28, 28, .2);
+        }
+
+        .profile-action--danger:hover {
+            background: #991b1b;
+            box-shadow: 0 12px 20px rgba(185, 28, 28, .26);
+        }
+
+        .profile-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .18s ease;
+            z-index: 2000;
+        }
+
+        .profile-modal.is-open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .profile-modal__panel {
+            width: min(520px, 92vw);
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, .25);
+            padding: 20px 22px;
+        }
+
+        .profile-modal__title {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--profile-ink);
+        }
+
+        .profile-modal__text {
+            margin: 0 0 16px;
+            color: var(--profile-muted);
+            line-height: 1.5;
+        }
+
+        .profile-modal__name {
+            font-weight: 800;
+            color: var(--profile-ink);
+        }
+
+        .profile-modal__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .profile-modal__btn {
+            border-radius: 10px;
+            border: 1px solid var(--profile-line);
+            padding: 8px 14px;
+            font-weight: 800;
+            font-size: .85rem;
+            cursor: pointer;
+            background: #f5f7fb;
+            color: var(--profile-ink);
+        }
+
+        .profile-modal__btn--danger {
+            background: #b91c1c;
+            color: #fff;
+            border-color: #b91c1c;
+        }
+
+        .profile-modal__btn--danger:hover {
+            background: #991b1b;
+        }
+
         @media (max-width: 768px) {
             .profile-filters {
                 grid-template-columns: 1fr;
@@ -102,7 +184,7 @@
             </div>
 
             <div class="profile-hero-actions">
-                <a href="{{ route('inventario.salida.create') }}" class="profile-action profile-action--soft">
+                <a href="{{ route('inventario.salida.create', ['personal_id' => $personal->id]) }}" class="profile-action profile-action--soft">
                     <i class="fas fa-arrow-up-from-box"></i>
                     Registrar Salida
                 </a>
@@ -116,6 +198,12 @@
                         Editar Perfil
                     </a>
                 @endcan
+                @if(auth()->user() && auth()->user()->role === 'superadmin')
+                    <button type="button" class="profile-action profile-action--danger" id="open-delete-personal">
+                        <i class="fas fa-trash"></i>
+                        Eliminar Trabajador
+                    </button>
+                @endif
             </div>
         </header>
 
@@ -145,6 +233,14 @@
                                 <div>
                                     <span>DEPARTAMENTO</span>
                                     <strong>{{ $personal->departamento ?: '—' }}</strong>
+                                </div>
+                                <div>
+                                    <span>ÚLTIMA REVISIÓN MÉDICA</span>
+                                    <strong>{{ optional($personal->ultima_revision_medica)->format('d M Y') ?: '—' }}</strong>
+                                </div>
+                                <div>
+                                    <span>PRÓXIMA REVISIÓN MÉDICA</span>
+                                    <strong>{{ optional($personal->proxima_revision_medica)->format('d M Y') ?: '—' }}</strong>
                                 </div>
                                 <div>
                                     <span>ANTIGÜEDAD</span>
@@ -295,4 +391,58 @@
             <i class="fas fa-arrow-left"></i>
         </a>
     </section>
+
+    @if(auth()->user() && auth()->user()->role === 'superadmin')
+        <div class="profile-modal" id="delete-personal-modal" aria-hidden="true" role="dialog" aria-modal="true">
+            <div class="profile-modal__panel">
+                <h2 class="profile-modal__title">Seguro que deseas eliminar</h2>
+                <p class="profile-modal__text">
+                    Nombre del trabajador:
+                    <span class="profile-modal__name">{{ $personal->name }} {{ $personal->apellido }}</span>
+                </p>
+                <form method="POST" action="{{ route('personal.destroy', $personal->id) }}" class="profile-modal__actions">
+                    @csrf
+                    @method('DELETE')
+                    <button type="button" class="profile-modal__btn" data-close-modal>Cancelar</button>
+                    <button type="submit" class="profile-modal__btn profile-modal__btn--danger">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    @endif
+@endsection
+
+@section('js')
+    <script>
+        (function() {
+            const openBtn = document.getElementById('open-delete-personal');
+            const modal = document.getElementById('delete-personal-modal');
+
+            if (!openBtn || !modal) return;
+
+            const closeButtons = modal.querySelectorAll('[data-close-modal]');
+
+            const openModal = () => {
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openBtn.addEventListener('click', openModal);
+            closeButtons.forEach((btn) => btn.addEventListener('click', closeModal));
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
 @endsection

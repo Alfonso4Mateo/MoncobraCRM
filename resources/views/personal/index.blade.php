@@ -18,10 +18,17 @@
                 <p>Consulta y administra el equipo de trabajo con información de equipamiento.</p>
             </div>
 
-            <a href="{{ route('personal.create') }}" class="personal-primary-action">
-                <i class="fas fa-user-plus" aria-hidden="true"></i>
-                + Añadir Nuevo Trabajador
-            </a>
+            <div class="personal-hero-actions">
+                <a href="{{ route('personal.tallas') }}" class="personal-action-btn personal-action-btn--soft" style="margin-right:12px;">
+                    <i class="fas fa-tshirt" aria-hidden="true"></i>
+                    Gestionar Tallas
+                </a>
+
+                <a href="{{ route('personal.create') }}" class="personal-primary-action">
+                    <i class="fas fa-user-plus" aria-hidden="true"></i>
+                    + Añadir Nuevo Trabajador
+                </a>
+            </div>
         </header>
 
         @if (session('success'))
@@ -47,11 +54,27 @@
                     </div>
 
                     <div class="personal-card__actions">
+                        <form method="GET" action="{{ route('personal.index') }}" class="personal-recognition-form">
+                            <input type="hidden" name="q" value="{{ $query ?? '' }}">
+                            <label for="alerta_dias" class="personal-recognition-label">Gestionar reconocimientos</label>
+                            <div class="personal-recognition-control">
+                                <i class="fas fa-stethoscope" aria-hidden="true"></i>
+                                <select id="alerta_dias" name="alerta_dias" onchange="this.form.submit()">
+                                    <option value="0" @selected(($alertaDias ?? 0) === 0)>Sin aviso</option>
+                                    <option value="30" @selected(($alertaDias ?? 0) === 30)>Avisar en 30 días</option>
+                                    <option value="60" @selected(($alertaDias ?? 0) === 60)>Avisar en 60 días</option>
+                                    <option value="90" @selected(($alertaDias ?? 0) === 90)>Avisar en 90 días</option>
+                                    <option value="120" @selected(($alertaDias ?? 0) === 120)>Avisar en 120 días</option>
+                                    <option value="180" @selected(($alertaDias ?? 0) === 180)>Avisar en 180 días</option>
+                                </select>
+                            </div>
+                        </form>
                     </div>
                 </header>
 
                 <div class="personal-search-wrap">
                     <form method="GET" action="{{ route('personal.index') }}" class="personal-search-form">
+                        <input type="hidden" name="alerta_dias" value="{{ $alertaDias ?? 0 }}">
                         <div class="personal-search-field personal-search-field--search">
                             <label for="q"></label>
                             <input type="search" id="q" name="q" value="{{ $query ?? '' }}" placeholder="Buscar por nombre o apellidos..." autocomplete="off">
@@ -79,6 +102,9 @@
                         <tbody>
                             @forelse ($personals as $personal)
                                 @php
+                                    $alertaRevision = $personal->alerta_revision_medica ?? false;
+                                @endphp
+                                @php
                                     $initials = collect(explode(' ', trim($personal->name)))
                                         ->filter()
                                         ->map(fn ($part) => strtoupper(mb_substr($part, 0, 1)))
@@ -86,7 +112,7 @@
                                         ->implode('');
                                     $userCode = str_pad((string) $personal->id, 4, '0', STR_PAD_LEFT);
                                 @endphp
-                                <tr>
+                                <tr class="{{ $alertaRevision ? 'personal-row--alert' : '' }}">
                                     <td data-label="ID">
                                         <span class="personal-code">{{ $userCode }}</span>
                                     </td>
@@ -94,7 +120,14 @@
                                         <div class="personal-person-cell">
                                             <span class="personal-avatar">{{ $initials ?: 'U' }}</span>
                                             <div class="personal-person-copy">
-                                                <strong>{{ $personal->name }} {{ $personal->apellido }}</strong>
+                                                <div class="personal-person-name">
+                                                    <strong>{{ $personal->name }} {{ $personal->apellido }}</strong>
+                                                    @if($alertaRevision)
+                                                        <span class="personal-alert-icon" title="Revisión médica próxima">
+                                                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                                        </span>
+                                                    @endif
+                                                </div>
                                                 <span style="font-size: 12px; color: #999;">{{ $personal->dni_nie ?: ($personal->telefono ?: '—') }}</span>
                                             </div>
                                         </div>

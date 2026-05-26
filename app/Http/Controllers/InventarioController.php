@@ -283,6 +283,20 @@ class InventarioController extends Controller
     public function createSalida()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
+        $solicitantePrefill = null;
+        $personalId = (int) request()->query('personal_id', 0);
+
+        if ($personalId > 0) {
+            $persona = Personal::query()->find($personalId);
+            if ($persona) {
+                $solicitantePrefill = trim((string) $persona->name . ' ' . (string) $persona->apellido);
+            }
+        }
+
+        if (!$solicitantePrefill) {
+            $querySolicitante = trim((string) request()->query('solicitante', ''));
+            $solicitantePrefill = $querySolicitante !== '' ? $querySolicitante : null;
+        }
 
         $catalogo = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -309,7 +323,7 @@ class InventarioController extends Controller
             ->unique()
             ->values();
 
-        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes'));
+        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill'));
     }
 
     public function storeSalida(Request $request)

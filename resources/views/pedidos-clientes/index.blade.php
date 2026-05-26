@@ -307,7 +307,7 @@
                         <p class="pedido-delete-modal__message mb-0" id="pedidoDeleteBlockedMessage"></p>
                     </div>
                     <div class="modal-footer pedido-delete-modal__footer">
-                        <button type="button" class="btn pedido-delete-modal__btn pedido-delete-modal__btn--primary" data-dismiss="modal">OK</button>
+                        <button type="button" class="btn pedido-delete-modal__btn pedido-delete-modal__btn--primary" data-dismiss="modal">Aceptar</button>
                     </div>
                 </div>
             </div>
