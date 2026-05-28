@@ -7,6 +7,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/inventario-item-create.css'])
+    <style>
+        .item-section--stacked {
+            display: block;
+        }
+
+        .item-section--stacked .item-section-label {
+            margin-bottom: 1rem;
+        }
+
+        .item-section--stacked .item-section-fields {
+            width: 100%;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .item-section .section-content {
+            width: 100%;
+            max-width: 40rem;
+        }
+
+        .variants-grid-fields {
+            grid-template-columns: minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+        }
+
+        .variants-grid-fields > * {
+            min-width: 0;
+        }
+
+        .variants-grid-fields .section-content {
+            width: 100%;
+        }
+    </style>
 @endsection
 
 @section('content')
@@ -33,103 +66,14 @@
                 @csrf
                 @method('PUT')
 
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 1</span>
-                        <h2>Datos Basicos</h2>
-                        <p>Identificacion fundamental del producto y vinculacion con proveedor oficial.</p>
-                    </aside>
+                @include('inventario.create-item.partials.section-basics')
 
-                    <div class="item-section-fields fields-2">
-                        <div class="field-group">
-                            <label for="codigo">Codigo del producto</label>
-                            <input id="codigo" name="codigo" type="text" value="{{ old('codigo', $inventario->codigo) }}" placeholder="Ejem: PRD-2024-X1" class="@error('codigo') is-invalid @enderror" required>
-                        </div>
+                @include('inventario.create-item.partials.section-variant-types')
 
-                        <div class="field-group">
-                            <label for="referencia_proveedor">Referencia proveedor</label>
-                            <input id="referencia_proveedor" name="referencia_proveedor" type="text" value="{{ old('referencia_proveedor', $inventario->referencia_proveedor) }}" placeholder="REF-8829-00" class="@error('referencia_proveedor') is-invalid @enderror">
-                        </div>
+                @php($showStockActual = true)
+                @include('inventario.create-item.partials.section-stock')
 
-                        <div class="field-group">
-                            <label for="nombre">Nombre del producto</label>
-                            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $inventario->nombre ?? $inventario->descripcion) }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
-                        </div>
-
-                        <div class="field-group field-full">
-                            <label for="descripcion">Descripcion del item</label>
-                            <input id="descripcion" name="descripcion" type="text" value="{{ old('descripcion', $inventario->descripcion) }}" placeholder="Descripcion larga o detalles técnicos" class="@error('descripcion') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="clase_id">Clase del producto</label>
-                            <select id="clase_id" name="clase_id" class="@error('clase_id') is-invalid @enderror">
-                                <option value="">-- Seleccionar una clase --</option>
-                                @foreach($clases as $id => $nombre)
-                                    <option value="{{ $id }}" @selected(old('clase_id', $inventario->clase_id) == $id)>{{ $nombre }}</option>
-                                @endforeach
-                            </select>
-                            @error('clase_id')
-                                <span class="invalid-feedback">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-                </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 1.5</span>
-                        <h2>Variantes Dinámicas del Producto</h2>
-                        <p>Define los tipos de variantes (Talla, Color, Material, etc.) y añade tantos valores como necesites por cada tipo.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-1">
-                        <div class="field-group field-full">
-                            <label for="tipos_atributos">Tipos de variantes</label>
-                            <input id="tipos_atributos" name="tipos_atributos" type="text" value="{{ old('tipos_atributos', implode(', ', $inventario->variante?->tipos_atributos ?? [])) }}" placeholder="Ejem: Talla, Color, Material (separados por coma)" class="@error('tipos_atributos') is-invalid @enderror">
-                            <small style="color: #666; display: block; margin-top: 0.5rem;">Especifica los tipos de variantes que tendrá este producto, separados por coma.</small>
-                        </div>
-
-                        <div id="atributos-container" class="field-group field-full" style="margin-top: 1rem;">
-                            <!-- Los campos de atributos se generarán dinámicamente con JavaScript -->
-                        </div>
-                    </div>
-                </section>
-
-                <section class="item-section">
-                    <aside class="item-section-label">
-                        <span>SECCION 2</span>
-                        <h2>Control de Existencias</h2>
-                        <p>Parametros de stock y ubicacion fisica dentro de los almacenes operativos.</p>
-                    </aside>
-
-                    <div class="item-section-fields fields-3">
-                        <div class="field-group field-tight">
-                            <label for="stock_actual">Stock actual</label>
-                            <input id="stock_actual" name="stock_actual" type="number" min="0" step="1" value="{{ old('stock_actual', $inventario->stock_actual) }}" class="@error('stock_actual') is-invalid @enderror" required>
-                        </div>
-
-                        <div class="field-group field-tight">
-                            <label for="stock_minimo">Minimo stock (alerta)</label>
-                            <input id="stock_minimo" name="stock_minimo" type="number" min="0" step="1" value="{{ old('stock_minimo', $inventario->stock_minimo) }}" class="@error('stock_minimo') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group field-tight">
-                            <label for="nivel_critico">Stock critico</label>
-                            <input id="nivel_critico" name="nivel_critico" type="number" min="0" step="1" value="{{ old('nivel_critico', $inventario->nivel_critico) }}" class="@error('nivel_critico') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="almacen">Almacen</label>
-                            <input id="almacen" name="almacen" type="text" value="{{ old('almacen', $inventario->almacen) }}" placeholder="Almacen Central" class="@error('almacen') is-invalid @enderror">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="ubicacion">Ubicacion</label>
-                            <input id="ubicacion" name="ubicacion" type="text" value="{{ old('ubicacion', $inventario->ubicacion) }}" placeholder="Pasillo 3 / Estanteria 12" class="@error('ubicacion') is-invalid @enderror">
-                        </div>
-                    </div>
-                </section>
+                @include('inventario.create-item.partials.section-variant-grid')
 
                 <footer class="item-form-footer">
                     <p>* Todos los campos son obligatorios para el registro.</p>
@@ -150,38 +94,115 @@
 @section('js')
     <script>
         (function () {
-            const valoresIniciales = @json(old('atributos_variante', $inventario->atributos_variante ?? []));
+            const valoresIniciales = @json(old('atributos_variante', $valoresIniciales ?? []));
+            const variantesIniciales = @json(old('variantes', $variantesIniciales ?? []));
 
-            // Generar campos dinámicos para variantes
             const tiposAtributosInput = document.getElementById('tipos_atributos');
             const atributosContainer = document.getElementById('atributos-container');
+            const variantesContainer = document.getElementById('variantes-container');
+            const variantesHead = document.getElementById('variantes-head');
+            const stockTotal = document.getElementById('stock-total');
+            const variantOrderPreview = document.getElementById('variant-order-preview');
+            const variantsSummary = document.getElementById('variants-summary');
+            const bulkStockValue = document.getElementById('bulk-stock-value');
+            const bulkApplyStock = document.getElementById('bulk-apply-stock');
+            const bulkSetZero = document.getElementById('bulk-set-zero');
+            const bulkActivateAll = document.getElementById('bulk-activate-all');
+            const bulkDeactivateAll = document.getElementById('bulk-deactivate-all');
+            const stockMinimoInput = document.getElementById('stock_minimo');
+            const nivelCriticoInput = document.getElementById('nivel_critico');
+            let tiposOrdenados = [];
 
-            const parseTipos = (value) => {
-                return String(value || '')
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter((item) => item.length > 0);
-            };
+            const parseTipos = (value) => String(value || '')
+                .split(',')
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0);
 
-            const collectCurrentValues = () => {
-                const valores = {};
+            const normalizeKey = (atributos) => Object.entries(atributos || {})
+                .map(([tipo, valor]) => `${tipo}:${valor}`)
+                .join('|');
+
+            const collectTypeValues = () => {
+                const valuesByType = {};
 
                 atributosContainer.querySelectorAll('[data-variant-type]').forEach((group) => {
                     const tipo = group.dataset.variantType || '';
-                    const inputs = group.querySelectorAll('input[data-variant-value]');
-                    const values = Array.from(inputs)
+                    const values = Array.from(group.querySelectorAll('input[data-variant-value]'))
                         .map((input) => input.value.trim())
-                        .filter((input) => input.length > 0);
+                        .filter((value) => value.length > 0);
 
                     if (tipo && values.length > 0) {
-                        valores[tipo] = values;
+                        valuesByType[tipo] = values;
                     }
                 });
 
-                return valores;
+                return valuesByType;
             };
 
-            const createValueRow = (tipo, value = '') => {
+            const collectCombinationStocks = () => {
+                const stocks = {};
+
+                variantesContainer.querySelectorAll('[data-combination-key]').forEach((row) => {
+                    const key = row.dataset.combinationKey || '';
+                    const input = row.querySelector('input[data-stock-input]');
+                    if (key && input) {
+                        stocks[key] = input.value;
+                    }
+                });
+
+                return stocks;
+            };
+
+            const buildInitialCombinationStocks = () => {
+                const stocks = {};
+
+                (Array.isArray(variantesIniciales) ? variantesIniciales : []).forEach((variant) => {
+                    const atributos = variant && typeof variant === 'object' ? (variant.atributos || {}) : {};
+                    const normalizedAttributes = {};
+
+                    Object.entries(atributos).forEach(([tipo, valor]) => {
+                        const firstValue = Array.isArray(valor) ? valor[0] : valor;
+                        if (firstValue !== undefined && firstValue !== null && String(firstValue).trim() !== '') {
+                            normalizedAttributes[tipo] = String(firstValue).trim();
+                        }
+                    });
+
+                    const key = normalizeKey(normalizedAttributes);
+                    if (key) {
+                        stocks[key] = String(variant.stock_actual ?? '0');
+                    }
+                });
+
+                return stocks;
+            };
+
+            const buildInitialCombinationIds = () => {
+                const ids = {};
+
+                (Array.isArray(variantesIniciales) ? variantesIniciales : []).forEach((variant) => {
+                    const atributos = variant && typeof variant === 'object' ? (variant.atributos || {}) : {};
+                    const normalizedAttributes = {};
+
+                    Object.entries(atributos).forEach(([tipo, valor]) => {
+                        const firstValue = Array.isArray(valor) ? valor[0] : valor;
+                        if (firstValue !== undefined && firstValue !== null && String(firstValue).trim() !== '') {
+                            normalizedAttributes[tipo] = String(firstValue).trim();
+                        }
+                    });
+
+                    const key = normalizeKey(normalizedAttributes);
+                    if (key && variant.id) {
+                        ids[key] = String(variant.id);
+                    }
+                });
+
+                return ids;
+            };
+
+            const initialCombinationStocks = buildInitialCombinationStocks();
+            const initialCombinationIds = buildInitialCombinationIds();
+
+            const createValueRow = (tipo, value = '', onChange = null) => {
                 const row = document.createElement('div');
                 row.style.display = 'flex';
                 row.style.gap = '0.75rem';
@@ -198,19 +219,29 @@
 
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
-                removeButton.innerHTML = '<i class="fas fa-trash"></i> Eliminar';
+                removeButton.textContent = 'Eliminar';
                 removeButton.style.border = '1px solid #d0d7de';
                 removeButton.style.background = '#fff';
                 removeButton.style.borderRadius = '8px';
                 removeButton.style.padding = '0.55rem 0.85rem';
+
+                const handleChange = () => {
+                    if (typeof onChange === 'function') {
+                        onChange();
+                    }
+                };
+
+                input.addEventListener('input', handleChange);
 
                 removeButton.addEventListener('click', () => {
                     row.remove();
 
                     const list = row.parentElement;
                     if (list && list.children.length === 0) {
-                        list.appendChild(createValueRow(tipo));
+                        list.appendChild(createValueRow(tipo, '', onChange));
                     }
+
+                    handleChange();
                 });
 
                 row.appendChild(input);
@@ -219,7 +250,7 @@
                 return row;
             };
 
-            const createVariantGroup = (tipo, values = []) => {
+            const createVariantGroup = (tipo, values = [], levelIndex = 0, onChange = null) => {
                 const group = document.createElement('div');
                 group.className = 'field-group field-full';
                 group.dataset.variantType = tipo;
@@ -235,13 +266,13 @@
                 header.style.gap = '1rem';
 
                 const label = document.createElement('label');
-                label.textContent = `Valor - ${tipo}`;
+                label.textContent = `Nivel ${levelIndex + 1} - ${tipo}`;
                 label.style.margin = '0';
                 label.style.fontWeight = '700';
 
                 const addButton = document.createElement('button');
                 addButton.type = 'button';
-                addButton.innerHTML = '<i class="fas fa-plus"></i> Añadir valor';
+                addButton.textContent = 'Añadir valor';
                 addButton.style.border = '1px solid #0f172a';
                 addButton.style.background = '#0f172a';
                 addButton.style.color = '#fff';
@@ -249,14 +280,17 @@
                 addButton.style.padding = '0.55rem 0.85rem';
 
                 const list = document.createElement('div');
+                const initialValues = Array.isArray(values) && values.length > 0 ? values : [''];
 
                 addButton.addEventListener('click', () => {
-                    list.appendChild(createValueRow(tipo));
+                    list.appendChild(createValueRow(tipo, '', onChange));
+                    if (typeof onChange === 'function') {
+                        onChange();
+                    }
                 });
 
-                const initialValues = Array.isArray(values) && values.length > 0 ? values : [''];
                 initialValues.forEach((value) => {
-                    list.appendChild(createValueRow(tipo, value));
+                    list.appendChild(createValueRow(tipo, value, onChange));
                 });
 
                 header.appendChild(label);
@@ -267,28 +301,397 @@
                 return group;
             };
 
-            const generarCamposAtributos = () => {
-                const valor = tiposAtributosInput.value.trim();
-                const valoresActuales = collectCurrentValues();
-                atributosContainer.innerHTML = '';
+            const renderTableHead = (types) => {
+                if (!variantesHead) {
+                    return;
+                }
 
-                if (!valor) return;
+                variantesHead.innerHTML = '';
 
-                const tipos = parseTipos(valor);
+                const row = document.createElement('tr');
 
-                if (tipos.length === 0) return;
-
-                tipos.forEach(tipo => {
-                    const valoresTipo = valoresActuales[tipo] || valoresIniciales[tipo] || [];
-                    atributosContainer.appendChild(createVariantGroup(tipo, valoresTipo));
+                types.forEach((tipo, index) => {
+                    const th = document.createElement('th');
+                    th.textContent = `Nivel ${index + 1} · ${tipo}`;
+                    row.appendChild(th);
                 });
+
+                ['Stock', 'Estado', 'Activo', 'Acciones'].forEach((label) => {
+                    const th = document.createElement('th');
+                    th.textContent = label;
+                    row.appendChild(th);
+                });
+
+                variantesHead.appendChild(row);
             };
 
-            // Generar campos iniciales
-            generarCamposAtributos();
+            const getVariantThresholds = () => ({
+                minimum: parseInt(stockMinimoInput?.value || '0', 10) || 0,
+                critical: parseInt(nivelCriticoInput?.value || '0', 10) || 0,
+            });
 
-            // Regenerar cuando cambie el input de tipos
-            tiposAtributosInput.addEventListener('input', generarCamposAtributos);
+            const resolveVariantState = (stockValue) => {
+                const { minimum, critical } = getVariantThresholds();
+
+                if (stockValue <= critical) {
+                    return 'critico';
+                }
+
+                if (stockValue <= minimum) {
+                    return 'bajo';
+                }
+
+                return 'optimo';
+            };
+
+            const updateVariantsSummary = () => {
+                if (!variantsSummary) {
+                    return;
+                }
+
+                const rows = Array.from(variantesContainer.querySelectorAll('tr[data-combination-key]'));
+                const activeRows = rows.filter((row) => {
+                    const activeInput = row.querySelector('input[data-row-active]');
+                    return activeInput ? activeInput.value === '1' : true;
+                });
+
+                variantsSummary.textContent = `${activeRows.length} combinaciones activas · ${rows.length} combinaciones totales`;
+            };
+
+            const updateRowState = (row) => {
+                const stockInput = row.querySelector('input[data-stock-input]');
+                const stateChip = row.querySelector('[data-state-chip]');
+                const activeInput = row.querySelector('input[data-row-active]');
+                const isActive = activeInput ? activeInput.value === '1' : true;
+                const stockValue = parseInt(stockInput?.value || '0', 10) || 0;
+                const state = resolveVariantState(stockValue);
+
+                row.dataset.variantState = state;
+                row.classList.remove('variant-row-optimo', 'variant-row-bajo', 'variant-row-critico', 'variant-row-inactive');
+                row.classList.add(`variant-row-${state}`);
+
+                if (!isActive) {
+                    row.classList.add('variant-row-inactive');
+                }
+
+                if (stateChip) {
+                    stateChip.className = `variant-state-chip variant-state-chip--${state}`;
+                    stateChip.textContent = state === 'critico'
+                        ? 'Crítico'
+                        : (state === 'bajo' ? 'Reposición' : 'Óptimo');
+                }
+
+                if (stockInput) {
+                    stockInput.classList.remove('variant-stock-input--critico', 'variant-stock-input--bajo');
+                    if (state === 'critico') {
+                        stockInput.classList.add('variant-stock-input--critico');
+                    } else if (state === 'bajo') {
+                        stockInput.classList.add('variant-stock-input--bajo');
+                    }
+                }
+            };
+
+            const setRowActiveState = (row, active) => {
+                const activeInput = row.querySelector('input[data-row-active]');
+                const fieldInputs = row.querySelectorAll('[data-row-field]');
+                const toggleInput = row.querySelector('input[data-row-toggle]');
+
+                if (activeInput) {
+                    activeInput.value = active ? '1' : '0';
+                }
+
+                if (toggleInput) {
+                    toggleInput.checked = active;
+                }
+
+                fieldInputs.forEach((input) => {
+                    input.disabled = !active;
+                });
+
+                row.classList.toggle('variant-row-inactive', !active);
+                updateRowState(row);
+                updateVariantsSummary();
+            };
+
+            const setAllRowsActive = (active) => {
+                variantesContainer.querySelectorAll('tr[data-combination-key]').forEach((row) => {
+                    setRowActiveState(row, active);
+                });
+                updateTotalStock();
+            };
+
+            const applyBulkStock = (value) => {
+                const parsedValue = Math.max(0, parseInt(value || '0', 10) || 0);
+
+                variantesContainer.querySelectorAll('tr[data-combination-key]').forEach((row) => {
+                    const activeInput = row.querySelector('input[data-row-active]');
+                    const stockInput = row.querySelector('input[data-stock-input]');
+
+                    if (activeInput && activeInput.value !== '1') {
+                        return;
+                    }
+
+                    if (stockInput && !stockInput.disabled) {
+                        stockInput.value = String(parsedValue);
+                        stockInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+
+                updateTotalStock();
+            };
+
+            const generateCombinations = (valuesByType, orderedTypes = []) => {
+                const types = orderedTypes.length > 0 ? orderedTypes : Object.keys(valuesByType);
+
+                if (types.length === 0) {
+                    return [];
+                }
+
+                return types.reduce((accumulator, type) => {
+                    const values = valuesByType[type] || [];
+
+                    if (values.length === 0) {
+                        return [];
+                    }
+
+                    const combinations = [];
+
+                    accumulator.forEach((existing) => {
+                        values.forEach((value) => {
+                            combinations.push({
+                                ...existing,
+                                [type]: value,
+                            });
+                        });
+                    });
+
+                    return combinations;
+                }, [{}]);
+            };
+
+            const updateTotalStock = () => {
+                const total = Array.from(variantesContainer.querySelectorAll('input[data-stock-input]'))
+                    .filter((input) => !input.disabled)
+                    .reduce((sum, input) => sum + (parseInt(input.value || '0', 10) || 0), 0);
+
+                stockTotal.textContent = String(total);
+            };
+
+            const renderCombinations = () => {
+                const valuesByType = collectTypeValues();
+                const types = tiposOrdenados.length > 0 ? tiposOrdenados : Object.keys(valuesByType);
+                const preservedStocks = collectCombinationStocks();
+                variantesContainer.innerHTML = '';
+                const emptyColspan = types.length + 4;
+
+                if (types.length === 0) {
+                    variantesContainer.innerHTML = `<tr><td colspan="${emptyColspan}" class="variants-grid-empty">Define al menos un tipo de variante para generar combinaciones.</td></tr>`;
+                    stockTotal.textContent = '0';
+                    updateVariantsSummary();
+                    return;
+                }
+
+                const combinations = generateCombinations(valuesByType, types);
+
+                if (combinations.length === 0) {
+                    variantesContainer.innerHTML = `<tr><td colspan="${emptyColspan}" class="variants-grid-empty">Añade al menos un valor en cada tipo para generar combinaciones.</td></tr>`;
+                    stockTotal.textContent = '0';
+                    updateVariantsSummary();
+                    return;
+                }
+
+                combinations.forEach((atributos, index) => {
+                    const combinationKey = normalizeKey(atributos);
+                    const stockValue = preservedStocks[combinationKey] ?? initialCombinationStocks[combinationKey] ?? '0';
+                    const rowId = initialCombinationIds[combinationKey] ?? '';
+                    const row = document.createElement('tr');
+                    row.dataset.combinationKey = combinationKey;
+                    row.className = 'variant-row variant-row-optimo';
+
+                    types.forEach((tipo) => {
+                        const td = document.createElement('td');
+                        const cell = document.createElement('div');
+                        cell.className = 'variant-attribute-cell';
+
+                        const name = document.createElement('span');
+                        name.className = 'variant-attribute-name';
+                        name.textContent = tipo;
+
+                        const value = document.createElement('span');
+                        value.className = 'variant-attribute-value';
+                        value.textContent = atributos[tipo] ?? '—';
+
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = `variantes[${index}][atributos][${tipo}]`;
+                        hidden.value = atributos[tipo] ?? '';
+                        hidden.dataset.rowField = '1';
+
+                        cell.appendChild(name);
+                        cell.appendChild(value);
+                        cell.appendChild(hidden);
+                        td.appendChild(cell);
+                        row.appendChild(td);
+                    });
+
+                    const stockTd = document.createElement('td');
+                    if (rowId) {
+                        const hiddenId = document.createElement('input');
+                        hiddenId.type = 'hidden';
+                        hiddenId.name = `variantes[${index}][id]`;
+                        hiddenId.value = rowId;
+                        hiddenId.dataset.rowField = '1';
+                        stockTd.appendChild(hiddenId);
+                    }
+
+                    const stockInput = document.createElement('input');
+                    stockInput.type = 'number';
+                    stockInput.min = '0';
+                    stockInput.step = '1';
+                    stockInput.name = `variantes[${index}][stock_actual]`;
+                    stockInput.dataset.stockInput = '1';
+                    stockInput.dataset.rowField = '1';
+                    stockInput.value = stockValue;
+                    stockInput.className = 'variant-stock-input';
+
+                    stockInput.addEventListener('input', () => {
+                        updateRowState(row);
+                        updateTotalStock();
+                    });
+
+                    stockTd.appendChild(stockInput);
+                    row.appendChild(stockTd);
+
+                    const stateTd = document.createElement('td');
+                    const stateChip = document.createElement('span');
+                    stateChip.dataset.stateChip = '1';
+                    stateTd.appendChild(stateChip);
+                    row.appendChild(stateTd);
+
+                    const activeTd = document.createElement('td');
+                    const activeWrapper = document.createElement('label');
+                    activeWrapper.className = 'variant-switch';
+
+                    const activeToggle = document.createElement('input');
+                    activeToggle.type = 'checkbox';
+                    activeToggle.checked = true;
+                    activeToggle.dataset.rowToggle = '1';
+
+                    const activeTrack = document.createElement('span');
+                    activeTrack.className = 'variant-switch__track';
+
+                    const activeThumb = document.createElement('span');
+                    activeThumb.className = 'variant-switch__thumb';
+
+                    activeToggle.addEventListener('change', () => {
+                        setRowActiveState(row, activeToggle.checked);
+                        updateTotalStock();
+                    });
+
+                    activeWrapper.appendChild(activeToggle);
+                    activeWrapper.appendChild(activeTrack);
+                    activeWrapper.appendChild(activeThumb);
+                    activeTd.appendChild(activeWrapper);
+
+                    const activeHidden = document.createElement('input');
+                    activeHidden.type = 'hidden';
+                    activeHidden.name = `variantes[${index}][activo]`;
+                    activeHidden.value = '1';
+                    activeHidden.dataset.rowActive = '1';
+                    activeTd.appendChild(activeHidden);
+                    row.appendChild(activeTd);
+
+                    const actionsTd = document.createElement('td');
+                    const actions = document.createElement('div');
+                    actions.className = 'variant-action-group';
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'variant-mini-btn';
+                    removeButton.innerHTML = '<i class="fas fa-trash"></i>';
+                    removeButton.title = 'Eliminar combinación';
+                    removeButton.addEventListener('click', () => {
+                        row.remove();
+                        updateTotalStock();
+                        updateVariantsSummary();
+                    });
+
+                    actions.appendChild(removeButton);
+                    actionsTd.appendChild(actions);
+                    row.appendChild(actionsTd);
+
+                    updateRowState(row);
+                    variantesContainer.appendChild(row);
+                });
+
+                updateTotalStock();
+                updateVariantsSummary();
+            };
+
+            const renderVariantTypes = () => {
+                const currentValues = collectTypeValues();
+                const tipos = parseTipos(tiposAtributosInput.value);
+                tiposOrdenados = tipos;
+
+                atributosContainer.innerHTML = '';
+
+                if (variantOrderPreview) {
+                    const previewText = tipos.length > 0 ? tipos.join(' → ') : '—';
+                    const previewSpan = variantOrderPreview.querySelector('span');
+                    if (previewSpan) {
+                        previewSpan.textContent = previewText;
+                    }
+                }
+
+                renderTableHead(tipos);
+
+                if (tipos.length === 0) {
+                    variantesContainer.innerHTML = `<tr><td colspan="${tipos.length + 4}" class="variants-grid-empty">Escribe tipos de variantes para empezar a generar combinaciones.</td></tr>`;
+                    stockTotal.textContent = '0';
+                    updateVariantsSummary();
+                    return;
+                }
+
+                tipos.forEach((tipo, index) => {
+                    const values = currentValues[tipo] || valoresIniciales[tipo] || [''];
+                    atributosContainer.appendChild(createVariantGroup(tipo, values, index, renderCombinations));
+                });
+
+                renderCombinations();
+            };
+
+            const autoGrowAreas = document.querySelectorAll('.input-auto-grow');
+            if (autoGrowAreas.length) {
+                const resizeArea = (el) => {
+                    el.style.height = 'auto';
+                    el.style.height = `${el.scrollHeight}px`;
+                };
+
+                autoGrowAreas.forEach((area) => {
+                    resizeArea(area);
+                    area.addEventListener('input', () => resizeArea(area));
+                });
+            }
+
+            tiposAtributosInput.addEventListener('input', renderVariantTypes);
+            if (bulkApplyStock) {
+                bulkApplyStock.addEventListener('click', () => applyBulkStock(bulkStockValue ? bulkStockValue.value : '0'));
+            }
+            if (bulkSetZero) {
+                bulkSetZero.addEventListener('click', () => {
+                    if (bulkStockValue) {
+                        bulkStockValue.value = '0';
+                    }
+                    applyBulkStock('0');
+                });
+            }
+            if (bulkActivateAll) {
+                bulkActivateAll.addEventListener('click', () => setAllRowsActive(true));
+            }
+            if (bulkDeactivateAll) {
+                bulkDeactivateAll.addEventListener('click', () => setAllRowsActive(false));
+            }
+            renderVariantTypes();
         })();
     </script>
 @endsection

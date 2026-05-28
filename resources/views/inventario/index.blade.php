@@ -58,6 +58,65 @@
         .inventory-toggle-btn[aria-expanded="true"] i {
             transform: rotate(90deg);
         }
+
+        .inventory-table {
+            table-layout: fixed;
+        }
+
+        .inventory-table th:nth-child(1),
+        .inventory-table td:nth-child(1) {
+            width: 7%;
+        }
+
+        .inventory-table th:nth-child(2),
+        .inventory-table td:nth-child(2) {
+            width: 8%;
+        }
+
+        .inventory-table th:nth-child(3),
+        .inventory-table td:nth-child(3) {
+            width: 30%;
+        }
+
+        .inventory-table th:nth-child(4),
+        .inventory-table td:nth-child(4) {
+            width: 8%;
+        }
+
+        .inventory-table th:nth-child(5),
+        .inventory-table td:nth-child(5) {
+            width: 7%;
+        }
+
+        .inventory-table th:nth-child(6),
+        .inventory-table td:nth-child(6) {
+            width: 10%;
+        }
+
+        .inventory-table th:nth-child(7),
+        .inventory-table td:nth-child(7),
+        .inventory-table th:nth-child(8),
+        .inventory-table td:nth-child(8),
+        .inventory-table th:nth-child(9),
+        .inventory-table td:nth-child(9) {
+            width: 5%;
+        }
+
+        .inventory-table th:nth-child(10),
+        .inventory-table td:nth-child(10) {
+            width: 7%;
+        }
+
+        .inventory-table th:nth-child(11),
+        .inventory-table td:nth-child(11) {
+            width: 8%;
+        }
+
+        .inventory-table td:nth-child(3),
+        .inventory-table td:nth-child(4),
+        .inventory-table td:nth-child(6) {
+            word-break: break-word;
+        }
     </style>
 @endsection
 
@@ -405,7 +464,13 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="inventory-pill muted">Hija</span>
+                                                @if (is_object(data_get($producto, 'claseRelacion')))
+                                                    <span class="inventory-pill muted">{{ data_get($producto, 'claseRelacion.nombre') }}</span>
+                                                @elseif($productoPadre->claseRelacion)
+                                                    <span class="inventory-pill muted">{{ $productoPadre->claseRelacion->nombre }}</span>
+                                                @else
+                                                    <span class="inventory-pill muted">Sin clase</span>
+                                                @endif
                                             </td>
                                             <td>
                                                 <div class="inventory-location">

@@ -353,6 +353,316 @@
     font-size: 0.55rem;
 }
 
+.variants-grid-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-top: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid #d7e1ee;
+    border-radius: 14px;
+    background: #f8fbff;
+}
+
+.variants-grid-toolbar__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 220px;
+}
+
+.variants-grid-toolbar__label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #73839a;
+}
+
+.variants-grid-toolbar__inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.variants-grid-toolbar__inline input {
+    width: 110px;
+    height: 40px;
+    border: 1px solid #d5dfec;
+    border-radius: 10px;
+    padding: 0 0.7rem;
+    font-weight: 700;
+    color: #0f2747;
+    background: #fff;
+}
+
+.variants-grid-toolbar__btn {
+    height: 40px;
+    padding: 0 0.9rem;
+    border-radius: 10px;
+    border: 1px solid #d5dfec;
+    background: #ffffff;
+    color: #173e67;
+    font-weight: 800;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.variants-grid-toolbar__btn--primary {
+    background: #173e67;
+    border-color: #173e67;
+    color: #fff;
+}
+
+.variants-grid-toolbar__summary {
+    margin-left: auto;
+    padding: 0.8rem 0.95rem;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #dce6f4;
+    color: #173e67;
+    font-weight: 800;
+    min-width: 220px;
+}
+
+.variants-grid-shell {
+    margin-top: 1rem;
+    border: 1px solid #dce6f4;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.variants-grid-fields {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+}
+
+.variants-grid-fields > * {
+    min-width: 0;
+}
+
+.variants-grid-fields .section-content {
+    width: 100%;
+}
+
+#variantes-container {
+    width: 100%;
+}
+
+.variants-grid-table {
+    width: 100%;
+    min-width: 100%;
+    margin: 0;
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.variants-grid-table thead th {
+    background: #f7f9fc;
+    border-bottom: 1px solid #dce6f4 !important;
+    color: #7a8ca4;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.8rem 0.6rem !important;
+    white-space: nowrap;
+}
+
+.variants-grid-table tbody td {
+    border-top: 1px solid #eef3f8 !important;
+    padding: 0.75rem 0.6rem !important;
+    vertical-align: middle !important;
+    color: #213a57;
+    font-size: 0.84rem;
+    white-space: normal;
+}
+
+.variants-grid-table thead th:nth-child(-n + 3),
+.variants-grid-table tbody td:nth-child(-n + 3) {
+    min-width: 10.5rem;
+}
+
+.variants-grid-table thead th:nth-last-child(-n + 4),
+.variants-grid-table tbody td:nth-last-child(-n + 4) {
+    min-width: 7.5rem;
+}
+
+.variant-row-critico td {
+    background: #ffecec;
+}
+
+.variant-row-bajo td {
+    background: #fff4e4;
+}
+
+.variant-row-optimo td {
+    background: #ffffff;
+}
+
+.variant-row-inactive {
+    opacity: 0.58;
+}
+
+.variant-attribute-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.variant-attribute-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #7a8ca4;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.variant-attribute-value {
+    font-weight: 800;
+    color: #173e67;
+    word-break: break-word;
+}
+
+.variant-stock-input {
+    width: 100%;
+    min-width: 90px;
+    height: 38px;
+    border: 1px solid #d5dfec;
+    border-radius: 10px;
+    padding: 0 0.75rem;
+    font-weight: 800;
+    color: #173e67;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.variant-stock-input--critico {
+    color: #a13c3c;
+}
+
+.variant-stock-input--bajo {
+    color: #b77b17;
+}
+
+.variant-state-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.25rem;
+    padding: 0.28rem 0.62rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.variant-state-chip--optimo {
+    background: #e7f9f0;
+    color: #1e8a58;
+}
+
+.variant-state-chip--bajo {
+    background: #fff3dd;
+    color: #b77b17;
+}
+
+.variant-state-chip--critico {
+    background: #ffe7e7;
+    color: #c43d3d;
+}
+
+.variant-action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    justify-content: flex-end;
+}
+
+.variant-switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.variant-switch input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.variant-switch__track {
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    background: #d6deea;
+    transition: background 0.18s ease;
+}
+
+.variant-switch__thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.15);
+    transition: transform 0.18s ease;
+}
+
+.variant-switch input:checked + .variant-switch__track {
+    background: #173e67;
+}
+
+.variant-switch input:checked + .variant-switch__track + .variant-switch__thumb {
+    transform: translateX(20px);
+}
+
+.variant-row-inactive .variant-switch__track {
+    background: #f1b5b5;
+}
+
+.variant-mini-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid #d5dfec;
+    background: #fff;
+    color: #8b97a8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.variant-mini-btn:hover {
+    color: #b42318;
+    border-color: #f0c9c9;
+    background: #fff5f5;
+}
+
+.variants-grid-empty {
+    padding: 1rem;
+    text-align: center;
+    color: #6b7280;
+    font-weight: 700;
+}
+
 @media (max-width: 1180px) {
     .inventory-item-layout {
         grid-template-columns: 1fr;

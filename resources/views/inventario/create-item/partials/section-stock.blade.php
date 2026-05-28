@@ -5,8 +5,19 @@
         <p>Estos valores se aplicarán a todas las combinaciones generadas.</p>
     </aside>
 
-    <div class="item-section-fields fields-2">
+    @php
+        $stockSectionClass = !empty($showStockActual) ? 'fields-3' : 'fields-2';
+    @endphp
+
+    <div class="item-section-fields {{ $stockSectionClass }}">
         <div class="section-content">
+        @if(!empty($showStockActual))
+        <div class="field-group field-tight">
+            <label for="stock_actual">Stock actual</label>
+            <input id="stock_actual" name="stock_actual" type="number" min="0" step="1" value="{{ old('stock_actual', $varianteBase->stock_actual ?? 0) }}" class="@error('stock_actual') is-invalid @enderror">
+        </div>
+        @endif
+
         <div class="field-group field-tight">
             <label for="stock_minimo">Minimo stock (alerta)</label>
             <input id="stock_minimo" name="stock_minimo" type="number" min="0" step="1" value="{{ old('stock_minimo', $varianteBase->stock_minimo ?? 10) }}" class="@error('stock_minimo') is-invalid @enderror">

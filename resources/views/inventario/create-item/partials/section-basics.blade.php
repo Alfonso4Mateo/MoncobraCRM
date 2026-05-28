@@ -19,7 +19,7 @@
 
         <div class="field-group">
             <label for="nombre">Nombre del producto</label>
-            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $varianteBase->descripcion ?? '') }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
+            <input id="nombre" name="nombre" type="text" value="{{ old('nombre', $varianteBase->nombre ?? $varianteBase->descripcion ?? '') }}" placeholder="Nombre corto del producto" class="@error('nombre') is-invalid @enderror" required>
         </div>
 
         <div class="field-group field-full">
