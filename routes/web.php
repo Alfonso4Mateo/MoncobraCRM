@@ -71,7 +71,7 @@ Route::middleware('auth')->group(function () {
 
     // Recursos CRUD
     Route::resource('clientes', ClienteController::class);
-    Route::post('clieFliente}/favorito', [ClienteController::class, 'toggleFavorito'])->name('clientes.favorito.toggle');
+    Route::post('clientes/{cliente}/favorito', [ClienteController::class, 'toggleFavorito'])->name('clientes.favorito.toggle');
     Route::get('albaranes/{albaran}/pdf', [AlbaranClienteController::class, 'pdfViewer'])->name('albaranes.pdf');
     Route::get('albaranes/{albaran}/pdf/file', [AlbaranClienteController::class, 'streamPdf'])->name('albaranes.pdf.file');
     Route::get('albaranes/{albaran}/pdf/download', [AlbaranClienteController::class, 'downloadPdf'])->name('albaranes.pdf.download');

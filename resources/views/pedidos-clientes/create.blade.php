@@ -29,6 +29,7 @@
         $clienteSeleccionadoId = (string) old('id_cliente', $clienteSeleccionadoId ?? '');
         $presupuestoSeleccionadoId = (string) old('presupuesto_id', $presupuestoSeleccionadoId ?? '');
         $estadoActual = (string) old('estado', 'pendiente');
+        $pedidoBolsa = (bool) old('bolsa', false);
         $numeroPedido = old('numero_pedido', '');
         $fechaPedido = old('fecha_pedido', $fechaPedido ?? now()->toDateString());
         $otPedido = old('ot', $presupuestoSeleccionado?->ot ?? null);
@@ -39,12 +40,14 @@
         $presupuestosParaPedidoJs = $presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
+        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 2, '.', ''));
     @endphp
 
     <form id="pedido-cliente-form" action="{{ route('pedidos-clientes.store') }}" method="POST" class="pedido-create-layout" novalidate>
         @csrf
+        <input type="hidden" name="bolsa" value="0">
         <input type="hidden" name="estado" id="pedido_estado" value="{{ $estadoActual }}">
-        <input type="hidden" name="total" id="pedido_total" value="{{ number_format($totalPedido, 2, '.', '') }}">
+        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 2, '.', '') }}">
         <input type="hidden" name="lista_articulos" id="pedido_lista_articulos" value="{{ $lineasJson }}">
 
         <section class="pedido-create-main">
@@ -144,6 +147,15 @@
                         <label for="ot">OT</label>
                         <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo">
                     </div>
+
+                    <div class="pedido-field">
+                        <label for="pedido_bolsa">Pedido bolsa</label>
+                        <label class="pedido-checkbox-inline" style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                            <input type="checkbox" id="pedido_bolsa" name="bolsa" value="1" {{ $pedidoBolsa ? 'checked' : '' }}>
+                            <span>Activar modo bolsa</span>
+                        </label>
+                        <small class="pedido-help">En modo bolsa no se usan líneas y solo se introduce el total del pedido.</small>
+                    </div>
                 </div>
             </article>
 
@@ -178,12 +190,18 @@
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_precio">P. unitario</label>
-                            <input type="number" step="0.01" min="0" max="1000000" id="line_precio" class="pedido-input" value="0">
+                                <input type="number" step="0.01" min="0" max="10000000" id="line_precio" class="pedido-input" value="0">
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_margen">Margen</label>
                             <input type="number" step="0.01" min="0" max="1000" id="line_margen" class="pedido-input" value="0">
                         </div>
+                    </div>
+
+                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_total_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
+                        <label for="pedido_bolsa_total">Total del pedido</label>
+                            <input type="number" step="0.01" min="0" max="10000000" id="pedido_bolsa_total" class="pedido-input" value="{{ $totalPedidoManual }}" placeholder="Importe total del pedido">
+                        <small class="pedido-help">Rellena este importe solo si el pedido es bolsa.</small>
                     </div>
                 </div>
 
@@ -251,6 +269,9 @@
             const form = document.getElementById('pedido-cliente-form');
             const body = document.getElementById('pedido-lines-body');
             const addLineButton = document.getElementById('pedido-add-line');
+            const bolsaCheckbox = document.getElementById('pedido_bolsa');
+            const bolsaTotalWrap = document.getElementById('pedido_bolsa_total_wrap');
+            const bolsaTotalInput = document.getElementById('pedido_bolsa_total');
             const descripcionInput = document.getElementById('line_descripcion');
             const cantidadInput = document.getElementById('line_cantidad');
             const medidaInput = document.getElementById('line_medida');
@@ -266,8 +287,11 @@
             const hiddenTotal = document.getElementById('pedido_total');
             const summaryBase = document.getElementById('summary-base');
             const summaryTotal = document.getElementById('summary-total');
+            const lineFormGrid = document.querySelector('.pedido-form-grid--line');
+            const lineTableWrap = document.querySelector('.pedido-table-wrap');
             const initialLines = @json($lineasInicialesJs ?? []);
             const presupuestos = @json($presupuestosParaPedidoJs ?? []);
+            let bolsaMode = bolsaCheckbox.checked;
 
             const moneyFormatter = new Intl.NumberFormat('es-ES', {
                 minimumFractionDigits: 2,
@@ -339,6 +363,22 @@
                 }
             };
 
+            const syncBolsaUi = () => {
+                bolsaMode = bolsaCheckbox.checked;
+                bolsaTotalWrap.hidden = !bolsaMode;
+                lineFormGrid.hidden = bolsaMode;
+                lineTableWrap.hidden = bolsaMode;
+                bolsaTotalInput.required = bolsaMode;
+                addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
+
+                if (bolsaMode) {
+                    items.splice(0, items.length);
+                    syncHidden();
+                }
+
+                renderRows();
+            };
+
             if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
                 window.jQuery(presupuestoSelect).select2({
                     theme: 'bootstrap4',
@@ -356,14 +396,21 @@
 
             const renderTotals = () => {
                 const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
-                const total = base;
+                const total = bolsaMode ? parseValue(bolsaTotalInput.value) : base;
 
                 hiddenTotal.value = total.toFixed(2);
-                summaryBase.textContent = formatMoney(base);
+                summaryBase.textContent = formatMoney(bolsaMode ? 0 : base);
                 summaryTotal.textContent = formatMoney(total);
             };
 
             const renderRows = () => {
+                if (bolsaMode) {
+                    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Modo bolsa activado. No se usan líneas.</td></tr>';
+                    syncHidden();
+                    renderTotals();
+                    return;
+                }
+
                 if (items.length === 0) {
                     body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay items agregados.</td></tr>';
                     syncHidden();
@@ -404,17 +451,25 @@
 
             const applyPresupuesto = (presupuestoId) => {
                 if (!presupuestoId) {
+                    bolsaCheckbox.disabled = false;
                     unlockCliente();
                     syncClienteFromSelect();
+                    syncBolsaUi();
                     return;
                 }
 
                 const presupuesto = findPresupuesto(presupuestoId);
                 if (!presupuesto) {
+                    bolsaCheckbox.disabled = false;
                     unlockCliente();
                     syncClienteFromSelect();
+                    syncBolsaUi();
                     return;
                 }
+
+                bolsaCheckbox.disabled = true;
+                bolsaCheckbox.checked = false;
+                syncBolsaUi();
 
                 if (presupuesto.cliente_id) {
                     clienteSelect.value = String(presupuesto.cliente_id);
@@ -439,6 +494,10 @@
             };
 
             const addLine = () => {
+                if (bolsaMode) {
+                    return;
+                }
+
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, parseValue(cantidadInput.value));
                 const medida = medidaInput.value.trim();
@@ -476,7 +535,7 @@
             };
 
             descripcionInput.addEventListener('input', () => {
-                addLineButton.disabled = descripcionInput.value.trim().length === 0;
+                addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
                 autoResizeDescripcion();
             });
 
@@ -497,8 +556,22 @@
 
             [cantidadInput, precioInput, margenInput].forEach((input) => {
                 input.addEventListener('input', () => {
-                    addLineButton.disabled = descripcionInput.value.trim().length === 0;
+                    addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
                 });
+            });
+
+            bolsaCheckbox.addEventListener('change', () => {
+                if (bolsaCheckbox.checked && presupuestoSelect.value) {
+                    bolsaCheckbox.checked = false;
+                    window.alert('El modo bolsa solo está disponible cuando el pedido no viene de un presupuesto.');
+                    return;
+                }
+
+                syncBolsaUi();
+            });
+
+            bolsaTotalInput.addEventListener('input', () => {
+                renderTotals();
             });
 
             clienteSelect.addEventListener('change', syncClienteFromSelect);
@@ -530,6 +603,7 @@
             });
 
             renderRows();
+            syncBolsaUi();
             addLineButton.disabled = descripcionInput.value.trim().length === 0;
             autoResizeDescripcion();
 
@@ -544,6 +618,11 @@
                 const button = document.activeElement;
                 if (button && button.dataset && button.dataset.estado) {
                     hiddenState.value = button.dataset.estado;
+                }
+
+                if (bolsaCheckbox.checked) {
+                    hiddenTotal.value = parseValue(bolsaTotalInput.value).toFixed(2);
+                    hiddenLines.value = '[]';
                 }
 
                 if (clienteSelect.disabled) {

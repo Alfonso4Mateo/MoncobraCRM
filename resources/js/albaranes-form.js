@@ -24,7 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let pedidoMode = root.dataset.pedidoMode === "1";
+    let pedidoBolsaMode = root.dataset.pedidoBolsa === "1";
     const isExistingEditForm = !Object.prototype.hasOwnProperty.call(root.dataset, 'pedidoMode');
+    const isPedidoRestrictoMode = () => pedidoMode && !pedidoBolsaMode;
 
     // `linea_articulo` eliminado de las vistas de creación; no lo buscamos.
     const descripcionInput = document.getElementById("linea_descripcion");
@@ -76,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         precio_unitario: precioUnitario,
                         margen,
                         total,
-                        selected: pedidoMode ? linea.selected !== false : true,
+                        selected: isPedidoRestrictoMode() ? linea.selected !== false : true,
                     };
                 })
                 .filter((linea) => linea.descripcion !== "");
@@ -117,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const syncHiddenField = () => {
-        const payload = pedidoMode
+        const payload = isPedidoRestrictoMode()
             ? lineas.filter((linea) => linea.selected !== false)
             : lineas;
 
@@ -125,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateTotal = () => {
-        const total = lineas.reduce((acc, linea) => acc + (pedidoMode && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
+        const total = lineas.reduce((acc, linea) => acc + (isPedidoRestrictoMode() && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
         totalElement.textContent = `${euroFormatter.format(round2(total))} €`;
     };
 
@@ -248,22 +250,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const setPedidoMode = (enabled) => {
         pedidoMode = !!enabled;
+        const restrictedMode = isPedidoRestrictoMode();
 
         // Hide or show the linea input row
         const lineaInputRow = document.querySelector('.linea-input-row');
         if (lineaInputRow) {
-            lineaInputRow.style.display = pedidoMode ? 'none' : '';
+            lineaInputRow.style.display = restrictedMode ? 'none' : '';
         }
 
         // Disable side add/edit/delete when in pedidoMode
-        if (addButton) addButton.disabled = pedidoMode;
-        if (editButton) editButton.disabled = pedidoMode || editButton.disabled;
-        if (deleteButton) deleteButton.disabled = pedidoMode || deleteButton.disabled;
+        if (addButton) addButton.disabled = restrictedMode;
+        if (editButton) editButton.disabled = restrictedMode || editButton.disabled;
+        if (deleteButton) deleteButton.disabled = restrictedMode || deleteButton.disabled;
 
         // Update table header to reflect pedido mode columns
         const headerRow = document.querySelector('.lineas-table thead tr');
             if (headerRow) {
-            if (pedidoMode) {
+            if (restrictedMode) {
                 headerRow.innerHTML = `
                     <th>Línea</th>
                     <th>Descripcion</th>
@@ -289,7 +292,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Ensure selection note exists when in pedidoMode
-        if (pedidoMode) {
+        if (restrictedMode) {
             let note = document.querySelector('.albaran-selection-note');
             if (!note) {
                 note = document.createElement('div');
@@ -311,8 +314,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const renderRows = () => {
+        const restrictedMode = isPedidoRestrictoMode();
+
         if (lineas.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="8" class="lineas-empty">${pedidoMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="8" class="lineas-empty">${restrictedMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
             selectedIndex = -1;
             setSideButtonsState();
             syncHiddenField();
@@ -331,7 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const qtyValue = Number.isFinite(linea.cantidad) ? linea.cantidad : 0;
                 const rowClass = locked ? 'is-locked' : (checked ? 'is-selected' : 'is-deselected');
 
-                if (pedidoMode) {
+                if (restrictedMode) {
                     return `
                         <tr data-index="${index}" class="${rowClass}">
                             <td>${String(index + 1).padStart(2, '0')}</td>
@@ -381,7 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const saveCurrentInputs = () => {
-        if (pedidoMode) {
+        if (isPedidoRestrictoMode()) {
             return;
         }
 
@@ -426,7 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
         addButton.addEventListener("click", saveCurrentInputs);
     }
 
-    if (!pedidoMode && cantidadInput && precioInput && margenInput) {
+    if (!isPedidoRestrictoMode() && cantidadInput && precioInput && margenInput) {
         [cantidadInput, precioInput, margenInput].forEach((input) => {
             input.addEventListener("keydown", (event) => {
                 if (event.key === "Enter") {
@@ -488,6 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!selectedOption || !selectedOption.value) {
             clienteSelect.value = "";
             otInput.value = "";
+            pedidoBolsaMode = false;
             setPedidoMode(false);
             return;
         }
@@ -506,6 +512,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const cId = data.id_cliente ?? data.id ?? clienteId ?? "";
             const cOt = data.ot ?? ot ?? "";
+            pedidoBolsaMode = !!(data.bolsa ?? data.pedido_bolsa ?? false);
 
             if (clienteSelect) {
                 if (window.jQuery && window.jQuery.fn.select2 && window.jQuery(clienteSelect).data('select2')) {
@@ -539,12 +546,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 renderRows();
             }
+
+            setPedidoMode(true);
         };
 
         activePedidoKey = pedidoKey;
         if (!isExistingEditForm) {
             lineas = [];
         }
+        pedidoBolsaMode = false;
         setPedidoMode(true);
 
         // Apply cliente/ot from option immediately
@@ -598,7 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const target = event.target.closest("button[data-action]");
         const row = event.target.closest("tr[data-index]");
 
-        if (pedidoMode && (checkboxTarget || qtyTarget)) {
+        if (isPedidoRestrictoMode() && (checkboxTarget || qtyTarget)) {
             return;
         }
 
@@ -610,7 +620,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const index = Number(target.dataset.index);
             const action = target.dataset.action;
 
-            if (pedidoMode && action === "toggle-selected") {
+            if (isPedidoRestrictoMode() && action === "toggle-selected") {
                 lineas[index].selected = target.checked;
                 renderRows();
                 return;
@@ -649,7 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tableBody.addEventListener("change", (event) => {
         const target = event.target;
 
-        if (!pedidoMode || !(target instanceof HTMLInputElement)) {
+        if (!isPedidoRestrictoMode() || !(target instanceof HTMLInputElement)) {
             return;
         }
 
@@ -675,11 +685,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    if (pedidoMode && !addButton && !descripcionInput) {
+    if (isPedidoRestrictoMode() && !addButton && !descripcionInput) {
         selectedIndex = -1;
     }
 
-    if (editButton && !pedidoMode) {
+    if (editButton && !isPedidoRestrictoMode()) {
         editButton.addEventListener("click", () => {
             if (selectedIndex < 0 || selectedIndex >= lineas.length) {
                 return;
@@ -697,7 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (deleteButton && !pedidoMode) {
+    if (deleteButton && !isPedidoRestrictoMode()) {
         deleteButton.addEventListener("click", () => {
             if (selectedIndex < 0 || selectedIndex >= lineas.length) {
                 return;

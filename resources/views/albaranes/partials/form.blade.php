@@ -2,6 +2,23 @@
     $formAction = route('albaranes.store');
     $currentEstado = old('estado', 'pendiente');
     $pedidoContext = $pedidoContext ?? null;
+    $pedidoBolsa = (bool) ($pedidoBolsa ?? false);
+    $pedidoModoRestringido = (bool) ($pedidoModoRestringido ?? false);
+    $pedidoPendienteFacturar = $pedidoPendienteFacturar ?? null;
+    // Si venimos de la vista de edición y el albarán tiene pedidos asociados,
+    // usaremos el primero como contexto para que la UI se adapte correctamente.
+    if ($pedidoContext === null && isset($albaran)) {
+        $firstPedido = null;
+        if (method_exists($albaran, 'pedidosClientes')) {
+            $firstPedido = $albaran->pedidosClientes->first();
+        }
+
+        if ($firstPedido) {
+            $pedidoContext = $firstPedido;
+            $pedidoBolsa = (bool) ($firstPedido->bolsa ?? false);
+            $pedidoModoRestringido = false;
+        }
+    }
     $lineasDesdeController = $lineasIniciales ?? [];
     $pedidoDefaults = $pedidoDefaults ?? [];
     $pedidosClientes = $pedidosClientes ?? collect();
@@ -55,7 +72,7 @@
     $lineasJsonInicial = json_encode($lineasIniciales, JSON_UNESCAPED_UNICODE);
 @endphp
 
-<section class="albaran-form-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-initial-lineas="{{ e($lineasJsonInicial) }}">
+<section class="albaran-form-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas="{{ e($lineasJsonInicial) }}">
     <header class="albaran-form-topbar">
         <nav class="albaran-breadcrumbs" aria-label="breadcrumb">
             <a href="{{ route('dashboard') }}">Inicio</a>
@@ -171,10 +188,41 @@
 
             <article class="albaran-card">
                 <h2>ARTICULOS</h2>
-                @if ($pedidoMode)
+                @if ($pedidoMode && !$pedidoBolsa)
                     <div class="albaran-selection-note">
                         <i class="fas fa-circle-info" aria-hidden="true"></i>
                         Marca los artículos que quieres incluir en este albarán. Los no marcados quedarán fuera del documento.
+                    </div>
+                @elseif ($pedidoBolsa)
+                    <div class="albaran-selection-note albaran-selection-note--warning">
+                        <i class="fas fa-circle-info" aria-hidden="true"></i>
+                        Este pedido es bolsa: puedes añadir las líneas que necesites, pero no podrás superar <strong>{{ number_format((float) ($pedidoPendienteFacturar ?? 0), 2, ',', '.') }} €</strong> pendientes por facturar.
+                    </div>
+                    <div class="linea-input-row">
+                        <div class="field-group flex-2">
+                            <label for="linea_descripcion">Descripcion</label>
+                            <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_cantidad">Cantidad</label>
+                            <input type="number" id="linea_cantidad" value="1" min="0" max="10000000" step="0.01">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_medida">Medida</label>
+                            <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_precio">P. unitario</label>
+                            <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
+                        </div>
+                        <div class="field-group flex-1">
+                            <label for="linea_margen">Margen (%)</label>
+                            <input type="number" id="linea_margen" value="0" min="0" max="1000" step="0.01">
+                        </div>
+                        <button type="button" class="btn-add-linea" id="btnAddLinea">
+                            <i class="fas fa-plus"></i>
+                            Agregar
+                        </button>
                     </div>
                 @else
                     <div class="linea-input-row">
@@ -184,7 +232,7 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_cantidad">Cantidad</label>
-                            <input type="number" id="linea_cantidad" value="1" min="0" max="1000000" step="0.01">
+                            <input type="number" id="linea_cantidad" value="1" min="0" max="10000000" step="0.01">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_medida">Medida</label>
@@ -192,7 +240,7 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_precio">P. unitario</label>
-                            <input type="number" id="linea_precio" value="0" min="0" max="1000000" step="0.01">
+                            <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_margen">Margen (%)</label>
@@ -211,7 +259,7 @@
                     <table class="table lineas-table">
                         <thead>
                             <tr>
-                                @if ($pedidoMode)
+                                @if ($pedidoMode && !$pedidoBolsa)
                                     <th>Línea</th>
                                     <th>Descripcion</th>
                                     <th>Cantidad</th>

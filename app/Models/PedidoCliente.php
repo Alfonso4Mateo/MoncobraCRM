@@ -36,6 +36,7 @@ class PedidoCliente extends Model
         'presupuesto_id',
         'albaran_id',
         'estado',
+        'bolsa',
         'total',
         'lista_articulos',
     ];
@@ -47,6 +48,7 @@ class PedidoCliente extends Model
      */
     protected $casts = [
         'fecha_pedido' => 'date',
+        'bolsa' => 'boolean',
         'total' => 'decimal:2',
         'lista_articulos' => 'array',
     ];

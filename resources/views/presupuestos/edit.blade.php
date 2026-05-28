@@ -91,10 +91,6 @@
                     </header>
 
                     <div class="items-form-grid">
-                        <div class="field-group">
-                            <label for="item_articulo">Articulo</label>
-                            <input type="text" id="item_articulo" placeholder="Codigo o referencia">
-                        </div>
                         <div class="field-group field-span-3">
                             <label for="item_descripcion">Descripcion</label>
                             <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
@@ -109,7 +105,7 @@
                         </div>
                         <div class="field-group">
                             <label for="item_precio_unitario">Precio unitario</label>
-                            <input type="number" id="item_precio_unitario" min="0" max="1000000" step="0.01" value="0">
+                            <input type="number" id="item_precio_unitario" min="0" max="10000000" step="0.01" value="0">
                         </div>
                         <div class="field-group field-group-margen">
                             <label for="item_margen">Margen (%)</label>
@@ -123,7 +119,7 @@
                         <table class="items-table" aria-label="Listado de items del presupuesto">
                             <thead>
                                 <tr>
-                                    <th>Articulo</th>
+                                    <th>Pos.</th>
                                     <th>Descripcion</th>
                                     <th>Cantidad</th>
                                     <th>P. Unitario</th>
@@ -197,7 +193,6 @@
             const subtotalEl = document.getElementById('items_subtotal');
             const totalEl = document.getElementById('items_total');
 
-            const articuloInput = document.getElementById('item_articulo');
             const descripcionInput = document.getElementById('item_descripcion');
             const cantidadInput = document.getElementById('item_cantidad');
             const unidadInput = document.getElementById('item_unidad');
@@ -213,7 +208,7 @@
             });
 
             const MAX_CANTIDAD = 1000000;
-            const MAX_PRECIO = 1000000;
+            const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
             const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -253,7 +248,6 @@
             let editingIndex = null;
 
             const resetItemForm = () => {
-                articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 unidadInput.value = '';
@@ -275,7 +269,6 @@
                     return;
                 }
 
-                articuloInput.value = item.articulo || '';
                 descripcionInput.value = item.descripcion || '';
                 cantidadInput.value = String(item.cantidad ?? 1);
                 unidadInput.value = String(item.unidad ?? '');
@@ -332,7 +325,7 @@
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.articulo ? `<strong>${item.articulo}</strong><br>` : ''}${item.descripcion}</td>
+                        <td>${item.descripcion}</td>
                         <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + item.unidad : ''}</td>
                         <td>${eur.format(safeNumber(item.precio_con_margen || item.precio_unitario))} EUR</td>
                         <td>${eur.format(safeNumber(item.total))} EUR</td>
@@ -354,7 +347,6 @@
 
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
-                const articulo = articuloInput.value.trim();
                 const cantidadRaw = safeNumber(cantidadInput.value);
                 const cantidad = Math.max(1, Math.round(cantidadRaw));
                 const unidad = String(unidadInput.value || '').trim();
@@ -371,7 +363,6 @@
                 const total = cantidad * precioConMargenRounded;
 
                 const payload = {
-                    articulo,
                     descripcion,
                     cantidad: Number(cantidad),
                     unidad: unidad,
@@ -391,7 +382,6 @@
 
                 editingIndex = null;
                 addButton.textContent = 'Agregar';
-                articuloInput.value = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 unidadInput.value = '';

@@ -5,9 +5,12 @@
 @section('content')
     @php
         $currentEstado = old('estado', $albaran->estado ?? 'pendiente');
+        $pedidoAsociado = $albaran->pedidosClientes->first();
+        $pedidoBolsa = (bool) ($pedidoAsociado?->bolsa ?? false);
+        $pedidoMode = $pedidoAsociado !== null;
     @endphp
 
-    <section class="albaran-edit-ui" data-albaran-form data-initial-lineas='@json($albaran->lista_articulos ?? [])'>
+    <section class="albaran-edit-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas='@json($albaran->lista_articulos ?? [])'>
         <header class="albaran-edit-topbar">
             <div>
                 <p class="breadcrumbs">Inicio <span>/</span> Editar Albarán Cliente</p>
@@ -57,7 +60,7 @@
                         <div class="form-grid cols-3">
                             <div class="field">
                                 <label for="documento">Documento</label>
-                                <input type="text" id="documento" name="documento" value="{{ old('documento', $albaran->documento ?? '') }}">
+                                <input type="text" id="documento" name="documento" value="{{ old('documento', $albaran->documento ?? '') }}" readonly>
                             </div>
                             <div class="field">
                                 <label for="numero">Número</label>
@@ -70,7 +73,7 @@
 
                             <div class="field">
                                 <label for="cliente_id">Cliente</label>
-                                <select id="cliente_id" name="cliente_id">
+                                <select id="cliente_id" name="cliente_id" disabled>
                                     <option value="">Selecciona cliente...</option>
                                     @foreach ($clientes as $cliente)
                                         <option value="{{ $cliente->id }}" @selected((string) old('cliente_id', $albaran->cliente_id) === (string) $cliente->id)>
@@ -78,14 +81,15 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <input type="hidden" name="cliente_id" value="{{ old('cliente_id', $albaran->cliente_id) }}">
                             </div>
                             <div class="field">
                                 <label for="ot">OT</label>
-                                <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
+                                <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}" readonly>
                             </div>
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}">
+                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}" readonly>
                             </div>
 
                             <div class="field span-2">
@@ -97,30 +101,37 @@
 
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
-                        <div class="line-row">
-                            <!-- Campo 'Código referencia' eliminado; se usa columna 'Línea' numerada -->
-                            <div class="field flex-3">
-                                <label for="linea_descripcion">Descripción</label>
-                                <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
+                        @if ($pedidoMode && !$pedidoBolsa)
+                            <div class="albaran-selection-note">
+                                <i class="fas fa-circle-info" aria-hidden="true"></i>
+                                Este albarán pertenece a un pedido no bolsa, por lo que no se pueden agregar nuevas líneas.
                             </div>
-                            <div class="field flex-1">
-                                <label for="linea_cantidad">Cantidad</label>
-                                <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
+                        @else
+                            <div class="line-row linea-input-row">
+                                <!-- Campo 'Código referencia' eliminado; se usa columna 'Línea' numerada -->
+                                <div class="field flex-3">
+                                    <label for="linea_descripcion">Descripción</label>
+                                    <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
+                                </div>
+                                <div class="field flex-1">
+                                    <label for="linea_cantidad">Cantidad</label>
+                                    <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
+                                </div>
+                                <div class="field flex-1">
+                                    <label for="linea_medida">Medida</label>
+                                    <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                                </div>
+                                <div class="field flex-1">
+                                    <label for="linea_precio">P. unitario</label>
+                                    <input type="number" id="linea_precio" value="0.00" min="0" max="10000000" step="0.01">
+                                </div>
+                                <div class="field flex-1">
+                                    <label for="linea_margen">Margen (%)</label>
+                                    <input type="number" id="linea_margen" value="0" min="0" step="0.01">
+                                </div>
+                                <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
                             </div>
-                            <div class="field flex-1">
-                                <label for="linea_medida">Medida</label>
-                                <input type="text" id="linea_medida" placeholder="u, kg, m...">
-                            </div>
-                            <div class="field flex-1">
-                                <label for="linea_precio">P. unitario</label>
-                                <input type="number" id="linea_precio" value="0.00" min="0" step="0.01">
-                            </div>
-                            <div class="field flex-1">
-                                <label for="linea_margen">Margen (%)</label>
-                                <input type="number" id="linea_margen" value="0" min="0" step="0.01">
-                            </div>
-                            <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
-                        </div>
+                        @endif
                     </section>
 
                     <section class="card-block empty-table">

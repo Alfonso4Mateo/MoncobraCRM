@@ -11,6 +11,9 @@
         'mode' => 'create',
         'clientes' => $clientes,
         'pedidoContext' => $pedidoContext ?? null,
+        'pedidoBolsa' => $pedidoBolsa ?? false,
+        'pedidoModoRestringido' => $pedidoModoRestringido ?? false,
+        'pedidoPendienteFacturar' => $pedidoPendienteFacturar ?? null,
         'lineasIniciales' => $lineasIniciales ?? [],
         'pedidoDefaults' => $pedidoDefaults ?? [],
     ])

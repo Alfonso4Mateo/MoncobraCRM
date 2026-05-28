@@ -30,6 +30,7 @@
         $searchActual = (string) ($searchActual ?? '');
         $desdeActual = (string) ($desdeActual ?? '');
         $hastaActual = (string) ($hastaActual ?? '');
+        $bolsaActual = (bool) ($bolsaActual ?? false);
         $variacionPedidosTexto = $variacionPedidosPorcentaje >= 0
             ? '+' . number_format($variacionPedidosPorcentaje, 1, ',', '.') . '%'
             : number_format($variacionPedidosPorcentaje, 1, ',', '.') . '%';
@@ -128,6 +129,9 @@
 
                     <div class="pedido-filter-actions">
                         <button type="submit" class="pedido-filter-submit">Aplicar</button>
+                        <a href="{{ route('pedidos-clientes.index', array_merge(request()->query(), ['bolsa' => $bolsaActual ? 0 : 1])) }}" class="pedido-filter-submit {{ $bolsaActual ? 'pedido-filter-submit--active' : '' }}">
+                            {{ $bolsaActual ? 'Ver todos' : 'Solo bolsa' }}
+                        </a>
                         <a href="{{ route('pedidos-clientes.index') }}" class="pedido-filter-reset">Limpiar</a>
                     </div>
                 </form>
@@ -144,7 +148,7 @@
                             <th>Fecha</th>
                             <th>Estado</th>
                             <th>Albarán asociado</th>
-                            <th class="text-right">Total</th>
+                            <th>Facturación</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -152,6 +156,8 @@
                         @forelse ($pedidos as $pedido)
                             @php
                                 $fechaPedido = optional($pedido->fecha_pedido);
+                                $totalPedido = round((float) ($pedido->ui_total ?? 0), 2);
+                                $pendienteFacturar = round(max(0, $totalPedido - (float) ($pedido->ui_total_albaranes ?? 0)), 2);
                             @endphp
                             <tr>
                                 <td data-label="Pedido-cliente">
@@ -195,8 +201,17 @@
                                         Ver albarán/es ({{ $albaranesCount }})
                                     </a>
                                 </td>
-                                <td data-label="Total" class="text-right">
-                                    <strong class="pedido-total">€{{ number_format((float) ($pedido->ui_total ?? 0), 2, ',', '.') }}</strong>
+                                <td data-label="Facturación">
+                                    <div class="pedido-facturacion-cell">
+                                        <div class="pedido-facturacion-line">
+                                            <span class="pedido-facturacion-label">Total:</span>
+                                            <strong class="pedido-total">€{{ number_format($totalPedido, 2, ',', '.') }}</strong>
+                                        </div>
+                                        <div class="pedido-facturacion-line pedido-facturacion-line--pending">
+                                            <span class="pedido-facturacion-label">Pendiente a facturar:</span>
+                                            <strong>€{{ number_format($pendienteFacturar, 2, ',', '.') }}</strong>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td data-label="Acciones">
                                     <div class="presupuesto-action-group">

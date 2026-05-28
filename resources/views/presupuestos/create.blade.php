@@ -105,7 +105,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_cantidad">Cantidad</label>
-                                <input type="number" id="item_cantidad" min="0" max="1000000" step="0.01" placeholder="1">
+                                <input type="number" id="item_cantidad" min="0" max="1000000" step="0.01" placeholder="0">
                             </div>
                             <div class="field-group">
                                 <label for="item_medida">Medida</label>
@@ -113,7 +113,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_precio_unitario">Precio unitario</label>
-                                <input type="number" id="item_precio_unitario" min="0" max="1000000" step="0.01" placeholder="0">
+                                <input type="number" id="item_precio_unitario" min="0" max="10000000" step="0.01" placeholder="0">
                             </div>
                             <div class="field-group field-group-margen">
                                 <label for="item_margen">Margen (%)</label>
@@ -208,7 +208,7 @@
             });
 
             const MAX_CANTIDAD = 1000000;
-            const MAX_PRECIO = 1000000;
+            const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
             const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -269,10 +269,10 @@
 
             const resetItemForm = () => {
                 descripcionInput.value = '';
-                cantidadInput.value = '';
+                cantidadInput.value = '0';
                 medidaInput.value = '';
-                precioInput.value = '';
-                margenInput.value = '';
+                precioInput.value = '0';
+                margenInput.value = '0';
                 editingIndex = null;
                 addButton.textContent = 'Agregar';
             };

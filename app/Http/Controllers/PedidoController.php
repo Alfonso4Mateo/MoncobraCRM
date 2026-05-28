@@ -21,7 +21,7 @@ class PedidoController extends Controller
     private const MAX_ARTICULO = 100;
     private const MAX_MEDIDA = 20;
     private const MAX_CANTIDAD = 1000000;
-    private const MAX_PRECIO = 1000000;
+    private const MAX_PRECIO = 10000000;
     private const MAX_MARGEN = 1000;
     private const MAX_TOTAL = 1000000000;
     private const PEDIDO_CLIENTE_ESTADOS = [
@@ -45,6 +45,7 @@ class PedidoController extends Controller
         $estado = trim((string) $request->input('estado', ''));
         $desde = trim((string) $request->input('desde', ''));
         $hasta = trim((string) $request->input('hasta', ''));
+        $bolsa = $request->boolean('bolsa');
 
         $pedidosQuery = PedidoCliente::query()
             ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot'])
@@ -80,6 +81,10 @@ class PedidoController extends Controller
             } catch (\Throwable $exception) {
                 // Ignore invalid dates.
             }
+        }
+
+        if ($bolsa) {
+            $pedidosQuery->where('bolsa', true);
         }
 
         $pedidos = $pedidosQuery
@@ -190,6 +195,7 @@ class PedidoController extends Controller
             'estadoActual' => $estado,
             'desdeActual' => $desde,
             'hastaActual' => $hasta,
+            'bolsaActual' => $bolsa,
             'pedidosActivos' => $pedidosActivos,
             'pendientesAlbaran' => $pendientesAlbaran,
             'albaranesPendientesRelacionados' => $albaranesPendientesRelacionados,
@@ -293,6 +299,7 @@ class PedidoController extends Controller
 
         $request->merge([
             'numero_pedido' => trim((string) $request->input('numero_pedido', '')),
+            'bolsa' => $request->boolean('bolsa'),
         ]);
 
         $validated = $request->validate([
@@ -321,9 +328,12 @@ class PedidoController extends Controller
                 }),
             ],
             'estado' => 'nullable|string|max:30',
-            'total' => 'nullable|numeric|min:0|max:' . self::MAX_TOTAL,
+            'bolsa' => 'nullable|boolean',
+            'total' => 'required_if:bolsa,1|numeric|gt:0|max:' . self::MAX_TOTAL,
             'lista_articulos' => 'nullable|json',
         ]);
+
+        $bolsa = (bool) ($validated['bolsa'] ?? false);
 
         $clienteValido = Cliente::query()
             ->where('proyecto_id', $proyectoId)
@@ -351,42 +361,49 @@ class PedidoController extends Controller
             abort(404);
         }
 
-        $lineas = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
-        $lineas = is_array($lineas) ? $lineas : [];
-        $lineasFiltradas = collect($lineas)
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->values()
-            ->all();
+        $lineas = [];
+        $total = 0.0;
 
-        $this->validateLineasPayload($lineasFiltradas);
+        if ($bolsa) {
+            $total = round((float) ($validated['total'] ?? 0), 2);
+        } else {
+            $lineas = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
+            $lineas = is_array($lineas) ? $lineas : [];
+            $lineasFiltradas = collect($lineas)
+                ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+                ->values()
+                ->all();
 
-        $lineas = collect($lineasFiltradas)
-            ->map(function (array $linea) {
-                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
-                $margen = max(0, (float) ($linea['margen'] ?? 0));
+            $this->validateLineasPayload($lineasFiltradas);
 
-                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
+            $lineas = collect($lineasFiltradas)
+                ->map(function (array $linea) {
+                    $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
+                    $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
+                    $margen = max(0, (float) ($linea['margen'] ?? 0));
 
-                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                $medida = $medida !== '' ? $medida : null;
+                    $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
-                return [
-                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                    'cantidad' => round($cantidad, 2),
-                    'medida' => $medida,
-                    'precio_unitario' => round($precioUnitario, 2),
-                    'margen' => round($margen, 2),
-                    'total' => round($total, 2),
-                ];
-            })
-            ->values()
-            ->all();
+                    $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                    $medida = $medida !== '' ? $medida : null;
 
-        $total = (float) collect($lineas)->sum('total');
+                    return [
+                        'articulo' => trim((string) ($linea['articulo'] ?? '')),
+                        'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                        'cantidad' => round($cantidad, 2),
+                        'medida' => $medida,
+                        'precio_unitario' => round($precioUnitario, 2),
+                        'margen' => round($margen, 2),
+                        'total' => round($total, 2),
+                    ];
+                })
+                ->values()
+                ->all();
 
-        DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas) {
+            $total = (float) collect($lineas)->sum('total');
+        }
+
+        DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas, $bolsa) {
             if ($presupuestoId !== null) {
                 $presupuestoBloqueado = Presupuesto::query()
                     ->where('proyecto_id', $proyectoId)
@@ -422,6 +439,7 @@ class PedidoController extends Controller
                 'presupuesto_id' => $presupuestoId,
                 'albaran_id' => null,
                 'estado' => $validated['estado'] ?? 'pendiente',
+                'bolsa' => $bolsa,
                 'total' => round($total, 2),
                 'lista_articulos' => $lineas ?: null,
             ]);
@@ -435,7 +453,9 @@ class PedidoController extends Controller
                     ]);
             }
 
-            $this->syncArticulosFromLineas($proyectoId, $lineas);
+            if (!$bolsa) {
+                $this->syncArticulosFromLineas($proyectoId, $lineas);
+            }
         });
 
         return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente creado correctamente');
@@ -558,6 +578,7 @@ class PedidoController extends Controller
             'numero_pedido' => $pedido->numero_pedido,
             'id_cliente' => $pedido->id_cliente,
             'ot' => $pedido->ot,
+            'bolsa' => (bool) ($pedido->bolsa ?? false),
             'lineas' => $lineas,
             'lista_articulos' => $lineas,
         ]);

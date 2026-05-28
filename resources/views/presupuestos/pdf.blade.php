@@ -56,7 +56,8 @@
             width: 100%;
             margin-top: 10px;
         }
-        .total-box { background: #2a6fb0; color: #fff; padding: 4px 18px; border-radius: 5px; margin-top: 4px; display: inline-block; font-size: 14px;}
+        .total-box { background: #2a6fb0; color: #fff; padding: 6px 16px; border-radius: 5px; display: inline-block; font-size: 14px; white-space: nowrap; text-align: center; }
+        .total-inline { display: inline; white-space: nowrap; font-weight: 700; }
         
         /* BLOQUE DE VALIDEZ Y EXCLUSIONES (Anclado al fondo) */
         .footer-bottom {
@@ -201,12 +202,9 @@
         <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td align="right">
-                     <div style="display: inline-block; text-align: right; width: 160px;">
-                         <strong style="color: #6b7b8f; font-size: 13px;">Total:</strong><br>
-                        <div class="total-box" style="display: block; text-align: center;">
-                            {{ number_format((float) $presupuesto->total ?? 0, 2, ',', '.') }} €
-                         </div>
-                     </div>
+                    <div class="total-box">
+                        <span class="total-inline">Total: {{ number_format((float) $presupuesto->total ?? 0, 2, ',', '.') }} €</span>
+                    </div>
                 </td>
             </tr>
         </table>

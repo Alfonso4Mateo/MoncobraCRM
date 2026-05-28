@@ -511,6 +511,39 @@ body,
     white-space: nowrap;
 }
 
+.pedido-facturacion-cell {
+    display: grid;
+    gap: 6px;
+}
+
+.pedido-facturacion-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pedido-facturacion-label {
+    color: #5b6f87;
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.pedido-facturacion-line--pending {
+    padding: 0;
+}
+
+.pedido-facturacion-line--pending .pedido-facturacion-label {
+    color: #b35d5b;
+}
+
+.pedido-facturacion-line--pending strong {
+    color: #b94a48;
+    font-size: .95rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
 .pedido-empty-state {
     display: grid;
     justify-items: center;

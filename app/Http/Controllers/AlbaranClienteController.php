@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class AlbaranClienteController extends Controller
 {
@@ -21,7 +22,7 @@ class AlbaranClienteController extends Controller
     private const MAX_ARTICULO = 100;
     private const MAX_MEDIDA = 20;
     private const MAX_CANTIDAD = 1000000;
-    private const MAX_PRECIO = 1000000;
+    private const MAX_PRECIO = 10000000;
     private const MAX_MARGEN = 1000;
     public function __construct()
     {
@@ -195,7 +196,12 @@ class AlbaranClienteController extends Controller
             ->orderByDesc('id')
             ->get(['id', 'numero_pedido', 'id_cliente', 'ot']);
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
-        $lineasIniciales = $pedidoContext ? $this->buildLineasInicialesFromPedido($pedidoContext, $proyectoId) : [];
+        $pedidoBolsa = (bool) ($pedidoContext?->bolsa ?? false);
+        $pedidoModoRestringido = $pedidoContext !== null && !$pedidoBolsa;
+        $lineasIniciales = $pedidoModoRestringido ? $this->buildLineasInicialesFromPedido($pedidoContext, $proyectoId) : [];
+        $pedidoPendienteFacturar = $pedidoBolsa && $pedidoContext
+            ? $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId)
+            : null;
         $pedidoDefaults = [
             'cliente_id' => $pedidoContext?->id_cliente,
             'pedido_cliente' => $pedidoContext?->numero_pedido,
@@ -203,7 +209,17 @@ class AlbaranClienteController extends Controller
             'pedido_id' => $pedidoContext?->id,
         ];
 
-        return view('albaranes.create', compact('clientes', 'pedidosClientes', 'pedidoContext', 'lineasIniciales', 'pedidoDefaults', 'numeroAlbaranAuto'));
+        return view('albaranes.create', compact(
+            'clientes',
+            'pedidosClientes',
+            'pedidoContext',
+            'pedidoBolsa',
+            'pedidoModoRestringido',
+            'pedidoPendienteFacturar',
+            'lineasIniciales',
+            'pedidoDefaults',
+            'numeroAlbaranAuto'
+        ));
     }
 
     public function store(Request $request)
@@ -230,6 +246,9 @@ class AlbaranClienteController extends Controller
             'archivo_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
+        $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
+        $pedidoBolsa = (bool) ($pedidoContext?->bolsa ?? false);
+
         $correlativoActual = $this->resolveNextAlbaranClienteNumber($proyectoId);
         $numeroManual = trim((string) ($validated['numero'] ?? ''));
         $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
@@ -239,12 +258,23 @@ class AlbaranClienteController extends Controller
         $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
+        $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 2);
+
+        if ($pedidoBolsa && $pedidoContext) {
+            $pendienteFacturar = $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId);
+
+            if ($totalAlbaran > $pendienteFacturar + 0.00001) {
+                throw ValidationException::withMessages([
+                    'lineas_json' => 'El albarán supera el importe pendiente por facturar del pedido bolsa (' . number_format($pendienteFacturar, 2, ',', '.') . ' €).',
+                ]);
+            }
+        }
 
         $validated['proyecto_id'] = $proyectoId;
         $validated['documento'] = 'Albarán';
         $validated['estado'] = $validated['estado'] ?? 'pendiente';
         $validated['lista_articulos'] = $lineas === [] ? null : $lineas;
-        $validated['total'] = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
+        $validated['total'] = $totalAlbaran;
         unset($validated['lineas_json']);
 
         if ($request->hasFile('archivo_pdf')) {
@@ -292,7 +322,7 @@ class AlbaranClienteController extends Controller
 
     private function resolvePedidoContext(Request $request, int $proyectoId): ?PedidoCliente
     {
-        $pedidoId = (int) $request->query('pedido_id', 0);
+        $pedidoId = (int) $request->input('pedido_id', $request->query('pedido_id', 0));
         if ($pedidoId > 0) {
             $pedido = PedidoCliente::query()
                 ->with('cliente')
@@ -304,7 +334,7 @@ class AlbaranClienteController extends Controller
             }
         }
 
-        $numeroPedido = trim((string) $request->query('pedido_cliente', ''));
+        $numeroPedido = trim((string) $request->input('pedido_cliente', $request->query('pedido_cliente', '')));
         if ($numeroPedido === '') {
             return null;
         }
@@ -319,8 +349,81 @@ class AlbaranClienteController extends Controller
     private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int $proyectoId): array
     {
         $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
+        $lineasPedido = collect($this->normalizePedidoLineas($lineas));
 
-        return $this->normalizePedidoLineas($lineas);
+        if ($lineasPedido->isEmpty()) {
+            return [];
+        }
+
+        $pedido = PedidoCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['albaranesPivot', 'albaran', 'albaranes'])
+            ->find($pedidoCliente->id) ?? $pedidoCliente;
+
+        $albaranes = collect($pedido->albaranesPivot ?? [])
+            ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
+            ->merge($pedido->albaranes ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
+            ->unique('id')
+            ->values();
+
+        if ($albaranes->isEmpty()) {
+            return $lineasPedido->all();
+        }
+
+        $consumos = $albaranes
+            ->flatMap(function (AlbaranCliente $albaran) {
+                $lineasAlbaran = is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [];
+                return collect($this->normalizePedidoLineas($lineasAlbaran));
+            })
+            ->groupBy(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+            ->map(fn ($items) => round($items->sum(fn (array $linea) => (float) ($linea['cantidad'] ?? 0)), 2));
+
+        return $lineasPedido
+            ->map(function (array $linea) use ($consumos) {
+                $signature = $this->normalizePedidoLineaSignature($linea);
+                $consumido = (float) ($consumos[$signature] ?? 0);
+                $cantidadOriginal = (float) ($linea['cantidad'] ?? 0);
+                $restante = round(max(0, $cantidadOriginal - $consumido), 2);
+
+                if ($restante <= 0) {
+                    return null;
+                }
+
+                $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
+                $margen = (float) ($linea['margen'] ?? 0);
+                $linea['cantidad'] = $restante;
+                $linea['cantidad_max'] = $restante;
+                $linea['total'] = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+
+                return $linea;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function calculatePedidoPendienteFacturar(PedidoCliente $pedido, int $proyectoId, ?int $excludeAlbaranId = null): float
+    {
+        $pedido = PedidoCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['albaranesPivot', 'albaran', 'albaranes'])
+            ->find($pedido->id) ?? $pedido;
+
+        $albaranes = collect($pedido->albaranesPivot ?? [])
+            ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
+            ->merge($pedido->albaranes ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
+            ->unique('id');
+
+        if ($excludeAlbaranId !== null && $excludeAlbaranId > 0) {
+            $albaranes = $albaranes->reject(fn (AlbaranCliente $albaran) => (int) $albaran->id === $excludeAlbaranId)->values();
+        }
+
+        $totalFacturado = round((float) $albaranes->sum(fn (AlbaranCliente $albaran) => (float) ($albaran->total ?? 0)), 2);
+        $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
+
+        return round(max(0, $pedidoTotal - $totalFacturado), 2);
     }
 
     public function show(AlbaranCliente $albaran)
@@ -451,6 +554,8 @@ class AlbaranClienteController extends Controller
             abort(404);
         }
 
+        $albaran->load('pedidosClientes');
+
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
 
         if ($albaran->cliente && !$clientes->contains('id', $albaran->cliente_id)) {
@@ -549,6 +654,17 @@ class AlbaranClienteController extends Controller
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $total = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
+
+        $pedidoContext = $this->resolvePedidoContext($request, $proyectoId) ?? $pedidoAnterior;
+        if ($pedidoContext && (bool) ($pedidoContext->bolsa ?? false)) {
+            $pendienteFacturar = $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId, (int) $albaran->id);
+
+            if ($total > $pendienteFacturar + 0.00001) {
+                throw ValidationException::withMessages([
+                    'lineas_json' => 'El albarán supera el importe pendiente por facturar del pedido bolsa (' . number_format($pendienteFacturar, 2, ',', '.') . ' €).',
+                ]);
+            }
+        }
 
         $albaran->update([
             'documento' => $validated['documento'],
@@ -1100,6 +1216,11 @@ class AlbaranClienteController extends Controller
     private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array $lineasDelAlbaran = []): void
     {
         $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        if ($pedido && (bool) ($pedido->bolsa ?? false)) {
+            $this->recalculatePedidoEstado($pedido, $proyectoId);
+            return;
+        }
+
         $lineasPedido = $pedido
             ? collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
                 ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
@@ -1129,18 +1250,24 @@ class AlbaranClienteController extends Controller
             ->find($pedido->id) ?? $pedido;
 
         $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
-        $lineasPedido = collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
-            ->filter()
-            ->values();
+        $pedidoEsBolsa = (bool) ($pedido->bolsa ?? false);
+        $lineasPedido = $pedidoEsBolsa
+            ? collect()
+            : collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
+                ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
+                ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
+                ->filter()
+                ->values();
 
         $albaranes = collect($pedido->albaranesPivot ?? [])
             ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
             ->merge($pedido->albaranes ?? collect())
             ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
-            ->unique('id')
-            ->filter(fn (AlbaranCliente $albaran) => $this->albaranAportaPedido($albaran, $lineasPedido));
+            ->unique('id');
+
+        if (!$pedidoEsBolsa) {
+            $albaranes = $albaranes->filter(fn (AlbaranCliente $albaran) => $this->albaranAportaPedido($albaran, $lineasPedido));
+        }
 
         $totalFacturado = round((float) $albaranes->sum(function (AlbaranCliente $albaran) {
             return (float) ($albaran->total ?? 0);
