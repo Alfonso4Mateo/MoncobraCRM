@@ -63,7 +63,7 @@ return [
     |
     */
 
-    'logo' => 'Moncobra<b>CRM</b>',
+    'logo' => 'Factu<b>Mon</b>',
     'logo_img' => 'images/logo_moncobra.png',
     'logo_img_class' => 'brand-image img-circle',
     'logo_img_xl' => null,

@@ -1,4 +1,4 @@
-<aside class="main-sidebar {{ config('adminlte.classes_sidebar', 'sidebar-dark-primary elevation-4') }}">
+<aside class="main-sidebar {{ config('adminlte.classes_sidebar', 'sidebar-dark-primary elevation-4') }} d-flex flex-column">
 
     {{-- Sidebar brand logo --}}
     @if(config('adminlte.logo_img_xl'))
@@ -50,10 +50,10 @@
         $toolsMenu = $toolsStartIndex === null ? [] : array_slice($sidebarMenu, $toolsStartIndex);
     @endphp
 
-    {{-- Sidebar menu --}}
-    <div class="sidebar">
-        <nav class="pt-2 d-flex flex-column h-100">
-            <ul class="nav nav-pills nav-sidebar flex-column sidebar-main-menu sidebar-main-menu-split {{ config('adminlte.classes_sidebar_nav', '') }}"
+    {{-- BLOQUE SUPERIOR: Menú principal (Controlado por AdminLTE y su scroll JS) --}}
+    <div class="sidebar flex-grow-1">
+        <nav class="pt-2">
+            <ul class="nav nav-pills nav-sidebar flex-column sidebar-main-menu {{ config('adminlte.classes_sidebar_nav', '') }}"
                 data-widget="treeview" role="menu"
                 @if(config('adminlte.sidebar_nav_animation_speed') != 300)
                     data-animation-speed="{{ config('adminlte.sidebar_nav_animation_speed') }}"
@@ -101,9 +101,14 @@
                 {{-- Main sidebar links --}}
                 @each('adminlte::partials.sidebar.menu-item', $mainMenu, 'item')
             </ul>
+        </nav>
+    </div>
 
-            @if(count($toolsMenu) > 0)
-                <ul class="nav nav-pills nav-sidebar flex-column sidebar-tools-menu sidebar-tools-menu-split {{ config('adminlte.classes_sidebar_nav', '') }}"
+    {{-- BLOQUE INFERIOR: Herramientas (FUERA del scroll de AdminLTE, anclado al fondo) --}}
+    @if(count($toolsMenu) > 0)
+        <div class="sidebar-custom-bottom mt-auto pb-2">
+            <nav class="pt-2">
+                <ul class="nav nav-pills nav-sidebar flex-column sidebar-tools-menu {{ config('adminlte.classes_sidebar_nav', '') }}"
                     data-widget="treeview" role="menu"
                     @if(config('adminlte.sidebar_nav_animation_speed') != 300)
                         data-animation-speed="{{ config('adminlte.sidebar_nav_animation_speed') }}"
@@ -114,57 +119,56 @@
                     {{-- Tools links pinned to bottom --}}
                     @each('adminlte::partials.sidebar.menu-item', $toolsMenu, 'item')
                 </ul>
-            @endif
-        </nav>
-    </div>
+            </nav>
+        </div>
+    @endif
 
 </aside>
+
 <style>
-    .main-sidebar .sidebar {
-        height: 100%;
+    /* Aseguramos que el pie se mantenga abajo sin romper nada */
+    .sidebar-custom-bottom {
+        flex-shrink: 0;
+        background-color: inherit;
+        z-index: 10;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 
-    .main-sidebar .sidebar .os-content {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
+    .sidebar-custom-bottom .nav-header {
+        margin: 0.35rem 0 0.25rem;
+        padding: 0.65rem 1rem 0.25rem;
+        background: transparent;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
     }
 
-    .main-sidebar .sidebar .os-viewport,
-    .main-sidebar .sidebar .os-content {
-        height: 100% !important;
+    .sidebar-custom-bottom .nav-sidebar .nav-link {
+        border-radius: 0.35rem;
+        color: rgba(255,255,255,0.92) !important;
     }
 
-    .main-sidebar .sidebar .os-content > nav {
-        flex: 1 1 auto;
+    /* Selected / hovered tool item: blue background and white text/icons */
+    .sidebar-custom-bottom .nav-sidebar .nav-link.active,
+    .sidebar-custom-bottom .nav-sidebar .nav-link:focus,
+    .sidebar-custom-bottom .nav-sidebar .nav-link:hover {
+        background: #2563EB !important;
+        color: #FFFFFF !important;
     }
 
-    .main-sidebar .sidebar > nav {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 0;
-        overflow: hidden;
+    .sidebar-custom-bottom .nav-sidebar .nav-link .nav-icon,
+    .sidebar-custom-bottom .nav-sidebar .nav-link i {
+        color: #FFFFFF !important;
     }
 
-    .main-sidebar .sidebar-main-menu-split {
-        flex: 0 0 auto;
-        height: 80% !important;
-        min-height: 0;
-        overflow-y: auto;
-    }
-
-    .main-sidebar .sidebar-tools-menu-split {
-        flex: 0 0 auto;
-        height: 20% !important;
-        min-height: 0;
-        overflow-y: auto;
-        margin-top: 0.65rem;
-        padding-top: 0.85rem;
-        border-top: 2px solid rgba(255, 255, 255, 0.18);
-    }
-
-    .main-sidebar .sidebar-main-menu-split + .sidebar-tools-menu-split {
-        margin-top: auto;
+    /* If any logo/text appears inside the tools area, keep it white */
+    .sidebar-custom-bottom .brand-text,
+    .sidebar-custom-bottom .brand-logo-image {
+        color: #FFFFFF !important;
+        filter: none !important;
     }
 </style>

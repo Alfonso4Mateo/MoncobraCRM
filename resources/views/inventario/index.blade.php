@@ -80,12 +80,12 @@
 
         .inventory-table th:nth-child(4),
         .inventory-table td:nth-child(4) {
-            width: 8%;
+            width: 12%;
         }
 
         .inventory-table th:nth-child(5),
         .inventory-table td:nth-child(5) {
-            width: 7%;
+            width: 15%;
         }
 
         .inventory-table th:nth-child(6),
@@ -94,28 +94,49 @@
         }
 
         .inventory-table th:nth-child(7),
-        .inventory-table td:nth-child(7),
+        .inventory-table td:nth-child(7) {
+            width: 9%;
+        }
+
         .inventory-table th:nth-child(8),
-        .inventory-table td:nth-child(8),
-        .inventory-table th:nth-child(9),
-        .inventory-table td:nth-child(9) {
-            width: 5%;
-        }
-
-        .inventory-table th:nth-child(10),
-        .inventory-table td:nth-child(10) {
-            width: 7%;
-        }
-
-        .inventory-table th:nth-child(11),
-        .inventory-table td:nth-child(11) {
-            width: 8%;
+        .inventory-table td:nth-child(8) {
+            width: 9%;
         }
 
         .inventory-table td:nth-child(3),
         .inventory-table td:nth-child(4),
-        .inventory-table td:nth-child(6) {
+        .inventory-table td:nth-child(5) {
             word-break: break-word;
+        }
+
+        .inventory-parent-alerts {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-top: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .inventory-parent-alert {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.28rem;
+            padding: 0.2rem 0.45rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .inventory-parent-alert--warning {
+            background: #fff4e4;
+            color: #c27b00;
+        }
+
+        .inventory-parent-alert--danger {
+            background: #ffecec;
+            color: #c0392b;
         }
     </style>
 @endsection
@@ -247,7 +268,6 @@
                 </div>
 
                 <div class="inventory-card inventory-table-card">
-
                     <div class="table-responsive inventory-table-wrapper">
                         <table class="table inventory-table">
                             <thead>
@@ -255,132 +275,72 @@
                                     <th>Código</th>
                                     <th>Nombre</th>
                                     <th>Descripción</th>
-                                    <th>Variante</th>
                                     <th>Clase</th>
                                     <th>Almacén</th>
                                     <th>Stock actual</th>
-                                    <th>Stock mínimo</th>
-                                    <th>Nivel crítico</th>
                                     <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($inventarios as $grupo)
-                                    @php
-                                        $productoPadre = $grupo->first();
-                                        if (is_array($productoPadre)) {
-                                            $productoPadre = (object) $productoPadre;
-                                        }
-                                        $variantePadre = data_get($productoPadre, 'variante');
-                                        $idPadre = data_get($productoPadre, 'id');
-                                        $stockGrupo = (int) $grupo->sum('stock_actual');
-
-                                        $variantePadreStockMin = data_get($variantePadre, 'stock_minimo');
-                                        $productoPadreStockMin = data_get($productoPadre, 'stock_minimo');
-                                        $stockMinimoGrupo = (int) ($variantePadreStockMin ?? $productoPadreStockMin ?? 0);
-
-                                        $variantePadreNivelCrit = data_get($variantePadre, 'nivel_critico');
-                                        $productoPadreNivelCrit = data_get($productoPadre, 'nivel_critico');
-                                        $nivelCriticoGrupo = (int) ($variantePadreNivelCrit ?? $productoPadreNivelCrit ?? 0);
-
-                                        if ($stockGrupo <= $nivelCriticoGrupo) {
-                                            $estadoGrupo = 'critico';
-                                            $estadoTextoGrupo = 'Crítico';
-                                        } elseif ($stockGrupo <= $stockMinimoGrupo) {
-                                            $estadoGrupo = 'bajo';
-                                            $estadoTextoGrupo = 'Reposición';
-                                        } else {
-                                            $estadoGrupo = 'optimo';
-                                            $estadoTextoGrupo = 'Óptimo';
-                                        }
-
-                                        $tiposPadre = data_get($variantePadre, 'tipos_atributos', []);
-                                        $variantePadreNombre = data_get($variantePadre, 'nombre');
-                                        $productoPadreNombre = data_get($productoPadre, 'nombre');
-                                        $variantePadreId = data_get($variantePadre, 'id');
-                                        $variantePadreCodigo = data_get($variantePadre, 'codigo');
-                                        $variantePadreDescripcion = data_get($variantePadre, 'descripcion');
-                                        $variantePadreRef = data_get($variantePadre, 'referencia_proveedor');
-                                        $variantePadreAlmacen = data_get($variantePadre, 'almacen');
-                                        $variantePadreUbicacion = data_get($variantePadre, 'ubicacion');
-                                    @endphp
-
-                                    <tr class="inventory-row inventory-row-{{ $estadoGrupo }} inventory-parent-row" data-parent-group="group-{{ $loop->index }}">
-                                            <td>
-                                                <span class="inventory-code">{{ $variantePadreCodigo ?? $productoPadre->codigo }}</span>
-                                            </td>
-                                            <td>
-                                                <div class="inventory-name">
-                                                    <strong>{{ $variantePadreNombre ?? $productoPadreNombre ?? '' }}</strong>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="inventory-description">
-                                                    <strong>{{ $variantePadreDescripcion ?? $productoPadre->descripcion }}</strong>
-                                                    @if($variantePadreRef ?? $productoPadre->referencia_proveedor)
-                                                        <span>{{ $variantePadreRef ?? $productoPadre->referencia_proveedor }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
+                                    <tr class="inventory-row inventory-row-{{ $grupo->estadoGrupo }} inventory-parent-row" data-parent-group="group-{{ $loop->index }}">
+                                        <td><span class="inventory-code">{{ $grupo->codigoPadre }}</span></td>
+                                        <td><div class="inventory-name"><strong>{{ $grupo->nombrePadre }}</strong></div></td>
                                         <td>
-                                            <div class="inventory-variant">
-                                                @if(!empty($tiposPadre))
-                                                    @foreach($tiposPadre as $tipo)
-                                                        <span class="inventory-pill muted">{{ $tipo }}</span>
-                                                    @endforeach
-                                                @else
-                                                    <span class="inventory-pill muted">Sin variantes</span>
+                                            <div class="inventory-description">
+                                                <strong>{{ $grupo->descripcionPadre }}</strong>
+                                                @if($grupo->hijosReposicion > 0 || $grupo->hijosCriticos > 0)
+                                                    <div class="inventory-parent-alerts" aria-label="Alertas de variantes hijas">
+                                                        @if($grupo->hijosReposicion > 0)
+                                                            <span class="inventory-parent-alert inventory-parent-alert--warning" title="Variantes en reposición">
+                                                                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                                                {{ $grupo->hijosReposicion }}
+                                                            </span>
+                                                        @endif
+                                                        @if($grupo->hijosCriticos > 0)
+                                                            <span class="inventory-parent-alert inventory-parent-alert--danger" title="Variantes críticas">
+                                                                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                                                {{ $grupo->hijosCriticos }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                                @if($grupo->referenciaPadre)
+                                                    <span>{{ $grupo->referenciaPadre }}</span>
                                                 @endif
                                             </div>
                                         </td>
-                                        <td>
-                                            @if(is_object($productoPadre->claseRelacion))
-                                                <span class="inventory-pill muted">{{ $productoPadre->claseRelacion->nombre }}</span>
-                                            @else
-                                                <span class="inventory-pill muted">{{ $productoPadre->clase ?: 'Sin clase' }}</span>
-                                            @endif
-                                        </td>
+                                        <td><span class="inventory-pill muted">{{ $grupo->clasePadre }}</span></td>
                                         <td>
                                             <div class="inventory-location">
-                                                <strong>{{ $variantePadreAlmacen ?? $productoPadre->almacen ?: 'Sin almacén' }}</strong>
-                                                @if($variantePadreUbicacion ?? $productoPadre->ubicacion)
-                                                    <span>{{ $variantePadreUbicacion ?? $productoPadre->ubicacion }}</span>
+                                                <strong>{{ $grupo->almacenPadre ?: 'Sin almacén' }}</strong>
+                                                @if($grupo->ubicacionPadre)
+                                                    <span>{{ $grupo->ubicacionPadre }}</span>
                                                 @endif
                                             </div>
                                         </td>
-                                        <td>
-                                            <span class="inventory-stock inventory-stock-main">{{ number_format($stockGrupo, 0, ',', '.') }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="inventory-stock">{{ number_format($stockMinimoGrupo, 0, ',', '.') }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="inventory-stock inventory-stock-critico">{{ number_format($nivelCriticoGrupo, 0, ',', '.') }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="inventory-status inventory-status-{{ $estadoGrupo }}">{{ $estadoTextoGrupo }}</span>
-                                        </td>
+                                        <td><span class="inventory-stock inventory-stock-main">{{ number_format($grupo->stockGrupo, 0, ',', '.') }}</span></td>
+                                        <td><span class="inventory-status inventory-status-{{ $grupo->estadoGrupo }}">{{ $grupo->estadoTextoGrupo }}</span></td>
                                         <td>
                                             <div class="inventory-actions">
-                                                @if($idPadre)
-                                                    <a href="{{ route('inventario.show', $idPadre) }}" class="inventory-action-icon" title="Ver producto padre">
+                                                @if($grupo->idPadre)
+                                                    <a href="{{ route('inventario.show', $grupo->idPadre) }}" class="inventory-action-icon" title="Ver producto padre">
                                                         <i class="far fa-eye"></i>
                                                     </a>
-                                                    <a href="{{ route('inventario.edit', $idPadre) }}" class="inventory-action-icon" title="Editar item">
+                                                    <a href="{{ route('inventario.edit', $grupo->idPadre) }}" class="inventory-action-icon" title="Editar item">
                                                         <i class="fas fa-pen"></i>
                                                     </a>
                                                 @else
                                                     <span class="inventory-action-icon" title="Ver producto padre"><i class="far fa-eye"></i></span>
                                                     <span class="inventory-action-icon" title="Editar item"><i class="fas fa-pen"></i></span>
                                                 @endif
-                                                @php $variantePadreIdSafe = $variantePadreId ?? null; @endphp
-                                                @if($variantePadreIdSafe)
-                                                    <a href="{{ route('inventario.item.create', ['variante_id' => $variantePadreIdSafe]) }}" class="inventory-action-icon" title="Añadir variante hija">
+                                                @if($grupo->variantePadreId)
+                                                    <a href="{{ route('inventario.item.create', ['variante_id' => $grupo->variantePadreId]) }}" class="inventory-action-icon" title="Añadir variante hija">
                                                         <i class="fas fa-plus"></i>
                                                     </a>
                                                 @endif
-                                                @if($grupo->count() > 1)
+                                                @if($grupo->tieneHijos)
                                                     <button type="button" class="inventory-toggle-btn" data-toggle-children data-target-group="group-{{ $loop->index }}" aria-expanded="false" aria-label="Mostrar variantes">
                                                         <i class="fas fa-chevron-right"></i>
                                                     </button>
@@ -389,116 +349,39 @@
                                         </td>
                                     </tr>
 
-                                    @foreach($grupo->skip(1) as $producto)
-                                        @php
-                                            if (is_array($producto)) {
-                                                $producto = (object) $producto;
-                                            }
-
-                                            $stockActual = (int) data_get($producto, 'stock_actual', 0);
-                                            $stockMinimo = (int) data_get($producto, 'stock_minimo', 0);
-                                            $nivelCriticoProducto = (int) data_get($producto, 'nivel_critico', 0);
-
-                                            if ($stockActual <= $nivelCriticoProducto) {
-                                                $estado = 'critico';
-                                                $estadoTexto = 'Crítico';
-                                            } elseif ($stockActual <= $stockMinimo) {
-                                                $estado = 'bajo';
-                                                $estadoTexto = 'Reposición';
-                                            } else {
-                                                $estado = 'optimo';
-                                                $estadoTexto = 'Óptimo';
-                                            }
-                                        @endphp
-                                        <tr class="inventory-row inventory-row-{{ $estado }} inventory-child-row" data-child-group="group-{{ $loop->parent->index }}" hidden>
-                                            @php
-                                                $codigoHijo = data_get($producto, 'codigo');
-                                                $nombreHijo = data_get($producto, 'nombre');
-                                                $descripcionHijo = data_get($producto, 'descripcion');
-                                                $refProveedorHijo = data_get($producto, 'referencia_proveedor');
-                                                $atributosHijo = data_get($producto, 'atributos_variante', []);
-                                                $almacenHijo = data_get($producto, 'almacen');
-                                                $ubicacionHijo = data_get($producto, 'ubicacion');
-                                                $idHijo = data_get($producto, 'id');
-                                            @endphp
-
-                                            <td>
-                                                <span class="inventory-code">{{ $codigoHijo }}</span>
-                                            </td>
-                                            <td>
-                                                <div class="inventory-name" style="padding-left:1.25rem;">
-                                                    <strong>{{ $nombreHijo ?? '' }}</strong>
-                                                </div>
-                                            </td>
+                                    @foreach($grupo->hijos as $producto)
+                                        <tr class="inventory-row inventory-row-{{ $producto->estado }} inventory-child-row" data-child-group="group-{{ $loop->parent->index }}" hidden>
+                                            <td><span class="inventory-code">{{ $producto->codigo }}</span></td>
+                                            <td><div class="inventory-name" style="padding-left:1.25rem;"><strong>{{ $producto->nombre ?? '' }}</strong></div></td>
                                             <td>
                                                 <div class="inventory-description">
                                                     <strong style="padding-left:1.25rem; position:relative;">
                                                         <span class="inventory-child-marker">└</span>
-                                                        {{ $descripcionHijo }}
+                                                        {{ $producto->descripcion }}
                                                     </strong>
-                                                    @if($refProveedorHijo)
-                                                        <span>{{ $refProveedorHijo }}</span>
+                                                    @if($producto->referencia_proveedor)
+                                                        <span>{{ $producto->referencia_proveedor }}</span>
                                                     @endif
                                                 </div>
                                             </td>
-                                            <td>
-                                                <div class="inventory-variant">
-                                                    @php
-                                                        $hasAtributos = is_array($atributosHijo) ? count(array_filter($atributosHijo)) > 0 : false;
-                                                    @endphp
-                                                    @if($hasAtributos)
-                                                        @foreach($atributosHijo as $tipo => $valor)
-                                                            @php
-                                                                $valores = is_array($valor) ? array_filter($valor, fn ($item) => $item !== null && $item !== '') : [$valor];
-                                                            @endphp
-                                                            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.5rem;">
-                                                                <span class="inventory-pill muted" style="font-size:0.78rem; font-weight:700;">{{ $tipo }}</span>
-                                                                @foreach($valores as $valorItem)
-                                                                    <span class="inventory-variant-badge">{{ $valorItem }}</span>
-                                                                @endforeach
-                                                            </div>
-                                                        @endforeach
-                                                    @else
-                                                        <span class="inventory-pill muted">Sin variante</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td>
-                                                @if (is_object(data_get($producto, 'claseRelacion')))
-                                                    <span class="inventory-pill muted">{{ data_get($producto, 'claseRelacion.nombre') }}</span>
-                                                @elseif($productoPadre->claseRelacion)
-                                                    <span class="inventory-pill muted">{{ $productoPadre->claseRelacion->nombre }}</span>
-                                                @else
-                                                    <span class="inventory-pill muted">Sin clase</span>
-                                                @endif
-                                            </td>
+                                            <td><span class="inventory-pill muted">{{ data_get($producto->clase_relacion, 'nombre', $grupo->clasePadre) }}</span></td>
                                             <td>
                                                 <div class="inventory-location">
-                                                    <strong>{{ $almacenHijo ?: 'Sin almacén' }}</strong>
-                                                    @if($ubicacionHijo)
-                                                        <span>{{ $ubicacionHijo }}</span>
+                                                    <strong>{{ $producto->almacen ?: 'Sin almacén' }}</strong>
+                                                    @if($producto->ubicacion)
+                                                        <span>{{ $producto->ubicacion }}</span>
                                                     @endif
                                                 </div>
                                             </td>
-                                            <td>
-                                                <span class="inventory-stock inventory-stock-{{ $estado === 'bajo' ? 'bajo' : ($estado === 'critico' ? 'critico' : 'main') }}">{{ number_format($stockActual, 0, ',', '.') }}</span>
-                                            </td>
-                                            <td>
-                                                <span class="inventory-stock">{{ number_format($stockMinimo, 0, ',', '.') }}</span>
-                                            </td>
-                                            <td>
-                                                <span class="inventory-stock inventory-stock-critico">{{ number_format($nivelCriticoProducto, 0, ',', '.') }}</span>
-                                            </td>
-                                            <td>
-                                                <span class="inventory-status inventory-status-{{ $estado }}">{{ $estadoTexto }}</span>
-                                            </td>
+                                            <td><span class="inventory-stock inventory-stock-{{ $producto->estado === 'bajo' ? 'bajo' : ($producto->estado === 'critico' ? 'critico' : 'main') }}">{{ number_format($producto->stock_actual, 0, ',', '.') }}</span></td>
+                                            <td><span class="inventory-status inventory-status-{{ $producto->estado }}">{{ $producto->estado_texto }}</span></td>
                                             <td>
                                                 <div class="inventory-actions">
-                                                    @if($idHijo)
-                                                        <a href="{{ route('inventario.show', $idHijo) }}" class="inventory-action-icon" title="Ver variante">
+                                                    @if($producto->id)
+                                                        <a href="{{ route('inventario.show', $producto->id) }}" class="inventory-action-icon" title="Ver variante">
                                                             <i class="far fa-eye"></i>
                                                         </a>
-                                                        <a href="{{ route('inventario.edit', $idHijo) }}" class="inventory-action-icon" title="Editar variante">
+                                                        <a href="{{ route('inventario.edit', $producto->id) }}" class="inventory-action-icon" title="Editar variante">
                                                             <i class="fas fa-pen"></i>
                                                         </a>
                                                     @else
@@ -511,7 +394,7 @@
                                     @endforeach
                                 @empty
                                     <tr>
-                                        <td colspan="11">
+                                        <td colspan="8">
                                             <div class="inventory-empty-state">
                                                 <i class="fas fa-box-open"></i>
                                                 <strong>No hay productos en inventario</strong>

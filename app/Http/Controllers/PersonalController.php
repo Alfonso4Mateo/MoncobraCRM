@@ -30,7 +30,10 @@ class PersonalController extends Controller
         }
         $alertaLimite = $alertaDias > 0 ? now()->addDays($alertaDias)->endOfDay() : null;
 
-        $buildQuery = function () use ($query) {
+        $alertaNombre = (string) $request->input('alerta_nombre', 'any');
+        $alertaNombre = in_array($alertaNombre, ['any', 'with', 'without'], true) ? $alertaNombre : 'any';
+
+        $buildQuery = function () use ($query, $alertaNombre, $alertaLimite) {
             $personalQuery = Personal::query()->with('proyectos');
 
             if ($query !== '') {
@@ -42,6 +45,26 @@ class PersonalController extends Controller
                         ->orWhere('telefono', 'like', "%{$query}%")
                         ->orWhere('departamento', 'like', "%{$query}%");
                 });
+            }
+
+            if ($alertaNombre === 'with') {
+                if ($alertaLimite) {
+                    $personalQuery->whereNotNull('proxima_revision_medica')
+                        ->where('proxima_revision_medica', '<=', $alertaLimite);
+                } else {
+                    $personalQuery->whereNotNull('proxima_revision_medica');
+                }
+            }
+
+            if ($alertaNombre === 'without') {
+                if ($alertaLimite) {
+                    $personalQuery->where(function ($q) use ($alertaLimite) {
+                        $q->whereNull('proxima_revision_medica')
+                          ->orWhere('proxima_revision_medica', '>', $alertaLimite);
+                    });
+                } else {
+                    $personalQuery->whereNull('proxima_revision_medica');
+                }
             }
 
             return $personalQuery->orderBy('name');
@@ -83,10 +106,21 @@ class PersonalController extends Controller
         $personalTotal = Personal::count();
         $personalActivos = Personal::where('activo', true)->count();
 
+        // Conteo de avisos de revisión médica según el límite de alerta actual
+        if ($alertaLimite) {
+            $avisosCount = Personal::whereNotNull('proxima_revision_medica')
+                ->where('proxima_revision_medica', '<=', $alertaLimite)
+                ->count();
+        } else {
+            $avisosCount = 0;
+        }
+
         return view('personal.index', [
             'personals' => $personals,
             'query' => $query,
             'alertaDias' => $alertaDias,
+            'alertaNombre' => $alertaNombre,
+            'avisosCount' => $avisosCount,
             'personalTotal' => $personalTotal,
             'personalActivos' => $personalActivos,
         ]);

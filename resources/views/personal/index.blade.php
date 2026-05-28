@@ -50,12 +50,18 @@
                 <header class="personal-card__header">
                     <div>
                         <h3>Registro general de personal</h3>
-                        <p>{{ $personals->total() }} trabajadores</p>
+                        <p>
+                            {{ $personals->total() }} trabajadores
+                            @if(($avisosCount ?? 0) > 0)
+                                &middot; <strong style="color:#c0392b;">{{ $avisosCount }} con aviso médico</strong>
+                            @endif
+                        </p>
                     </div>
 
                     <div class="personal-card__actions">
                         <form method="GET" action="{{ route('personal.index') }}" class="personal-recognition-form">
                             <input type="hidden" name="q" value="{{ $query ?? '' }}">
+                            <input type="hidden" name="alerta_nombre" value="{{ $alertaNombre ?? 'any' }}">
                             <label for="alerta_dias" class="personal-recognition-label">Gestionar reconocimientos</label>
                             <div class="personal-recognition-control">
                                 <i class="fas fa-stethoscope" aria-hidden="true"></i>
@@ -75,9 +81,21 @@
                 <div class="personal-search-wrap">
                     <form method="GET" action="{{ route('personal.index') }}" class="personal-search-form">
                         <input type="hidden" name="alerta_dias" value="{{ $alertaDias ?? 0 }}">
+
+                        <div class="personal-search-filters" style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
+                            <label for="alerta_nombre" class="personal-recognition-label" style="margin:0;">Filtrar por aviso médico</label>
+                            <div class="personal-recognition-control">
+                                <select id="alerta_nombre" name="alerta_nombre" onchange="this.form.submit()">
+                                    <option value="any" @selected(($alertaNombre ?? 'any') === 'any')>Todos</option>
+                                    <option value="with" @selected(($alertaNombre ?? '') === 'with')>Con aviso</option>
+                                    <option value="without" @selected(($alertaNombre ?? '') === 'without')>Sin aviso</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="personal-search-field personal-search-field--search">
                             <label for="q"></label>
-                            <input type="search" id="q" name="q" value="{{ $query ?? '' }}" placeholder="Buscar por nombre o apellidos..." autocomplete="off">
+                            <input type="search" id="q" name="q" value="{{ $query ?? '' }}" placeholder="Buscar por nombre o apellidos..." autocomplete="on">
                         </div>
                     </form>
                 </div>

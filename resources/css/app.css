@@ -1,32 +1,38 @@
-@import 'tailwindcss';
-
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
-
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-}
-
 /* Sidebar split ratio for AdminLTE custom menu blocks */
+.main-sidebar .sidebar {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 57px); 
+    overflow: hidden !important;
+}
+
 .main-sidebar .sidebar > nav {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     min-height: 0;
+    margin-bottom: 0 !important;
 }
 
+/* EL BLOQUE DE ARRIBA (Menú principal) */
 .main-sidebar .sidebar-main-menu-split {
-    flex: 0 0 70%;
+    /* LA MAGIA AQUÍ: flex: 1 significa "Crece para ocupar todo el espacio disponible" */
+    flex: 1 1 auto; 
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 10px; /* Le damos un poco de aire al final para que "Personal" no pegue con la línea al hacer scroll */
 }
 
+/* EL BLOQUE DE ABAJO (Herramientas) */
 .main-sidebar .sidebar-tools-menu-split {
-    flex: 0 0 30%;
+    /* LA MAGIA AQUÍ: flex: 0 0 auto significa "Ocupa estrictamente lo que midan tus botones, ni más ni menos" */
+    flex: 0 0 auto; 
     min-height: 0;
-    overflow-y: auto;
-}
-
-.main-sidebar .sidebar-main-menu-split + .sidebar-tools-menu-split {
-    margin-top: auto;
+    overflow-y: hidden; /* Aquí quitamos el scroll, no suele hacer falta abajo */
+    overflow-x: hidden;
+    
+    margin-top: auto; /* Esto es lo que empuja el bloque al fondo del todo */
+    border-top: 1px solid #4f5962; /* Dejamos la línea de tu compañero, pero ahora es real y dinámica */
+    padding-top: 15px;
 }

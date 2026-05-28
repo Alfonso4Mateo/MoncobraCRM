@@ -66,33 +66,18 @@
                             <div class="field-group field-wide">
                                 <label for="producto_busqueda">Producto</label>
                                 <div class="autocomplete-wrapper">
-                                    <textarea
+                                    <input
                                         id="producto_busqueda"
                                         name="producto_busqueda"
-                                        rows="1"
-                                        maxlength="1000"
+                                        type="search"
                                         placeholder="Escribe SKU o nombre..."
                                         data-sync="producto_busqueda"
                                         class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
                                         required
-                                    >{{ old('producto_busqueda') }}</textarea>
+                                        value="{{ old('producto_busqueda') }}"
+                                    >
                                     <div id="producto-suggestions" class="autocomplete-dropdown" role="listbox" aria-label="Sugerencias de productos"></div>
                                 </div>
-                            </div>
-
-                            <div class="field-group field-tight">
-                                <label for="cantidad_retirar">Cantidad a retirar</label>
-                                <input
-                                    id="cantidad_retirar"
-                                    name="cantidad_retirar"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    value="{{ old('cantidad_retirar', 1) }}"
-                                    data-sync="cantidad_retirar"
-                                    class="@error('cantidad_retirar') is-invalid @enderror"
-                                    required
-                                >
                             </div>
                         </div>
 
@@ -118,7 +103,10 @@
                         <div id="items-section-top" style="margin-top:0.75rem;">
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
                                 <small>Agrega las filas que quieras; se enviarán como <strong>items[]</strong></small>
-                                <button type="button" id="add-item-btn" class="btn-pdf btn-pdf--small" title="Añadir producto"> <i class="fas fa-plus"></i> Añadir producto</button>
+                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.2rem; min-width:18rem;">
+                                    <button type="button" id="add-item-btn" class="btn-pdf btn-pdf--small" title="Añadir producto"> <i class="fas fa-plus"></i> Añadir producto</button>
+                                    <small id="add-item-hint" style="min-height:1rem; color:#7b8ca4; font-size:0.72rem; line-height:1.1; text-align:right; opacity:0; transition:opacity 0.15s ease;">producto ya en la lista</small>
+                                </div>
                             </div>
 
                             <div id="items-container" style="margin-top:0.75rem;"></div>
@@ -161,7 +149,7 @@
                             </div>
                             <div>
                                 <dt>Cantidad de productos</dt>
-                                <dd id="qty-preview">-{{ (int) old('cantidad_retirar', 1) }}</dd>
+                                <dd id="qty-preview">0</dd>
                             </div>
                             <div>
                                 <dt>Criticidad</dt>
@@ -197,7 +185,7 @@
                                 <p class="history-empty">No hay salidas recientes registradas.</p>
                             @endforelse
                         </div>
-                        <button type="button" class="btn-history">Ver todo el historial</button>
+                        <button type="button" class="btn-history" onclick="window.location.href='{{ route('inventario.acciones.index') }}'">Ver todo el historial    </button>
                     </article>
                 </aside>
             </div>
@@ -343,11 +331,11 @@
             const catalogo = @json($catalogoSalidaJs);
             const productoInput = document.getElementById('producto_busqueda');
             const suggestionsDropdown = document.getElementById('producto-suggestions');
-            const cantidadInput = document.getElementById('cantidad_retirar');
             const qtyPreview = document.getElementById('qty-preview');
             const selectedName = document.getElementById('selected-product-name');
             const selectedCode = document.getElementById('selected-product-code');
             const selectedStock = document.getElementById('selected-stock-value');
+            const codigoHidden = document.getElementById('codigo');
             const pdfOpenButton = document.querySelector('[data-pdf-open]');
             const pdfModal = document.getElementById('salida-pdf-modal');
             const pdfCloseButtons = pdfModal ? pdfModal.querySelectorAll('[data-pdf-close]') : [];
@@ -355,15 +343,23 @@
             const syncInputs = document.querySelectorAll('[data-sync]');
             const autoGrowAreas = document.querySelectorAll('.pdf-auto-grow');
             const formAutoGrowAreas = document.querySelectorAll('.input-auto-grow');
+            const MIN_SEARCH_LENGTH = 2;
+            let confirmedSelectedProducto = null;
+            const addItemHint = document.getElementById('add-item-hint');
+
+            const closeSuggestions = () => {
+                suggestionsDropdown.classList.remove('is-open');
+                suggestionsDropdown.innerHTML = '';
+            };
 
             const showClientErrors = (errors) => {
                 const container = document.getElementById('client-errors');
                 if (!container) return;
                 container.innerHTML = `<strong>Errores:</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
                 container.classList.add('is-visible');
-                // clear previous highlights
+                
                 document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
-                // highlight rows where qty > maxStock
+                
                 const rows = document.querySelectorAll('.item-row');
                 rows.forEach(row => {
                     const qtyEl = row.querySelector('input[data-item-qty]');
@@ -383,19 +379,74 @@
                 document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
             };
 
+            const setAddItemHint = (text) => {
+                if (!addItemHint) return;
+                addItemHint.textContent = text || '';
+                addItemHint.style.opacity = text ? '1' : '0';
+            };
+
+            const getProductoFingerprint = (producto) => {
+                if (!producto) return null;
+
+                return {
+                    id: String(producto.id || '').trim(),
+                    codigo: normalize(producto.codigo || ''),
+                    descripcion: normalize(producto.descripcion || ''),
+                };
+            };
+
+            const isProductAlreadyAdded = (producto) => {
+                if (!producto) return false;
+
+                const fingerprint = getProductoFingerprint(producto);
+                if (!fingerprint) return false;
+
+                return Array.from(document.querySelectorAll('.item-row')).some((row) => {
+                    const hidden = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
+                    const rowId = String(hidden?.value || row.dataset.inventarioId || '').trim();
+                    const rowCodigo = normalize(row.dataset.productCodigo || '');
+                    const rowDescripcion = normalize(row.dataset.productDescripcion || '');
+
+                    // Only consider a match when both sides have a non-empty value.
+                    if (fingerprint.id && rowId && rowId === fingerprint.id) return true;
+                    if (fingerprint.codigo && rowCodigo && rowCodigo === fingerprint.codigo) return true;
+                    if (fingerprint.descripcion && rowDescripcion && rowDescripcion === fingerprint.descripcion) return true;
+                    return false;
+                });
+            };
+
+            const refreshAddItemHint = () => {
+                const producto = getSelectedProducto();
+                if (!producto) { setAddItemHint(''); return; }
+
+                // If product has no stock, hint 'sin stock'
+                const stock = Number(producto.stock_actual || 0);
+                if (stock <= 0) { setAddItemHint('sin stock'); return; }
+
+                if (isProductAlreadyAdded(producto)) {
+                    setAddItemHint('producto ya en la lista');
+                    return;
+                }
+
+                setAddItemHint('');
+            };
+
             const normalize = (value) => String(value || '').trim().toLowerCase();
 
             const findProducto = () => {
                 const search = normalize(productoInput.value);
-                if (!search) {
-                    return null;
-                }
-
+                if (!search) return null;
                 return catalogo.find((item) => {
                     return normalize(item.codigo) === search
                         || normalize(item.descripcion) === search
                         || normalize(item.nombre) === search;
                 }) || null;
+            };
+
+            const getSelectedProducto = () => {
+                // SOLUCIÓN BUG "ACEITE": Si hizo clic en un elemento, nos fiamos ciegamente de él.
+                if (confirmedSelectedProducto) return confirmedSelectedProducto;
+                return findProducto();
             };
 
             const findSimilarProductos = (query) => {
@@ -410,16 +461,14 @@
 
             const renderSuggestions = () => {
                 const query = productoInput.value.trim();
-                if (!query) {
-                    suggestionsDropdown.classList.remove('is-open');
-                    suggestionsDropdown.innerHTML = '';
+                if (query.length < MIN_SEARCH_LENGTH) {
+                    closeSuggestions();
                     return;
                 }
 
                 const similares = findSimilarProductos(query);
                 if (similares.length === 0) {
-                    suggestionsDropdown.classList.remove('is-open');
-                    suggestionsDropdown.innerHTML = '';
+                    closeSuggestions();
                     return;
                 }
 
@@ -439,57 +488,53 @@
                         const index = parseInt(item.dataset.index, 10);
                         const selected = similares[index];
                         productoInput.value = selected.descripcion;
+                        confirmedSelectedProducto = selected;
+                        if (codigoHidden) codigoHidden.value = selected.id;
                         hydrateProduct();
-                        suggestionsDropdown.classList.remove('is-open');
-                        suggestionsDropdown.innerHTML = '';
+                        closeSuggestions();
+                        refreshAddItemHint();
                     });
                 });
             };
 
-            const updateSummary = () => {
-                const qty = parseInt(cantidadInput.value || '0', 10) || 0;
-                qtyPreview.textContent = `-${Math.max(1, qty)}`;
-            };
-
             const hydrateProduct = () => {
-                const producto = findProducto();
+                const producto = getSelectedProducto();
 
                 if (!producto) {
-                    selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
+                    confirmedSelectedProducto = null;
                     selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
                     selectedCode.textContent = 'SKU: -';
                     selectedStock.textContent = '0';
-                    // clear limits
-                    if (cantidadInput) { cantidadInput.removeAttribute('max'); }
+                    if (codigoHidden) codigoHidden.value = '';
+                    refreshAddItemHint();
                     return;
                 }
+
+                confirmedSelectedProducto = producto;
                 selectedName.textContent = producto.descripcion;
                 selectedCode.textContent = `SKU: ${producto.codigo}`;
                 selectedStock.textContent = producto.stock_actual;
-                // set limits on single-quantity input
-                if (cantidadInput) {
-                    cantidadInput.max = producto.stock_actual;
-                    if (parseInt(cantidadInput.value || '0', 10) > producto.stock_actual) {
-                        cantidadInput.value = producto.stock_actual;
-                    }
-                }
+                if (codigoHidden) codigoHidden.value = producto.id;
+                refreshAddItemHint();
             };
 
             productoInput.addEventListener('change', hydrateProduct);
             productoInput.addEventListener('input', () => {
                 clearClientErrors();
+                confirmedSelectedProducto = null;
+                if (codigoHidden) codigoHidden.value = '';
                 renderSuggestions();
                 hydrateProduct();
+                refreshAddItemHint();
             });
-            cantidadInput.addEventListener('input', updateSummary);
-
-            // Cerrar dropdown cuando se hace click fuera
+            
+            productoInput.addEventListener('blur', () => window.setTimeout(closeSuggestions, 120));
+            
             document.addEventListener('click', (event) => {
-                if (!event.target.closest('.autocomplete-wrapper')) {
-                    suggestionsDropdown.classList.remove('is-open');
-                }
+                if (!event.target.closest('.autocomplete-wrapper')) closeSuggestions();
             });
 
+            // Lógica Modal PDF...
             if (pdfOpenButton && pdfModal) {
                 const openModal = () => {
                     populatePdfPreview();
@@ -504,63 +549,21 @@
                     const itemsContainerLocal = document.getElementById('items-container');
                     const rows = itemsContainerLocal ? itemsContainerLocal.querySelectorAll('.item-row') : [];
 
-                    const errors = [];
-
-                    if (rows.length > 0) {
-                        rows.forEach((row, rIdx) => {
-                            const qtyEl = row.querySelector('input[type="number"]');
-                            const qty = parseInt(qtyEl?.value || '0', 10) || 0;
-                            let maxStock = 0;
-                            if (qtyEl) {
-                                maxStock = parseInt(qtyEl.dataset.maxStock || qtyEl.max || '0', 10) || 0;
-                            }
-                            // try to resolve by hidden inventario_id if needed
-                            if (maxStock === 0) {
-                                const codeEl = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
-                                if (codeEl && codeEl.value) {
-                                    const found = catalogo.find(i => String(i.id) === String(codeEl.value));
-                                    if (found) maxStock = found.stock_actual || 0;
-                                }
-                            }
-                            if (maxStock > 0 && qty > maxStock) {
-                                errors.push(`Stock insuficiente en fila ${rIdx + 1}: solicitado ${qty}, disponible ${maxStock}`);
-                            }
-                        });
-                    } else {
-                        const prod = findProducto();
-                        const singleQty = parseInt(cantidadInput.value || '0', 10) || 0;
-                        if (prod && singleQty > (prod.stock_actual || 0)) {
-                            errors.push(`Stock insuficiente para ${prod.descripcion} (máx ${prod.stock_actual || 0}).`);
-                        }
-                    }
-
-                    if (errors.length > 0) {
-                        showClientErrors(errors);
+                    if (rows.length === 0) {
+                        showClientErrors(['Agrega al menos un producto antes de previsualizar.']);
                         return false;
                     }
 
-                    // if validation passed, populate fields
-                    if (rows.length > 0) {
-                        let idx = 1;
-                        rows.forEach(row => {
-                            const prodText = (row.querySelector('textarea') || {}).value || '';
-                            const qty = (row.querySelector('input[type="number"]') || {}).value || '';
-                            const lineEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}"]`);
-                            const qtyEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}-qty"]`);
-                            if (lineEl) lineEl.value = prodText;
-                            if (qtyEl) qtyEl.value = qty;
-                            idx++;
-                        });
-                    } else {
-                        const prod = findProducto();
-                        const prodName = prod ? prod.descripcion : (productoInput.value || '');
-                        const qty = cantidadInput.value || '';
-                        const lineEl = pdfModal.querySelector('textarea[data-pdf-line="1"]');
-                        const qtyEl = pdfModal.querySelector('textarea[data-pdf-line="1-qty"]');
-                        if (lineEl) lineEl.value = prodName;
+                    let idx = 1;
+                    rows.forEach((row) => {
+                        const prodText = (row.querySelector('textarea') || {}).value || '';
+                        const qty = (row.querySelector('input[type="number"]') || {}).value || '';
+                        const lineEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}"]`);
+                        const qtyEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}-qty"]`);
+                        if (lineEl) lineEl.value = prodText;
                         if (qtyEl) qtyEl.value = qty;
-                    }
-
+                        idx++;
+                    });
                     return true;
                 };
 
@@ -572,64 +575,48 @@
 
                 const triggerPrint = () => {
                     if (!pdfModal.classList.contains('is-open')) {
-                        // validate and open
                         if (!populatePdfPreview()) return;
                         openModal();
                     }
                     setTimeout(() => window.print(), 0);
                 };
 
-                // Expose a safe global opener as a fallback for the button
                 window.openSalidaPdf = () => {
                     try {
                         if (!populatePdfPreview()) return;
                         openModal();
-                    } catch (err) {
-                        console.warn('No se pudo abrir la vista previa del PDF', err);
-                    }
+                    } catch (err) { console.warn('Error PDF', err); }
                 };
 
                 pdfOpenButton.addEventListener('click', openModal);
                 pdfCloseButtons.forEach((button) => button.addEventListener('click', closeModal));
                 pdfPrintButtons.forEach((button) => button.addEventListener('click', triggerPrint));
                 document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape' && pdfModal.classList.contains('is-open')) {
-                        closeModal();
-                    }
+                    if (event.key === 'Escape' && pdfModal.classList.contains('is-open')) closeModal();
                 });
             }
 
+            // Sync Inputs y Auto Grow...
             if (syncInputs.length) {
                 const syncGroups = new Map();
                 const syncState = { active: false };
 
                 syncInputs.forEach((input) => {
                     const key = input.dataset.sync || '';
-                    if (!key) {
-                        return;
-                    }
-                    if (!syncGroups.has(key)) {
-                        syncGroups.set(key, []);
-                    }
+                    if (!key) return;
+                    if (!syncGroups.has(key)) syncGroups.set(key, []);
                     syncGroups.get(key).push(input);
                 });
 
                 const syncHandler = (event) => {
-                    if (syncState.active) {
-                        return;
-                    }
+                    if (syncState.active) return;
                     const source = event.target;
-                    const key = source.dataset.sync || '';
-                    const group = syncGroups.get(key);
-                    if (!group) {
-                        return;
-                    }
+                    const group = syncGroups.get(source.dataset.sync || '');
+                    if (!group) return;
+                    
                     syncState.active = true;
                     group.forEach((input) => {
-                        if (input === source) {
-                            return;
-                        }
-                        if (input.value !== source.value) {
+                        if (input !== source && input.value !== source.value) {
                             input.value = source.value;
                             input.dispatchEvent(new Event('input', { bubbles: true }));
                         }
@@ -642,34 +629,23 @@
                 });
             }
 
-            if (autoGrowAreas.length) {
+            const bindAutoGrow = (areas) => {
+                if(!areas.length) return;
                 const resizeArea = (el) => {
                     el.style.height = 'auto';
                     el.style.height = `${el.scrollHeight}px`;
                 };
-
-                autoGrowAreas.forEach((area) => {
+                areas.forEach((area) => {
                     resizeArea(area);
                     area.addEventListener('input', () => resizeArea(area));
                 });
-            }
-
-            if (formAutoGrowAreas.length) {
-                const resizeArea = (el) => {
-                    el.style.height = 'auto';
-                    el.style.height = `${el.scrollHeight}px`;
-                };
-
-                formAutoGrowAreas.forEach((area) => {
-                    resizeArea(area);
-                    area.addEventListener('input', () => resizeArea(area));
-                });
-            }
+            };
+            bindAutoGrow(autoGrowAreas);
+            bindAutoGrow(formAutoGrowAreas);
 
             hydrateProduct();
-            updateSummary();
 
-            // Dynamic items list (items[])
+            // --- LÓGICA DEL LISTADO DE PRODUCTOS (LA MAGIA DEL BOTÓN) ---
             (function () {
                 const itemsContainer = document.getElementById('items-container');
                 const addItemBtn = document.getElementById('add-item-btn');
@@ -679,13 +655,7 @@
                     const qtyEls = itemsContainer.querySelectorAll('input[data-item-qty]');
                     let total = 0;
                     qtyEls.forEach((el) => { total += parseInt(el.value || '0', 10) || 0; });
-                    if (total === 0) {
-                        // fallback to single quantity
-                        const single = parseInt(cantidadInput.value || '0', 10) || 0;
-                        qtyPreview.textContent = `-${Math.max(1, single)}`;
-                    } else {
-                        qtyPreview.textContent = `-${total}`;
-                    }
+                    qtyPreview.textContent = `-${total}`;
                 };
 
                 const createRow = (index, product = '', qty = 1) => {
@@ -702,10 +672,13 @@
                     prod.rows = 1;
                     prod.className = 'input-auto-grow';
                     prod.style.flex = '1';
-                    // if product is an object (selected), fill and lock the textarea and add hidden codigo
+                    
                     if (product && typeof product === 'object') {
                         prod.value = product.descripcion || product.nombre || '';
                         prod.readOnly = true;
+                        row.dataset.inventarioId = String(product.id || '');
+                        row.dataset.productCodigo = String(product.codigo || '');
+                        row.dataset.productDescripcion = String(product.descripcion || '');
                     } else {
                         prod.value = product || '';
                     }
@@ -745,8 +718,8 @@
                                 const si = parseInt(it.dataset.index, 10);
                                 const selected = similares[si];
                                 prod.value = selected.descripcion;
-                                // attach a hidden input to store codigo for server-side resolution
-                                let hidden = row.querySelector('input[type="hidden"][name="items[' + index + '][inventario_id]"]');
+                                
+                                let hidden = row.querySelector(`input[type="hidden"][name="items[${index}][inventario_id]"]`);
                                 if (!hidden) {
                                     hidden = document.createElement('input');
                                     hidden.type = 'hidden';
@@ -755,7 +728,6 @@
                                 }
                                 hidden.value = selected.id;
 
-                                // set max allowed on qty input according to stock
                                 if (qtyInput) {
                                     qtyInput.max = selected.stock_actual;
                                     qtyInput.dataset.maxStock = selected.stock_actual;
@@ -780,14 +752,14 @@
                         }
                         recalcQtyPreview();
                     });
-                    removeBtn.addEventListener('click', () => { row.remove(); recalcQtyPreview(); });
+                    
+                    removeBtn.addEventListener('click', () => { row.remove(); recalcQtyPreview(); refreshAddItemHint(); });
 
                     row.appendChild(prod);
                     row.appendChild(qtyInput);
                     row.appendChild(removeBtn);
                     row.appendChild(suggestions);
 
-                    // if product is object, also add hidden codigo input and set qty max
                     if (product && typeof product === 'object') {
                         let hidden = document.createElement('input');
                         hidden.type = 'hidden';
@@ -804,7 +776,7 @@
                     return row;
                 };
 
-                // Load old items if present
+                // Cargar items antiguos si falla la validación del formulario
                 const oldItems = @json(old('items', []));
                 if (Array.isArray(oldItems) && oldItems.length > 0) {
                     oldItems.forEach((it) => {
@@ -813,50 +785,68 @@
                             const found = catalogo.find(i => String(i.id) === String(it.inventario_id));
                             if (found) prod = found;
                         }
-                        const r = createRow(nextIndex++, prod, it.cantidad ?? 1);
-                        itemsContainer.appendChild(r);
+                        itemsContainer.appendChild(createRow(nextIndex++, prod, it.cantidad ?? 1));
                     });
                 }
 
+                refreshAddItemHint();
+
                 addItemBtn.addEventListener('click', () => {
                     clearClientErrors();
-                    const prod = findProducto();
-                    const qty = parseInt(cantidadInput.value || '0', 10) || 0;
-                    const clientErrors = [];
+                    const prod = getSelectedProducto();
+                    const qty = 1;
                     if (!prod) {
-                        clientErrors.push('Selecciona un producto válido arriba antes de añadir.');
+                        showClientErrors(['Selecciona un producto válido antes de añadir.']);
+                        setAddItemHint('');
+                        return;
                     }
-                    if (qty < 1) {
-                        clientErrors.push('Introduce una cantidad válida antes de añadir.');
+
+                    // Prevent adding products without available stock
+                    const prodStock = Number(prod.stock_actual || 0);
+                    if (prodStock <= 0) {
+                        showClientErrors(['No hay stock disponible para el producto seleccionado.']);
+                        setAddItemHint('sin stock');
+                        return;
                     }
-                    if (clientErrors.length) {
-                        showClientErrors(clientErrors);
+
+                    if (isProductAlreadyAdded(prod)) {
+                        setAddItemHint('producto ya en la lista');
                         return;
                     }
 
                     itemsContainer.appendChild(createRow(nextIndex++, prod, qty));
+                    productoInput.value = '';
+                    if (codigoHidden) codigoHidden.value = '';
+                    confirmedSelectedProducto = null;
+                    hydrateProduct();
+                    setAddItemHint('');
                     recalcQtyPreview();
+                    refreshAddItemHint();
                 });
 
-                // Form submit client-side validation: ensure no requested qty exceeds available stock
                 const stockForm = document.getElementById('stock-out-form');
                 stockForm.addEventListener('submit', (e) => {
                     const rows = itemsContainer.querySelectorAll('.item-row');
                     const errors = [];
 
-                    rows.forEach((row) => {
+                    if (rows.length === 0) {
+                        errors.push('Debes añadir al menos una fila a la lista antes de guardar. Usa el botón de "+ Añadir producto"');
+                    }
+
+                    rows.forEach((row, rIdx) => {
                         const qtyEl = row.querySelector('input[data-item-qty]');
                         const codeEl = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
                         const prodText = row.querySelector('textarea');
                         const qty = parseInt(qtyEl?.value || '0', 10) || 0;
+                        
                         if (qty < 1) {
-                            errors.push('Cantidad inválida en una de las filas.');
+                            errors.push(`Cantidad inválida en la fila ${rIdx + 1}.`);
                             return;
                         }
 
                         let maxStock = 0;
                         if (codeEl && codeEl.value) {
-                            const found = catalogo.find(i => String(i.id) === String(codeEl.value) || i.codigo === codeEl.value);
+                            const found = catalogo.find(i => String(i.id) === String(codeEl.value) || normalize(i.codigo) === normalize(codeEl.value));
                             if (found) maxStock = found.stock_actual || 0;
                         } else {
                             const found = catalogo.find(i => normalize(i.descripcion) === normalize(prodText.value) || normalize(i.codigo) === normalize(prodText.value) || normalize(i.nombre) === normalize(prodText.value));
@@ -864,18 +854,9 @@
                         }
 
                         if (maxStock > 0 && qty > maxStock) {
-                            errors.push(`Stock insuficiente para ${prodText.value} (máx ${maxStock}).`);
+                            errors.push(`Stock insuficiente para ${prodText.value} (Solicitado: ${qty}, Máximo: ${maxStock}).`);
                         }
                     });
-
-                    // Single product check if no items[] used
-                    if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('textarea').value.trim() === '')) {
-                        const singleQty = parseInt(cantidadInput.value || '0', 10) || 0;
-                        const prod = findProducto();
-                        if (prod && singleQty > (prod.stock_actual || 0)) {
-                            errors.push(`Stock insuficiente para ${prod.descripcion} (máx ${(prod.stock_actual || 0)}).`);
-                        }
-                    }
 
                     if (errors.length > 0) {
                         e.preventDefault();
@@ -884,8 +865,6 @@
                     }
                 });
 
-                // Recalculate when single quantity changes too
-                cantidadInput.addEventListener('input', recalcQtyPreview);
                 recalcQtyPreview();
             })();
         })();

@@ -132,6 +132,7 @@ Route::middleware('auth')->group(function () {
     Route::post('inventario/traslados', [InventarioController::class, 'storeTraslado'])->name('inventario.traslado.store');
     Route::get('inventario/nuevo-item', [InventarioController::class, 'createItem'])->name('inventario.item.create');
     Route::resource('inventario', InventarioController::class);
+    Route::get('inventario/historial', [HistoricoController::class, 'index'])->name('inventario.acciones');
     Route::resource('historico', HistoricoController::class)->only(['index']);
     Route::get('almacenes/nuevo', [AlmacenController::class, 'create'])->name('almacenes.create');
     Route::post('almacenes', [AlmacenController::class, 'store'])->name('almacenes.store');

@@ -64,7 +64,101 @@ class InventarioController extends Controller
                 return $varianteId > 0 ? 'variante_' . $varianteId : 'item_' . (int) $item->id;
             })
             ->map(function ($grupo) {
-                return collect($grupo)->sortBy('id')->values();
+                $grupo = collect($grupo)->sortBy('id')->values();
+                $productoPadre = $grupo->first();
+
+                if (is_array($productoPadre)) {
+                    $productoPadre = (object) $productoPadre;
+                }
+
+                $variantePadre = data_get($productoPadre, 'variante');
+                $stockGrupo = (int) $grupo->sum('stock_actual');
+
+                $stockMinimoGrupo = (int) (
+                    data_get($variantePadre, 'stock_minimo')
+                    ?? data_get($productoPadre, 'stock_minimo')
+                    ?? 0
+                );
+
+                $nivelCriticoGrupo = (int) (
+                    data_get($variantePadre, 'nivel_critico')
+                    ?? data_get($productoPadre, 'nivel_critico')
+                    ?? 0
+                );
+
+                if ($stockGrupo <= $nivelCriticoGrupo) {
+                    $estadoGrupo = 'critico';
+                    $estadoTextoGrupo = 'Crítico';
+                } elseif ($stockGrupo <= $stockMinimoGrupo) {
+                    $estadoGrupo = 'bajo';
+                    $estadoTextoGrupo = 'Reposición';
+                } else {
+                    $estadoGrupo = 'optimo';
+                    $estadoTextoGrupo = 'Óptimo';
+                }
+
+                $hijos = $grupo->skip(1)->map(function ($producto) {
+                    if (is_array($producto)) {
+                        $producto = (object) $producto;
+                    }
+
+                    $stockActual = (int) data_get($producto, 'stock_actual', 0);
+                    $stockMinimo = (int) data_get($producto, 'stock_minimo', 0);
+                    $nivelCritico = (int) data_get($producto, 'nivel_critico', 0);
+
+                    if ($stockActual <= $nivelCritico) {
+                        $estado = 'critico';
+                        $estadoTexto = 'Crítico';
+                    } elseif ($stockActual <= $stockMinimo) {
+                        $estado = 'bajo';
+                        $estadoTexto = 'Reposición';
+                    } else {
+                        $estado = 'optimo';
+                        $estadoTexto = 'Óptimo';
+                    }
+
+                    return (object) [
+                        'codigo' => data_get($producto, 'codigo'),
+                        'nombre' => data_get($producto, 'nombre'),
+                        'descripcion' => data_get($producto, 'descripcion'),
+                        'referencia_proveedor' => data_get($producto, 'referencia_proveedor'),
+                        'almacen' => data_get($producto, 'almacen'),
+                        'ubicacion' => data_get($producto, 'ubicacion'),
+                        'id' => data_get($producto, 'id'),
+                        'clase_relacion' => data_get($producto, 'claseRelacion') ?: data_get($productoPadre, 'claseRelacion'),
+                        'stock_actual' => $stockActual,
+                        'stock_minimo' => $stockMinimo,
+                        'nivel_critico' => $nivelCritico,
+                        'estado' => $estado,
+                        'estado_texto' => $estadoTexto,
+                    ];
+                })->values();
+
+                $hijosReposicion = $hijos->filter(fn ($hijo) => $hijo->stock_actual > 0 && $hijo->stock_actual <= $hijo->stock_minimo)->count();
+                $hijosCriticos = $hijos->filter(fn ($hijo) => $hijo->stock_actual > 0 && $hijo->stock_actual <= $hijo->nivel_critico)->count();
+
+                return (object) [
+                    'padre' => $productoPadre,
+                    'idPadre' => data_get($productoPadre, 'id'),
+                    'variantePadre' => $variantePadre,
+                    'variantePadreId' => data_get($variantePadre, 'id'),
+                    'codigoPadre' => data_get($variantePadre, 'codigo') ?? data_get($productoPadre, 'codigo'),
+                    'nombrePadre' => data_get($variantePadre, 'nombre') ?? data_get($productoPadre, 'nombre'),
+                    'descripcionPadre' => data_get($variantePadre, 'descripcion') ?? data_get($productoPadre, 'descripcion'),
+                    'referenciaPadre' => data_get($variantePadre, 'referencia_proveedor') ?? data_get($productoPadre, 'referencia_proveedor'),
+                    'almacenPadre' => data_get($variantePadre, 'almacen') ?? data_get($productoPadre, 'almacen'),
+                    'ubicacionPadre' => data_get($variantePadre, 'ubicacion') ?? data_get($productoPadre, 'ubicacion'),
+                    'clasePadre' => is_object(data_get($productoPadre, 'claseRelacion'))
+                        ? data_get($productoPadre, 'claseRelacion.nombre')
+                        : data_get($productoPadre, 'clase', 'Sin clase'),
+                    'stockGrupo' => $stockGrupo,
+                    'estadoGrupo' => $estadoGrupo,
+                    'estadoTextoGrupo' => $estadoTextoGrupo,
+                    'hijosReposicion' => $hijosReposicion,
+                    'hijosCriticos' => $hijosCriticos,
+                    'tieneHijos' => $grupo->count() > 1,
+                    'hijos' => $hijos,
+                ];
             })
             ->values();
 
@@ -304,7 +398,6 @@ class InventarioController extends Controller
             ->where('proyecto_id', $proyectoId)
             ->orderBy('descripcion')
             ->orderBy('codigo')
-            ->limit(30)
             ->get(['codigo', 'descripcion', 'almacen', 'ubicacion', 'stock_actual']);
 
         $salidasRecientes = Inventario::query()
@@ -335,7 +428,6 @@ class InventarioController extends Controller
         $validated = $request->validate([
             'producto_busqueda' => 'nullable|string|max:1000',
             'codigo' => 'nullable|string|max:255',
-            'cantidad_retirar' => 'nullable|integer|min:1',
             'items' => 'nullable|array',
             'items.*.inventario_id' => 'nullable|integer',
             'items.*.producto_busqueda' => 'nullable|string|max:1000',
@@ -359,15 +451,6 @@ class InventarioController extends Controller
                     $itemsToProcess[] = ['busqueda' => $busqueda, 'cantidad' => $cantidad];
                 }
             }
-        }
-
-        // Do not fallback to legacy pdf_articulo_* fields; require items[] or single producto_busqueda
-
-        if (empty($itemsToProcess) && trim((string) $request->input('producto_busqueda', '')) !== '') {
-            $itemsToProcess[] = [
-                'busqueda' => trim((string) $request->input('producto_busqueda', '')),
-                'cantidad' => (int) $request->input('cantidad_retirar', 0),
-            ];
         }
 
         if (empty($itemsToProcess)) {
@@ -405,10 +488,18 @@ class InventarioController extends Controller
         foreach ($itemsToProcess as $it) {
             $busqueda = $it['busqueda'];
             $inventarioId = isset($it['inventario_id']) ? (int) $it['inventario_id'] : null;
+            $codigo = trim((string) ($it['codigo'] ?? ''));
 
             $producto = null;
             if ($inventarioId && $inventarioId > 0) {
                 $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $inventarioId)->first();
+            }
+
+            if (!$producto && $codigo !== '') {
+                $producto = Inventario::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->where('codigo', $codigo)
+                    ->first();
             }
 
             if (!$producto) {
@@ -428,23 +519,23 @@ class InventarioController extends Controller
             $resolved[] = ['producto' => $producto, 'cantidad' => (int) $it['cantidad']];
         }
 
-        // Aggregate quantities by producto id to handle duplicate rows
-        $agg = [];
+        $seenIds = [];
         foreach ($resolved as $r) {
             $id = (int) $r['producto']->id;
-            if (!isset($agg[$id])) {
-                $agg[$id] = ['producto' => $r['producto'], 'cantidad' => 0];
+            if (isset($seenIds[$id])) {
+                return back()->withInput()->withErrors(['items' => 'No puedes añadir dos veces el mismo producto.']);
             }
-            $agg[$id]['cantidad'] += (int) $r['cantidad'];
+            $seenIds[$id] = true;
         }
 
         $salida = null;
 
         try {
-            DB::transaction(function () use ($proyectoId, $agg, $validated, $numeroSalida, $documentoMeta, &$salida) {
+            DB::transaction(function () use ($proyectoId, $resolved, $validated, $numeroSalida, $documentoMeta, &$salida) {
                 $itemsForSalida = [];
 
-                foreach ($agg as $id => $entry) {
+                foreach ($resolved as $entry) {
+                    $id = (int) $entry['producto']->id;
                     // lock the row for update
                     $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $id)->lockForUpdate()->first();
                     $cantidad = (int) $entry['cantidad'];
@@ -483,7 +574,7 @@ class InventarioController extends Controller
                 ]);
             });
         } catch (\RuntimeException $ex) {
-            return back()->withInput()->withErrors(['cantidad_retirar' => $ex->getMessage()]);
+            return back()->withInput()->withErrors(['items' => $ex->getMessage()]);
         }
 
         if ($guardarDocumento && $salida) {
