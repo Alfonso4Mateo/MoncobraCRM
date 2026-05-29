@@ -24,6 +24,12 @@
             </div>
         </header>
 
+        @if(session('status'))
+            <div class="docs-status-banner" style="margin: 0 0 1rem; padding: 0.9rem 1rem; border-radius: 14px; background: rgba(34, 197, 94, 0.12); color: #166534; border: 1px solid rgba(34, 197, 94, 0.25);">
+                {{ session('status') }}
+            </div>
+        @endif
+
         <section class="docs-type-grid" aria-label="Tipos de documentos">
             @foreach($tipos as $key => $tipo)
                 <a
@@ -198,13 +204,28 @@
                         @if(!empty($documentoActivo['acciones']))
                             <div class="docs-detail-actions">
                                 @foreach($documentoActivo['acciones'] as $accion)
-                                    <a
-                                        href="{{ $accion['url'] }}"
-                                        class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
-                                    >
-                                        <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
-                                        {{ $accion['label'] }}
-                                    </a>
+                                    @if(($accion['method'] ?? 'GET') === 'DELETE')
+                                        <form action="{{ $accion['url'] }}" method="POST" style="display:inline;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button
+                                                type="submit"
+                                                class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
+                                                onclick="return confirm('{{ $accion['confirm'] ?? '¿Seguro?' }}')"
+                                            >
+                                                <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
+                                                {{ $accion['label'] }}
+                                            </button>
+                                        </form>
+                                    @else
+                                        <a
+                                            href="{{ $accion['url'] }}"
+                                            class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
+                                        >
+                                            <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
+                                            {{ $accion['label'] }}
+                                        </a>
+                                    @endif
                                 @endforeach
                             </div>
                         @endif

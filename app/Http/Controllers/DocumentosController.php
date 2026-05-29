@@ -4,15 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\AlbaranCliente;
 use App\Models\EntradaStock;
+use App\Models\Documento;
 use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
 use App\Models\SalidaStock;
 use App\Models\TrasladoStock;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class DocumentosController extends Controller
 {
@@ -77,8 +81,88 @@ class DocumentosController extends Controller
     public function create()
     {
         return view('documentos.create', [
-            'tipos' => $this->documentTypes(),
+            'tiposCarga' => $this->uploadTypes(),
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $this->validate($request, [
+            'documentos' => 'required|array|min:1',
+            'documentos.*' => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,xml',
+            'fecha_documento' => 'nullable|date',
+            'numero_documento' => 'nullable|string|max:120',
+            'ot_documento' => 'nullable|string|max:120',
+            'cliente_documento' => 'nullable|string|max:191',
+            'tipo' => 'nullable|string|in:albaranes,presupuestos,pedidos,epi,factura,salidas,otros',
+        ]);
+
+        $tipo = $request->input('tipo') ?: 'otros';
+        $created = 0;
+        $createdPaths = [];
+
+        try {
+            DB::transaction(function () use ($request, $tipo, &$created, &$createdPaths) {
+                foreach ($request->file('documentos', []) as $file) {
+                    $storedName = now()->format('YmdHis') . '_' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $file->getClientOriginalName());
+                    $path = Storage::disk('public')->putFileAs('documentos/' . $tipo, $file, $storedName);
+                    $createdPaths[] = $path;
+
+                    Documento::create([
+                        'tipo' => $tipo,
+                        'numero_documento' => $request->input('numero_documento'),
+                        'fecha_documento' => $request->input('fecha_documento'),
+                        'ot' => $request->input('ot_documento'),
+                        'cliente' => $request->input('cliente_documento'),
+                        'original_name' => $file->getClientOriginalName(),
+                        'stored_name' => $storedName,
+                        'path' => $path,
+                        'mime_type' => $file->getClientMimeType(),
+                        'size' => $file->getSize(),
+                        'meta' => [
+                            'uploaded_at' => now()->toDateTimeString(),
+                            'uploaded_by' => auth()->id(),
+                        ],
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    $created++;
+                }
+            });
+        } catch (Throwable $exception) {
+            foreach ($createdPaths as $createdPath) {
+                if ($createdPath && Storage::disk('public')->exists($createdPath)) {
+                    Storage::disk('public')->delete($createdPath);
+                }
+            }
+
+            report($exception);
+
+            return back()
+                ->withInput()
+                ->withErrors(['documentos' => 'No se pudo guardar el documento. Intenta de nuevo.']);
+        }
+
+        $message = $created === 1
+            ? 'Documento cargado correctamente.'
+            : $created . ' documentos cargados correctamente.';
+
+        return redirect()->route('documentos.index', ['tipo' => 'cargados'])->with('status', $message);
+    }
+
+    public function download(Documento $documento)
+    {
+        abort_unless(Storage::disk('public')->exists($documento->path), 404);
+
+        return Storage::disk('public')->download($documento->path, $documento->original_name);
+    }
+
+    public function destroy(Documento $documento)
+    {
+        $documento->delete();
+
+        return redirect()->route('documentos.index', ['tipo' => 'cargados'])
+            ->with('status', 'Documento eliminado correctamente.');
     }
 
     private function documentTypes(): array
@@ -90,6 +174,20 @@ class DocumentosController extends Controller
             'entradas' => ['label' => 'Registro entrada', 'icon' => 'fa-truck'],
             'salidas' => ['label' => 'Registro salida', 'icon' => 'fa-box-open'],
             'traslados' => ['label' => 'Traslados', 'icon' => 'fa-shuffle'],
+            'cargados' => ['label' => 'Cargados', 'icon' => 'fa-cloud-arrow-up'],
+        ];
+    }
+
+    private function uploadTypes(): array
+    {
+        return [
+            'albaranes' => ['label' => 'Albaranes'],
+            'presupuestos' => ['label' => 'Presupuestos'],
+            'pedidos' => ['label' => 'Pedidos'],
+            'epi' => ['label' => 'EPI'],
+            'factura' => ['label' => 'Factura'],
+            'salidas' => ['label' => 'Salida de material'],
+            'otros' => ['label' => 'Otros'],
         ];
     }
 
@@ -102,6 +200,7 @@ class DocumentosController extends Controller
             'entradas' => EntradaStock::count(),
             'salidas' => SalidaStock::count(),
             'traslados' => TrasladoStock::count(),
+            'cargados' => Documento::count(),
         ];
     }
 
@@ -114,8 +213,45 @@ class DocumentosController extends Controller
             'entradas' => $this->fromEntradas(),
             'salidas' => $this->fromSalidas(),
             'traslados' => $this->fromTraslados(),
+            'cargados' => $this->fromCargados(),
             default => collect(),
         };
+    }
+
+    private function fromCargados(): Collection
+    {
+        return Documento::query()
+            ->orderByDesc('fecha_documento')
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get()
+            ->map(function (Documento $documento) {
+                $estado = 'ARCHIVADO';
+
+                return [
+                    'id' => (string) $documento->id,
+                    'codigo' => $documento->numero_documento ?: ('DOC-' . str_pad((string) $documento->id, 4, '0', STR_PAD_LEFT)),
+                    'fecha' => optional($documento->fecha_documento)->format('d/m/Y') ?: optional($documento->created_at)->format('d/m/Y') ?: '—',
+                    'persona' => $documento->cliente ?: 'Sin cliente',
+                    'estado' => $estado,
+                    'estado_clase' => 'status-success',
+                    'total' => $documento->size ? number_format($documento->size / 1024, 2, ',', '.') . ' KB' : '—',
+                    'totales' => ['base' => '—', 'iva' => '—', 'total' => '—'],
+                    'tipo' => 'cargados',
+                    'titulo' => $documento->original_name,
+                    'meta' => [
+                        ['label' => 'Tipo', 'value' => ucfirst($documento->tipo ?: 'otros')],
+                        ['label' => 'OT', 'value' => $documento->ot ?: '—'],
+                        ['label' => 'Cliente', 'value' => $documento->cliente ?: '—'],
+                        ['label' => 'Mime', 'value' => $documento->mime_type ?: '—'],
+                    ],
+                    'lineas' => [],
+                    'acciones' => [
+                        ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('documentos.download', $documento)],
+                        ['label' => 'Borrar', 'icon' => 'fa-trash', 'url' => route('documentos.destroy', $documento), 'method' => 'DELETE', 'confirm' => '¿Seguro que quieres borrar este documento?'],
+                    ],
+                ];
+            });
     }
 
     private function fromAlbaranes(): Collection

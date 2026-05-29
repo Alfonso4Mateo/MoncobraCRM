@@ -68,6 +68,9 @@ Route::middleware('auth')->group(function () {
     // Documentos
     Route::get('documentos', [DocumentosController::class, 'index'])->name('documentos.index');
     Route::get('documentos/cargar', [DocumentosController::class, 'create'])->name('documentos.create');
+    Route::post('documentos', [DocumentosController::class, 'store'])->name('documentos.store');
+    Route::get('documentos/{documento}/descargar', [DocumentosController::class, 'download'])->name('documentos.download');
+    Route::delete('documentos/{documento}', [DocumentosController::class, 'destroy'])->name('documentos.destroy');
 
     // Recursos CRUD
     Route::resource('clientes', ClienteController::class);
