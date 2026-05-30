@@ -20,6 +20,9 @@
         </header>
 
         <article class="pedido-cliente-card">
+            @php
+                $bolsaTexto = trim((string) ($pedidoCliente->bolsa_texto ?? ''));
+            @endphp
             <div class="pedido-grid">
                 <div>
                     <span class="label">Cliente</span>
@@ -38,7 +41,11 @@
                 @endphp
 
                 @if ($lineas === [])
-                    <p class="empty">Este pedido no tiene lineas asociadas.</p>
+                    @if ($bolsaTexto !== '')
+                        <p>{{ $bolsaTexto }}</p>
+                    @else
+                        <p class="empty">Este pedido no tiene lineas asociadas.</p>
+                    @endif
                 @else
                     <div class="table-responsive">
                         <table class="table table-sm">

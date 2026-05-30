@@ -18,13 +18,28 @@
                 <i class="fas fa-arrow-left" aria-hidden="true"></i>
                 Volver
             </a>
-            <a
-                href="{{ route('albaranes.create', ['pedido_id' => $pedidoCliente->id, 'pedido_cliente' => $pedidoCliente->numero_pedido, 'cliente_id' => $pedidoCliente->id_cliente, 'ot' => $pedidoCliente->ot]) }}"
-                class="pedidos-clientes-create-btn"
-            >
-                <i class="fas fa-plus" aria-hidden="true"></i>
-                Agregar Albarán
-            </a>
+            @php
+                $pedidoFacturado = (string) ($pedidoCliente->estado ?? '') === 'facturado';
+                $crearAlbaranUrl = route('albaranes.create', ['pedido_id' => $pedidoCliente->id, 'pedido_cliente' => $pedidoCliente->numero_pedido, 'cliente_id' => $pedidoCliente->id_cliente, 'ot' => $pedidoCliente->ot]);
+            @endphp
+            @if ($pedidoFacturado)
+                <span
+                    class="pedidos-clientes-create-btn pedidos-clientes-create-btn--disabled"
+                    aria-disabled="true"
+                    title="Este pedido ya está facturado"
+                >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    Agregar Albarán
+                </span>
+            @else
+                <a
+                    href="{{ $crearAlbaranUrl }}"
+                    class="pedidos-clientes-create-btn"
+                >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    Agregar Albarán
+                </a>
+            @endif
         </div>
     </div>
 @endsection

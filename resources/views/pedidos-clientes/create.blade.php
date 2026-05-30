@@ -34,6 +34,7 @@
         $fechaPedido = old('fecha_pedido', $fechaPedido ?? now()->toDateString());
         $otPedido = old('ot', $presupuestoSeleccionado?->ot ?? null);
         $referenciaManual = old('referencia_manual');
+        $bolsaTexto = old('bolsa_texto', '');
         $lineasJson = old('lista_articulos', json_encode($lineasIniciales ?? [], JSON_UNESCAPED_UNICODE));
         $lineasInicialesJs = json_decode($lineasJson, true);
         $lineasInicialesJs = is_array($lineasInicialesJs) ? $lineasInicialesJs : ($lineasIniciales ?? []);
@@ -203,6 +204,11 @@
                             <input type="number" step="0.01" min="0" max="10000000" id="pedido_bolsa_total" class="pedido-input" value="{{ $totalPedidoManual }}" placeholder="Importe total del pedido">
                         <small class="pedido-help">Rellena este importe solo si el pedido es bolsa.</small>
                     </div>
+                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_texto_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
+                        <label for="pedido_bolsa_texto">Texto del pedido bolsa</label>
+                        <textarea id="pedido_bolsa_texto" name="bolsa_texto" class="pedido-input pedido-textarea" rows="3" placeholder="Describe el pedido bolsa">{{ $bolsaTexto }}</textarea>
+                        <small class="pedido-help">Se mostrara como descripcion si no hay lineas en el PDF.</small>
+                    </div>
                 </div>
 
                 <div class="pedido-table-wrap">
@@ -272,6 +278,8 @@
             const bolsaCheckbox = document.getElementById('pedido_bolsa');
             const bolsaTotalWrap = document.getElementById('pedido_bolsa_total_wrap');
             const bolsaTotalInput = document.getElementById('pedido_bolsa_total');
+            const bolsaTextoWrap = document.getElementById('pedido_bolsa_texto_wrap');
+            const bolsaTextoInput = document.getElementById('pedido_bolsa_texto');
             const descripcionInput = document.getElementById('line_descripcion');
             const cantidadInput = document.getElementById('line_cantidad');
             const medidaInput = document.getElementById('line_medida');
@@ -366,6 +374,7 @@
             const syncBolsaUi = () => {
                 bolsaMode = bolsaCheckbox.checked;
                 bolsaTotalWrap.hidden = !bolsaMode;
+                bolsaTextoWrap.hidden = !bolsaMode;
                 lineFormGrid.hidden = bolsaMode;
                 lineTableWrap.hidden = bolsaMode;
                 bolsaTotalInput.required = bolsaMode;
@@ -623,6 +632,8 @@
                 if (bolsaCheckbox.checked) {
                     hiddenTotal.value = parseValue(bolsaTotalInput.value).toFixed(2);
                     hiddenLines.value = '[]';
+                } else if (bolsaTextoInput) {
+                    bolsaTextoInput.value = '';
                 }
 
                 if (clienteSelect.disabled) {

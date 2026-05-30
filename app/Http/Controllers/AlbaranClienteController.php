@@ -193,6 +193,10 @@ class AlbaranClienteController extends Controller
         $pedidosClientes = PedidoCliente::query()
             ->with('cliente')
             ->where('proyecto_id', $proyectoId)
+            ->where(function ($query) {
+                $query->whereNull('estado')
+                    ->orWhere('estado', '<>', 'facturado');
+            })
             ->orderByDesc('id')
             ->get(['id', 'numero_pedido', 'id_cliente', 'ot']);
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
@@ -288,6 +292,53 @@ class AlbaranClienteController extends Controller
         $this->syncPedidoClienteLink($albaran, $proyectoId);
         $this->syncPedidoEstadoFromAlbaran($albaran, $proyectoId, $lineas);
 
+        // If this albarán is for a non-bolsa pedido, decrement the pedido's
+        // `lista_articulos` quantities so subsequent albaranes reflect remaining
+        // unidades. This persists the remaining amounts on the pedido record.
+        $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        if ($pedido && ! (bool) ($pedido->bolsa ?? false)) {
+            $pedidoLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
+            if (!empty($pedidoLineas) && !empty($lineas)) {
+                // Build index of pedido lines by signature for matching
+                $indexMap = [];
+                foreach ($pedidoLineas as $idx => $pl) {
+                    $sig = $this->normalizePedidoLineaSignature((array) $pl);
+                    $indexMap[$sig][] = $idx;
+                }
+
+                foreach ($lineas as $l) {
+                    $sig = $this->normalizePedidoLineaSignature((array) $l);
+                    $cantidadAlbaran = round((float) ($l['cantidad'] ?? 0), 2);
+                    if ($cantidadAlbaran <= 0) {
+                        continue;
+                    }
+
+                    if (empty($indexMap[$sig])) {
+                        continue;
+                    }
+
+                    // Subtract across matching pedido lines in order
+                    foreach ($indexMap[$sig] as $idx) {
+                        $orig = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0), 2);
+                        if ($orig <= 0) {
+                            continue;
+                        }
+
+                        $toSubtract = min($orig, $cantidadAlbaran);
+                        $pedidoLineas[$idx]['cantidad'] = round(max(0, $orig - $toSubtract), 2);
+                        $cantidadAlbaran = round(max(0, $cantidadAlbaran - $toSubtract), 2);
+                        if ($cantidadAlbaran <= 0) {
+                            break;
+                        }
+                    }
+                }
+
+                // Remove lines that reached zero quantity
+                $pedidoLineas = array_values(array_filter($pedidoLineas, fn ($pl) => round((float) ($pl['cantidad'] ?? 0), 2) > 0));
+                $pedido->forceFill(['lista_articulos' => $pedidoLineas])->save();
+            }
+        }
+
         $consumos = collect($lineas)
             ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
             ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
@@ -348,6 +399,9 @@ class AlbaranClienteController extends Controller
 
     private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int $proyectoId): array
     {
+        // Use the pedido's current `lista_articulos` as the authoritative source
+        // of remaining quantities. The store flow decrements these values when
+        // an albarán se crea para un pedido (no-bolsa).
         $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
         $lineasPedido = collect($this->normalizePedidoLineas($lineas));
 
@@ -355,52 +409,17 @@ class AlbaranClienteController extends Controller
             return [];
         }
 
-        $pedido = PedidoCliente::query()
-            ->where('proyecto_id', $proyectoId)
-            ->with(['albaranesPivot', 'albaran', 'albaranes'])
-            ->find($pedidoCliente->id) ?? $pedidoCliente;
+        // Ensure each linea exposes a cantidad_max for the form UI
+        return $lineasPedido->map(function (array $linea) {
+            $cantidad = round((float) ($linea['cantidad'] ?? 0), 2);
+            $linea['cantidad'] = $cantidad;
+            $linea['cantidad_max'] = max($cantidad, (float) ($linea['cantidad_max'] ?? $cantidad));
+            $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
+            $margen = (float) ($linea['margen'] ?? 0);
+            $linea['total'] = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
 
-        $albaranes = collect($pedido->albaranesPivot ?? [])
-            ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
-            ->merge($pedido->albaranes ?? collect())
-            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
-            ->unique('id')
-            ->values();
-
-        if ($albaranes->isEmpty()) {
-            return $lineasPedido->all();
-        }
-
-        $consumos = $albaranes
-            ->flatMap(function (AlbaranCliente $albaran) {
-                $lineasAlbaran = is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [];
-                return collect($this->normalizePedidoLineas($lineasAlbaran));
-            })
-            ->groupBy(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
-            ->map(fn ($items) => round($items->sum(fn (array $linea) => (float) ($linea['cantidad'] ?? 0)), 2));
-
-        return $lineasPedido
-            ->map(function (array $linea) use ($consumos) {
-                $signature = $this->normalizePedidoLineaSignature($linea);
-                $consumido = (float) ($consumos[$signature] ?? 0);
-                $cantidadOriginal = (float) ($linea['cantidad'] ?? 0);
-                $restante = round(max(0, $cantidadOriginal - $consumido), 2);
-
-                if ($restante <= 0) {
-                    return null;
-                }
-
-                $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
-                $margen = (float) ($linea['margen'] ?? 0);
-                $linea['cantidad'] = $restante;
-                $linea['cantidad_max'] = $restante;
-                $linea['total'] = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
-
-                return $linea;
-            })
-            ->filter()
-            ->values()
-            ->all();
+            return $linea;
+        })->values()->all();
     }
 
     private function calculatePedidoPendienteFacturar(PedidoCliente $pedido, int $proyectoId, ?int $excludeAlbaranId = null): float
@@ -579,6 +598,7 @@ class AlbaranClienteController extends Controller
         $statsFormato = $this->correlativoStatsForPrefix($proyectoId, $formatoActual);
         $max = $statsFormato['max'];
         $generadosConFormatoActual = $statsFormato['count'];
+        $ultimosConFormato = $statsFormato['ultimos'];
         $override = DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', 'albaranes_next_correlativo')
@@ -587,7 +607,15 @@ class AlbaranClienteController extends Controller
         $suggested = max(($max ?? 0) + 1, (int) ($override ?? 0));
         $ejemplo = $this->formatCorrelativoNumero($formatoActual, $suggested);
 
-        return view('albaranes.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo', 'generadosConFormatoActual'));
+        return view('albaranes.correlativo', compact(
+            'max',
+            'override',
+            'suggested',
+            'formatoActual',
+            'ejemplo',
+            'generadosConFormatoActual',
+            'ultimosConFormato'
+        ));
     }
 
     public function updateCorrelativo(Request $request)
@@ -937,7 +965,7 @@ class AlbaranClienteController extends Controller
     private function correlativoStatsForPrefix(int $proyectoId, string $formato): array
     {
         if (preg_match('/^(.*?)(0+)$/', $formato, $matches) !== 1) {
-            return ['max' => 0, 'count' => 0];
+            return ['max' => 0, 'count' => 0, 'ultimos' => collect()];
         }
 
         $prefix = $matches[1];
@@ -963,7 +991,17 @@ class AlbaranClienteController extends Controller
             }
         }
 
-        return ['max' => $max, 'count' => $count];
+        $ultimos = AlbaranCliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero', 'like', $prefix . '%')
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get(['id', 'numero', 'fecha'])
+            ->filter(fn (AlbaranCliente $albaran) => is_string($albaran->numero)
+                && preg_match($pattern, $albaran->numero) === 1)
+            ->take(5);
+
+        return ['max' => $max, 'count' => $count, 'ultimos' => $ultimos];
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int

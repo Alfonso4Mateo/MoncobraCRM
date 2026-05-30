@@ -300,6 +300,7 @@ class PedidoController extends Controller
         $request->merge([
             'numero_pedido' => trim((string) $request->input('numero_pedido', '')),
             'bolsa' => $request->boolean('bolsa'),
+            'bolsa_texto' => trim((string) $request->input('bolsa_texto', '')),
         ]);
 
         $validated = $request->validate([
@@ -309,6 +310,8 @@ class PedidoController extends Controller
                 'max:80',
                 Rule::unique('pedidos_clientes', 'numero_pedido')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
             ],
+            'referencia_manual' => 'nullable|string|max:120',
+            'bolsa_texto' => 'nullable|string|max:2000',
             'fecha_pedido' => 'required|date',
             'id_cliente' => [
                 'required',
@@ -434,12 +437,14 @@ class PedidoController extends Controller
                 'id_cliente' => $validated['id_cliente'],
                 'proyecto_id' => $proyectoId,
                 'numero_pedido' => $validated['numero_pedido'],
+                'referencia_manual' => $validated['referencia_manual'] ?? null,
                 'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
                 'ot' => $validated['ot'] ?? null,
                 'presupuesto_id' => $presupuestoId,
                 'albaran_id' => null,
                 'estado' => $validated['estado'] ?? 'pendiente',
                 'bolsa' => $bolsa,
+                'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
                 'total' => round($total, 2),
                 'lista_articulos' => $lineas ?: null,
             ]);

@@ -38,7 +38,7 @@ class PresupuestoController extends Controller
             $estado = 'todos';
         }
 
-        $presupuestosQuery = Presupuesto::with('cliente')
+        $presupuestosQuery = Presupuesto::with(['cliente', 'pedidoCliente'])
             ->where('proyecto_id', $proyectoId);
 
         if ($search !== '') {
@@ -328,7 +328,9 @@ class PresupuestoController extends Controller
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId);
-        $max = $this->maxCorrelativoForFormato($proyectoId, $formatoActual);
+        $stats = $this->correlativoStatsForFormato($proyectoId, $formatoActual);
+        $max = $stats['max'];
+        $countFormato = $stats['count'];
         $override = DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', 'presupuestos_next_correlativo')
@@ -337,7 +339,17 @@ class PresupuestoController extends Controller
         $suggested = max(($max ?? 0) + 1, (int) ($override ?? 0));
         $ejemplo = $this->formatCorrelativoNumero($formatoActual, $suggested);
 
-        return view('presupuestos.correlativo', compact('max', 'override', 'suggested', 'formatoActual', 'ejemplo'));
+        $ultimosConFormato = $stats['ultimos'];
+
+        return view('presupuestos.correlativo', compact(
+            'max',
+            'override',
+            'suggested',
+            'formatoActual',
+            'ejemplo',
+            'countFormato',
+            'ultimosConFormato'
+        ));
     }
 
     public function updateCorrelativo(Request $request)
@@ -488,6 +500,17 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
+        $user = request()->user();
+        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
+            abort(403);
+        }
+
+        if ($presupuesto->pedidoCliente()->exists()) {
+            $pedidoNumero = $presupuesto->pedidoCliente?->numero_pedido ?? 'sin numero';
+            return redirect()->route('presupuestos.index')
+                ->with('error', 'No se puede borrar el presupuesto porque tiene el pedido asociado: ' . $pedidoNumero . '.');
+        }
+
         $presupuesto->delete();
         return redirect()->route('presupuestos.index')->with('success', 'Presupuesto eliminado');
     }
@@ -557,6 +580,11 @@ class PresupuestoController extends Controller
 
     private function maxCorrelativoForFormato(int $proyectoId, string $formato): int
     {
+        return $this->correlativoStatsForFormato($proyectoId, $formato)['max'];
+    }
+
+    private function correlativoStatsForFormato(int $proyectoId, string $formato): array
+    {
         $prefix = substr($formato, 0, -4);
         $regex = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
 
@@ -565,6 +593,7 @@ class PresupuestoController extends Controller
             ->pluck('numero');
 
         $max = 0;
+        $count = 0;
 
         foreach ($numeros as $numero) {
             if (!is_string($numero)) {
@@ -572,12 +601,27 @@ class PresupuestoController extends Controller
             }
 
             if (preg_match($regex, $numero, $matches) === 1) {
+                $count++;
                 $value = (int) $matches[1];
                 $max = max($max, $value);
             }
         }
 
-        return $max;
+        $ultimos = Presupuesto::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('numero', 'like', $prefix . '%')
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get(['id', 'numero', 'fecha'])
+            ->filter(fn (Presupuesto $presupuesto) => is_string($presupuesto->numero)
+                && preg_match($regex, $presupuesto->numero) === 1)
+            ->take(5);
+
+        return [
+            'max' => $max,
+            'count' => $count,
+            'ultimos' => $ultimos,
+        ];
     }
 
     private function formatCorrelativoNumero(string $formato, int $correlativo): string

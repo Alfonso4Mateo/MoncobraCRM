@@ -73,6 +73,17 @@ body,
     color: #fff !important;
 }
 
+.pedidos-clientes-create-btn--disabled,
+.pedidos-clientes-create-btn--disabled:hover {
+    background: linear-gradient(135deg, #a9b7c8 0%, #8b9bad 100%);
+    color: rgba(255, 255, 255, .85) !important;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    pointer-events: none;
+    opacity: .9;
+}
+
 .pedidos-clientes-shell {
     display: grid;
     gap: 18px;

@@ -142,6 +142,7 @@
                     <thead>
                         <tr>
                             <th>Pedido-cliente</th>
+                            <th>Nº-Ref-Interna</th>
                             <th>Presupuesto origen</th>
                             <th>Cliente</th>
                             <th>OT</th>
@@ -160,11 +161,16 @@
                                 $pendienteFacturar = round(max(0, $totalPedido - (float) ($pedido->ui_total_albaranes ?? 0)), 2);
                             @endphp
                             <tr>
-                                <td data-label="Pedido-cliente">
-                                    <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link">
-                                        {{ $pedido->numero_pedido }}
+                                <td data-label="Pedido-cliente" style="max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                    <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link" style="display:inline-block; max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                        {{ $pedido->referencia_manual}}
                                     </a>
                                 </td>
+                                <td data-label="Nº-Ref-Interna" style="max-width: 140px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                    <span style="display:inline-block; max-width: 140px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                        {{ $pedido->numero_pedido}}
+                                    </span>
+                                </td>  
                                 <td data-label="Presupuesto origen">
                                     @if ($pedido->presupuesto_id && $pedido->ui_presupuesto_numero)
                                         <a href="{{ route('presupuestos.show', $pedido->presupuesto_id) }}" class="pedido-code-link pedido-code-link--soft">

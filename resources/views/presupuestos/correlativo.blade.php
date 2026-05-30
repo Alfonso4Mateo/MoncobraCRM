@@ -25,10 +25,28 @@
                     <p class="corr-stat__value">{{ $max ?? '0' }}</p>
                 </div>
                 <div class="corr-stat">
+                    <span class="corr-stat__label">Con formato actual</span>
+                    <p class="corr-stat__value">{{ $countFormato ?? 0 }}</p>
+                </div>
+                <div class="corr-stat">
                     <span class="corr-stat__label">Override admin</span>
                     <p class="corr-stat__value">{{ $override ?? 'Sin override' }}</p>
                 </div>
             </div>
+
+            @if (!empty($ultimosConFormato) && $ultimosConFormato->isNotEmpty())
+                <div class="corr-recent">
+                    <p class="corr-recent__label">Ultimos con formato actual</p>
+                    <ul class="corr-recent__list">
+                        @foreach ($ultimosConFormato as $presupuesto)
+                            <li>
+                                <strong>{{ $presupuesto->numero }}</strong>
+                                <span>{{ optional($presupuesto->fecha)->format('d/m/Y') ?: '-' }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <form action="{{ route('presupuestos.correlativo.update') }}" method="POST" class="corr-form" novalidate>
                 @csrf

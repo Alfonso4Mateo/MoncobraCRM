@@ -34,6 +34,20 @@
                 </div>
             </div>
 
+            @if (!empty($ultimosConFormato) && $ultimosConFormato->isNotEmpty())
+                <div class="corr-recent">
+                    <p class="corr-recent__label">Ultimos con formato actual</p>
+                    <ul class="corr-recent__list">
+                        @foreach ($ultimosConFormato as $albaran)
+                            <li>
+                                <strong>{{ $albaran->numero }}</strong>
+                                <span>{{ optional($albaran->fecha)->format('d/m/Y') ?: '-' }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <form action="{{ route('albaranes.correlativo.update') }}" method="POST" class="corr-form" novalidate>
                 @csrf
                 <div class="corr-field">

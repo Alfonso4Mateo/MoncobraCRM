@@ -81,6 +81,151 @@ body,
   border-radius: var(--pres-radius);
   box-shadow: var(--pres-shadow);
 }
+/* Modal styling for presupuesto delete confirmation and blocked states */
+.presupuesto-delete-modal .modal-dialog {
+  max-width: 560px;
+}
+
+.presupuesto-delete-modal__content {
+  overflow: hidden;
+  border: 1px solid var(--pres-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 41, 69, 0.2);
+}
+
+.presupuesto-delete-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #e6edf5;
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f8fc 100%);
+}
+
+.presupuesto-delete-modal__title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.presupuesto-delete-modal__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.presupuesto-delete-modal__icon--blocked {
+  background: #fff4d6;
+  color: #b7791f;
+}
+
+.presupuesto-delete-modal__icon--danger {
+  background: #ffe9e9;
+  color: #bf1f1f;
+}
+
+.presupuesto-delete-modal__header .modal-title {
+  margin: 0;
+  color: #1e2a3a;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.presupuesto-delete-modal__subtitle {
+  margin: 4px 0 0;
+  color: var(--pres-muted);
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.presupuesto-delete-modal__close {
+  color: var(--pres-muted);
+  opacity: 1;
+  text-shadow: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+}
+
+.presupuesto-delete-modal__close:hover {
+  color: #1f2f45;
+}
+
+.presupuesto-delete-modal__body {
+  padding: 18px 20px 16px;
+  background: #fff;
+}
+
+.presupuesto-delete-modal__message {
+  color: #24364b;
+  font-size: .95rem;
+  line-height: 1.55;
+}
+
+.presupuesto-delete-modal__body strong {
+  color: #0f2f53;
+  font-weight: 800;
+}
+
+.presupuesto-delete-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #e6edf5;
+  background: #f8fbff;
+}
+
+.presupuesto-delete-modal__btn {
+  min-width: 120px;
+  min-height: 38px;
+  border-radius: 10px;
+  font-size: .8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border: 1px solid transparent;
+}
+
+.presupuesto-delete-modal__btn--ghost {
+  background: #fff;
+  border-color: #d8e3f0;
+  color: #445a75;
+}
+
+.presupuesto-delete-modal__btn--ghost:hover {
+  background: #f8fbff;
+  color: #20364f;
+}
+
+.presupuesto-delete-modal__btn--danger {
+  background: linear-gradient(135deg, #de3c3c 0%, #c21f1f 100%);
+  border-color: #b51d1d;
+  color: #fff;
+  box-shadow: 0 10px 18px -14px rgba(194, 31, 31, 0.85);
+}
+
+.presupuesto-delete-modal__btn--danger:hover {
+  background: linear-gradient(135deg, #c93434 0%, #a61a1a 100%);
+}
+
+.presupuesto-delete-modal__btn--primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: #1f43b7;
+  color: #fff;
+}
+
+.presupuesto-delete-modal__btn--primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+}
+
 
 .presupuestos-filters-card {
   padding: 22px;

@@ -172,6 +172,19 @@
                                         <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
                                             <i class="fas fa-pen"></i>
                                         </a>
+                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+                                            <button
+                                                type="button"
+                                                class="presupuesto-action-btn presupuesto-action-btn--danger"
+                                                data-delete-presupuesto
+                                                data-delete-url="{{ route('presupuestos.destroy', $presupuesto) }}"
+                                                data-pedido-numero="{{ $presupuesto->pedidoCliente?->numero_pedido ?? '' }}"
+                                                aria-label="Eliminar presupuesto"
+                                                title="Eliminar presupuesto"
+                                            >
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        @endif
                                         @if(in_array($estado, ['pendiente', 'pendiente pedido'], true))
                                             <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
                                                 <i class="fas fa-cart-plus"></i>
@@ -233,4 +246,123 @@
             </div>
         </div>
     </div>
+
+    <form id="presupuesto-delete-form" method="POST" class="d-none">
+        @csrf
+        @method('DELETE')
+    </form>
+
+    <div class="modal fade presupuesto-delete-modal presupuesto-delete-modal--blocked" id="presupuestoDeleteBlockedModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered presupuesto-delete-modal__dialog" role="document">
+            <div class="modal-content presupuesto-delete-modal__content">
+                <div class="modal-header presupuesto-delete-modal__header">
+                    <div class="presupuesto-delete-modal__title-wrap">
+                        <span class="presupuesto-delete-modal__icon presupuesto-delete-modal__icon--blocked">
+                            <i class="fas fa-ban" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <h5 class="modal-title">No se puede borrar el presupuesto</h5>
+                            <p class="presupuesto-delete-modal__subtitle">El presupuesto tiene un pedido asociado.</p>
+                        </div>
+                    </div>
+                    <button type="button" class="close presupuesto-delete-modal__close" data-dismiss="modal" aria-label="Cerrar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body presupuesto-delete-modal__body">
+                    <p class="presupuesto-delete-modal__message mb-0" id="presupuestoDeleteBlockedMessage"></p>
+                </div>
+                <div class="modal-footer presupuesto-delete-modal__footer">
+                    <button type="button" class="btn presupuesto-delete-modal__btn presupuesto-delete-modal__btn--primary" data-dismiss="modal">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade presupuesto-delete-modal presupuesto-delete-modal--confirm" id="presupuestoDeleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered presupuesto-delete-modal__dialog" role="document">
+            <div class="modal-content presupuesto-delete-modal__content">
+                <div class="modal-header presupuesto-delete-modal__header">
+                    <div class="presupuesto-delete-modal__title-wrap">
+                        <span class="presupuesto-delete-modal__icon presupuesto-delete-modal__icon--danger">
+                            <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <h5 class="modal-title">Eliminar presupuesto</h5>
+                            <p class="presupuesto-delete-modal__subtitle">Accion irreversible.</p>
+                        </div>
+                    </div>
+                    <button type="button" class="close presupuesto-delete-modal__close" data-dismiss="modal" aria-label="Cerrar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body presupuesto-delete-modal__body">
+                    <p id="presupuestoDeleteConfirmMessage" class="presupuesto-delete-modal__message mb-0"></p>
+                </div>
+                <div class="modal-footer presupuesto-delete-modal__footer">
+                    <button type="button" class="btn presupuesto-delete-modal__btn presupuesto-delete-modal__btn--ghost" data-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn presupuesto-delete-modal__btn presupuesto-delete-modal__btn--danger" id="presupuestoDeleteConfirmButton">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const deleteForm = document.getElementById('presupuesto-delete-form');
+            const confirmModal = document.getElementById('presupuestoDeleteConfirmModal');
+            const blockedModal = document.getElementById('presupuestoDeleteBlockedModal');
+            const confirmMessage = document.getElementById('presupuestoDeleteConfirmMessage');
+            const blockedMessage = document.getElementById('presupuestoDeleteBlockedMessage');
+            const confirmButton = document.getElementById('presupuestoDeleteConfirmButton');
+
+            let currentDeleteUrl = '';
+
+            const showModal = (modalElement) => {
+                if (!modalElement) {
+                    return;
+                }
+
+                if (window.$ && typeof window.$(modalElement).modal === 'function') {
+                    window.$(modalElement).modal('show');
+                    return;
+                }
+
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.setAttribute('aria-modal', 'true');
+            };
+
+            document.querySelectorAll('[data-delete-presupuesto]').forEach((button) => {
+                button.addEventListener('click', function () {
+                    const deleteUrl = this.getAttribute('data-delete-url') || '';
+                    const pedidoNumero = this.getAttribute('data-pedido-numero') || '';
+
+                    currentDeleteUrl = deleteUrl;
+
+                    if (pedidoNumero !== '') {
+                        blockedMessage.textContent = `No se puede borrar el presupuesto porque tiene el pedido asociado: ${pedidoNumero}.`;
+                        showModal(blockedModal);
+                        return;
+                    }
+
+                    confirmMessage.textContent = 'Quieres borrar este presupuesto?';
+                    showModal(confirmModal);
+                });
+            });
+
+            if (confirmButton) {
+                confirmButton.addEventListener('click', function () {
+                    if (!currentDeleteUrl || !deleteForm) {
+                        return;
+                    }
+
+                    deleteForm.setAttribute('action', currentDeleteUrl);
+                    deleteForm.submit();
+                });
+            }
+        });
+    </script>
 @endsection

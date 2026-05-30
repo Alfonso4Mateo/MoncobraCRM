@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pedido {{ $pedido->numero_pedido ?? '' }}</title>
+    <title>Pedido {{ $pedido->referencia_manual ?? $pedido->numero_pedido ?? '' }}</title>
     <style>
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
@@ -130,7 +130,7 @@
             
             <td width="2%"></td> <td width="23.5%" valign="top">
                 <div class="meta-header">NÚMERO</div>
-                    <div class="meta-body">{{ $pedido->numero_pedido ?? $pedido->numero ?? '' }}</div>
+                    <div class="meta-body">{{ $pedido->numero_pedido ?? 'Sin número' }}</div>
             </td>
             
             <td width="2%"></td> <td width="23.5%" valign="top">
@@ -140,7 +140,7 @@
 
             <td width="2%"></td> <td width="23.5%" valign="top">
                 <div class="meta-header">Nº DE PEDIDO</div>
-                <div class="meta-body">{{ $pedido->numero_pedido ?? '' }}</div>
+                <div class="meta-body">{{ $pedido->referencia_manual ?? "Sin pedido-cliente"}}</div>
             </td>
         </tr>
     </table>
@@ -153,9 +153,10 @@
             $precio = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
             return $descripcion !== '' || $cantidad > 0 || $precio > 0;
         })->values();
+        $bolsaTexto = trim((string) ($pedido->bolsa_texto ?? ''));
     @endphp
 
-    @if ($lineasValidas->isNotEmpty())
+    @if ($lineasValidas->isNotEmpty() || $bolsaTexto !== '')
     <table class="doc-table">
         <thead>
             <tr>
@@ -168,23 +169,34 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($lineasValidas as $i => $line)
-                @php
-                    $cantidad = (float) ($line['cantidad'] ?? 0);
-                    $precio = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
-                    $totalLinea = (float) ($line['total'] ?? 0);
-                    $medida = $line['medida'] ?? ($line['unidad'] ?? null);
-                    $medida = is_string($medida) ? trim($medida) : $medida;
-                @endphp
+            @if ($lineasValidas->isNotEmpty())
+                @foreach($lineasValidas as $i => $line)
+                    @php
+                        $cantidad = (float) ($line['cantidad'] ?? 0);
+                        $precio = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
+                        $totalLinea = (float) ($line['total'] ?? 0);
+                        $medida = $line['medida'] ?? ($line['unidad'] ?? null);
+                        $medida = is_string($medida) ? trim($medida) : $medida;
+                    @endphp
+                    <tr>
+                        <td>{{ $i + 1 }}</td>
+                        <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
+                        <td align="right">{{ number_format($cantidad, 2, ',', '.') }}</td>
+                        <td align="center">{{ $medida ? e($medida) : '' }}</td>
+                        <td align="right">{{ number_format($precio, 2, ',', '.') }} €</td>
+                        <td align="right">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
+                    </tr>
+                @endforeach
+            @elseif ($bolsaTexto !== '')
                 <tr>
-                    <td>{{ $i + 1 }}</td>
-                    <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                    <td align="right">{{ number_format($cantidad, 2, ',', '.') }}</td>
-                    <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                    <td align="right">{{ number_format($precio, 2, ',', '.') }} €</td>
-                    <td align="right">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
+                    <td>1</td>
+                    <td>{{ $bolsaTexto }}</td>
+                    <td align="right"></td>
+                    <td align="center"></td>
+                    <td align="right"></td>
+                    <td align="right"></td>
                 </tr>
-            @endforeach
+            @endif
         </tbody>
     </table>
     @endif
