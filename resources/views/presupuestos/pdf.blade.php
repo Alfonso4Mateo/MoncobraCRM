@@ -124,7 +124,7 @@
                         <td width="70%" class="client-content" valign="top">
                             <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($presupuesto->cliente)->empresa_nombre }}</div>
                             <div class="muted" style="margin-bottom: 8px;">{{ optional($presupuesto->cliente)->direccion ?? '' }}</div>
-                            <div style="font-weight:bold;">{{ optional($presupuesto->cliente)->cif ?? '' }}</div>
+                            <div style="font-weight:bold;">{{ optional($presupuesto->cliente)->cif_nif ?? '' }}</div>
                         </td>
                     </tr>
                 </table>
