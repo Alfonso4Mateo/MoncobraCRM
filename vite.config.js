@@ -20,6 +20,7 @@ export default defineConfig({
                 'resources/css/proyecto-show.css',
                 'resources/css/presupuestos-index.css',
                 'resources/css/presupuestos-create.css',
+                'resources/css/documentos-create.css',
                 'resources/css/clientes-index.css',
                 'resources/css/clientes-create.css',
                 'resources/css/clientes-edit.css',

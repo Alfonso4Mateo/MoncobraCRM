@@ -138,7 +138,7 @@
                         <td width="70%" class="client-content" valign="top">
                             <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($albaran->cliente)->empresa_nombre }}</div>
                             <div class="muted" style="margin-bottom: 8px;">{{ optional($albaran->cliente)->direccion ?? '' }}</div>
-                            <div style="font-weight:bold;">{{ optional($albaran->cliente)->cif ?? '' }}</div>
+                            <div style="font-weight:bold;">{{ optional($albaran->cliente)->cif_nif ?? '' }}</div>
                         </td>
                     </tr>
                 </table>

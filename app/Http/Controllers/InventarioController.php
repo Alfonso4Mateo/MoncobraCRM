@@ -1012,6 +1012,10 @@ class InventarioController extends Controller
             'tipos_atributos' => $tiposAtributos ?? array_keys($valoresIniciales),
         ];
 
+        // FIX: Inicializamos $variantesIniciales. Si el producto pertenece a una familia con variantes, las cargamos.
+        // Si es un producto sencillo importado del Excel, se quedará como un array vacío y el compact() no fallará.
+        $variantesIniciales = $inventario->variante ? $inventario->variante->items : [];
+
         return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales'));
     }
 

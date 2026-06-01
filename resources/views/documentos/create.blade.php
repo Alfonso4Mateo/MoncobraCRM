@@ -21,7 +21,7 @@
                 <h1>Cargar Nuevo Documento</h1>
                 <p>Centraliza nuevos registros industriales y asociarlos a su proyecto y cliente.</p>
             </div>
-            <a href="{{ route('documentos.index') }}" class="docs-upload-back">Cancelar</a>
+            <a href="{{ route('documentos.index') }}" class="docs-upload-cancel btn-back" id="cancel-back">Volver atrás</a>
         </header>
 
         @if ($errors->any())
@@ -414,8 +414,6 @@
         if (detectedPanel) {
             const discardBtn = document.getElementById('discard-detected');
             if (discardBtn) discardBtn.addEventListener('click', function(e){ e.preventDefault(); discardDetected(); });
-            const cancelBack = document.getElementById('cancel-back');
-            if (cancelBack) cancelBack.addEventListener('click', function(e){ e.preventDefault(); history.back(); });
         }
     });
 </script>
