@@ -157,6 +157,19 @@ class DocumentosController extends Controller
         return Storage::disk('public')->download($documento->path, $documento->original_name);
     }
 
+    public function preview(Documento $documento)
+    {
+        abort_unless(Storage::disk('public')->exists($documento->path), 404);
+
+        $absPath = Storage::disk('public')->path($documento->path);
+        $mime = $documento->mime_type ?: mime_content_type($absPath);
+
+        return response()->file($absPath, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . $documento->original_name . '"'
+        ]);
+    }
+
     public function destroy(Documento $documento)
     {
         $documento->delete();
@@ -247,6 +260,7 @@ class DocumentosController extends Controller
                     ],
                     'lineas' => [],
                     'acciones' => [
+                        ['label' => 'Previsualizar', 'icon' => 'fa-eye', 'url' => route('documentos.preview', $documento), 'preview' => true],
                         ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('documentos.download', $documento)],
                         ['label' => 'Borrar', 'icon' => 'fa-trash', 'url' => route('documentos.destroy', $documento), 'method' => 'DELETE', 'confirm' => '¿Seguro que quieres borrar este documento?'],
                     ],

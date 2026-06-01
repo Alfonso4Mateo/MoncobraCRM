@@ -204,7 +204,7 @@
                         @if(!empty($documentoActivo['acciones']))
                             <div class="docs-detail-actions">
                                 @foreach($documentoActivo['acciones'] as $accion)
-                                    @if(($accion['method'] ?? 'GET') === 'DELETE')
+                                            @if(($accion['method'] ?? 'GET') === 'DELETE')
                                         <form action="{{ $accion['url'] }}" method="POST" style="display:inline;">
                                             @csrf
                                             @method('DELETE')
@@ -218,13 +218,25 @@
                                             </button>
                                         </form>
                                     @else
-                                        <a
-                                            href="{{ $accion['url'] }}"
-                                            class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
-                                        >
-                                            <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
-                                            {{ $accion['label'] }}
-                                        </a>
+                                                @if(!empty($accion['preview']))
+                                                    <a
+                                                        href="{{ $accion['url'] }}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
+                                                    >
+                                                        <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
+                                                        {{ $accion['label'] }}
+                                                    </a>
+                                                @else
+                                                    <a
+                                                        href="{{ $accion['url'] }}"
+                                                        class="docs-action-btn {{ $loop->first ? 'docs-action-btn--primary' : '' }}"
+                                                    >
+                                                        <i class="fas {{ $accion['icon'] ?? 'fa-file' }}"></i>
+                                                        {{ $accion['label'] }}
+                                                    </a>
+                                                @endif
                                     @endif
                                 @endforeach
                             </div>

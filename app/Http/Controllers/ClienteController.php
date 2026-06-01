@@ -405,6 +405,14 @@ class ClienteController extends Controller
             abort(404);
         }
 
+        $albaranesCount = $cliente->albaranes()->count();
+        $presupuestosCount = $cliente->presupuestos()->count();
+        $pedidosCount = $cliente->pedidosClientes()->count();
+
+        if ($albaranesCount > 0 || $presupuestosCount > 0 || $pedidosCount > 0) {
+            return back()->with('error', 'Este cliente tiene documentos asociados y no puede ser borrado.');
+        }
+
         $cliente->delete();
 
         return redirect()->route('clientes.index')->with('success', 'Cliente eliminado exitosamente');

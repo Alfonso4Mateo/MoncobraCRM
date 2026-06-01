@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let pedidoMode = root.dataset.pedidoMode === "1";
     let pedidoBolsaMode = root.dataset.pedidoBolsa === "1";
-    const isExistingEditForm = !Object.prototype.hasOwnProperty.call(root.dataset, 'pedidoMode');
+    const isExistingEditForm = root.dataset.formMode === "edit";
     const isPedidoRestrictoMode = () => pedidoMode && !pedidoBolsaMode;
 
     // `linea_articulo` eliminado de las vistas de creación; no lo buscamos.
@@ -184,11 +184,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const pedidoLine = pedidoMap.get(signature);
             const orderedQuantity = round2(pedidoLine?.cantidad ?? baseLine.cantidad ?? 0);
             const currentQuantity = round2(baseLine.cantidad ?? 0);
+            const maxQuantity = round2(currentQuantity + orderedQuantity);
 
             merged.push({
                 ...baseLine,
                 cantidad: currentQuantity,
-                cantidad_max: Math.max(currentQuantity, orderedQuantity),
+                cantidad_max: Math.max(currentQuantity, maxQuantity),
                 selected: true,
                 locked: false,
             });

@@ -72,7 +72,7 @@
     $lineasJsonInicial = json_encode($lineasIniciales, JSON_UNESCAPED_UNICODE);
 @endphp
 
-<section class="albaran-form-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas="{{ e($lineasJsonInicial) }}">
+<section class="albaran-form-ui" data-albaran-form data-form-mode="create" data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas="{{ e($lineasJsonInicial) }}">
     <header class="albaran-form-topbar">
         <nav class="albaran-breadcrumbs" aria-label="breadcrumb">
             <a href="{{ route('dashboard') }}">Inicio</a>

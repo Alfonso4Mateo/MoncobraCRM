@@ -297,46 +297,7 @@ class AlbaranClienteController extends Controller
         // unidades. This persists the remaining amounts on the pedido record.
         $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
         if ($pedido && ! (bool) ($pedido->bolsa ?? false)) {
-            $pedidoLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
-            if (!empty($pedidoLineas) && !empty($lineas)) {
-                // Build index of pedido lines by signature for matching
-                $indexMap = [];
-                foreach ($pedidoLineas as $idx => $pl) {
-                    $sig = $this->normalizePedidoLineaSignature((array) $pl);
-                    $indexMap[$sig][] = $idx;
-                }
-
-                foreach ($lineas as $l) {
-                    $sig = $this->normalizePedidoLineaSignature((array) $l);
-                    $cantidadAlbaran = round((float) ($l['cantidad'] ?? 0), 2);
-                    if ($cantidadAlbaran <= 0) {
-                        continue;
-                    }
-
-                    if (empty($indexMap[$sig])) {
-                        continue;
-                    }
-
-                    // Subtract across matching pedido lines in order
-                    foreach ($indexMap[$sig] as $idx) {
-                        $orig = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0), 2);
-                        if ($orig <= 0) {
-                            continue;
-                        }
-
-                        $toSubtract = min($orig, $cantidadAlbaran);
-                        $pedidoLineas[$idx]['cantidad'] = round(max(0, $orig - $toSubtract), 2);
-                        $cantidadAlbaran = round(max(0, $cantidadAlbaran - $toSubtract), 2);
-                        if ($cantidadAlbaran <= 0) {
-                            break;
-                        }
-                    }
-                }
-
-                // Remove lines that reached zero quantity
-                $pedidoLineas = array_values(array_filter($pedidoLineas, fn ($pl) => round((float) ($pl['cantidad'] ?? 0), 2) > 0));
-                $pedido->forceFill(['lista_articulos' => $pedidoLineas])->save();
-            }
+            $this->adjustPedidoLineasFromAlbaran($pedido, $lineas, -1);
         }
 
         $consumos = collect($lineas)
@@ -657,6 +618,7 @@ class AlbaranClienteController extends Controller
         $this->validateProyectoAccess($proyectoId);
 
         $pedidoAnterior = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        $lineasAnteriores = is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [];
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -709,6 +671,14 @@ class AlbaranClienteController extends Controller
 
         $this->syncPedidoClienteLink($albaran, $proyectoId);
         $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
+        if ($pedidoAnterior && ! (bool) ($pedidoAnterior->bolsa ?? false)) {
+            $this->adjustPedidoLineasFromAlbaran($pedidoAnterior, $lineasAnteriores, 1);
+        }
+
+        if ($pedidoActual && ! (bool) ($pedidoActual->bolsa ?? false)) {
+            $this->adjustPedidoLineasFromAlbaran($pedidoActual, $lineas, -1);
+        }
 
         $this->recalculatePedidosEstadoFromAlbaran($proyectoId, array_filter([
             $pedidoAnterior,
@@ -822,10 +792,16 @@ class AlbaranClienteController extends Controller
 
         $pedidoRelacionado = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
 
-        DB::transaction(function () use ($albaran, $proyectoId) {
+        $lineasAlbaran = is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [];
+
+        DB::transaction(function () use ($albaran, $proyectoId, $lineasAlbaran) {
             $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
 
             if ($pedido) {
+                if (! (bool) ($pedido->bolsa ?? false)) {
+                    $this->adjustPedidoLineasFromAlbaran($pedido, $lineasAlbaran, 1);
+                }
+
                 $remainingAlbaranes = $pedido->albaranes()
                     ->where('albaranes_clientes.id', '!=', $albaran->id)
                     ->orderByDesc('fecha')
@@ -1328,6 +1304,95 @@ class AlbaranClienteController extends Controller
                 $this->recalculatePedidoEstado($pedido, $proyectoId);
             }
         }
+    }
+
+    private function adjustPedidoLineasFromAlbaran(PedidoCliente $pedido, array $lineasAlbaran, int $direction): void
+    {
+        if ((bool) ($pedido->bolsa ?? false) || $lineasAlbaran === []) {
+            return;
+        }
+
+        $pedidoLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
+
+        if ($pedidoLineas === [] && $direction < 0) {
+            return;
+        }
+
+        $indexMap = [];
+        foreach ($pedidoLineas as $idx => $lineaPedido) {
+            if (!is_array($lineaPedido)) {
+                continue;
+            }
+
+            $signature = $this->normalizePedidoLineaSignature($lineaPedido);
+            if ($signature !== '') {
+                $indexMap[$signature][] = $idx;
+            }
+        }
+
+        foreach ($lineasAlbaran as $lineaAlbaran) {
+            if (!is_array($lineaAlbaran)) {
+                continue;
+            }
+
+            $cantidad = round(max(0, (float) ($lineaAlbaran['cantidad'] ?? 0)), 2);
+            if ($cantidad <= 0) {
+                continue;
+            }
+
+            $signature = $this->normalizePedidoLineaSignature($lineaAlbaran);
+            if ($signature === '') {
+                continue;
+            }
+
+            if ($direction > 0) {
+                if (!empty($indexMap[$signature])) {
+                    $idx = $indexMap[$signature][0];
+                    $pedidoLineas[$idx]['cantidad'] = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0) + $cantidad, 2);
+                    $pedidoLineas[$idx]['total'] = round(
+                        (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
+                        * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
+                        * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)),
+                        2
+                    );
+                } else {
+                    $restored = $this->normalizePedidoLineas([$lineaAlbaran]);
+                    if (!empty($restored[0])) {
+                        $pedidoLineas[] = $restored[0];
+                    }
+                }
+
+                continue;
+            }
+
+            if (empty($indexMap[$signature])) {
+                continue;
+            }
+
+            foreach ($indexMap[$signature] as $idx) {
+                $orig = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0), 2);
+                if ($orig <= 0) {
+                    continue;
+                }
+
+                $toSubtract = min($orig, $cantidad);
+                $pedidoLineas[$idx]['cantidad'] = round(max(0, $orig - $toSubtract), 2);
+                $pedidoLineas[$idx]['total'] = round(
+                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
+                    * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
+                    * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)),
+                    2
+                );
+                $cantidad = round(max(0, $cantidad - $toSubtract), 2);
+
+                if ($cantidad <= 0) {
+                    break;
+                }
+            }
+        }
+
+        $pedidoLineas = array_values(array_filter($pedidoLineas, fn ($lineaPedido) => round((float) ($lineaPedido['cantidad'] ?? 0), 2) > 0));
+        $pedido->forceFill(['lista_articulos' => $pedidoLineas])->save();
     }
 
     private function normalizePedidoLineas(array $lineas): array

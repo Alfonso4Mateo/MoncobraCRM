@@ -70,6 +70,7 @@ Route::middleware('auth')->group(function () {
     Route::get('documentos/cargar', [DocumentosController::class, 'create'])->name('documentos.create');
     Route::post('documentos', [DocumentosController::class, 'store'])->name('documentos.store');
     Route::get('documentos/{documento}/descargar', [DocumentosController::class, 'download'])->name('documentos.download');
+    Route::get('documentos/{documento}/preview', [DocumentosController::class, 'preview'])->name('documentos.preview');
     Route::delete('documentos/{documento}', [DocumentosController::class, 'destroy'])->name('documentos.destroy');
 
     // Recursos CRUD

@@ -232,30 +232,7 @@
                                         @php
                                             $dropdownId = 'pedido-estado-dropdown-' . $pedido->id;
                                         @endphp
-                                        <div class="dropdown presupuesto-dropdown">
-                                            <button
-                                                type="button"
-                                                class="presupuesto-action-btn--state dropdown-toggle"
-                                                id="{{ $dropdownId }}"
-                                                data-toggle="dropdown"
-                                                aria-haspopup="true"
-                                                aria-expanded="false"
-                                                aria-label="Cambiar estado"
-                                                title="Cambiar estado de facturación"
-                                            >
-                                                <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
-                                            </button>
-                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
-                                                <h6 class="dropdown-header">Cambiar estado de facturación</h6>
-                                                <form method="POST" action="{{ route('pedidos-clientes.estado.update', $pedido) }}" class="estado-menu-form">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="facturado_parcial">Facturado Parcial</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado</button>
-                                                </form>
-                                            </div>
-                                        </div>
+
 
                                         @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
                                             <button

@@ -146,6 +146,14 @@
         </tr>
     </table>
 
+    @php
+        $pedidoAsociado = method_exists($albaran, 'pedidosClientes') ? $albaran->pedidosClientes->first() : null;
+        $numeroPedidoReferencia = trim((string) ($pedidoAsociado?->referencia_manual ?? ''));
+        if ($numeroPedidoReferencia === '') {
+            $numeroPedidoReferencia = trim((string) ($albaran->pedido_cliente ?? ''));
+        }
+    @endphp
+
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
         <tr>
             <td width="23.5%" valign="top">
@@ -165,7 +173,7 @@
 
             <td width="2%"></td> <td width="23.5%" valign="top">
                 <div class="meta-header">Nº DE PEDIDO</div>
-                <div class="meta-body">{{ $albaran->pedido_cliente ?? '' }}</div>
+                <div class="meta-body">{{ $numeroPedidoReferencia }}</div>
             </td>
         </tr>
     </table>

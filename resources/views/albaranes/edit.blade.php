@@ -10,7 +10,7 @@
         $pedidoMode = $pedidoAsociado !== null;
     @endphp
 
-    <section class="albaran-edit-ui" data-albaran-form data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas='@json($albaran->lista_articulos ?? [])'>
+    <section class="albaran-edit-ui" data-albaran-form data-form-mode="edit" data-pedido-mode="{{ $pedidoMode ? '1' : '0' }}" data-pedido-bolsa="{{ $pedidoBolsa ? '1' : '0' }}" data-initial-lineas='@json($albaran->lista_articulos ?? [])'>
         <header class="albaran-edit-topbar">
             <div>
                 <p class="breadcrumbs">Inicio <span>/</span> Editar Albarán Cliente</p>
