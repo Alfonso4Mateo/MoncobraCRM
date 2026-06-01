@@ -8,7 +8,6 @@ const clampNumber = (value) => {
     if (!Number.isFinite(parsed) || parsed < 0) {
         return 0;
     }
-
     return parsed;
 };
 
@@ -28,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const isExistingEditForm = root.dataset.formMode === "edit";
     const isPedidoRestrictoMode = () => pedidoMode && !pedidoBolsaMode;
 
-    // `linea_articulo` eliminado de las vistas de creación; no lo buscamos.
     const descripcionInput = document.getElementById("linea_descripcion");
     const cantidadInput = document.getElementById("linea_cantidad");
     const precioInput = document.getElementById("linea_precio");
@@ -91,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const lineasFromDataset = parseLineas(root.dataset.initialLineas ?? "[]");
 
     let lineas = lineasFromInput.length > 0 ? lineasFromInput : lineasFromDataset;
+    // Guardamos una copia estricta de las líneas iniciales del Albarán actual (útil para el modo edición)
     const editBaseLineas = isExistingEditForm ? lineas.map((linea) => ({ ...linea })) : [];
     let activePedidoKey = null;
     let selectedIndex = -1;
@@ -99,7 +98,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!descripcionInput || descripcionInput.tagName !== "TEXTAREA") {
             return;
         }
-
         descripcionInput.style.height = "auto";
         descripcionInput.style.height = `${Math.min(descripcionInput.scrollHeight, 192)}px`;
     };
@@ -108,7 +106,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!descripcionInput || !cantidadInput || !precioInput || !medidaInput || !margenInput) {
             return;
         }
-
         descripcionInput.value = "";
         cantidadInput.value = "1";
         medidaInput.value = "";
@@ -122,7 +119,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const payload = isPedidoRestrictoMode()
             ? lineas.filter((linea) => linea.selected !== false)
             : lineas;
-
         lineasJsonInput.value = JSON.stringify(payload);
     };
 
@@ -134,7 +130,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const lineSignature = (linea) => {
         const descripcion = String(linea?.descripcion ?? '').trim().toLowerCase();
         const medida = String(linea?.medida ?? linea?.unidad ?? '').trim().toLowerCase();
-
         return `${descripcion}|${medida}`;
     };
 
@@ -171,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return Array.from(grouped.values());
     };
 
+    // CORRECCIÓN: Combinación en modo EDICIÓN
     const mergeEditLines = (pedidoLineas) => {
         const pedidoMap = new Map();
         pedidoLineas.forEach((linea) => {
@@ -213,13 +209,36 @@ document.addEventListener("DOMContentLoaded", () => {
         return merged;
     };
 
+    // NUEVO/CORREGIDO: Calcula las cantidades restantes en modo CREACIÓN para evitar que salgan artículos ya albaranados
+    const mergeCreateLinesWithRemaining = (pedidoLineas) => {
+        // Mapeamos lo que ya pudiera venir en el dataset original por seguridad (historial de este formulario)
+        const yaAlbaranadoMap = new Map();
+        lineasFromDataset.forEach((l) => {
+            const sig = lineSignature(l);
+            yaAlbaranadoMap.set(sig, round2((yaAlbaranadoMap.get(sig) || 0) + l.cantidad));
+        });
+
+        return pedidoLineas.map((l) => {
+            const sig = lineSignature(l);
+            const consumido = yaAlbaranadoMap.get(sig) || 0;
+            // La cantidad disponible por albaranar será la solicitada en el pedido menos lo ya entregado
+            const cantidadRestante = Math.max(0, round2((l.cantidad ?? 0) - consumido));
+
+            return {
+                ...l,
+                cantidad: cantidadRestante,
+                cantidad_max: cantidadRestante,
+                selected: cantidadRestante > 0, // Si no queda stock, se desmarca por defecto
+            };
+        }).filter(l => l.cantidad_max > 0); // Filtramos y eliminamos las líneas que ya han sido totalmente albaranadas
+    };
+
     const setSideButtonsState = () => {
         const hasSelection = selectedIndex >= 0 && selectedIndex < lineas.length && !lineas[selectedIndex]?.locked;
 
         if (editButton) {
             editButton.disabled = !hasSelection;
         }
-
         if (deleteButton) {
             deleteButton.disabled = !hasSelection;
         }
@@ -228,7 +247,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const resolveCantidadMax = (linea) => {
         const current = round2(linea?.cantidad ?? 0);
         const maxValue = round2(linea?.cantidad_max ?? linea?.cantidad ?? 0);
-
         return Math.max(current, maxValue);
     };
 
@@ -253,24 +271,21 @@ document.addEventListener("DOMContentLoaded", () => {
         pedidoMode = !!enabled;
         const restrictedMode = isPedidoRestrictoMode();
 
-        // Hide or show the linea input row
         const lineaInputRow = document.querySelector('.linea-input-row');
         if (lineaInputRow) {
             lineaInputRow.style.display = restrictedMode ? 'none' : '';
         }
 
-        // Disable side add/edit/delete when in pedidoMode
         if (addButton) addButton.disabled = restrictedMode;
         if (editButton) editButton.disabled = restrictedMode || editButton.disabled;
         if (deleteButton) deleteButton.disabled = restrictedMode || deleteButton.disabled;
 
-        // Update table header to reflect pedido mode columns
         const headerRow = document.querySelector('.lineas-table thead tr');
-            if (headerRow) {
+        if (headerRow) {
             if (restrictedMode) {
                 headerRow.innerHTML = `
                     <th>Línea</th>
-                    <th>Descripcion</th>
+                    <th>Descripción</th>
                     <th>Cantidad</th>
                     <th>Medida</th>
                     <th>P. unitario</th>
@@ -280,19 +295,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
             } else {
                 headerRow.innerHTML = `
-                    <th>Linea</th>
-                    <th>Descripcion</th>
+                    <th>Línea</th>
+                    <th>Descripción</th>
                     <th>Cantidad</th>
                     <th>Medida</th>
                     <th>P. unitario</th>
                     <th>Margen</th>
                     <th>Total</th>
-                    <th>Accion</th>
+                    <th>Acción</th>
                 `;
             }
         }
 
-        // Ensure selection note exists when in pedidoMode
         if (restrictedMode) {
             let note = document.querySelector('.albaran-selection-note');
             if (!note) {
@@ -318,7 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const restrictedMode = isPedidoRestrictoMode();
 
         if (lineas.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="8" class="lineas-empty">${restrictedMode ? 'No hay artículos pendientes para incluir.' : 'No hay lineas añadidas.'}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="8" class="lineas-empty">${restrictedMode ? 'No hay artículos pendientes para incluir o ya han sido facturados.' : 'No hay líneas añadidas.'}</td></tr>`;
             selectedIndex = -1;
             setSideButtonsState();
             syncHiddenField();
@@ -368,10 +382,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td>${euroFormatter.format(linea.margen)} %</td>
                         <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
                         <td>
-                            <button type="button" class="linea-btn linea-edit" data-action="edit" data-index="${index}" title="Editar linea">
+                            <button type="button" class="linea-btn linea-edit" data-action="edit" data-index="${index}" title="Editar línea">
                                 <i class="far fa-edit"></i>
                             </button>
-                            <button type="button" class="linea-btn linea-delete" data-action="delete" data-index="${index}" title="Eliminar linea">
+                            <button type="button" class="linea-btn linea-delete" data-action="delete" data-index="${index}" title="Eliminar línea">
                                 <i class="far fa-trash-alt"></i>
                             </button>
                         </td>
@@ -452,21 +466,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Handle both <select> (create) and <input> (pantalla-roja) for pedido_cliente.
         let selectedOption = null;
         const isInputField = pedidoClienteSelect.tagName === 'INPUT' || pedidoClienteSelect.tagName === 'TEXTAREA';
 
         if (isInputField) {
             const rawVal = String(pedidoClienteSelect.value || '').trim();
             if (rawVal === '') {
-                // If empty input, do not clear existing cliente/ot values; just disable pedido mode.
                 clienteSelect.value = clienteSelect.value || '';
                 otInput.value = otInput.value || '';
                 setPedidoMode(false);
                 return;
             }
-
-            // Create a minimal selectedOption-like object for downstream logic
             selectedOption = { value: rawVal, dataset: {} };
         } else {
             selectedOption = pedidoClienteSelect.selectedOptions && pedidoClienteSelect.selectedOptions.length > 0
@@ -474,7 +484,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 : null;
         }
 
-        // Fallback: if Select2 is active it may not expose selectedOptions the same way
         if (!selectedOption && window.jQuery && window.jQuery.fn.select2 && window.jQuery(pedidoClienteSelect).data('select2')) {
             try {
                 const sd = window.jQuery(pedidoClienteSelect).select2('data');
@@ -534,13 +543,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (hasLineas) {
                 if (rawLineas.length > 0) {
+                    // MODIFICADO: Si estamos creando, restamos lo consumido usando la nueva función
                     lineas = isExistingEditForm
                         ? mergeEditLines(normalizedPedidoLineas)
-                        : normalizedPedidoLineas.map((l) => ({
-                            ...l,
-                            cantidad_max: Math.max(round2(l.cantidad ?? 0), round2(l.cantidad_max ?? l.cantidad ?? 0)),
-                            selected: true,
-                        }));
+                        : mergeCreateLinesWithRemaining(normalizedPedidoLineas);
                 } else if (!isExistingEditForm) {
                     lineas = [];
                 }
@@ -558,12 +564,10 @@ document.addEventListener("DOMContentLoaded", () => {
         pedidoBolsaMode = false;
         setPedidoMode(true);
 
-        // Apply cliente/ot from option immediately
         if (clienteId || ot) {
             applyFields({ id_cliente: clienteId, ot });
         }
 
-        // Otherwise try to fetch via AJAX using pedido_id or numero
         const params = pedidoId ? `?pedido_id=${encodeURIComponent(pedidoId)}` : `?numero=${encodeURIComponent(selectedOption?.value || '')}`;
         fetch(`/pedidos-clientes/data${params}`, {
             headers: { 'Accept': 'application/json' },
@@ -593,8 +597,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         $pc.on('select2:select select2:unselect select2:clear', syncPedidoClienteFields);
         $pc.on('change', syncPedidoClienteFields);
-
-        // Trigger once to populate initial values from a preselected option
         $pc.trigger('change');
     }
 

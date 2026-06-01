@@ -672,10 +672,18 @@ class AlbaranClienteController extends Controller
         $this->syncPedidoClienteLink($albaran, $proyectoId);
         $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
 
+        // 1. Devolvemos las cantidades antiguas al pedido
         if ($pedidoAnterior && ! (bool) ($pedidoAnterior->bolsa ?? false)) {
             $this->adjustPedidoLineasFromAlbaran($pedidoAnterior, $lineasAnteriores, 1);
         }
 
+        // 🔥 EL FIX: Si el pedido nuevo es el mismo que el anterior, 
+        // recargamos sus datos desde la BD para que sepa que hemos devuelto artículos.
+        if ($pedidoActual && $pedidoAnterior && $pedidoActual->id === $pedidoAnterior->id) {
+            $pedidoActual->refresh();
+        }
+
+        // 2. Restamos las nuevas cantidades
         if ($pedidoActual && ! (bool) ($pedidoActual->bolsa ?? false)) {
             $this->adjustPedidoLineasFromAlbaran($pedidoActual, $lineas, -1);
         }
