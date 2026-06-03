@@ -98,10 +98,11 @@ if (str_starts_with($empresa, 'PROV-')) {
             $cif = trim((string) ($row['cif'] ?? ''));
 
             // Actualizamos o creamos basándonos en el nombre de la empresa para no duplicar
+           // Actualizamos basándonos en el CIF si existe, o en el nombre si no
             Cliente::updateOrCreate(
-                ['empresa_nombre' => $empresa],
+                ['cif_nif' => $cif !== '' ? $cif : 'NO-CIF-' . $empresa],
                 [
-                    'cif_nif' => $cif !== '' ? $cif : null, // Ya no inventamos CIFs sintéticos
+                    'empresa_nombre' => $empresa,
                     'direccion' => trim((string) ($row['direccion'] ?? '')),
                     'localidad' => trim((string) ($row['localidad'] ?? '')),
                     'codigo_postal' => trim((string) ($row['cp'] ?? '')),
