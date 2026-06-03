@@ -52,10 +52,14 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. Validamos los nuevos campos que vienen de la vista
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
             'dni_nie' => 'required|string|max:20|unique:users,dni_nie',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'required|in:user,admin,superadmin',
             'departamento' => 'nullable|string|max:255',
             'tipo_personal' => 'required|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
@@ -72,16 +76,19 @@ class UserController extends Controller
             'activo' => 'nullable|boolean',
         ]);
 
-        $generatedEmail = $this->generateWorkerEmail($validated['dni_nie']);
-        $generatedPassword = $this->generateWorkerPassword($validated['dni_nie']);
+        // Un admin no puede crear a un superadmin
+        if (auth()->user()->role === 'admin' && $validated['role'] === 'superadmin') {
+            return back()->withErrors(['role' => 'No tienes permisos para asignar el rol de Super Admin.'])->withInput();
+        }
 
+        // 2. Creamos el usuario usando los datos del formulario directamente
         $user = User::create([
             'name' => $validated['name'],
             'apellido' => $validated['apellido'],
             'dni_nie' => $validated['dni_nie'],
-            'email' => $generatedEmail,
-            'password' => Hash::make($generatedPassword),
-            'role' => 'user',
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']), // Encriptamos la contraseña recibida
+            'role' => $validated['role'],
             'departamento' => $validated['departamento'] ?? null,
             'tipo_personal' => $validated['tipo_personal'],
             'camiseta' => $validated['camiseta'] ?? null,
@@ -98,19 +105,12 @@ class UserController extends Controller
 
         $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
 
+        // 3. Sincronizamos todos los proyectos si el rol creado es superadmin
+        if ($user->role === 'superadmin') {
+            $user->syncAllProjectsIfSuperadmin();
+        }
+
         return redirect()->route('users.index')->with('success', 'Usuario creado correctamente.');
-    }
-
-    private function generateWorkerEmail(string $dniNie): string
-    {
-        $normalized = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $dniNie));
-
-        return "{$normalized}@moncobra.local";
-    }
-
-    private function generateWorkerPassword(string $dniNie): string
-    {
-        return preg_replace('/\s+/', '', $dniNie);
     }
 
     /**
@@ -120,7 +120,10 @@ class UserController extends Controller
     {
         $this->authorize('edit-user', $user);
 
-        return view('usuarios.edit', compact('user'));
+        // AÑADIDO: Pasamos los proyectos a la vista para poder asignarlos
+        $proyectos = Proyecto::orderBy('nombre')->get();
+
+        return view('usuarios.edit', compact('user', 'proyectos'));
     }
 
     /**
@@ -137,6 +140,9 @@ class UserController extends Controller
             'telefono' => 'nullable|string|max:20',
             'descripcion' => 'nullable|string',
             'activo' => 'boolean',
+            // AÑADIDO: Validamos los proyectos que llegan desde los checkboxes
+            'proyecto_ids' => 'nullable|array',
+            'proyecto_ids.*' => 'exists:proyectos,id',
         ]);
 
         // Validar que no intente cambiar su propio rol
@@ -155,8 +161,11 @@ class UserController extends Controller
 
         $user->update($validated);
 
+        // AÑADIDO: Sincronizar los proyectos asignados
         if ($user->role === 'superadmin') {
             $user->syncAllProjectsIfSuperadmin();
+        } else {
+            $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
         }
 
         return redirect()->route('users.index')->with('success', 'Usuario actualizado correctamente.');

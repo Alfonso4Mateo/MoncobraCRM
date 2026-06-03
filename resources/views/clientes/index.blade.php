@@ -44,7 +44,7 @@
                         type="text"
                         name="buscar"
                         value="{{ $buscar }}"
-                        placeholder="Filtrar por nombre, CIF, sector o localidad..."
+                        placeholder="Filtrar por nombre, CIF o localidad..."
                         aria-label="Buscar clientes"
                     >
                 </div>

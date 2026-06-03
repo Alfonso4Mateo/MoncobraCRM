@@ -21,6 +21,7 @@ use App\Http\Controllers\GestionProyectoController;
 use App\Http\Controllers\ProyectoContextController;
 use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\ClaseController;
+use App\Http\Controllers\ProyectoController;
 
 // 1. CAMBIO: Nombre de ruta único para la página de bienvenida.
 // Antes se llamaba 'dashboard', ahora 'welcome'.
@@ -35,9 +36,10 @@ Auth::routes(['register' => false]);
 Route::middleware('auth')->group(function () {
     
     // 2. Dashboard Real
-    // Esta es la ruta a la que apunta el RouteServiceProvider que cambiamos antes.
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/dashboard/panel-order', [DashboardController::class, 'updatePanelOrder'])->name('dashboard.panel-order.update');
+    
+    // Gestión de Proyectos
     Route::get('/proyectos/{proyecto}/seleccionar', [ProyectoContextController::class, 'seleccionar'])
         ->name('proyectos.seleccionar');
     Route::get('/herramientas/gestion-proyectos', [GestionProyectoController::class, 'index'])
@@ -49,7 +51,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/herramientas/gestion-proyectos/{proyecto}/editar', [GestionProyectoController::class, 'edit'])
         ->middleware('can:manage-projects')
         ->name('herramientas.proyectos.edit');
-    Route::get('/herramientas/gestion-proyectos/{proyecto}', [GestionProyectoController::class, 'show'])
+    Route::get('/herramientas/gestion-proyectos/{proyecto}', [ProyectoController::class, 'show'])
         ->middleware('can:manage-projects')
         ->name('herramientas.proyectos.show');
     Route::post('/herramientas/gestion-proyectos', [GestionProyectoController::class, 'store'])
@@ -58,6 +60,11 @@ Route::middleware('auth')->group(function () {
     Route::put('/herramientas/gestion-proyectos/{proyecto}', [GestionProyectoController::class, 'update'])
         ->middleware('can:manage-projects')
         ->name('herramientas.proyectos.update');
+    
+    // RUTA NUEVA: Asignar usuario a proyecto
+    Route::post('/herramientas/gestion-proyectos/{proyecto}/assign-user', [ProyectoController::class, 'assignUser'])
+        ->middleware('can:manage-projects')
+        ->name('herramientas.proyectos.assignUser');
     
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');

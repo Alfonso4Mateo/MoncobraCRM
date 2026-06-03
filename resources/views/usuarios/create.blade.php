@@ -13,15 +13,17 @@
     <div class="usuarios-create-hero">
         <div class="usuarios-create-hero__copy">
             <div class="usuarios-create-crumbs">GESTIÓN DE PERSONAL <span>•</span> AÑADIR TRABAJADOR</div>
-            <h1>Registro de nuevo personal</h1>
-            <p>Complete el expediente técnico del trabajador. Los campos marcados con asterisco son obligatorios para la asignación de EPIs.</p>
+            <h1>Registro de nuevo usuario</h1>
+            <p>Complete el expediente técnico y las credenciales de acceso del trabajador. Los campos marcados con asterisco son obligatorios.</p>
         </div>
     </div>
 @endsection
 
 @section('content')
     @php
+        // Genera una sugerencia base para el correo usando el DNI
         $sugerenciaCorreo = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', old('dni_nie', '')));
+        $emailSugerido = $sugerenciaCorreo ? $sugerenciaCorreo . '@empresa.com' : '';
     @endphp
 
     <div class="usuarios-create-page">
@@ -46,7 +48,7 @@
                 <article class="usuarios-panel">
                     <header class="usuarios-panel__header">
                         <i class="fas fa-user"></i>
-                        <h2>1. Datos personales</h2>
+                        <h2>1. Datos personales y Acceso</h2>
                     </header>
 
                     <div class="usuarios-panel__body usuarios-panel__body--grid">
@@ -75,6 +77,34 @@
                             </select>
                         </div>
 
+                        <div class="field-group">
+                            <label for="email">Correo Electrónico *</label>
+                            <input type="email" id="email" name="email" value="{{ old('email', $emailSugerido) }}" placeholder="Ej. usuario@empresa.com" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="role">Rol en el Sistema *</label>
+                            <select id="role" name="role" required>
+                                <option value="user" @selected(old('role') === 'user')>Usuario</option>
+                                @if(auth()->user()->role === 'superadmin' || auth()->user()->role === 'admin')
+                                    <option value="admin" @selected(old('role') === 'admin')>Admin</option>
+                                @endif
+                                @if(auth()->user()->role === 'superadmin')
+                                    <option value="superadmin" @selected(old('role') === 'superadmin')>Super Admin</option>
+                                @endif
+                            </select>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="password">Contraseña *</label>
+                            <input type="password" id="password" name="password" required placeholder="Mínimo 8 caracteres">
+                        </div>
+
+                        <div class="field-group">
+                            <label for="password_confirmation">Confirmar Contraseña *</label>
+                            <input type="password" id="password_confirmation" name="password_confirmation" required placeholder="Repite la contraseña">
+                        </div>
+                        
                         <div class="field-group field-group--full">
                             <label>Tipo de personal</label>
                             <div class="choice-grid">
@@ -88,36 +118,38 @@
                                 </label>
                             </div>
                         </div>
-                    </div>
+
+                        <div class="field-group field-group--full" id="proyectos-container" style="margin-top: 1rem;">
+                            <label>Asignación de Proyectos</label>
+                            <p style="font-size: 0.85rem; color: #6c757d; margin-bottom: 10px;">
+                                Selecciona los proyectos a los que tendrá acceso este trabajador.
+                            </p>
+                            
+                            <div class="choice-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+                                @foreach($proyectos as $proyecto)
+                                    <label class="choice-card" style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <input 
+                                            type="checkbox" 
+                                            name="proyecto_ids[]" 
+                                            value="{{ $proyecto->id }}" 
+                                            class="proyecto-checkbox"
+                                            @checked(is_array(old('proyecto_ids')) && in_array($proyecto->id, old('proyecto_ids')))
+                                        >
+                                        <span>{{ $proyecto->nombre }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            <small id="superadmin-note" style="display: none; color: #0dcaf0; margin-top: 10px; font-weight: 600;">
+                                <i class="fas fa-info-circle"></i> Los usuarios Super Admin tienen acceso total a todos los proyectos automáticamente.
+                            </small>
+                        </div>
+                        </div>
                 </article>
-
-                <article class="usuarios-panel usuarios-panel--wide">
-                    <header class="usuarios-panel__header">
-                        <i class="fas fa-file-circle-plus"></i>
-                        <h2>2. Documentación</h2>
-                    </header>
-
-                    <div class="usuarios-panel__body usuarios-doc-grid">
-                        <label class="upload-card">
-                            <input type="file" hidden disabled>
-                            <i class="fas fa-id-card"></i>
-                            <strong>DNI escaneado</strong>
-                            <span>PDF, JPG o PNG (Max 5MB)</span>
-                        </label>
-
-                        <label class="upload-card">
-                            <input type="file" hidden disabled>
-                            <i class="fas fa-file-contract"></i>
-                            <strong>Contrato laboral</strong>
-                            <span>PDF firmado (Max 10MB)</span>
-                        </label>
-                    </div>
-                </article>
-
                 <article class="usuarios-panel usuarios-panel--full">
                     <header class="usuarios-panel__header">
                         <i class="fas fa-address-card"></i>
-                        <h2>3. Observaciones</h2>
+                        <h2>2. Observaciones</h2>
                     </header>
                     <div class="usuarios-panel__body">
                         <div class="field-group">
@@ -141,91 +173,44 @@
             </section>
 
             <aside class="usuarios-create-sidebar">
-                <article class="usuarios-panel">
-                    <header class="usuarios-panel__header">
-                        <i class="fas fa-shirt"></i>
-                        <h2>4. Gestión de tallas</h2>
-                    </header>
-
-                    <div class="usuarios-panel__body usuarios-panel__body--stack">
-                        <div class="field-group field-group--inline">
-                            <label for="camiseta">Camiseta</label>
-                            <select id="camiseta" name="camiseta">
-                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('camiseta') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="chaqueta">Chaqueta</label>
-                            <select id="chaqueta" name="chaqueta">
-                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('chaqueta') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="sudadera">Sudadera</label>
-                            <select id="sudadera" name="sudadera">
-                                @foreach(['' => 'Selecciona talla', 'XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('sudadera') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="pantalon">Pantalón</label>
-                            <select id="pantalon" name="pantalon">
-                                @foreach(['' => 'Selecciona talla', '36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('pantalon') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="calzado">Calzado</label>
-                            <select id="calzado" name="calzado">
-                                @foreach(['' => 'Selecciona talla', '36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('calzado') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="casco">Casco</label>
-                            <select id="casco" name="casco">
-                                @foreach(['' => 'Selecciona talla', 'Estándar' => 'Estándar'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('casco') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field-group field-group--inline">
-                            <label for="guantes">Guantes</label>
-                            <select id="guantes" name="guantes">
-                                @foreach(['' => 'Selecciona talla', '6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('guantes') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="usuarios-note-card">
-                    <i class="fas fa-circle-info"></i>
-                    <div>
-                        <strong>Nota de seguridad</strong>
-                        <p>Las tallas y el expediente se revisan antes de la entrega formal de EPIs.</p>
-                    </div>
-                </article>
-
                 <div class="usuarios-create-actions">
-                    <a href="{{ route('personal.index') }}" class="btn-secondary-action">Cancelar</a>
+                    <a href="{{ route('users.index') }}" class="btn-secondary-action">Cancelar</a>
                     <button type="submit" class="btn-primary-action">Guardar Trabajador</button>
                 </div>
             </aside>
         </form>
     </div>
+@endsection
+
+@section('js')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const roleSelect = document.getElementById('role');
+        const checkboxes = document.querySelectorAll('.proyecto-checkbox');
+        const superadminNote = document.getElementById('superadmin-note');
+
+        function toggleProyectosState() {
+            const isSuperAdmin = roleSelect.value === 'superadmin';
+
+            checkboxes.forEach(checkbox => {
+                if (isSuperAdmin) {
+                    checkbox.checked = true;    // Los marcamos todos
+                    checkbox.disabled = true;   // Los bloqueamos visualmente
+                } else {
+                    checkbox.disabled = false;  // Los desbloqueamos para user/admin
+                }
+            });
+
+            // Mostramos u ocultamos el mensaje de aviso
+            superadminNote.style.display = isSuperAdmin ? 'block' : 'none';
+        }
+
+        // Ejecutar cuando se cambia el desplegable
+        if (roleSelect) {
+            roleSelect.addEventListener('change', toggleProyectosState);
+            // Ejecutar también al cargar la página (por si hay un old('role') tras un error de validación)
+            toggleProyectosState();
+        }
+    });
+</script>
 @endsection

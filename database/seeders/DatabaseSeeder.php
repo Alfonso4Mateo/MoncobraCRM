@@ -11,6 +11,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Intentionally left blank: demo seeders removed.
+        // Le decimos a Laravel que ejecute tu seeder de Administrador
+        $this->call([
+            AdminUserSeeder::class,
+        ]);
     }
 }

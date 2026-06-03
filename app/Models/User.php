@@ -42,6 +42,8 @@ class User extends Authenticatable
         'ultimo_acceso',
         'dashboard_panel_order',
         'personal_alerta_dias',
+        'ruta_dni',      // Añadido para guardar el archivo del DNI
+        'ruta_contrato', // Añadido para guardar el archivo del contrato
     ];
 
     /**

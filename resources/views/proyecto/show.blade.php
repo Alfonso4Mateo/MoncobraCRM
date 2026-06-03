@@ -80,7 +80,7 @@
                 <div class="proyecto-badges">
                     <span class="badge-item">
                         <i class="fas fa-users"></i>
-                        {{ $proyecto->usuarios_count }} {{ $proyecto->usuarios_count === 1 ? 'usuario asociado' : 'usuarios asociados' }}
+                        {{ $proyecto->usuarios_count ?? $proyecto->usuarios->count() }} usuarios asociados
                     </span>
                     <span class="badge-item">
                         <i class="fas fa-hashtag"></i>
@@ -102,14 +102,20 @@
         </section>
 
         <section class="proyecto-users-card">
-            <div class="proyecto-users-card__header">
-                <h3>Usuarios del Proyecto</h3>
-                <span>{{ $proyecto->usuarios_count }}</span>
+            <div class="proyecto-users-card__header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3 style="margin: 0;">Usuarios del Proyecto</h3>
+                    <span class="badge badge-info" style="font-size: 1rem;">{{ $proyecto->usuarios_count ?? $proyecto->usuarios->count() }}</span>
+                </div>
+                
+                <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#modalAddUser">
+                    <i class="fas fa-user-plus"></i> Añadir Usuario
+                </button>
             </div>
 
             @if($proyecto->usuarios->isEmpty())
-                <div class="empty-users">
-                    <i class="fas fa-user-slash"></i>
+                <div class="empty-users" style="padding: 2rem; text-align: center; color: #6c757d;">
+                    <i class="fas fa-user-slash" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                     <p>Este proyecto no tiene usuarios asignados.</p>
                 </div>
             @else
@@ -126,7 +132,7 @@
                         <tbody>
                             @foreach($proyecto->usuarios as $usuario)
                                 <tr>
-                                    <td>{{ $usuario->name }}</td>
+                                    <td>{{ $usuario->name }} {{ $usuario->apellido }}</td>
                                     <td>{{ $usuario->email }}</td>
                                     <td>
                                         @if($usuario->role === 'superadmin')
@@ -151,5 +157,44 @@
                 </div>
             @endif
         </section>
+    </div>
+
+    <div class="modal fade" id="modalAddUser" tabindex="-1" role="dialog" aria-labelledby="modalAddUserLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form action="{{ route('herramientas.proyectos.assignUser', $proyecto) }}" method="POST">
+                    @csrf
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="modalAddUserLabel"><i class="fas fa-user-plus"></i> Asignar Usuario</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="user_id">Selecciona un usuario disponible:</label>
+                            @if($availableUsers->count() > 0)
+                                <select name="user_id" id="user_id" class="form-control" required>
+                                    <option value="">-- Elige un usuario --</option>
+                                    @foreach($availableUsers as $user)
+                                        <option value="{{ $user->id }}">{{ $user->name }} {{ $user->apellido }} ({{ $user->email }})</option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <div class="alert alert-warning mb-0">
+                                    <i class="fas fa-info-circle"></i> Todos los usuarios activos ya están asignados a este proyecto.
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        @if($availableUsers->count() > 0)
+                            <button type="submit" class="btn btn-primary">Asignar al Proyecto</button>
+                        @endif
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 @endsection

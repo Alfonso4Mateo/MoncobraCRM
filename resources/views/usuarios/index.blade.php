@@ -190,12 +190,6 @@
     </div>
 
     <div class="bottom-row">
-        <div class="card-audit">
-            <h5>Auditoría de Seguridad</h5>
-            <p>Revisa los últimos accesos y cambios de contraseña realizados por los usuarios del sistema.</p>
-            <a href="#">Ver historial de logs <i class="fas fa-arrow-right"></i></a>
-        </div>
-
         <div class="card-permisos">
             <div class="card-permisos-header">
                 <div class="permisos-icon"><i class="fas fa-circle-info"></i></div>

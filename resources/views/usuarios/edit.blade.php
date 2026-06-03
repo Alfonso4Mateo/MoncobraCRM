@@ -46,7 +46,6 @@
                             </div>
                         @endif
 
-                        <!-- Nombre -->
                         <div class="form-group">
                             <label for="name">Nombre</label>
                             <input 
@@ -62,7 +61,6 @@
                             @enderror
                         </div>
 
-                        <!-- Email -->
                         <div class="form-group">
                             <label for="email">Email</label>
                             <input 
@@ -78,7 +76,6 @@
                             @enderror
                         </div>
 
-                        <!-- Rol -->
                         <div class="form-group">
                             <label for="role">Rol</label>
                             <select 
@@ -119,7 +116,6 @@
                             </small>
                         </div>
 
-                        <!-- Teléfono -->
                         <div class="form-group">
                             <label for="telefono">Teléfono</label>
                             <input 
@@ -134,7 +130,6 @@
                             @enderror
                         </div>
 
-                        <!-- Descripción -->
                         <div class="form-group">
                             <label for="descripcion">Descripción</label>
                             <textarea 
@@ -148,7 +143,6 @@
                             @enderror
                         </div>
 
-                        <!-- Estado -->
                         <div class="form-group">
                             <div class="custom-control custom-switch">
                                 <input 
@@ -165,8 +159,33 @@
                             </div>
                         </div>
 
-                        <!-- Información adicional -->
-                        <div class="alert alert-info">
+                        <div class="form-group mt-4" id="proyectos-wrapper">
+                            <label>Asignación de Proyectos</label>
+                            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 10px;">
+                                Selecciona los proyectos a los que tendrá acceso este usuario en el sistema.
+                            </p>
+                            
+                            <div class="row">
+                                @foreach($proyectos as $proyecto)
+                                    <div class="col-md-6 col-lg-4 mb-2">
+                                        <div class="custom-control custom-checkbox">
+                                            <input 
+                                                type="checkbox" 
+                                                name="proyecto_ids[]" 
+                                                value="{{ $proyecto->id }}" 
+                                                id="proyecto_{{ $proyecto->id }}"
+                                                class="custom-control-input proyecto-checkbox"
+                                                @checked(in_array($proyecto->id, old('proyecto_ids', $user->proyectos->pluck('id')->toArray())))
+                                            >
+                                            <label class="custom-control-label" for="proyecto_{{ $proyecto->id }}" style="font-weight: normal; cursor: pointer;">
+                                                {{ $proyecto->nombre }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-4">
                             <strong>Información adicional:</strong>
                             <ul class="mb-0 mt-2">
                                 <li><strong>Creado:</strong> {{ $user->created_at->format('d/m/Y H:i') }}</li>

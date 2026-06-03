@@ -37,12 +37,16 @@ class ProfileController extends Controller
      */
     public function update(Request $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . Auth::id()],
-            'telefono' => ['nullable', 'string', 'max:20'],
-            'descripcion' => ['nullable', 'string', 'max:500'],
-            'avatar' => ['nullable', 'image', 'max:2048'],
+       $validated = $request->validate([
+            'name'          => ['required', 'string', 'max:255'],
+            'apellido'      => ['required', 'string', 'max:255'],
+            'email'         => ['required', 'email', 'max:255', 'unique:users,email,' . Auth::id()],
+            'dni_nie'       => ['nullable', 'string', 'max:20', 'unique:users,dni_nie,' . Auth::id()],
+            'telefono'      => ['nullable', 'string', 'max:20'],
+            'departamento'  => ['nullable', 'string', 'max:255'],
+            'tipo_personal' => ['nullable', 'in:indefinido,temporal'],
+            'descripcion'   => ['nullable', 'string', 'max:500'],
+            'avatar'        => ['nullable', 'image', 'max:2048'],
         ]);
 
         $user = Auth::user();
@@ -72,7 +76,7 @@ class ProfileController extends Controller
     {
         $request->validate([
             'current_password' => 'required',
-            'password' => 'required|string|min:8|confirmed',
+            'password'         => 'required|string|min:8|confirmed',
         ]);
 
         if (!Hash::check($request->current_password, Auth::user()->password)) {

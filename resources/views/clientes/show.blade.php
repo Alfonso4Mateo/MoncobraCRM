@@ -33,10 +33,6 @@
                 <p>Gestión integral del flujo de pedidos y trazabilidad de fabricación.</p>
             </div>
             <div class="cliente-show-actions">
-                <a href="{{ route('presupuestos.create', ['cliente_id' => $cliente->id, 'volver_cliente' => 1, 'modo' => 'carga']) }}" class="btn-exportar">
-                    <i class="fas fa-upload" aria-hidden="true"></i>
-                    Cargar Presupuesto
-                </a>
                 <a href="{{ route('presupuestos.create', ['cliente_id' => $cliente->id, 'volver_cliente' => 1]) }}" class="btn-nuevo-presupuesto">
                     <i class="fas fa-plus" aria-hidden="true"></i>
                     Nuevo Presupuesto

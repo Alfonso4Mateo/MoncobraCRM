@@ -111,7 +111,7 @@
         </article>
 
         <footer class="cliente-bottom-note">
-            © 2024 ALADDIN 2.0 · Sistema de Gestión Empresarial Avanzado
+            © 2026 Factumon · Sistema de Gestión Empresarial Avanzado
         </footer>
     </section>
 @endsection

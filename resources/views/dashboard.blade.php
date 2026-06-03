@@ -23,10 +23,6 @@
                 <h2>Hola, {{ Auth::user()->name }}</h2>
                 <p>Bienvenido al hub central de gestion industrial.</p>
             </div>
-            <div class="dashboard-status-pill">
-                <span class="status-dot" aria-hidden="true"></span>
-                Sistema online - version {{ $dashboardVersion }}
-            </div>
         </section>
 
         <section class="dashboard-shortcuts">

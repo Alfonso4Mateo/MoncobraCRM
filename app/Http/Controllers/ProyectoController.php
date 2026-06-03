@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Proyecto;
+use App\Models\User; // <-- ¡Añadido para poder consultar los usuarios!
 use Illuminate\Http\Request;
 
 class ProyectoController extends Controller
@@ -36,7 +37,7 @@ class ProyectoController extends Controller
 
         Proyecto::create($validated);
 
-        return redirect()->route('proyectos.index')
+        return redirect()->route('herramientas.proyectos.index')
                         ->with('success', 'Proyecto creado correctamente.');
     }
 
@@ -45,8 +46,15 @@ class ProyectoController extends Controller
      */
     public function show(Proyecto $proyecto)
     {
+        // Cargamos los usuarios actuales del proyecto
         $proyecto->load('usuarios');
-        return view('proyectos.show', compact('proyecto'));
+
+        // Buscamos a los usuarios activos que AÚN NO están en este proyecto para el desplegable
+        $availableUsers = User::whereDoesntHave('proyectos', function($query) use ($proyecto) {
+            $query->where('proyectos.id', $proyecto->id);
+        })->where('activo', true)->orderBy('name')->get();
+
+        return view('proyecto.show', compact('proyecto', 'availableUsers'));
     }
 
     /**
@@ -54,7 +62,7 @@ class ProyectoController extends Controller
      */
     public function edit(Proyecto $proyecto)
     {
-        return view('proyectos.edit', compact('proyecto'));
+        return view('proyecto.edit', compact('proyecto'));
     }
 
     /**
@@ -69,8 +77,24 @@ class ProyectoController extends Controller
 
         $proyecto->update($validated);
 
-        return redirect()->route('proyectos.show', $proyecto)
+        return redirect()->route('herramientas.proyectos.show', $proyecto)
                         ->with('success', 'Proyecto actualizado correctamente.');
+    }
+
+    /**
+     * Assign a user to the project.
+     */
+    public function assignUser(Request $request, Proyecto $proyecto)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id'
+        ]);
+
+        // Añadimos el usuario a la tabla intermedia sin borrar los que ya están
+        $proyecto->usuarios()->syncWithoutDetaching([$request->user_id]);
+
+        return redirect()->route('herramientas.proyectos.show', $proyecto)
+                        ->with('success', 'Usuario asignado al proyecto correctamente.');
     }
 
     /**
@@ -80,7 +104,7 @@ class ProyectoController extends Controller
     {
         $proyecto->delete();
 
-        return redirect()->route('proyectos.index')
+        return redirect()->route('herramientas.proyectos.index')
                         ->with('success', 'Proyecto eliminado correctamente.');
     }
 }
