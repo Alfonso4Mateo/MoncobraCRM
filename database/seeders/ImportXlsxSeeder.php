@@ -18,36 +18,59 @@ class ImportXlsxSeeder extends Seeder
 {
     public function run(): void
     {
-        // Usamos database_path() para que apunte automáticamente a 'factumon/database/data/'
-        // ¡IMPORTANTE! Asegúrate de que el nombre del archivo aquí coincida exactamente con el que has guardado.
-        $path = database_path('data/ALADDIN_Puerto_Real_1.5_2026 (1).csv'); 
-        // Si lo has renombrado, sería: $path = database_path('data/importacion_principal.csv');
+        // 1. Apuntamos a la CARPETA en lugar de a un archivo en concreto
+        $directory = database_path('data');
 
-        if (! file_exists($path)) {
-            $this->command?->error("Archivo no encontrado en la ruta dinámica: {$path}");
+        // Comprobamos que la carpeta exista
+        if (!is_dir($directory)) {
+            $this->command?->error("La carpeta no existe: {$directory}");
             return;
         }
 
-        $reader = IOFactory::createReaderForFile($path);
-        $reader->setReadDataOnly(true);
+        // 2. Le pedimos a Laravel que nos dé una lista de todos los archivos de esa carpeta
+        $archivos = \Illuminate\Support\Facades\File::files($directory);
 
-        $spreadsheet = $reader->load($path);
+        if (empty($archivos)) {
+            $this->command?->warn("La carpeta está vacía. No hay nada que importar en: {$directory}");
+            return;
+        }
 
-        DB::transaction(function () use ($spreadsheet): void {
-            $this->importClients($spreadsheet->getSheetByName('Clientes'));
-            $this->importPresupuestos(
-                $spreadsheet->getSheetByName('Presupuestos'),
-                $spreadsheet->getSheetByName('Detalle_Presupuestos')
-            );
-            $this->importAlbaranesClientes(
-                $spreadsheet->getSheetByName('Albaran_Cliente'),
-                $spreadsheet->getSheetByName('Detalle_Albaran_Cliente')
-            );
-            $this->importArticulos($spreadsheet->getSheetByName('Lista de productos'));
-            $this->importInventario($spreadsheet->getSheetByName('Lista de inventario_modelo'));
-        });
+        // 3. Empezamos el bucle: por cada archivo que encuentre, hace el proceso
+        foreach ($archivos as $archivo) {
+            $path = $archivo->getPathname();
+            $extension = strtolower($archivo->getExtension());
 
-        $this->command?->info('Workbook import completed.');
+            // Filtro de seguridad: Solo leemos si termina en .csv, .xlsx o .xls
+            if (!in_array($extension, ['csv', 'xlsx', 'xls'])) {
+                $this->command?->line("Saltando archivo no válido: " . $archivo->getFilename());
+                continue; // Pasa al siguiente archivo de la lista
+            }
+
+            $this->command?->info("Importando: " . $archivo->getFilename() . "...");
+
+            // Aquí empieza la magia original de leer el Excel
+            $reader = IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+
+            DB::transaction(function () use ($spreadsheet): void {
+                $this->importClients($spreadsheet->getSheetByName('Clientes'));
+                $this->importPresupuestos(
+                    $spreadsheet->getSheetByName('Presupuestos'),
+                    $spreadsheet->getSheetByName('Detalle_Presupuestos')
+                );
+                $this->importAlbaranesClientes(
+                    $spreadsheet->getSheetByName('Albaran_Cliente'),
+                    $spreadsheet->getSheetByName('Detalle_Albaran_Cliente')
+                );
+                $this->importArticulos($spreadsheet->getSheetByName('Lista de productos'));
+                $this->importInventario($spreadsheet->getSheetByName('Lista de inventario_modelo'));
+            });
+
+            $this->command?->info("Completado: " . $archivo->getFilename());
+        }
+
+        $this->command?->info('¡Todos los archivos de la carpeta han sido importados con éxito!');
     }
 
     private function importClients(?Worksheet $sheet): void
