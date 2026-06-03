@@ -7,6 +7,8 @@ export default defineConfig({
             input: [
                 'resources/sass/app.scss',
                 'resources/js/app.js',
+                'resources/js/albaranes-form.js',
+                'resources/js/bootstrap.js',
                 
                 // --- Archivos CSS de las vistas (Ordenados alfabéticamente) ---
                 'resources/css/albaran-pdf-viewer.css',

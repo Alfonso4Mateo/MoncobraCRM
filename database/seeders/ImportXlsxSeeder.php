@@ -58,7 +58,17 @@ class ImportXlsxSeeder extends Seeder
             if ($empresa === '') {
                 continue;
             }
+if (str_starts_with($empresa, 'PROV-')) {
+                // Omitimos clientes que parecen ser proveedores
+                continue;
+            }
 
+            $tipo = strtolower(trim((string) ($row['tipo'] ?? '')));
+            if(str_contains($tipo, 'proveedor') || str_contains($tipo, 'prov')) {
+                // Omitimos clientes que en su tipo mencionan ser proveedores
+                continue;
+            }
+            
             $cif = trim((string) ($row['cif'] ?? ''));
 
             // Actualizamos o creamos basándonos en el nombre de la empresa para no duplicar

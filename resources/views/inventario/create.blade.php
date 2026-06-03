@@ -206,33 +206,6 @@
                         </div>
                     </article>
 
-                    <article class="entry-card summary-card">
-                        <header>
-                            <h2>Resumen rapido</h2>
-                            <i class="fas fa-chart-line" aria-hidden="true"></i>
-                        </header>
-
-                        <dl class="summary-metrics">
-                            <div>
-                                <dt>Stock Actual</dt>
-                                <dd><span id="stock-base">{{ (int) $stockBaseInicial }}</span> uds</dd>
-                            </div>
-                            <div>
-                                <dt>Stock tras entrada</dt>
-                                <dd><span id="stock-final">{{ (int) $stockBaseInicial + (int) old('stock_actual', 1) }}</span> uds</dd>
-                            </div>
-                            <div>
-                                <dt>Ultima entrada</dt>
-                                <dd>Hace 2 dias</dd>
-                            </div>
-                        </dl>
-
-                        <div class="summary-status">
-                            <small>ESTADO DE OPERACION</small>
-                            <strong><i class="fas fa-circle"></i> Validacion Automatica ON</strong>
-                        </div>
-                    </article>
-
                     <article class="entry-note-box">
                         <i class="fas fa-info-circle" aria-hidden="true"></i>
                         <p>Asegurese de que el numero de albaran sea legible. Al guardar, se generara una etiqueta de ubicacion automaticamente.</p>
