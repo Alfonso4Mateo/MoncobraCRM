@@ -18,10 +18,13 @@ class ImportXlsxSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = 'C:\\Users\\Usuario\\Downloads\\ALADDIN_Puerto_Real_1.5_2026 (1).csv';
+        // Usamos database_path() para que apunte automáticamente a 'factumon/database/data/'
+        // ¡IMPORTANTE! Asegúrate de que el nombre del archivo aquí coincida exactamente con el que has guardado.
+        $path = database_path('data/ALADDIN_Puerto_Real_1.5_2026 (1).csv'); 
+        // Si lo has renombrado, sería: $path = database_path('data/importacion_principal.csv');
 
         if (! file_exists($path)) {
-            $this->command?->error("File not found: {$path}");
+            $this->command?->error("Archivo no encontrado en la ruta dinámica: {$path}");
             return;
         }
 
