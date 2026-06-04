@@ -6,40 +6,83 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/css/inventario-create.css'])
+    @vite(['resources/css/inventario-item-create.css'])
+    <style>
+        .btn-entry-new-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #173e67; 
+            border: none;
+            padding: 0.65rem 1.2rem;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            color: #ffffff; 
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 6px rgba(23, 62, 103, 0.2);
+        }
+        .btn-entry-new-item:hover {
+            background: #0f2747; 
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .sidebar-save-btn {
+            width: 100%;
+            margin-top: 1.5rem;
+            background: #173e67;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 0.9rem;
+            font-weight: 800;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .sidebar-save-btn:hover {
+            background: #0f2747;
+        }
+        .variants-grid-table input[type="number"] {
+            width: 100px;
+            height: 36px;
+            border: 1px solid #d5dfec;
+            border-radius: 8px;
+            padding: 0 0.5rem;
+            font-weight: 700;
+            color: #173e67;
+        }
+    </style>
 @endsection
 
 @section('content')
     @php
         $hoy = now()->format('d / m / Y');
-        $stockBaseInicial = old('stock_base_preview', $stockBase ?? 0);
     @endphp
 
-    <section class="inventory-entry-page">
-        <header class="inventory-entry-topbar">
-            <nav class="inventory-entry-breadcrumb" aria-label="breadcrumb">
-                <a href="{{ route('inventario.index') }}">Inventario</a>
-                <span><i class="fas fa-chevron-right" aria-hidden="true"></i></span>
-                <strong>Nueva Entrada de Stock</strong>
-            </nav>
-
-            <div class="inventory-entry-actions">
-                <a href="{{ route('inventario.index') }}" class="btn-entry-cancel">Cancelar</a>
-                <button type="submit" form="inventory-entry-form" class="btn-entry-save">
-                    <i class="fas fa-save" aria-hidden="true"></i>
-                    Guardar Registro
-                </button>
+    <section class="inventory-item-page">
+        <header class="inventory-item-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <span class="module-tag">MÓDULO DE INVENTARIO</span>
+                <h1 style="margin-bottom: 0.2rem;">Nueva Entrada Múltiple de Stock</h1>
+                <p style="margin-bottom: 0;">Registrar la entrada de uno o varios artículos simultáneamente.</p>
+            </div>
+            <div>
+                <a href="{{ route('inventario.item.create') }}" class="btn-entry-new-item">
+                    <i class="fas fa-plus"></i>
+                    Crear ítem nuevo en el catálogo
+                </a>
             </div>
         </header>
 
-        <section class="inventory-entry-head">
-            <h1>Nueva Entrada de Stock</h1>
-            <p>Registrar mercancia recibida en el almacen central.</p>
-        </section>
-
         @if ($errors->any())
-            <div class="inventory-entry-alert" role="alert">
-                <strong>No se pudo guardar el registro.</strong>
+            <div class="item-alert" role="alert">
+                <strong>No se pudo registrar la entrada.</strong>
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -48,281 +91,259 @@
             </div>
         @endif
 
-        <form id="inventory-entry-form" action="{{ route('inventario.entrada.store') }}" method="POST" novalidate>
-            @csrf
+        <div class="inventory-item-layout">
+            <form id="inventory-entry-form" action="{{ route('inventario.entrada.store') }}" method="POST" class="inventory-item-form" novalidate>
+                @csrf
 
-            <div class="inventory-entry-layout">
-                <div class="inventory-entry-main">
-                    <article class="entry-card">
-                        <header>
-                            <h2><i class="far fa-copy" aria-hidden="true"></i> Detalles del producto</h2>
-                        </header>
-
-                        <div class="entry-grid entry-grid-producto">
-                            <div class="field-group field-wide">
-                                <label for="producto_busqueda">Producto</label>
-                                <textarea
-                                    id="producto_busqueda"
-                                    name="producto_busqueda"
-                                    rows="1"
-                                    maxlength="1000"
-                                    placeholder="Buscar por nombre o SKU..."
-                                    class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
-                                    required
-                                >{{ old('producto_busqueda') }}</textarea>
-                                <small>Se mostraran resultados coincidentes del catalogo activo.</small>
-                            </div>
-
-                            <div class="field-group field-wide">
-                                <label>Nuevo item</label>
-                                <a href="{{ route('inventario.item.create') }}" class="btn-entry-new-item">
-                                    <i class="fas fa-plus"></i>
-                                    Crear nuevo item
-                                </a>
-                                <small>Si el producto no existe en catalogo, registralo primero desde esta opcion.</small>
-                            </div>
-                        </div>
-
-                        <div class="entry-grid entry-grid-two">
+                {{-- SECCIÓN 1: LOGÍSTICA GENERAL (Simplificada) --}}
+                <fieldset class="item-section">
+                    <div class="item-section-label">
+                        <h3><i class="fas fa-truck-loading" aria-hidden="true"></i> Datos de la Entrada</h3>
+                        <p>Información general aplicable a todos los artículos de esta recepción.</p>
+                    </div>
+                    <div class="item-section-content">
+                        <div class="item-section-fields fields-3">
                             <div class="field-group">
-                                <label for="stock_actual">Cantidad</label>
-                                <div class="input-chip-wrap">
-                                    <input
-                                        id="stock_actual"
-                                        name="stock_actual"
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value="{{ old('stock_actual', 1) }}"
-                                        class="@error('stock_actual') is-invalid @enderror"
-                                        required
-                                    >
-                                    <span>UNIDADES</span>
-                                </div>
+                                <label>Fecha de entrada</label>
+                                <input type="text" value="{{ $hoy }}" readonly style="background: #f8fafc; color: #64748b; font-weight: 700;">
                             </div>
 
                             <div class="field-group">
-                                <label for="almacen">Almacen destino</label>
-                                <input
-                                    id="almacen"
-                                    name="almacen"
-                                    type="text"
-                                    value="{{ old('almacen') }}"
-                                    placeholder="Ej: Almacen Central - Nave A"
-                                    class="@error('almacen') is-invalid @enderror"
-                                >
-                            </div>
-
-                            <div class="field-group">
-                                <label for="ubicacion">Zona</label>
-                                <input
-                                    id="ubicacion"
-                                    name="ubicacion"
-                                    type="text"
-                                    value="{{ old('ubicacion') }}"
-                                    placeholder="Pasillo 3"
-                                    class="@error('ubicacion') is-invalid @enderror"
-                                >
-                            </div>
-
-                            <div class="field-group">
-                                <label for="clase">Nivel</label>
-                                <input
-                                    id="clase"
-                                    name="clase"
-                                    type="text"
-                                    value="{{ old('clase') }}"
-                                    placeholder="Estanteria 12"
-                                    class="@error('clase') is-invalid @enderror"
-                                >
-                            </div>
-                        </div>
-
-                    </article>
-
-                    <article class="entry-card">
-                        <header>
-                            <h2><i class="far fa-file-alt" aria-hidden="true"></i> Notas y observaciones</h2>
-                        </header>
-
-                        <div class="field-group full">
-                            <textarea id="notas" rows="4" class="input-auto-grow input-auto-grow--notes" placeholder="Indicar cualquier incidencia, estado del embalaje o instrucciones especiales..."></textarea>
-                        </div>
-                    </article>
-                </div>
-
-                <aside class="inventory-entry-side">
-                    <article class="entry-card">
-                        <header>
-                            <h2><i class="fas fa-truck-loading" aria-hidden="true"></i> Logistica y origen</h2>
-                        </header>
-
-                        <div class="entry-grid single">
-                            <div class="field-group">
-                                <label for="fecha_preview">Fecha de entrada</label>
-                                <input id="fecha_preview" type="text" value="{{ $hoy }}" readonly>
-                            </div>
-
-                            <div class="field-group">
-                                <label for="ot">Orden de trabajo (OT)</label>
-                                <input
-                                    id="ot"
-                                    name="ot"
-                                    type="text"
-                                    value="{{ old('ot') }}"
-                                    placeholder="Buscar OT activa..."
-                                    class="@error('ot') is-invalid @enderror"
-                                >
-                            </div>
-
-                            <div class="field-group">
-                                <label for="solicitante">Solicitante</label>
-                                <input
-                                    id="solicitante"
-                                    name="solicitante"
-                                    type="text"
-                                    value="{{ old('solicitante', auth()->user()->name ?? '') }}"
-                                    placeholder="Nombre del solicitante"
-                                    class="@error('solicitante') is-invalid @enderror"
-                                >
-                            </div>
-
-                            <div class="field-group">
-                                <label for="referencia_proveedor">Proveedor asociado</label>
-                                <select id="referencia_proveedor" name="referencia_proveedor" class="@error('referencia_proveedor') is-invalid @enderror">
-                                    <option value="">Seleccionar proveedor</option>
-                                    @foreach ($proveedores as $proveedor)
-                                        <option value="{{ $proveedor }}" @selected(old('referencia_proveedor') === $proveedor)>
-                                            {{ $proveedor }}
-                                        </option>
-                                    @endforeach
+                                <label for="almacen_global">Almacén a ingresar</label>
+                                <select id="almacen_global" name="almacen_global" required style="border: 1px solid #d5dfec; border-radius: 8px; padding: 0.5rem; width: 100%; color: #173e67; font-weight: 600;">
+                                    <option value="" disabled selected>Selecciona un almacén...</option>
+                                    @isset($almacenes)
+                                        @foreach($almacenes as $almacen)
+                                            {{-- Usamos el nombre del almacén como value porque la tabla inventario lo guarda como texto --}}
+                                            <option value="{{ $almacen->nombre }}" @selected(old('almacen_global') === $almacen->nombre)>
+                                                {{ $almacen->nombre }}
+                                            </option>
+                                        @endforeach
+                                    @endisset
                                 </select>
                             </div>
 
                             <div class="field-group">
-                                <label for="albaran_preview">N Albaran proveedor</label>
-                                <input id="albaran_preview" type="text" value="{{ old('codigo', 'ALB-2025-XXXX') }}" readonly>
+                                <label for="solicitante">Personal / Usuario</label>
+                                <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', auth()->user()->name ?? '') }}" placeholder="Nombre del receptor" required>
                             </div>
                         </div>
-                    </article>
+                    </div>
+                </fieldset>
 
-                    <article class="entry-note-box">
-                        <i class="fas fa-info-circle" aria-hidden="true"></i>
-                        <p>Asegurese de que el numero de albaran sea legible. Al guardar, se generara una etiqueta de ubicacion automaticamente.</p>
-                    </article>
-                </aside>
-            </div>
+                {{-- SECCIÓN 2: AÑADIR ARTÍCULOS --}}
+                <fieldset class="item-section">
+                    <div class="item-section-label">
+                        <h3><i class="fas fa-boxes" aria-hidden="true"></i> Artículos a Ingresar</h3>
+                        <p>Busca en el catálogo y añade las cantidades recibidas a la lista.</p>
+                    </div>
+                    <div class="item-section-content">
+                        
+                        {{-- Buscador y botón añadir --}}
+                        <div class="item-section-fields fields-1">
+                            <div class="field-group" style="display: flex; gap: 1rem; align-items: flex-end;">
+                                <div style="flex: 1;">
+                                    <label for="producto_busqueda">Buscar producto o variante</label>
+                                    <input
+                                        type="text"
+                                        list="inventario-catalogo"
+                                        id="producto_busqueda"
+                                        placeholder="Escribe el nombre, código o atributo (ej: Talla M)..."
+                                        autocomplete="off"
+                                    >
+                                </div>
+                                <button type="button" id="btn-add-item" class="variants-grid-toolbar__btn variants-grid-toolbar__btn--primary">
+                                    Añadir a la lista
+                                </button>
+                            </div>
+                        </div>
 
-            <datalist id="inventario-catalogo">
-                @foreach ($catalogo as $producto)
-                    <option value="{{ $producto->descripcion }}" data-codigo="{{ $producto->codigo }}"></option>
-                    <option value="{{ $producto->codigo }}" data-codigo="{{ $producto->codigo }}"></option>
-                @endforeach
-            </datalist>
-            <input type="hidden" name="codigo" id="codigo" value="{{ old('codigo') }}">
-            <input type="hidden" name="stock_base_preview" id="stock_base_preview" value="{{ (int) $stockBaseInicial }}">
-        </form>
+                        {{-- Tabla de artículos añadidos --}}
+                        <div class="variants-grid-shell" style="margin-top: 2rem;">
+                            <table class="variants-grid-table">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Descripción del Artículo</th>
+                                        <th style="width: 140px;">Uds. a ingresar</th>
+                                        <th style="width: 80px; text-align: center;">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-table-body">
+                                    <tr id="empty-row">
+                                        <td colspan="4" class="text-center" style="color: #64748b; font-weight: 600; padding: 2rem !important;">
+                                            No hay artículos en la lista. Busca y añade un producto arriba.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </fieldset>
+            </form>
+
+            {{-- SIDEBAR LATERAL --}}
+            <aside class="inventory-sidebar">
+                <div class="inventory-sidebar-card" style="background: #f8fbff; border-color: #dce6f4;">
+                    <div class="inventory-sidebar-title" style="color: #173e67;">
+                        <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+                        Resumen de Entrada
+                    </div>
+                    
+                    <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.8rem; border-bottom: 1px dashed #d5dfec;">
+                        <span style="font-size: 0.75rem; font-weight: 800; color: #7a8ca4;">PRODUCTOS DISTINTOS</span>
+                        <strong id="summary-items" style="font-size: 1.15rem; color: #0f2747;">0</strong>
+                    </div>
+                    <div style="margin-top: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.75rem; font-weight: 800; color: #7a8ca4;">TOTAL UNIDADES</span>
+                        <strong id="summary-units" style="font-size: 1.4rem; color: #1e8a58;">0</strong>
+                    </div>
+
+                    <button type="submit" form="inventory-entry-form" class="sidebar-save-btn" id="btn-submit">
+                        <i class="fas fa-check-circle" aria-hidden="true"></i>
+                        Confirmar Entrada Múltiple
+                    </button>
+                    <div style="text-align: center; margin-top: 0.8rem;">
+                        <a href="{{ route('inventario.index') }}" style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-decoration: underline;">Cancelar y volver</a>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        {{-- DATALIST PARA BÚSQUEDA --}}
+        <datalist id="inventario-catalogo">
+            @foreach ($catalogo as $producto)
+                <option value="{{ $producto->descripcion }}" data-codigo="{{ $producto->codigo }}"></option>
+            @endforeach
+        </datalist>
     </section>
 @endsection
 
 @section('js')
     @php
-        $catalogoJs = $catalogo
-            ->map(function ($item) {
-                return [
-                    'codigo' => (string) $item->codigo,
-                    'descripcion' => (string) $item->descripcion,
-                    'almacen' => (string) ($item->almacen ?? ''),
-                    'ubicacion' => (string) ($item->ubicacion ?? ''),
-                    'stock_actual' => (int) ($item->stock_actual ?? 0),
-                ];
-            })
-            ->values();
+        $catalogoJs = $catalogo->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'codigo' => (string) $item->codigo,
+                'descripcion' => (string) $item->descripcion,
+            ];
+        })->values();
     @endphp
 
     <script>
         (function () {
             const catalogo = @json($catalogoJs);
+            let addedItems = {}; 
 
-            const descripcionInput = document.getElementById('producto_busqueda');
-            const codigoInput = document.getElementById('codigo');
-            const stockInput = document.getElementById('stock_actual');
-            const almacenInput = document.getElementById('almacen');
-            const ubicacionInput = document.getElementById('ubicacion');
-            const stockBaseEl = document.getElementById('stock-base');
-            const stockFinalEl = document.getElementById('stock-final');
-            const stockBaseHidden = document.getElementById('stock_base_preview');
-            const albaranPreview = document.getElementById('albaran_preview');
+            const searchInput = document.getElementById('producto_busqueda');
+            const btnAdd = document.getElementById('btn-add-item');
+            const tbody = document.getElementById('items-table-body');
+            const emptyRow = document.getElementById('empty-row');
+            const summaryItems = document.getElementById('summary-items');
+            const summaryUnits = document.getElementById('summary-units');
+            const btnSubmit = document.getElementById('btn-submit');
 
             const normalize = (value) => String(value || '').trim().toLowerCase();
 
             const findProducto = () => {
-                const descripcionValue = normalize(descripcionInput.value);
-                const codigoValue = normalize(codigoInput.value);
+                const searchVal = normalize(searchInput.value);
+                if (!searchVal) return null;
+                return catalogo.find((item) => normalize(item.descripcion) === searchVal || normalize(item.codigo) === searchVal) || null;
+            };
 
-                if (!descripcionValue && !codigoValue) {
-                    return null;
+            const updateSummary = () => {
+                const rows = tbody.querySelectorAll('tr.item-row');
+                let totalUnits = 0;
+                
+                rows.forEach(row => {
+                    const qtyInput = row.querySelector('.qty-input');
+                    if (qtyInput) totalUnits += parseInt(qtyInput.value || 0, 10);
+                });
+
+                summaryItems.textContent = Object.keys(addedItems).length;
+                summaryUnits.textContent = totalUnits;
+                
+                if (Object.keys(addedItems).length > 0) {
+                    emptyRow.style.display = 'none';
+                    btnSubmit.disabled = false;
+                    btnSubmit.style.opacity = '1';
+                } else {
+                    emptyRow.style.display = 'table-row';
+                    btnSubmit.disabled = true;
+                    btnSubmit.style.opacity = '0.5';
                 }
-
-                return catalogo.find((item) => {
-                    return normalize(item.codigo) === codigoValue
-                        || normalize(item.descripcion) === descripcionValue
-                        || normalize(item.codigo) === descripcionValue;
-                }) || null;
             };
 
-            const refreshSummary = () => {
-                const base = parseInt(stockBaseHidden.value || '0', 10) || 0;
-                const entrada = parseInt(stockInput.value || '0', 10) || 0;
-                stockBaseEl.textContent = base;
-                stockFinalEl.textContent = base + Math.max(0, entrada);
+            const renderRow = (producto) => {
+                const tr = document.createElement('tr');
+                tr.className = 'item-row';
+                tr.dataset.id = producto.id;
+
+                tr.innerHTML = `
+                    <td>
+                        <span style="font-weight: 800; color: #173e67;">${producto.codigo}</span>
+                        <input type="hidden" name="items[${producto.id}][inventario_id]" value="${producto.id}">
+                        <input type="hidden" name="items[${producto.id}][codigo]" value="${producto.codigo}">
+                    </td>
+                    <td>
+                        <strong style="color: #213a57;">${producto.descripcion}</strong>
+                        <input type="hidden" name="items[${producto.id}][descripcion]" value="${producto.descripcion}">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${producto.id}][cantidad]" class="qty-input" value="1" min="1" required>
+                    </td>
+                    <td style="text-align: center;">
+                        <button type="button" class="variant-mini-btn btn-remove" title="Quitar de la lista">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+
+                // Eventos de la fila
+                tr.querySelector('.btn-remove').addEventListener('click', () => {
+                    tr.remove();
+                    delete addedItems[producto.id];
+                    updateSummary();
+                });
+
+                tr.querySelector('.qty-input').addEventListener('input', updateSummary);
+
+                tbody.appendChild(tr);
             };
 
-            const hydrateFromCatalogo = () => {
+            btnAdd.addEventListener('click', () => {
                 const producto = findProducto();
-
                 if (!producto) {
-                    codigoInput.value = '';
-                    refreshSummary();
+                    alert('Producto no encontrado. Por favor, selecciona uno de la lista desplegable.');
                     return;
                 }
 
-                codigoInput.value = producto.codigo;
-
-                if (!almacenInput.value) {
-                    almacenInput.value = producto.almacen;
+                if (addedItems[producto.id]) {
+                    // Si ya existe, le sumamos 1
+                    const existingRow = tbody.querySelector(`tr[data-id="${producto.id}"]`);
+                    const input = existingRow.querySelector('.qty-input');
+                    input.value = parseInt(input.value, 10) + 1;
+                } else {
+                    // Si es nuevo, creamos la fila
+                    addedItems[producto.id] = true;
+                    renderRow(producto);
                 }
 
-                if (!ubicacionInput.value) {
-                    ubicacionInput.value = producto.ubicacion;
-                }
-
-                stockBaseHidden.value = String(producto.stock_actual);
-                albaranPreview.value = codigoInput.value || producto.codigo || 'ALB-2025-XXXX';
-                refreshSummary();
-            };
-
-            descripcionInput.addEventListener('change', hydrateFromCatalogo);
-            codigoInput.addEventListener('change', hydrateFromCatalogo);
-            stockInput.addEventListener('input', refreshSummary);
-            codigoInput.addEventListener('input', function () {
-                albaranPreview.value = this.value || 'ALB-2025-XXXX';
+                searchInput.value = ''; // Limpiar buscador
+                updateSummary();
             });
 
-            const autoGrowAreas = document.querySelectorAll('.input-auto-grow');
-            if (autoGrowAreas.length) {
-                const resizeArea = (el) => {
-                    el.style.height = 'auto';
-                    el.style.height = `${el.scrollHeight}px`;
-                };
+            // Prevenir enviar formulario al pulsar Enter en el buscador
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    btnAdd.click();
+                }
+            });
 
-                autoGrowAreas.forEach((area) => {
-                    resizeArea(area);
-                    area.addEventListener('input', () => resizeArea(area));
-                });
-            }
-
-            refreshSummary();
+            // Init
+            updateSummary();
         })();
     </script>
 @endsection

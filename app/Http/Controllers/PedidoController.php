@@ -380,28 +380,34 @@ class PedidoController extends Controller
             $this->validateLineasPayload($lineasFiltradas);
 
             $lineas = collect($lineasFiltradas)
-                ->map(function (array $linea) {
-                    $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                    $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
-                    $margen = max(0, (float) ($linea['margen'] ?? 0));
+            // 1. Añadimos ", int $index" como segundo parámetro
+            ->map(function (array $linea, int $index) {
+                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
+                $margen = max(0, (float) ($linea['margen'] ?? 0));
 
-                    $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
+                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
-                    $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                    $medida = $medida !== '' ? $medida : null;
+                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
 
-                    return [
-                        'articulo' => trim((string) ($linea['articulo'] ?? '')),
-                        'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                        'cantidad' => round($cantidad, 2),
-                        'medida' => $medida,
-                        'precio_unitario' => round($precioUnitario, 2),
-                        'margen' => round($margen, 2),
-                        'total' => round($total, 2),
-                    ];
-                })
-                ->values()
-                ->all();
+                // 2. Lógica del contador: 
+                // Si el usuario no escribió un código de artículo, le asignamos la línea (1, 2, 3...)
+                $articuloOriginal = trim((string) ($linea['articulo'] ?? ''));
+                $articuloFinal = $articuloOriginal === '' ? (string) ($index + 1) : $articuloOriginal;
+
+                return [
+                    'articulo' => $articuloFinal, // 3. Guardamos el artículo generado
+                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                    'cantidad' => round($cantidad, 2),
+                    'medida' => $medida,
+                    'precio_unitario' => round($precioUnitario, 2),
+                    'margen' => round($margen, 2),
+                    'total' => round($total, 2),
+                ];
+            })
+            ->values()
+            ->all();
 
             $total = (float) collect($lineas)->sum('total');
         }

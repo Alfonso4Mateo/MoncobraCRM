@@ -108,27 +108,29 @@
                             </div>
                         @else
                             <div class="line-row linea-input-row">
-                                <!-- Campo 'Código referencia' eliminado; se usa columna 'Línea' numerada -->
-                                <div class="field flex-3">
+                                <div class="field flex-6">
                                     <label for="linea_descripcion">Descripción</label>
                                     <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
                                 </div>
-                                <div class="field flex-1">
+                                
+                                <div class="field flex-compact">
                                     <label for="linea_cantidad">Cantidad</label>
                                     <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
                                 </div>
-                                <div class="field flex-1">
+                                <div class="field flex-compact">
                                     <label for="linea_medida">Medida</label>
                                     <input type="text" id="linea_medida" placeholder="u, kg, m...">
                                 </div>
-                                <div class="field flex-1">
+                                
+                                <div class="field flex-compact-lg">
                                     <label for="linea_precio">P. unitario</label>
                                     <input type="number" id="linea_precio" value="0.00" min="0" max="10000000" step="0.01">
                                 </div>
-                                <div class="field flex-1">
+                                <div class="field flex-compact">
                                     <label for="linea_margen">Margen (%)</label>
                                     <input type="number" id="linea_margen" value="0" min="0" step="0.01">
                                 </div>
+                                
                                 <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
                             </div>
                         @endif

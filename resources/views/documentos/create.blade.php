@@ -21,7 +21,9 @@
                 <h1>Cargar Nuevo Documento</h1>
                 <p>Centraliza nuevos registros industriales y asociarlos a su proyecto y cliente.</p>
             </div>
-            <a href="{{ route('documentos.index') }}" class="docs-upload-cancel btn-back" id="cancel-back">Volver atrás</a>
+                <a href="{{ route('documentos.index') }}" class="docs-upload-cancel btn-back">
+                    <i class="fas fa-arrow-left"></i> Volver atrás
+                </a>
         </header>
 
         @if ($errors->any())
@@ -92,7 +94,6 @@
                         <div class="docs-detected-actions">
                             <button id="discard-detected" type="button" class="docs-upload-cancel">Descartar</button>
                             <button type="submit" class="docs-upload-submit" style="background:linear-gradient(135deg,var(--docs-primary),var(--docs-primary-dark));">Cargar Documento</button>
-                            <button type="button" id="cancel-back" class="docs-upload-cancel btn-back">Cancelar</button>
                         </div>
 
                         <pre id="detected-raw" style="display:none; white-space:pre-wrap; margin-top:10px; background:#f8fafc; padding:8px; border-radius:6px; border:1px solid #e6eef6; max-height:180px; overflow:auto;"> </pre>

@@ -554,7 +554,7 @@ class AlbaranClienteController extends Controller
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
-            return 'ALB-' . now()->format('Y') . '-000';
+            return 'ALB-' . now()->format('Y') . '-0000';
         });
         $statsFormato = $this->correlativoStatsForPrefix($proyectoId, $formatoActual);
         $max = $statsFormato['max'];
@@ -839,7 +839,7 @@ class AlbaranClienteController extends Controller
     private function resolveNextAlbaranClienteNumber(int $proyectoId): array
     {
         $formato = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
-            return 'ALB-' . now()->format('Y') . '-000';
+            return 'ALB-' . now()->format('Y') . '-0000';
         });
 
         $nextIndex = $this->getContadorValue($proyectoId, 'albaranes_next_correlativo');
