@@ -212,17 +212,6 @@
                             <span class="inventory-stat-icon amber"><i class="fas fa-boxes"></i></span>
                         </div>
                     </article>
-
-                    <article class="inventory-stat-card">
-                        <div class="inventory-stat-top">
-                            <div>
-                                <span class="inventory-stat-label">Ubicaciones</span>
-                                <strong class="inventory-stat-value">{{ number_format($ubicaciones, 0, ',', '.') }}</strong>
-                                <span class="inventory-stat-note">{{ number_format($almacenes, 0, ',', '.') }} almacenes operativos</span>
-                            </div>
-                            <span class="inventory-stat-icon teal"><i class="fas fa-map-marker-alt"></i></span>
-                        </div>
-                    </article>
                 </div>
 
                 <div class="inventory-search-card">
@@ -312,14 +301,6 @@
                                             </div>
                                         </td>
                                         <td><span class="inventory-pill muted">{{ $grupo->clasePadre }}</span></td>
-                                        <td>
-                                            <div class="inventory-location">
-                                                <strong>{{ $grupo->almacenPadre ?: 'Sin almacén' }}</strong>
-                                                @if($grupo->ubicacionPadre)
-                                                    <span>{{ $grupo->ubicacionPadre }}</span>
-                                                @endif
-                                            </div>
-                                        </td>
                                         <td><span class="inventory-stock inventory-stock-main">{{ number_format($grupo->stockGrupo, 0, ',', '.') }}</span></td>
                                         <td><span class="inventory-status inventory-status-{{ $grupo->estadoGrupo }}">{{ $grupo->estadoTextoGrupo }}</span></td>
                                         <td>
@@ -365,14 +346,6 @@
                                                 </div>
                                             </td>
                                             <td><span class="inventory-pill muted">{{ data_get($producto->clase_relacion, 'nombre', $grupo->clasePadre) }}</span></td>
-                                            <td>
-                                                <div class="inventory-location">
-                                                    <strong>{{ $producto->almacen ?: 'Sin almacén' }}</strong>
-                                                    @if($producto->ubicacion)
-                                                        <span>{{ $producto->ubicacion }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
                                             <td><span class="inventory-stock inventory-stock-{{ $producto->estado === 'bajo' ? 'bajo' : ($producto->estado === 'critico' ? 'critico' : 'main') }}">{{ number_format($producto->stock_actual, 0, ',', '.') }}</span></td>
                                             <td><span class="inventory-status inventory-status-{{ $producto->estado }}">{{ $producto->estado_texto }}</span></td>
                                             <td>

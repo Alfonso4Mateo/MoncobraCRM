@@ -14,7 +14,7 @@
         @if(!empty($showStockActual))
         <div class="field-group field-tight">
             <label for="stock_actual">Stock actual</label>
-            <input id="stock_actual" name="stock_actual" type="number" min="0" step="1" value="{{ old('stock_actual', $varianteBase->stock_actual ?? 0) }}" class="@error('stock_actual') is-invalid @enderror">
+            <input id="stock_actual" name="stock_actual" type="number" min="0" max="99999" oninput="if(this.value.length > 5) this.value = this.value.slice(0, 5);">
         </div>
         @endif
 
@@ -30,13 +30,16 @@
 
         <div class="field-group">
             <label for="almacen">Almacen</label>
-            <input id="almacen" name="almacen" type="text" value="{{ old('almacen', $varianteBase->almacen ?? '') }}" placeholder="Almacen Central" class="@error('almacen') is-invalid @enderror">
-        </div>
-
-        <div class="field-group">
-            <label for="ubicacion">Ubicacion</label>
-            <input id="ubicacion" name="ubicacion" type="text" value="{{ old('ubicacion', $varianteBase->ubicacion ?? '') }}" placeholder="Pasillo 3 / Estanteria 12" class="@error('ubicacion') is-invalid @enderror">
-        </div>
+            <select id="almacen" name="almacen" style="border: 1px solid #d5dfec; border-radius: 10px; padding: 0.5rem 0.75rem; width: 100%; color: #173e67; font-weight: 700; background: #fff; height: 42px;">
+                <option value="" disabled selected>Selecciona un almacén...</option>
+                    @isset($almacenes)
+                         @foreach($almacenes as $almacenOpt)
+                            <option value="{{ $almacenOpt->nombre }}" @selected(old('almacen', $varianteBase->almacen ?? '') === $almacenOpt->nombre)>
+                                {{ $almacenOpt->nombre }}
+                            </option>
+                         @endforeach
+                    @endisset
+            </select>
         </div>
     </div>
 </section>

@@ -188,10 +188,6 @@
                     <i class="fas fa-arrow-up-from-box"></i>
                     Registrar Salida
                 </a>
-                <a href="#" class="profile-action profile-action--soft">
-                    <i class="fas fa-file-export"></i>
-                    Exportar Ficha
-                </a>
                 @can('manage-users')
                     <a href="{{ route('personal.edit', $personal->id) }}" class="profile-action profile-action--primary">
                         <i class="fas fa-pen"></i>

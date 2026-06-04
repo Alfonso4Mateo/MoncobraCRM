@@ -123,7 +123,6 @@ class InventarioController extends Controller
                         'descripcion' => data_get($producto, 'descripcion'),
                         'referencia_proveedor' => data_get($producto, 'referencia_proveedor'),
                         'almacen' => data_get($producto, 'almacen'),
-                        'ubicacion' => data_get($producto, 'ubicacion'),
                         'id' => data_get($producto, 'id'),
                         'clase_relacion' => data_get($producto, 'claseRelacion') ?: data_get($productoPadre, 'claseRelacion'),
                         'stock_actual' => $stockActual,
@@ -147,7 +146,7 @@ class InventarioController extends Controller
                     'descripcionPadre' => data_get($variantePadre, 'descripcion') ?? data_get($productoPadre, 'descripcion'),
                     'referenciaPadre' => data_get($variantePadre, 'referencia_proveedor') ?? data_get($productoPadre, 'referencia_proveedor'),
                     'almacenPadre' => data_get($variantePadre, 'almacen') ?? data_get($productoPadre, 'almacen'),
-                    'ubicacionPadre' => data_get($variantePadre, 'ubicacion') ?? data_get($productoPadre, 'ubicacion'),
+
                     'clasePadre' => is_object(data_get($productoPadre, 'claseRelacion'))
                         ? data_get($productoPadre, 'claseRelacion.nombre')
                         : data_get($productoPadre, 'clase', 'Sin clase'),
@@ -184,11 +183,6 @@ class InventarioController extends Controller
         $nivelCritico = (clone $baseQuery)->whereColumn('stock_actual', '<=', 'nivel_critico')->count();
         $stockBajo = (clone $baseQuery)->whereColumn('stock_actual', '<=', 'stock_minimo')->count();
         $stockTotal = (clone $baseQuery)->sum('stock_actual');
-        $ubicaciones = (clone $baseQuery)
-            ->whereNotNull('ubicacion')
-            ->where('ubicacion', '<>', '')
-            ->distinct()
-            ->count('ubicacion');
         $almacenesRegistrados = Almacen::query()
             ->where('proyecto_id', $proyectoId)
             ->orderBy('nombre')
@@ -289,7 +283,6 @@ class InventarioController extends Controller
             'nivelCritico',
             'stockBajo',
             'stockTotal',
-            'ubicaciones',
             'almacenes',
             'movimientosRecientes',
             'ocupacionAlmacenes',
@@ -308,7 +301,7 @@ class InventarioController extends Controller
             ->orderBy('descripcion')
             ->orderBy('codigo')
             ->limit(30)
-            ->get(['id', 'codigo', 'descripcion', 'nombre', 'almacen', 'ubicacion', 'stock_actual']);
+            ->get(['id', 'codigo', 'descripcion', 'nombre', 'almacen', 'stock_actual']);
 
         $proveedores = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -375,8 +368,13 @@ class InventarioController extends Controller
             ->where('proyecto_id', $proyectoId)
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
+        
+        $almacenes = \App\Models\Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
 
-        return view('inventario.create-item', compact('ultimaAccion', 'clases', 'varianteBase', 'valoresIniciales'));
+        return view('inventario.create-item', compact('ultimaAccion', 'clases', 'varianteBase', 'valoresIniciales', 'almacenes'));
     }
 
     public function createSalida()
@@ -402,7 +400,7 @@ class InventarioController extends Controller
             ->where('proyecto_id', $proyectoId)
             ->orderBy('descripcion')
             ->orderBy('codigo')
-            ->get(['codigo', 'descripcion', 'almacen', 'ubicacion', 'stock_actual']);
+            ->get(['codigo', 'descripcion', 'almacen', 'stock_actual']);
 
         $salidasRecientes = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -820,38 +818,32 @@ class InventarioController extends Controller
             'descripcion' => 'nullable|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
-            'ubicacion' => 'nullable|string|max:255',
             'almacen' => 'nullable|string|max:255',
-            'stock_actual' => 'nullable|integer|min:0|required_without:variantes',
+            'stock_actual' => 'nullable|integer|min:0|max:999999|required_without:variantes',
             'stock_minimo' => 'nullable|integer|min:0',
             'nivel_critico' => 'nullable|integer|min:0',
-            'tipos_atributos' => 'nullable|string', // JSON string con tipos de variantes
-            'atributos_variante' => 'nullable|array', // Valores de los atributos
+            'tipos_atributos' => 'nullable|string',
+            'atributos_variante' => 'nullable|array',
             'atributos_variante.*' => 'nullable|array',
             'atributos_variante.*.*' => 'nullable|string|max:255',
             'variantes' => 'nullable|array',
             'variantes.*.activo' => 'nullable|boolean',
-            'variantes.*.stock_actual' => 'nullable|integer|min:0',
+            'variantes.*.stock_actual' => 'nullable|integer|min:0|max:999999',
             'variantes.*.atributos' => 'nullable|array',
             'variantes.*.atributos.*' => 'nullable|string|max:255',
             'inventario_variante_id' => 'nullable|integer|exists:inventario_variantes,id',
+            'items.*.cantidad' => 'required|integer|min:1|max:99999',
         ]);
 
         $validated['proyecto_id'] = $proyectoId;
 
-        // Prefer 'nombre' as the main descripción if provided
         if (!empty($validated['nombre'])) {
             $validated['descripcion'] = $validated['nombre'];
         }
 
-        // Parsear tipos de atributos si viene como string JSON
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
-
-        // Limpiar y preparar atributos de variante
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
-
         $variantes = $this->normalizeVariantRows($validated['variantes'] ?? null);
-
         $variante = null;
 
         if (!empty($validated['inventario_variante_id'])) {
@@ -867,10 +859,9 @@ class InventarioController extends Controller
                 [
                     'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                     'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? null,
-                    'referencia_proveedor' => $validated['referencia_proveedor'],
-                    'clase_id' => $validated['clase_id'],
-                    'ubicacion' => $validated['ubicacion'],
-                    'almacen' => $validated['almacen'],
+                    'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
+                    'clase_id' => $validated['clase_id'] ?? null, // Blindado
+                    'almacen' => $validated['almacen'] ?? null, // Blindado
                     'stock_minimo' => $validated['stock_minimo'] ?? 0,
                     'nivel_critico' => $validated['nivel_critico'] ?? 0,
                     'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
@@ -885,19 +876,17 @@ class InventarioController extends Controller
         $variante->update([
             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? $variante->nombre,
             'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? $variante->descripcion,
-            'referencia_proveedor' => $validated['referencia_proveedor'],
+            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
             'clase_id' => !empty($validated['inventario_variante_id'])
                 ? $variante->clase_id
-                : $validated['clase_id'],
-            'ubicacion' => $validated['ubicacion'],
-            'almacen' => $validated['almacen'],
+                : ($validated['clase_id'] ?? null), // Blindado
+            'almacen' => $validated['almacen'] ?? null, // Blindado
             'stock_minimo' => $validated['stock_minimo'] ?? 0,
             'nivel_critico' => $validated['nivel_critico'] ?? 0,
             'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : $variante->tipos_atributos,
         ]);
 
         if (!empty($variantes)) {
-            // NUEVO: Obtenemos las variantes que ya existen en la base de datos para esta familia
             $existingItems = $variante->items()->get();
 
             DB::transaction(function () use ($proyectoId, $validated, $variante, $variantes, $tiposAtributos, $claseIdParaItems, $existingItems) {
@@ -905,13 +894,11 @@ class InventarioController extends Controller
                     $atributos = $varianteRow['atributos'];
                     $stockActual = (int) $varianteRow['stock_actual'];
 
-                    // NUEVO: BÚSQUEDA INTELIGENTE
                     $existingItem = $existingItems->first(function ($item) use ($atributos) {
                         return json_encode($item->atributos_variante) === json_encode($atributos);
                     });
 
                     if ($existingItem) {
-                        // ACTUALIZAR LA VARIANTE EXISTENTE (No se duplica)
                         $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingItem->id);
                         $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
 
@@ -919,17 +906,15 @@ class InventarioController extends Controller
                             'codigo' => $codigoItem,
                             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'],
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
                             'clase_id' => $claseIdParaItems,
-                            'ubicacion' => $validated['ubicacion'],
-                            'almacen' => $validated['almacen'],
+                            'almacen' => $validated['almacen'] ?? null, // Blindado
                             'stock_actual' => $stockActual,
                             'stock_minimo' => $validated['stock_minimo'] ?? 0,
                             'nivel_critico' => $validated['nivel_critico'] ?? 0,
-                            'atributos_variante' => $atributos, // Forzar que guarde también los atributos limpios
+                            'atributos_variante' => $atributos,
                         ]);
                     } else {
-                        // CREAR VARIANTE TOTALMENTE NUEVA
                         $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index);
                         $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
 
@@ -939,10 +924,9 @@ class InventarioController extends Controller
                             'codigo' => $codigoItem,
                             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'],
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
                             'clase_id' => $claseIdParaItems,
-                            'ubicacion' => $validated['ubicacion'],
-                            'almacen' => $validated['almacen'],
+                            'almacen' => $validated['almacen'] ?? null, // Blindado
                             'stock_actual' => $stockActual,
                             'stock_minimo' => $validated['stock_minimo'] ?? 0,
                             'nivel_critico' => $validated['nivel_critico'] ?? 0,
@@ -963,10 +947,9 @@ class InventarioController extends Controller
             'codigo' => $codigoItem,
             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
             'descripcion' => $validated['descripcion'],
-            'referencia_proveedor' => $validated['referencia_proveedor'],
+            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
             'clase_id' => $claseIdParaItems,
-            'ubicacion' => $validated['ubicacion'],
-            'almacen' => $validated['almacen'],
+            'almacen' => $validated['almacen'] ?? null, // Blindado
             'stock_actual' => (int) ($validated['stock_actual'] ?? 0),
             'stock_minimo' => $validated['stock_minimo'] ?? 0,
             'nivel_critico' => $validated['nivel_critico'] ?? 0,
@@ -1002,6 +985,11 @@ class InventarioController extends Controller
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
 
+        $almacenes = \App\Models\Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
         $valoresIniciales = $this->normalizeVariantAttributes($inventario->atributos_variante ?? []);
         $tiposAtributos = $inventario->variante?->tipos_atributos;
 
@@ -1012,15 +1000,12 @@ class InventarioController extends Controller
             'referencia_proveedor' => $inventario->referencia_proveedor,
             'clase_id' => $inventario->clase_id,
             'almacen' => $inventario->almacen,
-            'ubicacion' => $inventario->ubicacion,
             'stock_actual' => $inventario->stock_actual,
             'stock_minimo' => $inventario->stock_minimo,
             'nivel_critico' => $inventario->nivel_critico,
             'tipos_atributos' => $tiposAtributos ?? array_keys($valoresIniciales),
         ];
 
-        // FIX: Inicializamos $variantesIniciales. Si el producto pertenece a una familia con variantes, las cargamos.
-        // Si es un producto sencillo importado del Excel, se quedará como un array vacío y el compact() no fallará.
        $variantesIniciales = $inventario->variante
             ? $inventario->variante->items->map(function ($item) {
                 return [
@@ -1031,7 +1016,7 @@ class InventarioController extends Controller
             })->toArray()
             : [];
 
-        return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales'));
+        return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales', 'almacenes'));
     }
 
     public function update(Request $request, Inventario $inventario)
@@ -1042,14 +1027,12 @@ class InventarioController extends Controller
             abort(404);
         }
 
-        // 1. AQUI SOLO REGLAS DE VALIDACIÓN 
         $validated = $request->validate([
             'codigo' => 'required|string|max:255',
             'nombre' => 'required|string|max:255',
             'descripcion' => 'required|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
-            'ubicacion' => 'nullable|string|max:255',
             'almacen' => 'nullable|string|max:255',
             'stock_actual' => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
@@ -1066,10 +1049,7 @@ class InventarioController extends Controller
             'variantes.*.atributos.*' => 'nullable|string|max:255',
         ]);
 
-        // Parsear tipos de atributos si viene como string JSON
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
-
-        // Limpiar y preparar atributos de variante
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
         $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null);
 
@@ -1077,31 +1057,27 @@ class InventarioController extends Controller
             ? $inventario->variante?->clase_id
             : ($validated['clase_id'] ?? null);
 
-        // Actualizar la variante si existe
         if ($inventario->variante) {
             $inventario->variante->update([
                 'codigo' => $validated['codigo'],
                 'nombre' => $validated['nombre'],
                 'descripcion' => $validated['descripcion'],
-                'referencia_proveedor' => $validated['referencia_proveedor'],
-                'clase_id' => $validated['clase_id'],
-                'ubicacion' => $validated['ubicacion'],
-                'almacen' => $validated['almacen'],
+                'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
+                'clase_id' => $validated['clase_id'] ?? null, // Blindado
+                'almacen' => $validated['almacen'] ?? null, // Blindado
                 'stock_minimo' => $validated['stock_minimo'] ?? 0,
                 'nivel_critico' => $validated['nivel_critico'] ?? 0,
                 'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
             ]);
         }
 
-        // 2. AQUI ES DONDE SE GUARDAN LOS DATOS REALES EN LA BASE DE DATOS
         $inventario->update([
             'codigo' => $validated['codigo'],
             'nombre' => $validated['nombre'],
             'descripcion' => $validated['descripcion'],
-            'referencia_proveedor' => $validated['referencia_proveedor'],
-            'clase_id' => $validated['clase_id'],
-            'ubicacion' => $validated['ubicacion'],
-            'almacen' => $validated['almacen'],
+            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
+            'clase_id' => $validated['clase_id'] ?? null, // Blindado
+            'almacen' => $validated['almacen'] ?? null, // Blindado
             'stock_actual' => $validated['stock_actual'],
             'stock_minimo' => $validated['stock_minimo'] ?? 0,
             'nivel_critico' => $validated['nivel_critico'] ?? 0,
@@ -1118,20 +1094,16 @@ class InventarioController extends Controller
                     $stockActual = (int) $varianteRow['stock_actual'];
                     $itemId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
 
-                    // NUEVA BÚSQUEDA INTELIGENTE
                     $existingItem = null;
                     if ($itemId && $existingItems->has($itemId)) {
-                        // Si nos llega el ID correcto, lo usamos directamente
                         $existingItem = $existingItems->get($itemId);
                     } else {
-                        // Si no llega ID, buscamos si ya existe un hermano con exactamente los mismos atributos
                         $existingItem = $existingItems->first(function ($item) use ($atributos) {
                             return json_encode($item->atributos_variante) === json_encode($atributos);
                         });
                     }
 
                     if ($existingItem) {
-                        // ACTUALIZAR LA VARIANTE EXISTENTE (No se duplica)
                         $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingItem->id);
                         $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
 
@@ -1139,10 +1111,9 @@ class InventarioController extends Controller
                             'codigo' => $codigoItem,
                             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'],
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
                             'clase_id' => $claseIdParaItems,
-                            'ubicacion' => $validated['ubicacion'],
-                            'almacen' => $validated['almacen'],
+                            'almacen' => $validated['almacen'] ?? null, // Blindado
                             'stock_actual' => $stockActual,
                             'stock_minimo' => $validated['stock_minimo'] ?? 0,
                             'nivel_critico' => $validated['nivel_critico'] ?? 0,
@@ -1151,7 +1122,6 @@ class InventarioController extends Controller
 
                         $keptIds[] = $existingItem->id;
                     } else {
-                        // CREAR VARIANTE TOTALMENTE NUEVA
                         $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index);
                         $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
 
@@ -1161,10 +1131,9 @@ class InventarioController extends Controller
                             'codigo' => $codigoItem,
                             'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'],
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
                             'clase_id' => $claseIdParaItems,
-                            'ubicacion' => $validated['ubicacion'],
-                            'almacen' => $validated['almacen'],
+                            'almacen' => $validated['almacen'] ?? null, // Blindado
                             'stock_actual' => $stockActual,
                             'stock_minimo' => $validated['stock_minimo'] ?? 0,
                             'nivel_critico' => $validated['nivel_critico'] ?? 0,

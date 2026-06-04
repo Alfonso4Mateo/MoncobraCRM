@@ -291,7 +291,7 @@
                         <input type="hidden" name="items[${producto.id}][descripcion]" value="${producto.descripcion}">
                     </td>
                     <td>
-                        <input type="number" name="items[${producto.id}][cantidad]" class="qty-input" value="1" min="1" required>
+                        <input type="number" name="items[${producto.id}][cantidad]" class="qty-input" value="1" min="1" max="99999" oninput="if(this.value.length > 5) this.value = this.value.slice(0, 5);" required>
                     </td>
                     <td style="text-align: center;">
                         <button type="button" class="variant-mini-btn btn-remove" title="Quitar de la lista">

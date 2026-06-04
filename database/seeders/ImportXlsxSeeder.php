@@ -6,28 +6,26 @@ use App\Models\AlbaranCliente;
 use App\Models\Articulo;
 use App\Models\Cliente;
 use App\Models\Inventario;
-use App\Models\PedidoCliente;
+use App\Models\PedidoCliente; // <-- OJO: Si usas PedidoProveedor, cámbialo aquí
 use App\Models\Presupuesto;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class ImportXlsxSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Apuntamos a la CARPETA en lugar de a un archivo en concreto
         $directory = database_path('data');
 
-        // Comprobamos que la carpeta exista
         if (!is_dir($directory)) {
             $this->command?->error("La carpeta no existe: {$directory}");
             return;
         }
 
-        // 2. Le pedimos a Laravel que nos dé una lista de todos los archivos de esa carpeta
         $archivos = \Illuminate\Support\Facades\File::files($directory);
 
         if (empty($archivos)) {
@@ -35,36 +33,37 @@ class ImportXlsxSeeder extends Seeder
             return;
         }
 
-        // 3. Empezamos el bucle: por cada archivo que encuentre, hace el proceso
         foreach ($archivos as $archivo) {
             $path = $archivo->getPathname();
             $extension = strtolower($archivo->getExtension());
 
-            // Filtro de seguridad: Solo leemos si termina en .csv, .xlsx o .xls
             if (!in_array($extension, ['csv', 'xlsx', 'xls'])) {
                 $this->command?->line("Saltando archivo no válido: " . $archivo->getFilename());
-                continue; // Pasa al siguiente archivo de la lista
+                continue;
             }
 
             $this->command?->info("Importando: " . $archivo->getFilename() . "...");
 
-            // Aquí empieza la magia original de leer el Excel
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(true);
             $spreadsheet = $reader->load($path);
 
             DB::transaction(function () use ($spreadsheet): void {
-                $this->importClients($spreadsheet->getSheetByName('Clientes'));
+                // Usamos la nueva función inteligente para encontrar las pestañas
+                $this->importClients($this->getSheetSafe($spreadsheet, 'Clientes'));
                 $this->importPresupuestos(
-                    $spreadsheet->getSheetByName('Presupuestos'),
-                    $spreadsheet->getSheetByName('Detalle_Presupuestos')
+                    $this->getSheetSafe($spreadsheet, 'Presupuestos'),
+                    $this->getSheetSafe($spreadsheet, 'Detalle_Presupuestos')
                 );
                 $this->importAlbaranesClientes(
-                    $spreadsheet->getSheetByName('Albaran_Cliente'),
-                    $spreadsheet->getSheetByName('Detalle_Albaran_Cliente')
+                    $this->getSheetSafe($spreadsheet, 'Albaran_Cliente'),
+                    $this->getSheetSafe($spreadsheet, 'Detalle_Albaran_Cliente')
                 );
-                $this->importArticulos($spreadsheet->getSheetByName('Lista de productos'));
-                $this->importInventario($spreadsheet->getSheetByName('Lista de inventario_modelo'));
+                $this->importArticulos($this->getSheetSafe($spreadsheet, 'Lista de productos'));
+                $this->importInventario($this->getSheetSafe($spreadsheet, 'Lista de inventario_modelo'));
+                
+                // ¡AQUÍ ESTABA EL FALLO! Añadimos la llamada para importar los pedidos
+                $this->importPedidos($this->getSheetSafe($spreadsheet, 'Pedidos'));
             });
 
             $this->command?->info("Completado: " . $archivo->getFilename());
@@ -73,32 +72,35 @@ class ImportXlsxSeeder extends Seeder
         $this->command?->info('¡Todos los archivos de la carpeta han sido importados con éxito!');
     }
 
+    /**
+     * BUSCADOR INTELIGENTE DE PESTAÑAS
+     * Ignora espacios en blanco accidentales y mayúsculas/minúsculas en el Excel.
+     */
+    private function getSheetSafe(Spreadsheet $spreadsheet, string $name): ?Worksheet
+    {
+        foreach ($spreadsheet->getSheetNames() as $sheetName) {
+            if (strtolower(trim($sheetName)) === strtolower(trim($name))) {
+                return $spreadsheet->getSheetByName($sheetName);
+            }
+        }
+        return null;
+    }
+
     private function importClients(?Worksheet $sheet): void
     {
-        if ($sheet === null) {
-            return;
-        }
+        if ($sheet === null) return;
 
         foreach ($this->sheetRows($sheet) as $row) {
             $empresa = trim((string) ($row['cliente'] ?? ''));
-            if ($empresa === '') {
-                continue;
-            }
-if (str_starts_with($empresa, 'PROV-')) {
-                // Omitimos clientes que parecen ser proveedores
-                continue;
-            }
+            if ($empresa === '') continue;
+
+            if (str_starts_with($empresa, 'PROV-')) continue;
 
             $tipo = strtolower(trim((string) ($row['tipo'] ?? '')));
-            if(str_contains($tipo, 'proveedor') || str_contains($tipo, 'prov')) {
-                // Omitimos clientes que en su tipo mencionan ser proveedores
-                continue;
-            }
+            if(str_contains($tipo, 'proveedor') || str_contains($tipo, 'prov')) continue;
             
             $cif = trim((string) ($row['cif'] ?? ''));
 
-            // Actualizamos o creamos basándonos en el nombre de la empresa para no duplicar
-           // Actualizamos basándonos en el CIF si existe, o en el nombre si no
             Cliente::updateOrCreate(
                 ['cif_nif' => $cif !== '' ? $cif : 'NO-CIF-' . $empresa],
                 [
@@ -114,11 +116,37 @@ if (str_starts_with($empresa, 'PROV-')) {
         }
     }
 
+    /**
+     * NUEVA FUNCIÓN PARA IMPORTAR PEDIDOS
+     */
+    private function importPedidos(?Worksheet $sheet): void
+    {
+        if ($sheet === null) return;
+
+        foreach ($this->sheetRows($sheet) as $row) {
+            $codigo = trim((string) ($row['codigo_pedido'] ?? ''));
+            if ($codigo === '') continue;
+
+            // Nota: Si usas otra tabla distinta a PedidoCliente (como PedidoProveedor), cambia el Modelo aquí
+            PedidoCliente::updateOrCreate(
+                ['numero' => $codigo], // Cambia 'numero' por la columna real que uses para el código
+                [
+                    'proveedor' => trim((string) ($row['proveedor'] ?? '')),
+                    'fecha' => $this->excelDate($row['fecha'] ?? null),
+                    'titulo' => trim((string) ($row['titulo'] ?? '')),
+                    'total' => $this->normalizeMoney($row['total_compra'] ?? null),
+                    'estado' => $this->normalizeEstado($row['estado'] ?? null, ['recibido', 'pendiente', 'cancelado']),
+                    'ot' => trim((string) ($row['ot'] ?? '')),
+                    'pedido_cliente' => trim((string) ($row['pedido_cliente'] ?? '')),
+                    'numero_oferta' => trim((string) ($row['numero_oferta'] ?? '')),
+                ]
+            );
+        }
+    }
+
     private function importPresupuestos(?Worksheet $sheet, ?Worksheet $detailSheet): void
     {
-        if ($sheet === null) {
-            return;
-        }
+        if ($sheet === null) return;
 
         $details = $this->groupDetailLines($detailSheet, 'numero');
 
@@ -126,16 +154,10 @@ if (str_starts_with($empresa, 'PROV-')) {
             $numero = trim((string) ($row['numero'] ?? ''));
             $clienteName = trim((string) ($row['cliente'] ?? ''));
             
-            if ($numero === '' || $clienteName === '') {
-                continue;
-            }
+            if ($numero === '' || $clienteName === '') continue;
 
             $clienteId = $this->resolveClienteId($clienteName);
-            
-            // Si el cliente no existe en la base de datos (ej. es un PROV-*), omitimos el presupuesto
-            if ($clienteId === null) {
-                continue;
-            }
+            if ($clienteId === null) continue;
 
             Presupuesto::updateOrCreate(
                 ['numero' => $numero],
@@ -157,9 +179,7 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function importAlbaranesClientes(?Worksheet $sheet, ?Worksheet $detailSheet): void
     {
-        if ($sheet === null) {
-            return;
-        }
+        if ($sheet === null) return;
 
         $details = $this->groupDetailLines($detailSheet, 'numero');
 
@@ -167,16 +187,10 @@ if (str_starts_with($empresa, 'PROV-')) {
             $numero = trim((string) ($row['numero'] ?? ''));
             $clienteName = trim((string) ($row['cliente'] ?? ''));
             
-            if ($numero === '' || $clienteName === '') {
-                continue;
-            }
+            if ($numero === '' || $clienteName === '') continue;
 
             $clienteId = $this->resolveClienteId($clienteName);
-
-            // Si el cliente no existe en la base de datos, omitimos el albarán
-            if ($clienteId === null) {
-                continue;
-            }
+            if ($clienteId === null) continue;
 
             AlbaranCliente::updateOrCreate(
                 ['numero' => $numero],
@@ -197,15 +211,17 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function importArticulos(?Worksheet $sheet): void
     {
-        if ($sheet === null) {
-            return;
-        }
+        if ($sheet === null) return;
 
         foreach ($this->sheetRows($sheet) as $row) {
             $codigo = trim((string) ($row['codigo'] ?? ''));
             $descripcion = trim((string) ($row['descripcion_producto'] ?? ($row['descripci_n_producto'] ?? '')));
-            if ($codigo === '' || $descripcion === '') {
-                continue;
+            if ($codigo === '' || $descripcion === '') continue;
+
+            // NUEVO: Buscamos la medida y si no hay, ponemos 'Und'
+            $medida = trim((string) ($row['medida'] ?? ''));
+            if ($medida === '') {
+                $medida = 'Und';
             }
 
             Articulo::updateOrCreate(
@@ -213,7 +229,7 @@ if (str_starts_with($empresa, 'PROV-')) {
                 [
                     'descripcion' => $descripcion,
                     'cantidad' => 1,
-                    'medida' => null,
+                    'medida' => $medida, // <-- Ahora guarda la medida o 'Und'
                     'precio_unitario' => $this->normalizeMoney($row['precio_por_unidad'] ?? null),
                     'margen' => 0,
                     'total' => $this->normalizeMoney($row['precio_por_unidad'] ?? null),
@@ -224,16 +240,12 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function importInventario(?Worksheet $sheet): void
     {
-        if ($sheet === null) {
-            return;
-        }
+        if ($sheet === null) return;
 
         foreach ($this->sheetRows($sheet, 3) as $row) {
             $codigo = trim((string) ($row['id_de_inventario'] ?? ''));
             $nombre = trim((string) ($row['nombre'] ?? ''));
-            if ($codigo === '' || $nombre === '') {
-                continue;
-            }
+            if ($codigo === '' || $nombre === '') continue;
 
             Inventario::updateOrCreate(
                 ['codigo' => $codigo],
@@ -287,20 +299,23 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function groupDetailLines(?Worksheet $sheet, string $parentKey): array
     {
-        if ($sheet === null) {
-            return [];
-        }
+        if ($sheet === null) return [];
 
         $grouped = [];
         foreach ($this->sheetRows($sheet) as $row) {
             $parent = trim((string) ($row[$parentKey] ?? ''));
-            if ($parent === '') {
-                continue;
+            if ($parent === '') continue;
+
+            // NUEVO: Verificamos si existe 'medida', si está vacío, forzamos 'Und'
+            $medida = trim((string) ($row['medida'] ?? ''));
+            if ($medida === '') {
+                $medida = 'Und';
             }
 
             $grouped[$parent][] = [
                 'descripcion' => trim((string) ($row['descripcion'] ?? '')),
                 'cantidad' => $this->normalizeMoney($row['cantidad'] ?? 0),
+                'medida' => $medida, // <-- Añadido al array del documento
                 'precio_unitario' => $this->normalizeMoney($row['precio_un'] ?? ($row['precio_un_'] ?? ($row['precio'] ?? 0))),
                 'total' => $this->normalizeMoney($row['total'] ?? 0),
                 'estado' => trim((string) ($row['estado'] ?? '')),
@@ -335,9 +350,7 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function excelDate($value): ?string
     {
-        if ($value === null || $value === '') {
-            return null;
-        }
+        if ($value === null || $value === '') return null;
 
         if (is_numeric($value)) {
             try {
@@ -356,13 +369,9 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function normalizeMoney($value): float
     {
-        if ($value === null || $value === '') {
-            return 0.0;
-        }
+        if ($value === null || $value === '') return 0.0;
 
-        if (is_numeric($value)) {
-            return round((float) $value, 2);
-        }
+        if (is_numeric($value)) return round((float) $value, 2);
 
         $value = str_replace(['.', ' '], ['', ''], trim((string) $value));
         $value = str_replace(',', '.', $value);
@@ -397,9 +406,7 @@ if (str_starts_with($empresa, 'PROV-')) {
     private function extractContactName($value): ?string
     {
         $text = trim((string) $value);
-        if ($text === '') {
-            return null;
-        }
+        if ($text === '') return null;
 
         if (str_contains($text, '<')) {
             $text = trim(explode('<', $text, 2)[0]);
@@ -416,8 +423,6 @@ if (str_starts_with($empresa, 'PROV-')) {
 
     private function resolveClienteId(string $name): ?int
     {
-        // Busca al cliente por su nombre exacto en la BD y devuelve su ID.
-        // Si no existe, devuelve null.
         $cliente = Cliente::where('empresa_nombre', $name)->first();
         return $cliente ? $cliente->id : null;
     }

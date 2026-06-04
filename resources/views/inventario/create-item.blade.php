@@ -827,6 +827,7 @@
                     const stockInput = document.createElement('input');
                     stockInput.type = 'number';
                     stockInput.min = '0';
+                    stockInput.max = '999999';
                     stockInput.step = '1';
                     stockInput.name = `variantes[${index}][stock_actual]`;
                     stockInput.dataset.stockInput = '1';
@@ -834,9 +835,10 @@
                     stockInput.value = stockValue;
                     stockInput.className = 'variant-stock-input';
 
-                    stockInput.addEventListener('input', () => {
-                        updateRowState(row);
-                        updateTotalStock();
+                    stockInput.addEventListener('input', function() {
+                        if (this.value.length > 5) {
+                            this.value = this.value.slice(0, 5);
+                        }
                     });
 
                     stockTd.appendChild(stockInput);

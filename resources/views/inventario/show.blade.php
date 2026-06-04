@@ -122,14 +122,10 @@
                         </div>
 
                         <div class="field-group">
-                            <label>Almacen</label>
-                            <div class="field-read">{{ $inventario->almacen }}</div>
+                            <label>Almacén</label>
+                            <div class="field-read">{{ $inventario->almacen ?: 'Sin almacén' }}</div>
                         </div>
 
-                        <div class="field-group">
-                            <label>Ubicacion</label>
-                            <div class="field-read">{{ $inventario->ubicacion }}</div>
-                        </div>
                     </div>
                 </section>
 
