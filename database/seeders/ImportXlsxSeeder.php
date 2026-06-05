@@ -127,18 +127,18 @@ class ImportXlsxSeeder extends Seeder
             $codigo = trim((string) ($row['codigo_pedido'] ?? ''));
             if ($codigo === '') continue;
 
-            // Nota: Si usas otra tabla distinta a PedidoCliente (como PedidoProveedor), cambia el Modelo aquí
             PedidoCliente::updateOrCreate(
-                ['numero' => $codigo], // Cambia 'numero' por la columna real que uses para el código
+                ['numero_pedido' => $codigo], // <--- ¡AQUÍ ESTÁ LA SOLUCIÓN AL ERROR!
                 [
-                    'proveedor' => trim((string) ($row['proveedor'] ?? '')),
-                    'fecha' => $this->excelDate($row['fecha'] ?? null),
-                    'titulo' => trim((string) ($row['titulo'] ?? '')),
-                    'total' => $this->normalizeMoney($row['total_compra'] ?? null),
-                    'estado' => $this->normalizeEstado($row['estado'] ?? null, ['recibido', 'pendiente', 'cancelado']),
+                    'fecha_pedido' => $this->excelDate($row['fecha'] ?? null), // Ajustado al modelo
                     'ot' => trim((string) ($row['ot'] ?? '')),
-                    'pedido_cliente' => trim((string) ($row['pedido_cliente'] ?? '')),
-                    'numero_oferta' => trim((string) ($row['numero_oferta'] ?? '')),
+                    'estado' => $this->normalizeEstado($row['estado'] ?? null, ['recibido', 'pendiente', 'cancelado', 'aceptado']),
+                    'total' => $this->normalizeMoney($row['total_compra'] ?? null),
+                    
+                    // Como tu modelo no tiene columna "proveedor" ni "titulo", 
+                    // los guardamos en los campos de texto que sí tienes disponibles:
+                    'referencia_manual' => trim((string) ($row['proveedor'] ?? '')), 
+                    'bolsa_texto' => trim((string) ($row['titulo'] ?? '')),
                 ]
             );
         }
