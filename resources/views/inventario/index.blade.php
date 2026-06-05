@@ -332,22 +332,55 @@
 
                                     @foreach($grupo->hijos as $producto)
                                         <tr class="inventory-row inventory-row-{{ $producto->estado }} inventory-child-row" data-child-group="group-{{ $loop->parent->index }}" hidden>
-                                            <td><span class="inventory-code">{{ $producto->codigo }}</span></td>
-                                            <td><div class="inventory-name" style="padding-left:1.25rem;"><strong>{{ $producto->nombre ?? '' }}</strong></div></td>
+                                            
+                                            {{-- 1. Hueco vacío para cuadrar con la flecha de desplegar del padre --}}
+                                            <td></td>
+
+                                            {{-- 2. Código --}}
                                             <td>
-                                                <div class="inventory-description">
-                                                    <strong style="padding-left:1.25rem; position:relative;">
-                                                        <span class="inventory-child-marker">└</span>
-                                                        {{ $producto->descripcion }}
-                                                    </strong>
+                                                <span class="inventory-code">
+                                                    <span class="inventory-child-marker">└</span> {{ $producto->codigo }}
+                                                </span>
+                                            </td>
+
+                                            {{-- 3. ITEM (Nombre y Descripción agrupados en la misma columna) --}}
+                                            <td>
+                                                <div class="inventory-name" style="padding-left:1.25rem;">
+                                                    <strong>{{ $producto->nombre ?? '' }}</strong>
+                                                </div>
+                                                <div class="inventory-description" style="padding-left:1.25rem;">
+                                                    {{ $producto->descripcion }}
                                                     @if($producto->referencia_proveedor)
-                                                        <span>{{ $producto->referencia_proveedor }}</span>
+                                                        <span style="margin-left: 5px; color: #64748b;">({{ $producto->referencia_proveedor }})</span>
                                                     @endif
                                                 </div>
                                             </td>
-                                            <td><span class="inventory-pill muted">{{ data_get($producto->clase_relacion, 'nombre', $grupo->clasePadre) }}</span></td>
-                                            <td><span class="inventory-stock inventory-stock-{{ $producto->estado === 'bajo' ? 'bajo' : ($producto->estado === 'critico' ? 'critico' : 'main') }}">{{ number_format($producto->stock_actual, 0, ',', '.') }}</span></td>
-                                            <td><span class="inventory-status inventory-status-{{ $producto->estado }}">{{ $producto->estado_texto }}</span></td>
+
+                                            {{-- 4. Clase --}}
+                                            <td>
+                                                <span class="inventory-pill muted">{{ data_get($producto->clase_relacion, 'nombre', $grupo->clasePadre) }}</span>
+                                            </td>
+
+                                            {{-- 5. ALMACÉN (La lógica que faltaba) --}}
+                                            <td>
+                                                <div style="font-weight: 600; color: #334155;">
+                                                    {{ $producto->almacen ?: 'No asignado' }}
+                                                </div>
+                                            </td>
+
+                                            {{-- 6. Stock --}}
+                                            <td>
+                                                <span class="inventory-stock inventory-stock-{{ $producto->estado === 'bajo' ? 'bajo' : ($producto->estado === 'critico' ? 'critico' : 'main') }}">
+                                                    {{ number_format($producto->stock_actual, 0, ',', '.') }}
+                                                </span>
+                                            </td>
+
+                                            {{-- 7. Estado --}}
+                                            <td>
+                                                <span class="inventory-status inventory-status-{{ $producto->estado }}">{{ $producto->estado_texto }}</span>
+                                            </td>
+
+                                            {{-- 8. Acciones --}}
                                             <td>
                                                 <div class="inventory-actions">
                                                     @if($producto->id)
