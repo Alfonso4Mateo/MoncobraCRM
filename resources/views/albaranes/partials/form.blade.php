@@ -178,11 +178,6 @@
                         <label for="titulo">Titulo</label>
                         <input type="text" id="titulo" name="titulo" value="{{ old('titulo') }}">
                     </div>
-
-                    <div class="field-group">
-                        <label for="archivo_pdf">PDF del albaran</label>
-                        <input type="file" id="archivo_pdf" name="archivo_pdf" accept="application/pdf">
-                    </div>
                 </div>
             </article>
 

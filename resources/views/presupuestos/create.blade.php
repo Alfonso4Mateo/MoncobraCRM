@@ -81,12 +81,6 @@
                         <label for="exclusiones">Exclusiones</label>
                         <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', 'Cualquier concepto no descrito en la oferta') }}</textarea>
                     </div>
-
-                    <div class="field-group field-full">
-                        <label for="archivo_pdf">Archivo PDF {{ $isCarga ? '(obligatorio)' : '(opcional)' }}</label>
-                        <input type="file" id="archivo_pdf" name="archivo_pdf" accept="application/pdf" class="@error('archivo_pdf') is-invalid @enderror" {{ $isCarga ? 'required' : '' }}>
-                        <small class="pdf-help">Formato permitido: PDF. Tamano maximo: 10 MB.</small>
-                    </div>
                 </div>
 
                 <section class="items-builder" aria-labelledby="items-builder-title">
