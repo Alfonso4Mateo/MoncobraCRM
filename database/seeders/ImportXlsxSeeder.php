@@ -61,9 +61,6 @@ class ImportXlsxSeeder extends Seeder
                 );
                 $this->importArticulos($this->getSheetSafe($spreadsheet, 'Lista de productos'));
                 $this->importInventario($this->getSheetSafe($spreadsheet, 'Lista de inventario_modelo'));
-                
-                // ¡AQUÍ ESTABA EL FALLO! Añadimos la llamada para importar los pedidos
-                $this->importPedidos($this->getSheetSafe($spreadsheet, 'Pedidos'));
             });
 
             $this->command?->info("Completado: " . $archivo->getFilename());
