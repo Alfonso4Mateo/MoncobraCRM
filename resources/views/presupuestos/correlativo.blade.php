@@ -52,8 +52,8 @@
                 @csrf
                 <div class="corr-field">
                     <label for="formato" class="corr-label">Formato base</label>
-                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="PRES-2026-0000" required>
-                    <p class="corr-help">Debe terminar en <strong>-0000</strong>. Ejemplo: <strong>PRES-2026-0000</strong>.</p>
+                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="PRES-2026-000" required>
+                    <p class="corr-help">Debe terminar en <strong>-000</strong>. Ejemplo: <strong>PRES-2026-000</strong>.</p>
                     @error('formato')
                         <p class="corr-error">{{ $message }}</p>
                     @enderror

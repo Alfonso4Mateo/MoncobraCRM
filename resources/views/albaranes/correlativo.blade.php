@@ -53,7 +53,7 @@
                 <div class="corr-field">
                     <label for="formato" class="corr-label">Formato base</label>
                     <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="ALB-2026-000" required>
-                    <p class="corr-help">Debe terminar en ceros, por ejemplo <strong>ALB-2026-0000</strong> o <strong>ALB-2026-0000</strong>.</p>
+                    <p class="corr-help">Debe terminar en ceros, por ejemplo <strong>ALB-2026-000</strong> o <strong>ALB-2026-000</strong>.</p>
                     @error('formato')
                         <p class="corr-error">{{ $message }}</p>
                     @enderror

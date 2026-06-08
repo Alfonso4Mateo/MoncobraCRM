@@ -556,8 +556,8 @@ class PresupuestoController extends Controller
             $formato = trim((string) substr($storedKey, strlen('presupuestos_formato_correlativo:')));
         }
 
-        if ($formato === '' || !preg_match('/^.+-0000$/', $formato)) {
-            return 'PRES-' . now()->format('Y') . '-0000';
+        if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
+            return 'PRES-' . now()->format('Y') . '-000';
         }
 
         return $formato;
