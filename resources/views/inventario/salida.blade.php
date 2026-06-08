@@ -484,7 +484,9 @@
                 suggestionsDropdown.classList.add('is-open');
 
                 suggestionsDropdown.querySelectorAll('.autocomplete-item').forEach((item) => {
-                    item.addEventListener('click', () => {
+                    item.addEventListener('mousedown', (e) => { // <--- Solución
+                        e.preventDefault(); // Evita que el input principal pierda el foco al instante
+                        
                         const index = parseInt(item.dataset.index, 10);
                         const selected = similares[index];
                         productoInput.value = selected.descripcion;
@@ -713,11 +715,14 @@
                             </div>
                         `).join('');
                         suggestions.classList.add('is-open');
-                        suggestions.querySelectorAll('.autocomplete-item').forEach((it) => {
-                            it.addEventListener('click', () => {
+                       suggestions.querySelectorAll('.autocomplete-item').forEach((it) => {
+                            it.addEventListener('mousedown', (e) => {
+                                e.preventDefault();
+                                
                                 const si = parseInt(it.dataset.index, 10);
                                 const selected = similares[si];
                                 prod.value = selected.descripcion;
+                                
                                 
                                 let hidden = row.querySelector(`input[type="hidden"][name="items[${index}][inventario_id]"]`);
                                 if (!hidden) {
