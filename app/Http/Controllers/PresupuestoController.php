@@ -407,12 +407,37 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
-        // En edición solo se permite cambiar los artículos
-        $validated = $request->validate([
+        $user = $request->user();
+        $isSuperadmin = $user && $user->role === 'superadmin';
+
+        // Reglas base
+        $rules = [
             'lista_articulos' => 'nullable|json',
             'validez_oferta' => 'nullable|string|max:255',
             'exclusiones' => 'nullable|string|max:2000',
-        ]);
+        ];
+
+        // Añadimos validación estricta si es superadmin
+        if ($isSuperadmin) {
+            $rules['documento'] = 'required|string|max:50';
+            $rules['numero'] = [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('presupuestos', 'numero')
+                    ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+                    ->ignore($presupuesto->id),
+            ];
+            $rules['fecha'] = 'required|date';
+            $rules['cliente_id'] = [
+                'required',
+                Rule::exists('clientes', 'id')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+            ];
+            $rules['titulo'] = 'nullable|string|max:255';
+            $rules['ot'] = 'nullable|string|max:255';
+        }
+
+        $validated = $request->validate($rules);
 
         $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
         $listaArticulos = is_array($listaArticulos) ? $listaArticulos : [];
@@ -433,7 +458,6 @@ class PresupuestoController extends Controller
                 $precioUnitarioRounded = round($precioUnitario, 2);
                 $margenRounded = round($margen, 2);
 
-                // Apply margin to unit price on server-side (only once)
                 $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
                 $precioConMargenRounded = round($precioConMargen, 2);
                 $totalComputed = round($precioConMargenRounded * $cantidadInt, 2);
@@ -456,18 +480,29 @@ class PresupuestoController extends Controller
             return (float) ($item['total'] ?? 0);
         });
 
-        $presupuesto->update([
+        // Preparamos el array de datos básicos
+        $updateData = [
             'lista_articulos' => $articulosNormalizados ?: null,
             'total' => round($totalComputed, 2),
             'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
-        ]);
+        ];
+
+        // Añadimos la cabecera si el rol lo autoriza
+        if ($isSuperadmin) {
+            $updateData['documento'] = $validated['documento'];
+            $updateData['numero'] = $validated['numero'] ?? null;
+            $updateData['fecha'] = $validated['fecha'];
+            $updateData['cliente_id'] = $validated['cliente_id'];
+            $updateData['titulo'] = $validated['titulo'] ?? null;
+            $updateData['ot'] = $validated['ot'] ?? null;
+        }
+
+        $presupuesto->update($updateData);
 
         $this->syncArticulosFromLineas($proyectoId, $articulosNormalizados);
 
-        // Regenerate stored PDF copy after updating the presupuesto so preview shows current data
         try {
-            // Ensure we have the latest model state
             $presupuesto->refresh();
 
             if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
@@ -489,7 +524,7 @@ class PresupuestoController extends Controller
             report($e);
         }
 
-        return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Artículos del presupuesto actualizados');
+        return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Presupuesto actualizado correctamente');
     }
 
     public function destroy(Presupuesto $presupuesto)

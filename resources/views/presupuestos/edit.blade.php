@@ -20,55 +20,14 @@
 @endsection
 
 @section('content')
-    <section class="presupuesto-detail-shell">
-        <!-- Información de solo lectura -->
-        <article class="presupuesto-detail-card">
-            <header class="presupuesto-detail-card__head">
-                <h2>Información del presupuesto</h2>
-            </header>
-            <div class="presupuesto-detail-card__body">
-                <div class="presupuesto-summary-grid">
-                    <div class="summary-item">
-                        <span>Documento</span>
-                        <strong>{{ $presupuesto->documento ?: 'N/D' }}</strong>
-                    </div>
-                    <div class="summary-item">
-                        <span>Número</span>
-                        <strong>{{ $presupuesto->numero ?: 'N/D' }}</strong>
-                    </div>
-                    <div class="summary-item">
-                        <span>Fecha</span>
-                        <strong>{{ optional($presupuesto->fecha)->format('d/m/Y') ?: 'N/D' }}</strong>
-                    </div>
-                    <div class="summary-item">
-                        <span>Estado</span>
-                        <strong>{{ ucfirst($presupuesto->estado ?? 'pendiente') }}</strong>
-                    </div>
-                    <div class="summary-item summary-item--wide">
-                        <span>Cliente</span>
-                        <strong>{{ $presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}</strong>
-                    </div>
-                    <div class="summary-item summary-item--wide">
-                        <span>Título</span>
-                        <strong>{{ $presupuesto->titulo ?: 'Sin título' }}</strong>
-                    </div>
-                    <div class="summary-item">
-                        <span>OT</span>
-                        <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
-                    </div>
-                </div>
-            </div>
-        </article>
+    <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate>
+        @csrf
+        @method('PUT')
 
-        <!-- Edición de artículos -->
-        <article class="presupuesto-detail-card">
-            <header class="presupuesto-detail-card__head">
-                <h2>Editar artículos</h2>
-            </header>
-
-            <div class="presupuesto-detail-card__body">
+        <section class="presupuesto-detail-shell">
+            
             @if ($errors->any())
-                <div class="alert alert-danger presupuesto-detail-alert" role="alert">
+                <div class="alert alert-danger presupuesto-detail-alert" role="alert" style="margin-bottom: 20px;">
                     <strong>No se pudo actualizar el presupuesto.</strong>
                     <ul>
                         @foreach ($errors->all() as $error)
@@ -78,111 +37,190 @@
                 </div>
             @endif
 
-            <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate>
-                @csrf
-                @method('PUT')
-
-                <section class="items-builder" aria-labelledby="items-builder-title">
-                    <header class="items-builder-head">
-                        <h3 id="items-builder-title">Datos del item</h3>
-                        <button type="button" id="btn_agregar_item" class="btn-agregar-item">
-                            Agregar
-                        </button>
-                    </header>
-
-                    <div class="items-form-grid">
-                        <div class="field-group field-span-3">
-                            <label for="item_descripcion">Descripcion</label>
-                            <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
+            <article class="presupuesto-detail-card">
+                <header class="presupuesto-detail-card__head">
+                    <h2>Información del presupuesto</h2>
+                </header>
+                <div class="presupuesto-detail-card__body">
+                    @if(auth()->user()->role === 'superadmin')
+                        <div class="items-form-grid">
+                            <div class="field-group">
+                                <label for="documento">Documento</label>
+                                <input type="text" id="documento" name="documento" value="{{ old('documento', $presupuesto->documento) }}" required>
+                            </div>
+                            <div class="field-group">
+                                <label for="numero">Número</label>
+                                <input type="text" id="numero" name="numero" value="{{ old('numero', $presupuesto->numero) }}">
+                            </div>
+                            <div class="field-group">
+                                <label for="fecha">Fecha</label>
+                                <input type="date" id="fecha" name="fecha" value="{{ old('fecha', optional($presupuesto->fecha)->format('Y-m-d')) }}" required>
+                            </div>
+                            <div class="field-group">
+                                <label for="estado_display">Estado</label>
+                                <input type="text" id="estado_display" value="{{ ucfirst($presupuesto->estado ?? 'pendiente') }}" disabled title="El estado se actualiza desde las acciones">
+                            </div>
+                            <div class="field-group field-span-3">
+                                <label for="cliente_id">Cliente</label>
+                                <select id="cliente_id" name="cliente_id" required>
+                                    @foreach($clientes as $cliente)
+                                        <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) == $cliente->id ? 'selected' : '' }}>
+                                            {{ $cliente->empresa_nombre }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field-group field-span-3">
+                                <label for="titulo">Título</label>
+                                <input type="text" id="titulo" name="titulo" value="{{ old('titulo', $presupuesto->titulo) }}">
+                            </div>
+                            <div class="field-group">
+                                <label for="ot">OT</label>
+                                <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot) }}">
+                            </div>
                         </div>
+                    @else
+                        <div class="presupuesto-summary-grid">
+                            <div class="summary-item">
+                                <span>Documento</span>
+                                <strong>{{ $presupuesto->documento ?: 'N/D' }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Número</span>
+                                <strong>{{ $presupuesto->numero ?: 'N/D' }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Fecha</span>
+                                <strong>{{ optional($presupuesto->fecha)->format('d/m/Y') ?: 'N/D' }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Estado</span>
+                                <strong>{{ ucfirst($presupuesto->estado ?? 'pendiente') }}</strong>
+                            </div>
+                            <div class="summary-item summary-item--wide">
+                                <span>Cliente</span>
+                                <strong>{{ $presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}</strong>
+                            </div>
+                            <div class="summary-item summary-item--wide">
+                                <span>Título</span>
+                                <strong>{{ $presupuesto->titulo ?: 'Sin título' }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>OT</span>
+                                <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </article>
+
+            <article class="presupuesto-detail-card">
+                <header class="presupuesto-detail-card__head">
+                    <h2>Editar artículos</h2>
+                </header>
+
+                <div class="presupuesto-detail-card__body">
+                    <section class="items-builder" aria-labelledby="items-builder-title">
+                        <header class="items-builder-head">
+                            <h3 id="items-builder-title">Datos del item</h3>
+                            <button type="button" id="btn_agregar_item" class="btn-agregar-item">
+                                Agregar
+                            </button>
+                        </header>
+
+                        <div class="items-form-grid">
+                            <div class="field-group field-span-3">
+                                <label for="item_descripcion">Descripcion</label>
+                                <textarea id="item_descripcion" rows="3" placeholder="Descripcion detallada del material o servicio"></textarea>
+                            </div>
+                            <div class="field-group">
+                                <label for="item_cantidad">Cantidad</label>
+                                <input type="number" id="item_cantidad" min="1" max="1000000" step="1" value="1">
+                            </div>
+                            <div class="field-group">
+                                <label for="item_unidad">Unidades de medida</label>
+                                <input type="text" id="item_unidad" placeholder="u, kg, m, etc.">
+                            </div>
+                            <div class="field-group">
+                                <label for="item_precio_unitario">Precio unitario</label>
+                                <input type="number" id="item_precio_unitario" min="0" max="10000000" step="0.01" value="0">
+                            </div>
+                            <div class="field-group field-group-margen">
+                                <label for="item_margen">Margen (%)</label>
+                                <input type="number" id="item_margen" min="0" max="1000" step="0.01" value="0">
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', json_encode($presupuesto->lista_articulos ?? [])) }}'>
+
+                        <div class="items-table-wrap">
+                            <table class="items-table" aria-label="Listado de items del presupuesto">
+                                <thead>
+                                    <tr>
+                                        <th>Pos.</th>
+                                        <th>Descripcion</th>
+                                        <th>Cantidad</th>
+                                        <th>P. Unitario</th>
+                                        <th>Total</th>
+                                        <th class="actions-col"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items_tbody">
+                                    <tr class="items-empty-row">
+                                        <td colspan="6">No hay items agregados.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="presupuesto-extra-fields" style="margin-top:12px;">
                         <div class="field-group">
-                            <label for="item_cantidad">Cantidad</label>
-                            <input type="number" id="item_cantidad" min="1" max="1000000" step="1" value="1">
+                            <label for="validez_oferta">Validez oferta</label>
+                            <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', $presupuesto->validez_oferta ?? '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
                         </div>
-                        <div class="field-group">
-                            <label for="item_unidad">Unidades de medida</label>
-                            <input type="text" id="item_unidad" placeholder="u, kg, m, etc.">
+
+                        <div class="field-group field-full">
+                            <label for="exclusiones">Exclusiones</label>
+                            <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta') }}</textarea>
                         </div>
-                        <div class="field-group">
-                            <label for="item_precio_unitario">Precio unitario</label>
-                            <input type="number" id="item_precio_unitario" min="0" max="10000000" step="0.01" value="0">
+                    </section>
+
+                    <footer class="presupuesto-actions">
+                        <div class="presupuesto-actions-left">
+                            <button type="button" id="btn_eliminar_item" class="btn-neutral btn-eliminar" disabled>
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                                Eliminar
+                            </button>
+                            <button type="button" id="btn_editar_item" class="btn-neutral btn-editar" disabled>
+                                <i class="fas fa-pen" aria-hidden="true"></i>
+                                Editar
+                            </button>
+                            <a href="{{ route('presupuestos.show', $presupuesto) }}" class="btn-neutral btn-salir">
+                                <i class="fas fa-times" aria-hidden="true"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn-guardar">
+                            <i class="fas fa-save" aria-hidden="true"></i>
+                                Guardar cambios
+                            </button>
                         </div>
-                        <div class="field-group field-group-margen">
-                            <label for="item_margen">Margen (%)</label>
-                            <input type="number" id="item_margen" min="0" max="1000" step="0.01" value="0">
+
+                        <div class="presupuesto-totals-box" aria-live="polite">
+                            <div class="total-row">
+                                <span>Subtotal</span>
+                                <strong id="items_subtotal">0,00 EUR</strong>
+                            </div>
+                            <div class="total-row total-final">
+                                <span>Total presupuesto</span>
+                                <strong id="items_total">0,00 EUR</strong>
+                            </div>
                         </div>
-                    </div>
-
-                    <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', json_encode($presupuesto->lista_articulos ?? [])) }}'>
-
-                    <div class="items-table-wrap">
-                        <table class="items-table" aria-label="Listado de items del presupuesto">
-                            <thead>
-                                <tr>
-                                    <th>Pos.</th>
-                                    <th>Descripcion</th>
-                                    <th>Cantidad</th>
-                                    <th>P. Unitario</th>
-                                    <th>Total</th>
-                                    <th class="actions-col"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="items_tbody">
-                                <tr class="items-empty-row">
-                                    <td colspan="6">No hay items agregados.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <section class="presupuesto-extra-fields" style="margin-top:12px;">
-                    <div class="field-group">
-                        <label for="validez_oferta">Validez oferta</label>
-                        <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', $presupuesto->validez_oferta ?? '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
-                    </div>
-
-                    <div class="field-group field-full">
-                        <label for="exclusiones">Exclusiones</label>
-                        <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta') }}</textarea>
-                    </div>
-                </section>
-
-                <footer class="presupuesto-actions">
-                    <div class="presupuesto-actions-left">
-                        <button type="button" id="btn_eliminar_item" class="btn-neutral btn-eliminar" disabled>
-                            <i class="fas fa-trash-alt" aria-hidden="true"></i>
-                            Eliminar
-                        </button>
-                        <button type="button" id="btn_editar_item" class="btn-neutral btn-editar" disabled>
-                            <i class="fas fa-pen" aria-hidden="true"></i>
-                            Editar
-                        </button>
-                        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="btn-neutral btn-salir">
-                            <i class="fas fa-times" aria-hidden="true"></i>
-                            Cancelar
-                        </a>
-                        <button type="submit" class="btn-guardar">
-                        <i class="fas fa-save" aria-hidden="true"></i>
-                            Guardar cambios
-                        </button>
-                    </div>
-
-                    <div class="presupuesto-totals-box" aria-live="polite">
-                        <div class="total-row">
-                            <span>Subtotal</span>
-                            <strong id="items_subtotal">0,00 EUR</strong>
-                        </div>
-                        <div class="total-row total-final">
-                            <span>Total presupuesto</span>
-                            <strong id="items_total">0,00 EUR</strong>
-                        </div>
-                    </div>
-                </footer>
-            </form>
-            </div>
-        </article>
-    </section>
+                    </footer>
+                </div>
+            </article>
+        </section>
+    </form>
 @endsection
 
 @section('js')
