@@ -24,6 +24,7 @@ class AlbaranClienteController extends Controller
     private const MAX_CANTIDAD = 1000000;
     private const MAX_PRECIO = 10000000;
     private const MAX_MARGEN = 1000;
+    
     public function __construct()
     {
         $this->middleware('auth');
@@ -292,9 +293,6 @@ class AlbaranClienteController extends Controller
         $this->syncPedidoClienteLink($albaran, $proyectoId);
         $this->syncPedidoEstadoFromAlbaran($albaran, $proyectoId, $lineas);
 
-        // If this albarán is for a non-bolsa pedido, decrement the pedido's
-        // `lista_articulos` quantities so subsequent albaranes reflect remaining
-        // unidades. This persists the remaining amounts on the pedido record.
         $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
         if ($pedido && ! (bool) ($pedido->bolsa ?? false)) {
             $this->adjustPedidoLineasFromAlbaran($pedido, $lineas, -1);
@@ -360,9 +358,6 @@ class AlbaranClienteController extends Controller
 
     private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int $proyectoId): array
     {
-        // Use the pedido's current `lista_articulos` as the authoritative source
-        // of remaining quantities. The store flow decrements these values when
-        // an albarán se crea para un pedido (no-bolsa).
         $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
         $lineasPedido = collect($this->normalizePedidoLineas($lineas));
 
@@ -370,7 +365,6 @@ class AlbaranClienteController extends Controller
             return [];
         }
 
-        // Ensure each linea exposes a cantidad_max for the form UI
         return $lineasPedido->map(function (array $linea) {
             $cantidad = round((float) ($linea['cantidad'] ?? 0), 2);
             $linea['cantidad'] = $cantidad;
@@ -412,7 +406,7 @@ class AlbaranClienteController extends Controller
         $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
-            return redirect()->route('albaranes.index')->with('error', 'No se pudo eliminar el albarán seleccionado.');
+            return redirect()->route('albaranes.index')->with('error', 'No se pudo ver el albarán seleccionado.');
         }
 
         return view('albaranes.preview', [
@@ -589,7 +583,7 @@ class AlbaranClienteController extends Controller
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
-            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0+$/'],
+            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-000$/'],
             'next' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -672,18 +666,14 @@ class AlbaranClienteController extends Controller
         $this->syncPedidoClienteLink($albaran, $proyectoId);
         $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
 
-        // 1. Devolvemos las cantidades antiguas al pedido
         if ($pedidoAnterior && ! (bool) ($pedidoAnterior->bolsa ?? false)) {
             $this->adjustPedidoLineasFromAlbaran($pedidoAnterior, $lineasAnteriores, 1);
         }
 
-        // 🔥 EL FIX: Si el pedido nuevo es el mismo que el anterior, 
-        // recargamos sus datos desde la BD para que sepa que hemos devuelto artículos.
         if ($pedidoActual && $pedidoAnterior && $pedidoActual->id === $pedidoAnterior->id) {
             $pedidoActual->refresh();
         }
 
-        // 2. Restamos las nuevas cantidades
         if ($pedidoActual && ! (bool) ($pedidoActual->bolsa ?? false)) {
             $this->adjustPedidoLineasFromAlbaran($pedidoActual, $lineas, -1);
         }
@@ -693,7 +683,6 @@ class AlbaranClienteController extends Controller
             $pedidoActual,
         ]), $albaran);
 
-        // Regenerate stored PDF after updating so preview shows current data
         try {
             $albaran->refresh();
 
@@ -865,12 +854,15 @@ class AlbaranClienteController extends Controller
             ->orderByDesc('id')
             ->value('clave');
 
+        $formato = '';
         if (is_string($storedKey) && str_starts_with($storedKey, $claveBase . ':')) {
-            return substr($storedKey, strlen($claveBase) + 1);
+            $formato = substr($storedKey, strlen($claveBase) + 1);
         }
 
-        $formato = (string) $fallback();
-        $this->setCorrelativoFormato($proyectoId, $formato, $claveBase);
+        if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
+            $formato = (string) $fallback();
+            $this->setCorrelativoFormato($proyectoId, $formato, $claveBase);
+        }
 
         return $formato;
     }
@@ -927,34 +919,15 @@ class AlbaranClienteController extends Controller
         ]);
     }
 
-    private function formatCorrelativoNumero(string $formato, int $correlativo): string
-    {
-        if (preg_match('/^(.*?)(0+)$/', $formato, $matches) !== 1) {
-            return $formato . $correlativo;
-        }
-
-        return $matches[1] . str_pad((string) $correlativo, strlen($matches[2]), '0', STR_PAD_LEFT);
-    }
-
     private function maxCorrelativoForPrefix(int $proyectoId, string $formato): int
     {
         return $this->correlativoStatsForPrefix($proyectoId, $formato)['max'];
     }
 
-    /**
-     * Devuelve estadísticas del correlativo para el formato dado.
-     * - max: máximo índice numérico encontrado
-     * - count: cuántos albaranes encajan con el formato actual (prefijo + dígitos)
-     */
     private function correlativoStatsForPrefix(int $proyectoId, string $formato): array
     {
-        if (preg_match('/^(.*?)(0+)$/', $formato, $matches) !== 1) {
-            return ['max' => 0, 'count' => 0, 'ultimos' => collect()];
-        }
-
-        $prefix = $matches[1];
-        $digits = strlen($matches[2]);
-        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{' . $digits . '})$/';
+        $prefix = substr($formato, 0, -3);
+        $regex = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
 
         $max = 0;
         $count = 0;
@@ -969,7 +942,7 @@ class AlbaranClienteController extends Controller
                 continue;
             }
 
-            if (preg_match($pattern, $numero, $match) === 1) {
+            if (preg_match($regex, $numero, $match) === 1) {
                 $count++;
                 $max = max($max, (int) $match[1]);
             }
@@ -982,19 +955,22 @@ class AlbaranClienteController extends Controller
             ->orderByDesc('id')
             ->get(['id', 'numero', 'fecha'])
             ->filter(fn (AlbaranCliente $albaran) => is_string($albaran->numero)
-                && preg_match($pattern, $albaran->numero) === 1)
+                && preg_match($regex, $albaran->numero) === 1)
             ->take(5);
 
         return ['max' => $max, 'count' => $count, 'ultimos' => $ultimos];
     }
 
+    private function formatCorrelativoNumero(string $formato, int $correlativo): string
+    {
+        $prefix = substr($formato, 0, -3);
+        return $prefix . str_pad((string) max(0, $correlativo), 3, '0', STR_PAD_LEFT);
+    }
+
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
     {
-        if (preg_match('/^(.*?)(0+)$/', $formato, $matches) !== 1) {
-            return null;
-        }
-
-        $pattern = '/^' . preg_quote($matches[1], '/') . '(\d{' . strlen($matches[2]) . '})$/';
+        $prefix = substr($formato, 0, -3);
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
 
         if (preg_match($pattern, $numero, $match) !== 1) {
             return null;
@@ -1186,7 +1162,6 @@ class AlbaranClienteController extends Controller
             return $fallbackProyectoId;
         }
 
-        // If no fallback available, try to enforce session (original behavior)
         return $this->resolveActiveProyectoId(request());
     }
 
