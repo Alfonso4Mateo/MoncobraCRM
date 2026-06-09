@@ -362,7 +362,7 @@ class PresupuestoController extends Controller
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
-            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0000$/'],
+            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-000$/'],
             'next' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -620,8 +620,8 @@ class PresupuestoController extends Controller
 
     private function correlativoStatsForFormato(int $proyectoId, string $formato): array
     {
-        $prefix = substr($formato, 0, -4);
-        $regex = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
+        $prefix = substr($formato, 0, -3);
+        $regex = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
 
         $numeros = Presupuesto::where('proyecto_id', $proyectoId)
             ->where('numero', 'like', $prefix . '%')
@@ -661,15 +661,15 @@ class PresupuestoController extends Controller
 
     private function formatCorrelativoNumero(string $formato, int $correlativo): string
     {
-        $prefix = substr($formato, 0, -4);
+        $prefix = substr($formato, 0, -3);
 
-        return $prefix . str_pad((string) max(0, $correlativo), 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) max(0, $correlativo), 3, '0', STR_PAD_LEFT);
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
     {
-        $prefix = substr($formato, 0, -4);
-        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
+        $prefix = substr($formato, 0, -3);
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
 
         if (preg_match($pattern, $numero, $matches) !== 1) {
             return null;
