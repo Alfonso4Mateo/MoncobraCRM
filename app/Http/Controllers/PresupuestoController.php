@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Validator;
 
 class PresupuestoController extends Controller
 {
-    private const MAX_LINEAS = 500;
-    private const MAX_DESCRIPCION = 500;
-    private const MAX_ARTICULO = 100;
-    private const MAX_MEDIDA = 20;
+    private const MAX_LINEAS = 5000;
+    private const MAX_DESCRIPCION = 500000;
+    private const MAX_ARTICULO = 1000;
+    private const MAX_MEDIDA = 200;
     private const MAX_CANTIDAD = 1000000;
     private const MAX_PRECIO = 10000000;
-    private const MAX_MARGEN = 100;
+    private const MAX_MARGEN = 1000;
     public function __construct()
     {
         $this->middleware('auth');
@@ -557,7 +557,7 @@ class PresupuestoController extends Controller
         }
 
         if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
-            return 'PRES-' . now()->format('Y') . '-000';
+            return 'PR-' . now()->format('Y') . '-000';
         }
 
         return $formato;
