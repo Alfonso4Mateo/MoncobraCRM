@@ -215,7 +215,7 @@ class PresupuestoController extends Controller
         try {
             if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
                 $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
-                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                $filePath = "presupuestos/{$presupuesto->numero}.pdf";
                 Storage::disk('public')->put($filePath, $pdf->output());
                 $presupuesto->update(['archivo_pdf' => $filePath]);
             } elseif (class_exists(\Dompdf\Dompdf::class)) {
@@ -224,7 +224,7 @@ class PresupuestoController extends Controller
                 $dompdf->setPaper('A4', 'portrait');
                 $dompdf->loadHtml($html);
                 $dompdf->render();
-                $filePath = 'presupuestos/presupuesto-' . $presupuesto->id . '.pdf';
+                $filePath = "presupuestos/{$presupuesto->numero}.pdf";
                 Storage::disk('public')->put($filePath, $dompdf->output());
                 $presupuesto->update(['archivo_pdf' => $filePath]);
             }
