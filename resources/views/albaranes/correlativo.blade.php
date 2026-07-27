@@ -11,7 +11,7 @@
         <header class="corr-hero">
             <p class="corr-eyebrow">Ajustes avanzados</p>
             <h1 class="corr-title">Correlativo de albaranes</h1>
-            <p class="corr-subtitle">Configura el prefijo y el siguiente número para mantener un flujo ordenado de documentos de entrega.</p>
+            <p class="corr-subtitle">Configura el prefijo, la posición y el siguiente número para mantener un flujo ordenado de documentos de entrega.</p>
         </header>
 
         <article class="corr-card">
@@ -36,7 +36,7 @@
 
             @if (!empty($ultimosConFormato) && $ultimosConFormato->isNotEmpty())
                 <div class="corr-recent">
-                    <p class="corr-recent__label">Ultimos con formato actual</p>
+                    <p class="corr-recent__label">Últimos con formato actual</p>
                     <ul class="corr-recent__list">
                         @foreach ($ultimosConFormato as $albaran)
                             <li>
@@ -52,8 +52,8 @@
                 @csrf
                 <div class="corr-field">
                     <label for="formato" class="corr-label">Formato base</label>
-                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="ALB-2026-000" required>
-                    <p class="corr-help">Debe terminar en <strong>-000</strong> (tres ceros). Puedes cambiar las letras y el año libremente. Ejemplo: <strong>ALB-2026-000</strong>.</p>
+                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="A0000-26" required>
+                    <p class="corr-help">Debe contener <strong>0000</strong> (cuatro ceros) donde quieras que vaya el número. Ejemplo: <strong>A0000-26</strong>.</p>
                     @error('formato')
                         <p class="corr-error">{{ $message }}</p>
                     @enderror
@@ -88,17 +88,12 @@
             const formato = formatoInput.value.trim();
             const next = parseInt(nextInput.value) || 0;
 
-            // Verificamos que termine en guion y tres ceros (-000)
-            if (formato.endsWith('-000')) {
-                // Cortamos SOLO los últimos 3 caracteres (los "000") para conservar el guion
-                const prefix = formato.slice(0, -3); 
-                // Rellenamos el nuevo número para que siempre tenga 3 posiciones (ej. 1 -> 001)
-                const paddedNext = String(next).padStart(3, '0');
-                
-                previewText.textContent = prefix + paddedNext;
+            if (formato.includes('0000')) {
+                const paddedNext = String(next).padStart(4, '0');
+                previewText.textContent = formato.replace('0000', paddedNext);
                 previewText.style.color = "inherit";
             } else {
-                previewText.textContent = 'El formato debe terminar obligatoriamente en -000';
+                previewText.textContent = 'El formato debe contener obligatoriamente "0000" (ej: A0000-26)';
                 previewText.style.color = "red";
             }
         }

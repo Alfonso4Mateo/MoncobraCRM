@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Albarán {{ $albaran->numero ?? '' }}</title>
     <style>
+        /* NUEVAS CLASES PARA LA TABLA */
+        .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
+        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; }
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
@@ -129,18 +132,35 @@
             
             <td width="48%" valign="top">
                 <table width="100%" cellpadding="0" cellspacing="0">
+                    <td width="48%" valign="top">
+                <!-- Tabla anidada donde el borde exterior lo tiene la propia tabla -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
                     <tr>
-                        <td width="30%" class="client-labels" valign="top">
-                            <div style="margin-bottom: 8px;">Empresa</div>
-                            <div style="margin-bottom: 8px;">Dirección</div>
-                            <div>CIF</div>
-                        </td>
-                        <td width="70%" class="client-content" valign="top">
-                            <div style="font-weight:bold; margin-bottom: 8px;">{{ optional($albaran->cliente)->empresa_nombre }}</div>
-                            <div class="muted" style="margin-bottom: 8px;">{{ optional($albaran->cliente)->direccion ?? '' }}</div>
-                            <div style="font-weight:bold;">{{ optional($albaran->cliente)->cif_nif ?? '' }}</div>
+                        <td width="30%" class="client-labels-row" valign="top">Empresa</td>
+                        <td width="70%" class="client-content-row" valign="top" style="font-weight:bold;">
+                            {{ optional($albaran->cliente)->empresa_nombre }}
                         </td>
                     </tr>
+                    <tr>
+                        <td class="client-labels-row" valign="top">Dirección</td>
+                        <td class="client-content-row muted" valign="top">
+                            {{ optional($albaran->cliente)->direccion ?? '' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="client-labels-row" valign="top">CIF</td>
+                        <td class="client-content-row" valign="top" style="font-weight:bold;">
+                            {{ optional($albaran->cliente)->cif_nif ?? '' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="client-labels-row" valign="top">Localidad CP</td>
+                        <td class="client-content-row" valign="top">
+                            {{ optional($albaran->cliente)->localidad ?? '' }} {{ optional($albaran->cliente)->codigo_postal ?? '' }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
                 </table>
             </td>
         </tr>

@@ -548,7 +548,7 @@ class AlbaranClienteController extends Controller
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
-            return 'ALB-' . now()->format('Y') . '-000';
+            return 'A0000-' . now()->format('y');
         });
         $statsFormato = $this->correlativoStatsForPrefix($proyectoId, $formatoActual);
         $max = $statsFormato['max'];
@@ -583,7 +583,7 @@ class AlbaranClienteController extends Controller
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
-            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-000$/'],
+            'formato' => ['required', 'string', 'max:100', 'regex:/0000/'],
             'next' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -788,8 +788,10 @@ class AlbaranClienteController extends Controller
         }
 
         $pedidoRelacionado = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
-
         $lineasAlbaran = is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [];
+
+        // 1. Guardamos el número en una variable antes de borrar el albarán
+        $numeroBorrado = (string) $albaran->numero;
 
         DB::transaction(function () use ($albaran, $proyectoId, $lineasAlbaran) {
             $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
@@ -815,11 +817,30 @@ class AlbaranClienteController extends Controller
                 $albaran->pedidosClientes()->detach();
             }
 
+            // 2. Borramos el albarán
             $albaran->delete();
         });
 
         if ($pedidoRelacionado) {
             $this->recalculatePedidoEstado($pedidoRelacionado, $proyectoId);
+        }
+
+        // 3. LÓGICA INTELIGENTE: Retroceder el contador si es necesario
+        $formato = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
+            return 'A0000-' . now()->format('y');
+        });
+        
+        $correlativoBorrado = $this->extractCorrelativoFromNumero($formato, $numeroBorrado);
+
+        if ($correlativoBorrado !== null) {
+            $override = DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', 'albaranes_next_correlativo')
+                ->value('valor');
+
+            if ($override !== null && (int) $override === ($correlativoBorrado + 1)) {
+                $this->setContadorValue($proyectoId, 'albaranes_next_correlativo', $correlativoBorrado);
+            }
         }
 
         return redirect()->route('albaranes.index')->with('success', 'Albarán eliminado correctamente');
@@ -828,7 +849,7 @@ class AlbaranClienteController extends Controller
     private function resolveNextAlbaranClienteNumber(int $proyectoId): array
     {
         $formato = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
-            return 'ALB-' . now()->format('Y') . '-000';
+            return 'A0000-' . now()->format('y');
         });
 
         $nextIndex = $this->getContadorValue($proyectoId, 'albaranes_next_correlativo');
@@ -859,7 +880,7 @@ class AlbaranClienteController extends Controller
             $formato = substr($storedKey, strlen($claveBase) + 1);
         }
 
-        if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
+        if ($formato === '' || !preg_match('/^.+-0000$/', $formato)) {
             $formato = (string) $fallback();
             $this->setCorrelativoFormato($proyectoId, $formato, $claveBase);
         }
@@ -926,15 +947,16 @@ class AlbaranClienteController extends Controller
 
     private function correlativoStatsForPrefix(int $proyectoId, string $formato): array
     {
-        $prefix = substr($formato, 0, -3);
-        $regex = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
+        $parts = explode('0000', $formato);
+        $regex = '/^' . preg_quote($parts[0], '/') . '(\d{4})' . preg_quote($parts[1] ?? '', '/') . '$/';
+        $likePattern = str_replace('0000', '%', $formato); 
 
         $max = 0;
         $count = 0;
 
         $numeros = AlbaranCliente::query()
             ->where('proyecto_id', $proyectoId)
-            ->where('numero', 'like', $prefix . '%')
+            ->where('numero', 'like', $likePattern) 
             ->pluck('numero');
 
         foreach ($numeros as $numero) {
@@ -950,12 +972,12 @@ class AlbaranClienteController extends Controller
 
         $ultimos = AlbaranCliente::query()
             ->where('proyecto_id', $proyectoId)
-            ->where('numero', 'like', $prefix . '%')
+            ->where('numero', 'like', $likePattern)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->get(['id', 'numero', 'fecha'])
             ->filter(fn (AlbaranCliente $albaran) => is_string($albaran->numero)
-                && preg_match($regex, $albaran->numero) === 1)
+                && preg_match($regex, $albaran->numero) === 1) 
             ->take(5);
 
         return ['max' => $max, 'count' => $count, 'ultimos' => $ultimos];
@@ -963,21 +985,22 @@ class AlbaranClienteController extends Controller
 
     private function formatCorrelativoNumero(string $formato, int $correlativo): string
     {
-        $prefix = substr($formato, 0, -3);
-        return $prefix . str_pad((string) max(0, $correlativo), 3, '0', STR_PAD_LEFT);
+        $padded = str_pad((string) max(0, $correlativo), 4, '0', STR_PAD_LEFT);
+        return str_replace('0000', $padded, $formato);
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
-    {
-        $prefix = substr($formato, 0, -3);
-        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
+{
+    $parts = explode('0000', $formato); 
+    
+    $pattern = '/^' . preg_quote($parts[0], '/') . '(\d{4})' . preg_quote($parts[1] ?? '', '/') . '$/';
 
-        if (preg_match($pattern, $numero, $match) !== 1) {
-            return null;
-        }
-
-        return (int) $match[1];
+    if (preg_match($pattern, $numero, $match) !== 1) {
+        return null;
     }
+
+    return (int) $match[1];
+}
 
     private function isDelivered(AlbaranCliente $albaran): bool
     {

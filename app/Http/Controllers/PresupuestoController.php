@@ -115,11 +115,13 @@ class PresupuestoController extends Controller
         $validated = $request->validate([
             'documento' => 'required|string|max:50',
             'numero' => [
-                'nullable',
-                'string',
-                'max:50',
-                Rule::unique('presupuestos', 'numero')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
-            ],
+            'nullable',
+            'string',
+            'max:50',
+            Rule::unique('presupuestos', 'numero')
+                ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+                ->whereNull('deleted_at'),
+        ],
             'fecha' => 'required|date',
             'cliente_id' => [
                 'required',
@@ -418,15 +420,15 @@ class PresupuestoController extends Controller
         ];
 
         // Añadimos validación estricta si es superadmin
-        if ($isSuperadmin) {
             $rules['documento'] = 'required|string|max:50';
             $rules['numero'] = [
-                'nullable',
-                'string',
-                'max:50',
-                Rule::unique('presupuestos', 'numero')
-                    ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
-                    ->ignore($presupuesto->id),
+            'nullable',
+            'string',
+            'max:50',
+            Rule::unique('presupuestos', 'numero')
+                ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+                ->whereNull('deleted_at')
+                ->ignore($presupuesto->id),
             ];
             $rules['fecha'] = 'required|date';
             $rules['cliente_id'] = [
@@ -435,8 +437,7 @@ class PresupuestoController extends Controller
             ];
             $rules['titulo'] = 'nullable|string|max:255';
             $rules['ot'] = 'nullable|string|max:255';
-        }
-
+    
         $validated = $request->validate($rules);
 
         $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
@@ -488,15 +489,12 @@ class PresupuestoController extends Controller
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
         ];
 
-        // Añadimos la cabecera si el rol lo autoriza
-        if ($isSuperadmin) {
-            $updateData['documento'] = $validated['documento'];
-            $updateData['numero'] = $validated['numero'] ?? null;
-            $updateData['fecha'] = $validated['fecha'];
-            $updateData['cliente_id'] = $validated['cliente_id'];
-            $updateData['titulo'] = $validated['titulo'] ?? null;
-            $updateData['ot'] = $validated['ot'] ?? null;
-        }
+        $updateData['documento'] = $validated['documento'];
+        $updateData['numero'] = $validated['numero'] ?? null;
+        $updateData['fecha'] = $validated['fecha'];
+        $updateData['cliente_id'] = $validated['cliente_id'];
+        $updateData['titulo'] = $validated['titulo'] ?? null;
+        $updateData['ot'] = $validated['ot'] ?? null;
 
         $presupuesto->update($updateData);
 
@@ -546,7 +544,29 @@ class PresupuestoController extends Controller
                 ->with('error', 'No se puede borrar el presupuesto porque tiene el pedido asociado: ' . $pedidoNumero . '.');
         }
 
+        // 1. Guardamos el número en una variable antes de borrar el presupuesto
+        $numeroBorrado = (string) $presupuesto->numero;
+
+        // 2. Borramos el presupuesto
         $presupuesto->delete();
+
+        // 3. LÓGICA INTELIGENTE: Retroceder el contador si es necesario
+        $formato = $this->getCorrelativoFormato($proyectoId);
+        $correlativoBorrado = $this->extractCorrelativoFromNumero($formato, $numeroBorrado);
+
+        if ($correlativoBorrado !== null) {
+            // Miramos qué número iba a sugerir el programa a continuación
+            $override = DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', 'presupuestos_next_correlativo')
+                ->value('valor');
+
+            // Si el programa iba a sugerir justo el siguiente al que hemos borrado, le restamos 1
+            if ($override !== null && (int) $override === ($correlativoBorrado + 1)) {
+                $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $correlativoBorrado);
+            }
+        }
+
         return redirect()->route('presupuestos.index')->with('success', 'Presupuesto eliminado');
     }
 
@@ -592,7 +612,7 @@ class PresupuestoController extends Controller
         }
 
         if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
-            return 'PR-' . now()->format('Y') . '-000';
+            return 'PR-' . now()->format('y') . '-000';
         }
 
         return $formato;

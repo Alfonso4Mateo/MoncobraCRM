@@ -42,7 +42,6 @@
                     <h2>Información del presupuesto</h2>
                 </header>
                 <div class="presupuesto-detail-card__body">
-                    @if(auth()->user()->role === 'superadmin')
                         <div class="items-form-grid">
                             <div class="field-group">
                                 <label for="documento">Documento</label>
@@ -79,38 +78,7 @@
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot) }}">
                             </div>
                         </div>
-                    @else
-                        <div class="presupuesto-summary-grid">
-                            <div class="summary-item">
-                                <span>Documento</span>
-                                <strong>{{ $presupuesto->documento ?: 'N/D' }}</strong>
-                            </div>
-                            <div class="summary-item">
-                                <span>Número</span>
-                                <strong>{{ $presupuesto->numero ?: 'N/D' }}</strong>
-                            </div>
-                            <div class="summary-item">
-                                <span>Fecha</span>
-                                <strong>{{ optional($presupuesto->fecha)->format('d/m/Y') ?: 'N/D' }}</strong>
-                            </div>
-                            <div class="summary-item">
-                                <span>Estado</span>
-                                <strong>{{ ucfirst($presupuesto->estado ?? 'pendiente') }}</strong>
-                            </div>
-                            <div class="summary-item summary-item--wide">
-                                <span>Cliente</span>
-                                <strong>{{ $presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}</strong>
-                            </div>
-                            <div class="summary-item summary-item--wide">
-                                <span>Título</span>
-                                <strong>{{ $presupuesto->titulo ?: 'Sin título' }}</strong>
-                            </div>
-                            <div class="summary-item">
-                                <span>OT</span>
-                                <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
-                            </div>
-                        </div>
-                    @endif
+                        
                 </div>
             </article>
 

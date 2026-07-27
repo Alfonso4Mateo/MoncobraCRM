@@ -60,20 +60,22 @@
                         <div class="form-grid cols-3">
                             <div class="field">
                                 <label for="documento">Documento</label>
-                                <input type="text" id="documento" name="documento" value="{{ old('documento', $albaran->documento ?? '') }}" readonly>
+                                <!-- Quitamos el readonly -->
+                                <input type="text" id="documento" name="documento" value="{{ old('documento', $albaran->documento ?? '') }}" required>
                             </div>
                             <div class="field">
                                 <label for="numero">Número</label>
-                                <input type="text" id="numero" name="numero" value="{{ old('numero', $albaran->numero ?? '') }}">
+                                <input type="text" id="numero" name="numero" value="{{ old('numero', $albaran->numero ?? '') }}" required>
                             </div>
                             <div class="field">
                                 <label for="fecha">Fecha</label>
-                                <input type="date" id="fecha" name="fecha" value="{{ old('fecha', optional($albaran->fecha)->format('Y-m-d')) }}">
+                                <input type="date" id="fecha" name="fecha" value="{{ old('fecha', optional($albaran->fecha)->format('Y-m-d')) }}" required>
                             </div>
 
                             <div class="field">
                                 <label for="cliente_id">Cliente</label>
-                                <select id="cliente_id" name="cliente_id" disabled>
+                                <!-- Quitamos el disabled y eliminamos el input hidden duplicado -->
+                                <select id="cliente_id" name="cliente_id" required>
                                     <option value="">Selecciona cliente...</option>
                                     @foreach ($clientes as $cliente)
                                         <option value="{{ $cliente->id }}" @selected((string) old('cliente_id', $albaran->cliente_id) === (string) $cliente->id)>
@@ -81,15 +83,16 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <input type="hidden" name="cliente_id" value="{{ old('cliente_id', $albaran->cliente_id) }}">
                             </div>
                             <div class="field">
                                 <label for="ot">OT</label>
-                                <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}" readonly>
+                                <!-- Quitamos el readonly -->
+                                <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
                             </div>
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}" readonly>
+                                <!-- Quitamos el readonly -->
+                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}">
                             </div>
 
                             <div class="field span-2">
