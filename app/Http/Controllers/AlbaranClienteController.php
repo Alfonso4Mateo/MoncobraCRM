@@ -694,8 +694,9 @@ class AlbaranClienteController extends Controller
         try {
             $albaran->refresh();
 
-            $filePathWith = 'albaranes/albaran-' . $albaran->id . '.pdf';
-            $filePathWithout = 'albaranes/albaran-' . $albaran->id . '-sin-presupuesto.pdf';
+            $identificador = $albaran->numero ?: $albaran->id;
+            $filePathWith = "albaranes/{$identificador}.pdf";
+            $filePathWithout = "albaranes/{$identificador}-sin-presupuesto.pdf";
 
             $presupuesto = Presupuesto::query()
                 ->where('proyecto_id', $albaran->proyecto_id)
@@ -1118,7 +1119,7 @@ class AlbaranClienteController extends Controller
     private function buildOrResolvePdf(AlbaranCliente $albaran, bool $withPresupuesto = false): array
     {
         $disk = Storage::disk('public');
-        $fileName = 'albaran-' . ($albaran->numero ?: $albaran->id) . '.pdf';
+        $fileName = ($albaran->numero ?: 'albaran-' . $albaran->id) . '.pdf';
 
         $basePdfPath = $this->resolvePdfPath($albaran);
         $pdfPath = $this->resolvePdfVariantPath($albaran, $withPresupuesto, $basePdfPath);

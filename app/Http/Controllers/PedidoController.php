@@ -787,7 +787,7 @@ class PedidoController extends Controller
         }
 
         $pdfContent = null;
-        $fileName = 'pedido-' . ($pedido->numero_pedido ?: $pedido->id) . '.pdf';
+        $fileName = ($pedido->numero_pedido ?: 'pedido-' . $pedido->id) . '.pdf';
 
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pedidos-clientes.pdf', compact('pedido'));
