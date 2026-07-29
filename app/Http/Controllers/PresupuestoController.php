@@ -6,6 +6,7 @@ use App\Models\Articulo;
 use Carbon\Carbon;
 use App\Models\Presupuesto;
 use App\Models\Cliente;
+use App\Services\DocumentLineNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -21,9 +22,15 @@ class PresupuestoController extends Controller
     private const MAX_CANTIDAD = 1000000;
     private const MAX_PRECIO = 10000000;
     private const MAX_MARGEN = 1000;
+    private DocumentLineNormalizer $lineNormalizer;
+
+    /**
+     * Inicializa el controlador con el servicio compartido de normalización.
+     */
     public function __construct()
     {
         $this->middleware('auth');
+        $this->lineNormalizer = new DocumentLineNormalizer();
     }
 
     public function index(Request $request)
@@ -155,48 +162,11 @@ class PresupuestoController extends Controller
             $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('presupuestos', 'public');
         }
 
-        $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
-        $listaArticulos = is_array($listaArticulos) ? $listaArticulos : [];
-        $lineasFiltradas = collect($listaArticulos)
-            ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
-            ->values()
-            ->all();
+        $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
         $this->validateLineasPayload($lineasFiltradas);
 
-        $validated['lista_articulos'] = collect($lineasFiltradas)
-            ->map(function (array $item) {
-                $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? ($item['precio'] ?? 0)));
-                $margen = max(0, (float) ($item['margen'] ?? 0));
-
-                $cantidadRounded = round($cantidad, 2);
-                $precioUnitarioRounded = round($precioUnitario, 2);
-                $margenRounded = round($margen, 2);
-
-                // Apply margin to unit price on server-side (only once)
-                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
-                $precioConMargenRounded = round($precioConMargen, 2);
-                $totalComputed = round($precioConMargenRounded * $cantidadRounded, 2);
-
-                $medida = trim((string) ($item['medida'] ?? ($item['unidad'] ?? '')));
-                $medida = $medida !== '' ? $medida : null;
-
-                return [
-                    'articulo' => trim((string) ($item['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($item['descripcion'] ?? '')),
-                    'cantidad' => $cantidadRounded,
-                    'medida' => $medida,
-                    // compatibilidad con formatos antiguos
-                    'unidad' => $medida,
-                    'precio_unitario' => $precioUnitarioRounded,
-                    'margen' => $margenRounded,
-                    'precio_con_margen' => $precioConMargenRounded,
-                    'total' => $totalComputed,
-                ];
-            })
-            ->values()
-            ->all();
+        $validated['lista_articulos'] = $this->lineNormalizer->normalize($lineasFiltradas);
 
         if ($validated['lista_articulos'] === []) {
             $validated['lista_articulos'] = null;
@@ -364,7 +334,7 @@ class PresupuestoController extends Controller
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
-            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-000$/'],
+            'formato' => ['required', 'string', 'max:100', 'regex:/^.+-0000$/'],
             'next' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -440,42 +410,11 @@ class PresupuestoController extends Controller
     
         $validated = $request->validate($rules);
 
-        $listaArticulos = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
-        $listaArticulos = is_array($listaArticulos) ? $listaArticulos : [];
-        $lineasFiltradas = collect($listaArticulos)
-            ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
-            ->values()
-            ->all();
+        $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
         $this->validateLineasPayload($lineasFiltradas);
 
-        $articulosNormalizados = collect($lineasFiltradas)
-            ->map(function (array $item) {
-                $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? 0));
-                $margen = max(0, (float) ($item['margen'] ?? 0));
-
-                $cantidadInt = (int) max(0, round($cantidad, 0));
-                $precioUnitarioRounded = round($precioUnitario, 2);
-                $margenRounded = round($margen, 2);
-
-                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
-                $precioConMargenRounded = round($precioConMargen, 2);
-                $totalComputed = round($precioConMargenRounded * $cantidadInt, 2);
-
-                return [
-                    'articulo' => trim((string) ($item['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($item['descripcion'] ?? '')),
-                    'cantidad' => $cantidadInt,
-                    'unidad' => isset($item['unidad']) ? trim((string) $item['unidad']) : null,
-                    'precio_unitario' => $precioUnitarioRounded,
-                    'margen' => $margenRounded,
-                    'precio_con_margen' => $precioConMargenRounded,
-                    'total' => $totalComputed,
-                ];
-            })
-            ->values()
-            ->all();
+        $articulosNormalizados = $this->lineNormalizer->normalize($lineasFiltradas, true);
 
         $totalComputed = collect($articulosNormalizados)->sum(function (array $item) {
             return (float) ($item['total'] ?? 0);
@@ -611,8 +550,8 @@ class PresupuestoController extends Controller
             $formato = trim((string) substr($storedKey, strlen('presupuestos_formato_correlativo:')));
         }
 
-        if ($formato === '' || !preg_match('/^.+-000$/', $formato)) {
-            return 'PR-' . now()->format('y') . '-000';
+        if ($formato === '' || !preg_match('/^.+-0000$/', $formato)) {
+            return 'PR-' . now()->format('y') . '-0000';
         }
 
         return $formato;
@@ -633,6 +572,64 @@ class PresupuestoController extends Controller
         ])->validate();
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterLineasPresupuesto(string|array $listaArticulos): array
+    {
+        $lineas = is_string($listaArticulos)
+            ? json_decode($listaArticulos, true)
+            : $listaArticulos;
+
+        $lineas = is_array($lineas) ? $lineas : [];
+
+        return collect($lineas)
+            ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $lineas
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizePresupuestoLineas(array $lineas, bool $cantidadEntera = false): array
+    {
+        return collect($lineas)
+            ->map(function (array $item) use ($cantidadEntera) {
+                $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
+                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? ($item['precio'] ?? 0)));
+                $margen = max(0, (float) ($item['margen'] ?? 0));
+
+                $cantidadNormalizada = $cantidadEntera ? (int) max(0, round($cantidad, 0)) : round($cantidad, 2);
+                $precioUnitarioRounded = round($precioUnitario, 2);
+                $margenRounded = round($margen, 2);
+
+                // Apply margin to unit price on server-side (only once).
+                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
+                $precioConMargenRounded = round($precioConMargen, 2);
+                $totalComputed = round($precioConMargenRounded * $cantidadNormalizada, 2);
+
+                $medida = trim((string) ($item['medida'] ?? ($item['unidad'] ?? '')));
+                $medida = $medida !== '' ? $medida : null;
+
+                return [
+                    'articulo' => trim((string) ($item['articulo'] ?? '')),
+                    'descripcion' => trim((string) ($item['descripcion'] ?? '')),
+                    'cantidad' => $cantidadNormalizada,
+                    'medida' => $medida,
+                    // compatibilidad con formatos antiguos.
+                    'unidad' => $medida,
+                    'precio_unitario' => $precioUnitarioRounded,
+                    'margen' => $margenRounded,
+                    'precio_con_margen' => $precioConMargenRounded,
+                    'total' => $totalComputed,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     private function maxCorrelativoForFormato(int $proyectoId, string $formato): int
     {
         return $this->correlativoStatsForFormato($proyectoId, $formato)['max'];
@@ -640,8 +637,8 @@ class PresupuestoController extends Controller
 
     private function correlativoStatsForFormato(int $proyectoId, string $formato): array
     {
-        $prefix = substr($formato, 0, -3);
-        $regex = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
+        $prefix = substr($formato, 0, -4);
+        $regex = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
 
         $numeros = Presupuesto::where('proyecto_id', $proyectoId)
             ->where('numero', 'like', $prefix . '%')
@@ -681,15 +678,15 @@ class PresupuestoController extends Controller
 
     private function formatCorrelativoNumero(string $formato, int $correlativo): string
     {
-        $prefix = substr($formato, 0, -3);
+        $prefix = substr($formato, 0, -4);
 
-        return $prefix . str_pad((string) max(0, $correlativo), 3, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) max(0, $correlativo), 4, '0', STR_PAD_LEFT);
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
     {
-        $prefix = substr($formato, 0, -3);
-        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{3})$/';
+        $prefix = substr($formato, 0, -4);
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d{4})$/';
 
         if (preg_match($pattern, $numero, $matches) !== 1) {
             return null;

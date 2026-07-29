@@ -14,7 +14,7 @@
         <div class="usuarios-create-hero__copy">
             <div class="usuarios-create-crumbs">GESTIÓN DE PERSONAL <span>•</span> AÑADIR TRABAJADOR</div>
             <h1>Registro de nuevo usuario</h1>
-            <p>Complete el expediente técnico y las credenciales de acceso del trabajador. Los campos marcados con asterisco son obligatorios.</p>
+            <p>Complete el expediente técnico y de acceso del trabajador. Los campos marcados con asterisco son obligatorios.</p>
         </div>
     </div>
 @endsection
@@ -94,18 +94,16 @@
                                 @endif
                             </select>
                         </div>
-
-                        <div class="field-group">
-                            <label for="password">Contraseña *</label>
-                            <input type="password" id="password" name="password" required placeholder="Mínimo 8 caracteres">
-                        </div>
-
-                        <div class="field-group">
-                            <label for="password_confirmation">Confirmar Contraseña *</label>
-                            <input type="password" id="password_confirmation" name="password_confirmation" required placeholder="Repite la contraseña">
-                        </div>
                         
-                        <div class="field-group field-group--full">
+                        {{-- NOTA INFORMATIVA SOBRE LA CONTRASEÑA --}}
+                        <div class="field-group field-group--full" style="background-color: #f8f9fa; border-left: 4px solid #0dcaf0; padding: 15px; margin-top: 10px; border-radius: 4px;">
+                            <p style="margin: 0; font-size: 0.9rem; color: #495057;">
+                                <i class="fas fa-envelope-open-text" style="color: #0dcaf0; margin-right: 8px;"></i>
+                                <strong>Configuración de contraseña:</strong> Al guardar el trabajador, se le enviará automáticamente un correo electrónico a la dirección proporcionada con un enlace seguro para que configure su propia contraseña.
+                            </p>
+                        </div>
+
+                        <div class="field-group field-group--full mt-3">
                             <label>Tipo de personal</label>
                             <div class="choice-grid">
                                 <label class="choice-card">
@@ -144,7 +142,7 @@
                                 <i class="fas fa-info-circle"></i> Los usuarios Super Admin tienen acceso total a todos los proyectos automáticamente.
                             </small>
                         </div>
-                        </div>
+                    </div>
                 </article>
                 <article class="usuarios-panel usuarios-panel--full">
                     <header class="usuarios-panel__header">

@@ -612,29 +612,7 @@ class PedidoController extends Controller
 
     private function normalizePedidoLineas(array $lineas): array
     {
-        return collect($lineas)
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(function (array $linea) {
-                $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
-                $margen = max(0, (float) ($linea['margen'] ?? 0));
-                $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                $medida = $medida !== '' ? $medida : null;
-                $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
-
-                return [
-                    'articulo_id' => isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null,
-                    'articulo' => trim((string) ($linea['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                    'cantidad' => round($cantidad, 2),
-                    'medida' => $medida,
-                    'precio_unitario' => round($precioUnitario, 2),
-                    'margen' => round($margen, 2),
-                    'total' => $total,
-                ];
-            })
-            ->values()
-            ->all();
+        return (new \App\Services\DocumentLineNormalizer())->normalize($lineas);
     }
 
     public function albaranesCliente(PedidoCliente $pedidoCliente)

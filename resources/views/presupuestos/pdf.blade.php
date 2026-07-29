@@ -40,7 +40,6 @@
             border-collapse: collapse; 
             margin-top: 20px; 
             font-size: 12px; 
-            table-layout: fixed;
             border-bottom: 1px solid #7db0e4; 
         }
         .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
@@ -50,8 +49,12 @@
             border-top: none;
             border-bottom: none;
             padding: 8px; 
-            vertical-align: top; 
+            vertical-align: middle; 
             word-wrap: break-word; 
+        }
+
+        .evitar-salto {
+            white-space: nowrap;
         }
 
         /* BLOQUE DEL TOTAL (Flujo natural debajo de la tabla) */
@@ -183,12 +186,12 @@
     <table class="doc-table">
         <thead>
             <tr>
-                <th width="6%">Pos.</th>
-                <th width="44%">Descripción</th>
+                <th width="5%">Pos.</th>
+                <th width="35%">Descripción</th>
                 <th width="10%" style="text-align:right;">Cant.</th>
-                <th width="10%" style="text-align:center;">Ud.</th>
+                <th width="15%" style="text-align:center;">Ud.</th>
                 <th width="15%" style="text-align:right;">Precio</th>
-                <th width="15%" style="text-align:right;">Total</th>
+                <th width="20%" style="text-align:right;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -204,10 +207,10 @@
                 <tr>
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
-                    <td align="right">{{ number_format($cantidad, 2, ',', '.') }}</td>
+                    <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                     <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                    <td align="right">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
-                    <td align="right">{{ number_format($line['total'] ?? 0, 2, ',', '.') }} €</td>
+                    <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
+                    <td align="right" class="evitar-salto">{{ number_format($line['total'] ?? 0, 2, ',', '.') }} €</td>
                 </tr>
             @endforeach
         </tbody>

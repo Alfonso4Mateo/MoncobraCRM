@@ -218,7 +218,10 @@
 
                             <div class="profile-name-block">
                                 <h2>{{ $personal->name }} {{ $personal->apellido }}</h2>
-                                <p>{{ strtoupper($personal->departamento ?: 'Sin departamento') }}</p>
+                                @php
+                                    $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
+                                @endphp
+                                <p>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : 'SIN DEPARTAMENTO' }}</p>
                             </div>
 
                             <div class="profile-metadata">
@@ -227,8 +230,12 @@
                                     <strong>AL-{{ str_pad((string) $personal->id, 3, '0', STR_PAD_LEFT) }}</strong>
                                 </div>
                                 <div>
+                                    <span>ID RRHH</span>
+                                    <strong>{{ $personal->id_rrhh ?: '—' }}</strong>
+                                </div>
+                               <div>
                                     <span>DEPARTAMENTO</span>
-                                    <strong>{{ $personal->departamento ?: '—' }}</strong>
+                                    <strong>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : '—' }}</strong>
                                 </div>
                                 <div>
                                     <span>ÚLTIMA REVISIÓN MÉDICA</span>

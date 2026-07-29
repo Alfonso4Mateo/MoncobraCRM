@@ -400,12 +400,23 @@ class AlbaranClienteController extends Controller
         return round(max(0, $pedidoTotal - $totalFacturado), 2);
     }
 
-    public function show(AlbaranCliente $albaran)
+    private function resolveVisibleAlbaranProyectoId(AlbaranCliente $albaran): ?int
     {
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
+            return null;
+        }
+
+        return $proyectoId;
+    }
+
+    public function show(AlbaranCliente $albaran)
+    {
+        $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
+
+        if ($proyectoId === null) {
             return redirect()->route('albaranes.index')->with('error', 'No se pudo ver el albarán seleccionado.');
         }
 
@@ -420,10 +431,9 @@ class AlbaranClienteController extends Controller
 
     public function pdfViewer(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
-        $this->validateProyectoAccess($proyectoId);
+        $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
-        if ((int) $albaran->proyecto_id !== $proyectoId) {
+        if ($proyectoId === null) {
             abort(404);
         }
 
@@ -446,10 +456,9 @@ class AlbaranClienteController extends Controller
 
     public function streamPdf(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
-        $this->validateProyectoAccess($proyectoId);
+        $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
-        if ((int) $albaran->proyecto_id !== $proyectoId) {
+        if ($proyectoId === null) {
             abort(404);
         }
 
@@ -482,10 +491,9 @@ class AlbaranClienteController extends Controller
 
     public function downloadPdf(AlbaranCliente $albaran)
     {
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
-        $this->validateProyectoAccess($proyectoId);
+        $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
-        if ((int) $albaran->proyecto_id !== $proyectoId) {
+        if ($proyectoId === null) {
             abort(404);
         }
 

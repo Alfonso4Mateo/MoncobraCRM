@@ -52,8 +52,8 @@
                 @csrf
                 <div class="corr-field">
                     <label for="formato" class="corr-label">Formato base</label>
-                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="PRES-2026-000" required>
-                    <p class="corr-help">Debe terminar en <strong>-000</strong> (tres ceros). Puedes cambiar las letras y el año libremente. Ejemplo: <strong>AIRBUS-2026-000</strong>.</p>
+                    <input type="text" id="formato" name="formato" class="corr-input" value="{{ old('formato', $formatoActual) }}" placeholder="PR-26-0000" required>
+                    <p class="corr-help">Debe terminar en <strong>-0000</strong> (cuatro ceros). Puedes cambiar las letras y el año libremente. Ejemplo: <strong>AIRBUS-26-0000</strong>.</p>
                     @error('formato')
                         <p class="corr-error">{{ $message }}</p>
                     @enderror
@@ -88,17 +88,17 @@
             const formato = formatoInput.value.trim();
             const next = parseInt(nextInput.value) || 0;
 
-            // Verificamos que termine en guion y tres ceros (-000)
-            if (formato.endsWith('-000')) {
-                // Cortamos los últimos 4 caracteres (el "-000") para quedarnos con el prefijo
-                const prefix = formato.slice(0, -3); 
-                // Rellenamos el nuevo número para que siempre tenga 3 posiciones (ej. 1 -> 001)
-                const paddedNext = String(next).padStart(3, '0');
+            // Verificamos que termine en guion y cuatro ceros (-0000)
+            if (formato.endsWith('-0000')) {
+                // Cortamos los últimos 4 caracteres (el "-0000") para quedarnos con el prefijo
+                const prefix = formato.slice(0, -4); 
+                // Rellenamos el nuevo número para que siempre tenga 4 posiciones (ej. 1 -> 0001)
+                const paddedNext = String(next).padStart(4, '0');
                 
                 previewText.textContent = prefix + paddedNext;
                 previewText.style.color = "inherit";
             } else {
-                previewText.textContent = 'El formato debe terminar obligatoriamente en -000';
+                previewText.textContent = 'El formato debe terminar obligatoriamente en -0000';
                 previewText.style.color = "red";
             }
         }

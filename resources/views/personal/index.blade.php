@@ -150,8 +150,11 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td data-label="DEPARTAMENTO">
-                                        <span class="personal-muted">{{ $personal->departamento ?? '—' }}</span>
+                                   <td data-label="DEPARTAMENTO">
+                                        @php
+                                            $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
+                                        @endphp
+                                        <span class="personal-muted">{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : '—' }}</span>
                                     </td>
                                     <td data-label="VINCULACIÓN">
                                         @if($personal->activo)

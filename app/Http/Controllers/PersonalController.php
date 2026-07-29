@@ -7,6 +7,7 @@ use App\Models\SalidaStock;
 use App\Models\Proyecto;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Models\Departamento;
 
 class PersonalController extends Controller
 {
@@ -42,6 +43,7 @@ class PersonalController extends Controller
                         ->where('name', 'like', "%{$query}%")
                         ->orWhere('apellido', 'like', "%{$query}%")
                         ->orWhere('dni_nie', 'like', "%{$query}%")
+                        ->orWhere('id_rrhh', 'like', "%{$query}%")
                         ->orWhere('telefono', 'like', "%{$query}%")
                         ->orWhere('departamento', 'like', "%{$query}%");
                 });
@@ -129,11 +131,13 @@ class PersonalController extends Controller
     public function create()
     {
         $personal = new Personal(['activo' => true]);
+        $departamentos = Departamento::orderBy('nombre')->get();
 
         return view('personal.edit', [
             'personal' => $personal,
             'isCreate' => true,
             'proyectos' => Proyecto::orderBy('nombre')->get(),
+            'departamentos' => $departamentos, 
         ]);
     }
 
@@ -257,10 +261,13 @@ class PersonalController extends Controller
 
     public function edit(Personal $personal)
     {
+        $departamentos = Departamento::orderBy('nombre')->get();
+
         return view('personal.edit', [
             'personal' => $personal,
             'isCreate' => false,
             'proyectos' => Proyecto::orderBy('nombre')->get(),
+            'departamentos' => $departamentos, 
         ]);
     }
 
@@ -328,7 +335,8 @@ class PersonalController extends Controller
                 'max:20',
                 Rule::unique('personal', 'dni_nie')->ignore($ignoreId),
             ],
-            'departamento' => 'nullable|string|max:255',
+            'departamento'   => 'nullable|array',
+            'departamento.*' => 'string|max:255',
             'tipo_personal' => 'nullable|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
             'chaqueta' => 'nullable|string|max:20',
@@ -344,6 +352,12 @@ class PersonalController extends Controller
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
             'activo' => 'boolean',
+            'id_rrhh' => [
+                'nullable',
+                'string',
+                'max:10', 
+                Rule::unique('personal', 'id_rrhh')->ignore($ignoreId),
+            ],
         ];
 
         $validated = $request->validate($rules);

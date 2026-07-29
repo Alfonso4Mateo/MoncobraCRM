@@ -181,7 +181,10 @@
 
                                 <div class="profile-name-block">
                                     <h2>{{ $personal->name }} {{ $personal->apellido }}</h2>
-                                    <p>{{ strtoupper($personal->departamento ?: 'Sin departamento') }}</p>
+                                    @php
+                                        $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
+                                    @endphp
+                                    <p>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : 'SIN DEPARTAMENTO' }}</p>
                                 </div>
 
                                 <div class="profile-metadata">
@@ -218,10 +221,43 @@
                                     <label for="dni_nie">DNI / NIE</label>
                                     <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}" class="@error('dni_nie') is-invalid @enderror">
                                 </div>
+
+                                <div class="profile-edit-form-group">
+                                    <label for="id_rrhh">ID de RRHH</label>
+                                    <input type="text" id="id_rrhh" name="id_rrhh" maxlength="10" value="{{ old('id_rrhh', $personal->id_rrhh ?? '') }}" placeholder="Ej. A1B2C3D4E5" class="@error('id_rrhh') is-invalid @enderror">
+                                </div>
                 
                                 <div class="profile-edit-form-group">
-                                    <label for="departamento">Departamento</label>
-                                    <input type="text" id="departamento" name="departamento" value="{{ old('departamento', $personal->departamento) }}" class="@error('departamento') is-invalid @enderror">
+                                    <!-- Contenedor flex para alinear la etiqueta y los botones de añadir/quitar departamento -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <label for="departamento" style="margin-bottom: 0;">Departamento</label>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button type="button" id="btn-add-depto" title="Añadir departamento" style="border: 1px solid var(--profile-line); background: #f7f9fc; color: var(--profile-ink); border-radius: 4px; padding: 2px 8px; cursor: pointer;">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                            <button type="button" id="btn-del-depto" title="Eliminar seleccionado" style="border: 1px solid #f5c2c7; background: #fff1f2; color: #b91c1c; border-radius: 4px; padding: 2px 8px; cursor: pointer;">
+                                                <i class="fas fa-minus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <select id="departamento" name="departamento[]" multiple class="@error('departamento') is-invalid @enderror" style="height: 140px;">
+                                        @php
+                                            // Normalizamos el dato guardado en el trabajador para asegurar que siempre sea un array
+                                            $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
+                                            
+                                            // old() recupera los seleccionados si la validación falla
+                                            $deptosSeleccionados = old('departamento', $deptosActuales);
+                                        @endphp
+
+                                        <!-- Ahora iteramos sobre la variable $departamentos que nos ha mandado el Controlador -->
+                                        @foreach($departamentos as $depto)
+                                            <option value="{{ $depto->nombre }}" @selected(in_array($depto->nombre, $deptosSeleccionados ?: []))>
+                                                {{ strtoupper($depto->nombre) }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <small style="font-size: 0.75rem; color: #8a98ab; margin-top: 4px; display: block;">Mantén pulsado Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</small>
                                 </div>
 
                                 <div class="profile-edit-form-group">
@@ -353,6 +389,7 @@
 
 @section('js')
     <script>
+        // Lógica de fechas
         (function() {
             const btnHoy = document.getElementById('set-ultima-hoy');
             const ultimaInput = document.getElementById('ultima_revision_medica');
@@ -395,6 +432,86 @@
                 const parsed = parseDate(ultimaInput.value);
                 setNextFrom(parsed);
             });
+        })();
+
+        // LÓGICA PARA LOS BOTONES DE DEPARTAMENTO (AJAX)
+        (function() {
+            const btnAddDepto = document.getElementById('btn-add-depto');
+            const btnDelDepto = document.getElementById('btn-del-depto');
+            const selectDepto = document.getElementById('departamento');
+
+            // Acción del botón "+"
+            if (btnAddDepto) {
+                btnAddDepto.addEventListener('click', async function() {
+                    const nombre = prompt('Escribe el nombre del nuevo departamento:');
+                    if (!nombre || nombre.trim() === '') return;
+
+                    try {
+                        const response = await fetch('{{ route("departamentos.store") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}' // Medida de seguridad obligatoria en Laravel
+                            },
+                            body: JSON.stringify({ nombre: nombre.trim() })
+                        });
+
+                        const data = await response.json();
+                        
+                        if (response.ok && data.success) {
+                            // Si Laravel dice OK, creamos la opción y la añadimos al HTML visualmente
+                            const option = document.createElement('option');
+                            option.value = data.departamento.nombre;
+                            option.text = data.departamento.nombre.toUpperCase();
+                            selectDepto.appendChild(option);
+                            
+                            // Seleccionamos automáticamente el que acabamos de crear
+                            option.selected = true;
+                        } else {
+                            alert('Error: Es posible que el departamento ya exista o haya un problema de validación.');
+                        }
+                    } catch (error) {
+                        alert('Error de conexión al crear el departamento.');
+                        console.error(error);
+                    }
+                });
+            }
+
+            // Acción del botón "-"
+            if (btnDelDepto) {
+                btnDelDepto.addEventListener('click', async function() {
+                    const selectedOptions = Array.from(selectDepto.selectedOptions);
+                    
+                    if (selectedOptions.length === 0) {
+                        alert('Selecciona en la lista el departamento que quieres eliminar.');
+                        return;
+                    }
+
+                    const confirmacion = confirm('¿Eliminar los departamentos seleccionados de la base de datos?\n\n(Nota: No se borrarán de los trabajadores que ya lo tengan asignado).');
+                    if (!confirmacion) return;
+
+                    // Recorremos todos los que haya marcado y los borramos uno a uno
+                    for (const option of selectedOptions) {
+                        try {
+                            const response = await fetch(`/departamentos/${option.value}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                }
+                            });
+
+                            if (response.ok) {
+                                option.remove(); // Lo borramos del HTML visualmente
+                            } else {
+                                alert(`Error al intentar borrar el departamento: ${option.value}`);
+                            }
+                        } catch (error) {
+                            console.error('Error al borrar', error);
+                            alert('Hubo un error de conexión al intentar borrar el departamento.');
+                        }
+                    }
+                });
+            }
         })();
     </script>
 @endsection

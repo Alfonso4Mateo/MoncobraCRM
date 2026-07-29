@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Notifications\Messages\MailMessage;  
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,15 +26,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Paginator::useBootstrapFive();
 
-        // Gate para gestionar usuarios (solo admin y superadmin)
-        Gate::define('manage-users', function (User $user) {
+        $isAdminOrSuperadmin = function (User $user): bool {
             return in_array($user->role, ['admin', 'superadmin']);
-        });
+        };
+
+        // Gate para gestionar usuarios (solo admin y superadmin)
+        Gate::define('manage-users', $isAdminOrSuperadmin);
 
         // Gate para ver todos los usuarios
-        Gate::define('view-users', function (User $user) {
-            return in_array($user->role, ['admin', 'superadmin']);
-        });
+        Gate::define('view-users', $isAdminOrSuperadmin);
 
         // Gate para ver detalles de un usuario específico
         Gate::define('view-user', function (User $user, User $targetUser) {
@@ -82,6 +84,24 @@ class AppServiceProvider extends ServiceProvider
         // Gate para gestionar proyectos (solo superadmin)
         Gate::define('manage-projects', function (User $user) {
             return $user->role === 'superadmin';
+        });
+
+        // Personalización del correo de creación/restablecimiento de contraseña
+        ResetPassword::toMailUsing(function (object $notifiable, string $token) {
+            // Generamos la URL segura con el token y el email del trabajador
+            $url = url(route('password.reset', [
+                'token' => $token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], false));
+
+            return (new MailMessage)
+                ->subject('¡Bienvenido al ERP Moncobra! Configura tu acceso')
+                ->greeting('¡Hola, ' . $notifiable->name . '!')
+                ->line('Se ha dado de alta tu perfil de trabajador en el sistema de Moncobra.')
+                ->line('Para empezar a utilizar la plataforma, por favor configura tu contraseña de acceso haciendo clic en el siguiente botón:')
+                ->action('Configurar mi contraseña', $url)
+                ->line('Por motivos de seguridad, este enlace es de un solo uso y caducará en 60 minutos.')
+                ->salutation('¡Un saludo, el equipo de Moncobra!');
         });
     }
 }

@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -50,15 +52,17 @@ class UserController extends Controller
     /**
      * Guardar nuevo usuario
      */
+    /**
+     * Guardar nuevo usuario
+     */
     public function store(Request $request)
     {
-        // 1. Validamos los nuevos campos que vienen de la vista
+        // 1. Validamos los campos (¡Eliminamos la validación del password!)
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
             'dni_nie' => 'required|string|max:20|unique:users,dni_nie',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:user,admin,superadmin',
             'departamento' => 'nullable|string|max:255',
             'tipo_personal' => 'required|in:indefinido,temporal',
@@ -81,13 +85,13 @@ class UserController extends Controller
             return back()->withErrors(['role' => 'No tienes permisos para asignar el rol de Super Admin.'])->withInput();
         }
 
-        // 2. Creamos el usuario usando los datos del formulario directamente
+        // 2. Creamos el usuario asignándole una contraseña aleatoria muy segura
         $user = User::create([
             'name' => $validated['name'],
             'apellido' => $validated['apellido'],
             'dni_nie' => $validated['dni_nie'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']), // Encriptamos la contraseña recibida
+            'password' => Hash::make(Str::random(32)), // Generamos un password aleatorio
             'role' => $validated['role'],
             'departamento' => $validated['departamento'] ?? null,
             'tipo_personal' => $validated['tipo_personal'],
@@ -110,7 +114,11 @@ class UserController extends Controller
             $user->syncAllProjectsIfSuperadmin();
         }
 
-        return redirect()->route('users.index')->with('success', 'Usuario creado correctamente.');
+        // 4. AÑADIDO: Generamos el token y enviamos el correo automático de Laravel
+        $token = Password::broker()->createToken($user);
+        $user->sendPasswordResetNotification($token);
+
+        return redirect()->route('users.index')->with('success', 'Usuario creado correctamente y correo de configuración enviado.');
     }
 
     /**
