@@ -7,7 +7,9 @@
     <style>
          /* NUEVAS CLASES PARA LA TABLA */
         .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; }
+        /* APLICADO: Negrita y color fijo para que todo el bloque del cliente sea uniforme */
+        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; font-weight: bold; color: #17385d; }
+        
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
@@ -28,22 +30,22 @@
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
-        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES */
+        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES (Optimizada en tamaño) */
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 20px; 
-            font-size: 12px; 
+            margin-top: 15px; /* Reducido de 20px a 15px */
+            font-size: 10.5px; /* Reducido de 12px para ahorrar espacio vertical */
             border-bottom: 1px solid #7db0e4; /* Cierra la tabla por abajo */
         }
-        .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
+        .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
         .doc-table td { 
             border-left: 1px solid #7db0e4; 
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 8px; 
-            vertical-align: middle; 
+            padding: 5px 6px; /* Reducido para ahorrar espacio vertical */
+            vertical-align: top; /* Cambiado a top para textos largos */
             word-wrap: break-word; 
         }
 
@@ -83,7 +85,8 @@
 </head>
 <body>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: margen inferior reducido a 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="50%" valign="top">
                 <img src="{{ public_path('images/logo_h100.png') }}" alt="logo" style="max-height: 80px; max-width: 250px;">
@@ -94,7 +97,8 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: margen inferior reducido a 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="48%" valign="top">
                 <div class="box-header">Moncobra, S.A.</div>
@@ -109,23 +113,25 @@
             <td width="4%"></td>
             
             <td width="48%" valign="top">
-                <!-- Tabla anidada donde el borde exterior lo tiene la propia tabla -->
                 <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
                     <tr>
                         <td width="30%" class="client-labels-row" valign="top">Empresa</td>
-                        <td width="70%" class="client-content-row" valign="top" style="font-weight:bold;">
+                        <!-- LIMPIO: style="font-weight:bold;" eliminado -->
+                        <td width="70%" class="client-content-row" valign="top">
                             {{ optional($pedido->cliente)->empresa_nombre }}
                         </td>
                     </tr>
                     <tr>
                         <td class="client-labels-row" valign="top">Dirección</td>
-                        <td class="client-content-row muted" valign="top">
+                        <!-- LIMPIO: clase muted eliminada -->
+                        <td class="client-content-row" valign="top">
                             {{ optional($pedido->cliente)->direccion ?? '' }}
                         </td>
                     </tr>
                     <tr>
                         <td class="client-labels-row" valign="top">CIF</td>
-                        <td class="client-content-row" valign="top" style="font-weight:bold;">
+                        <!-- LIMPIO: style="font-weight:bold;" eliminado -->
+                        <td class="client-content-row" valign="top">
                             {{ optional($pedido->cliente)->cif_nif ?? '' }}
                         </td>
                     </tr>
@@ -140,7 +146,8 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: margen inferior reducido a 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="23.5%" valign="top">
                 <div class="meta-header">DOCUMENTO</div>
@@ -179,12 +186,13 @@
     <table class="doc-table">
         <thead>
             <tr>
+                <!-- APLICADO: Redistribución de porcentajes -->
                 <th width="5%">Pos.</th>
-                <th width="35%">Descripción</th>
-                <th width="10%" style="text-align:right;">Cant.</th>
-                <th width="15%" style="text-align:center;">Ud.</th>
-                <th width="15%" style="text-align:right;">Precio</th>
-                <th width="20%" style="text-align:right;">Total</th>
+                <th width="55%">Descripción</th>
+                <th width="8%" style="text-align:right;">Cant.</th>
+                <th width="7%" style="text-align:center;">Ud.</th>
+                <th width="12%" style="text-align:right;">Precio</th>
+                <th width="13%" style="text-align:right;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -199,17 +207,19 @@
                     @endphp
                     <tr>
                         <td>{{ $i + 1 }}</td>
-                        <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
+                        <!-- APLICADO: Saltos de línea para la descripción del array -->
+                        <td style="white-space: pre-wrap;">{!! nl2br(e($line['descripcion'] ?? $line['articulo'] ?? '')) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
-                    <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                    <td align="right" class="evitar-salto">{{ number_format($precio, 2, ',', '.') }} €</td>
-                    <td align="right" class="evitar-salto">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
+                        <td align="center">{{ $medida ? e($medida) : '' }}</td>
+                        <td align="right" class="evitar-salto">{{ number_format($precio, 2, ',', '.') }} €</td>
+                        <td align="right" class="evitar-salto">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
                     </tr>
                 @endforeach
             @elseif ($bolsaTexto !== '')
                 <tr>
                     <td>1</td>
-                    <td>{{ $bolsaTexto }}</td>
+                    <!-- APLICADO: Saltos de línea también para la opción bolsaTexto -->
+                    <td style="white-space: pre-wrap;">{!! nl2br(e($bolsaTexto)) !!}</td>
                     <td align="right"></td>
                     <td align="center"></td>
                     <td align="right"></td>

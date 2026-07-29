@@ -7,7 +7,10 @@
     <style>
         /* NUEVAS CLASES PARA LA TABLA */
         .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; }
+        
+        /* AÑADIDO: font-weight: bold y el color principal para igualar a la sección de Moncobra */
+        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; font-weight: bold; color: #17385d; }
+        
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
@@ -17,8 +20,7 @@
         /* EL BODY VUELVE A TENER SU MARGEN DE SEGURIDAD PARA EL PIE */
         body {
             position: relative;
-            /* Si vas a escribir textos muy grandes en el pie, puedes subir este valor (ej. 150px) */
-            padding-bottom: 120px; 
+            padding-bottom: 80px; /* Reducido para dar más espacio al contenido principal */
             box-sizing: border-box;
             min-height: 100%;
         }
@@ -38,18 +40,18 @@
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 20px; 
-            font-size: 12px; 
+            margin-top: 15px; /* Reducido de 20px a 15px */
+            font-size: 10.5px; /* Reducido de 12px */
             border-bottom: 1px solid #7db0e4; 
         }
-        .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
+        .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
         .doc-table td { 
             border-left: 1px solid #7db0e4; 
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 8px; 
-            vertical-align: middle; 
+            padding: 5px 6px; /* Reducido de 8px a 5px verticalmente */
+            vertical-align: top; /* Cambiado a 'top' para que los textos largos queden mejor alineados */
             word-wrap: break-word; 
         }
 
@@ -73,7 +75,6 @@
             right: 0;
             width: 100%;
         }
-        /* NUEVA CLASE: Fuerza a la tabla del pie a respetar su ancho */
         .footer-table {
             width: 100%;
             table-layout: fixed; 
@@ -83,7 +84,6 @@
             padding: 8px; 
             background: #fff; 
             font-size: 13px;
-            /* NUEVAS REGLAS: Obligan al texto a saltar de línea */
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
@@ -91,7 +91,7 @@
 </head>
 <body>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="50%" valign="top">
                 <img src="{{ public_path('images/moncobra-1l.png') }}" alt="logo" style="max-height: 80px; max-width: 250px;">
@@ -105,7 +105,7 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="48%" valign="top">
                 <div class="box-header">Moncobra, S.A.</div>
@@ -124,26 +124,29 @@
                 <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
                     <tr>
                         <td width="30%" class="client-labels-row" valign="top">Empresa</td>
-                        <td width="70%" class="client-content-row" valign="top" style="font-weight:bold;">
+                        <!-- ELIMINADO: style="font-weight:bold;" (ahora lo maneja la clase) -->
+                        <td width="70%" class="client-content-row" valign="top">
                             {{ optional($presupuesto->cliente)->empresa_nombre }}
                         </td>
                     </tr>
                     <tr>
                         <td class="client-labels-row" valign="top">Dirección</td>
-                        <td class="client-content-row muted" valign="top">
+                        <!-- ELIMINADO: la clase "muted" para que no quede gris y herede la negrita -->
+                        <td class="client-content-row" valign="top">
                             {{ optional($presupuesto->cliente)->direccion ?? '' }}
                         </td>
                     </tr>
                     <tr>
-                        <td class="client-labels-row" valign="top">CIF</td>
-                        <td class="client-content-row" valign="top" style="font-weight:bold;">
-                            {{ optional($presupuesto->cliente)->cif_nif ?? '' }}
+                        <td class="client-labels-row" valign="top">CP Localidad</td>
+                        <td class="client-content-row" valign="top">
+                            {{ optional($presupuesto->cliente)->codigo_postal ?? '' }} {{ optional($presupuesto->cliente)->localidad ?? '' }}
                         </td>
                     </tr>
                     <tr>
-                        <td class="client-labels-row" valign="top">Localidad CP</td>
+                        <td class="client-labels-row" valign="top">CIF</td>
+                        <!-- ELIMINADO: style="font-weight:bold;" (ahora lo maneja la clase) -->
                         <td class="client-content-row" valign="top">
-                            {{ optional($presupuesto->cliente)->localidad ?? '' }} {{ optional($presupuesto->cliente)->codigo_postal ?? '' }}
+                            {{ optional($presupuesto->cliente)->cif_nif ?? '' }}
                         </td>
                     </tr>
                 </table>
@@ -151,7 +154,7 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="32%" valign="top">
                 <div class="meta-header">DOCUMENTO</div>
@@ -187,11 +190,11 @@
         <thead>
             <tr>
                 <th width="5%">Pos.</th>
-                <th width="35%">Descripción</th>
-                <th width="10%" style="text-align:right;">Cant.</th>
-                <th width="15%" style="text-align:center;">Ud.</th>
-                <th width="15%" style="text-align:right;">Precio</th>
-                <th width="20%" style="text-align:right;">Total</th>
+                <th width="55%">Descripción</th>
+                <th width="8%" style="text-align:right;">Cant.</th>
+                <th width="7%" style="text-align:center;">Ud.</th>
+                <th width="12%" style="text-align:right;">Precio</th>
+                <th width="13%" style="text-align:right;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -206,7 +209,7 @@
                 @endphp
                 <tr>
                     <td>{{ $i + 1 }}</td>
-                    <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
+                    <td style="white-space: pre-wrap;">{!! nl2br(e($line['descripcion'] ?? $line['articulo'] ?? '')) !!}</td>
                     <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                     <td align="center">{{ $medida ? e($medida) : '' }}</td>
                     <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>

@@ -328,7 +328,7 @@
                                     <label for="pantalon">Pantalón</label>
                                     <select id="pantalon" name="pantalon" class="@error('pantalon') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50'] as $value => $label)
+                                        @foreach(['34' => '34','36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50','52' => '52','54' => '54','56' => '56','58' => '58','60' => '60','62' => '62','64' => '64'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>

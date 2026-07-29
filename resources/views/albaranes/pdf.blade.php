@@ -7,7 +7,9 @@
     <style>
         /* NUEVAS CLASES PARA LA TABLA */
         .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; }
+        /* APLICADO: Negrita y color unificado para toda la caja del cliente */
+        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; font-weight: bold; color: #17385d; }
+        
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
@@ -30,22 +32,22 @@
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
-        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES */
+        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES (Optimizada en tamaño) */
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 20px; 
-            font-size: 12px; 
+            margin-top: 15px; /* Reducido para ahorrar espacio */
+            font-size: 10.5px; /* Reducido para mayor capacidad vertical */
             border-bottom: 1px solid #7db0e4; /* Cierra la tabla por abajo */
         }
-        .doc-table th { background: #2a6fb0; color: #fff; padding: 8px; text-align: left; }
+        .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
         .doc-table td { 
             border-left: 1px solid #7db0e4; 
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 8px; 
-            vertical-align: middle; 
+            padding: 5px 6px; /* Padding vertical reducido */
+            vertical-align: top; /* Cambiado a top para textos largos */
             word-wrap: break-word; 
         }
 
@@ -85,7 +87,8 @@
 </head>
 <body>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: Margen inferior de 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="50%" valign="top">
                 <img src="{{ public_path('images/moncobra-1l.png') }}" alt="logo" style="max-height: 80px; max-width: 250px;">
@@ -100,7 +103,8 @@
     </table>
 
     @if (!empty($with_presupuesto) && !empty($presupuesto))
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 18px;">
+        <!-- APLICADO: Margen inferior de 15px -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
             <tr>
                 <td width="100%" valign="top">
                     <div class="box-header">PRESUPUESTO ASOCIADO</div>
@@ -119,7 +123,8 @@
         </table>
     @endif
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: Margen inferior de 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="48%" valign="top">
                 <div class="box-header">Moncobra, S.A.</div>
@@ -137,19 +142,20 @@
                 <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
                     <tr>
                         <td width="30%" class="client-labels-row" valign="top">Empresa</td>
-                        <td width="70%" class="client-content-row" valign="top" style="font-weight:bold;">
+                        <!-- LIMPIO: Se eliminaron los style y clases extra -->
+                        <td width="70%" class="client-content-row" valign="top">
                             {{ optional($albaran->cliente)->empresa_nombre }}
                         </td>
                     </tr>
                     <tr>
                         <td class="client-labels-row" valign="top">Dirección</td>
-                        <td class="client-content-row muted" valign="top">
+                        <td class="client-content-row" valign="top">
                             {{ optional($albaran->cliente)->direccion ?? '' }}
                         </td>
                     </tr>
                     <tr>
                         <td class="client-labels-row" valign="top">CIF</td>
-                        <td class="client-content-row" valign="top" style="font-weight:bold;">
+                        <td class="client-content-row" valign="top">
                             {{ optional($albaran->cliente)->cif_nif ?? '' }}
                         </td>
                     </tr>
@@ -160,9 +166,7 @@
                         </td>
                     </tr>
                 </table>
-            </td>
-                </table>
-            </td>
+            </td> <!-- CORREGIDO: Se eliminaron etiquetas de cierre duplicadas que estaban aquí -->
         </tr>
     </table>
 
@@ -174,7 +178,8 @@
         }
     @endphp
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+    <!-- APLICADO: Margen inferior de 15px -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="23.5%" valign="top">
                 <div class="meta-header">DOCUMENTO</div>
@@ -215,12 +220,13 @@
             <thead>
                 <tr>
                     <th width="5%">Pos.</th>
-                    <th width="{{ !empty($with_presupuesto) ? '35%' : '70%' }}">Descripción</th>
-                    <th width="10%" style="text-align:right;">Cant.</th>
-                    <th width="15%" style="text-align:center;">Ud.</th>
+                    <!-- APLICADO: Porcentajes condicionales dinámicos según si se muestran los precios o no -->
+                    <th width="{{ !empty($with_presupuesto) ? '55%' : '75%' }}">Descripción</th>
+                    <th width="{{ !empty($with_presupuesto) ? '8%' : '10%' }}" style="text-align:right;">Cant.</th>
+                    <th width="{{ !empty($with_presupuesto) ? '7%' : '10%' }}" style="text-align:center;">Ud.</th>
                     @if (!empty($with_presupuesto))
-                        <th width="15%" style="text-align:right;">Precio</th>
-                        <th width="20%" style="text-align:right;">Total</th>
+                        <th width="12%" style="text-align:right;">Precio</th>
+                        <th width="13%" style="text-align:right;">Total</th>
                     @endif
                 </tr>
             </thead>
@@ -236,7 +242,8 @@
                     @endphp
                     <tr>
                         <td>{{ $i + 1 }}</td>
-                        <td>{{ $line['descripcion'] ?? $line['articulo'] ?? '' }}</td>
+                        <!-- APLICADO: Respeto a los saltos de línea con pre-wrap y nl2br -->
+                        <td style="white-space: pre-wrap;">{!! nl2br(e($line['descripcion'] ?? $line['articulo'] ?? '')) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>
                         @if (!empty($with_presupuesto))
