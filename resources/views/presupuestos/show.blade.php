@@ -121,6 +121,18 @@
                         <span>OT</span>
                         <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
                     </div>
+                    
+                    <!-- NUEVOS CAMPOS AÑADIDOS -->
+                    <div class="summary-item">
+                        <span>Solicitante</span>
+                        <strong>{{ $presupuesto->solicitante ?: 'N/D' }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Destinatario</span>
+                        <strong>{{ $presupuesto->destinatario ?: 'N/D' }}</strong>
+                    </div>
+                    <!-- FIN NUEVOS CAMPOS -->
+
                     <div class="summary-item">
                         <span>Total</span>
                         <strong>{{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR</strong>

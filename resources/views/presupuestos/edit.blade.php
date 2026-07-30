@@ -77,6 +77,14 @@
                                 <label for="ot">OT</label>
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot) }}">
                             </div>
+                            <div class="field-group">
+                                <label for="solicitante">Solicitante</label>
+                                <input type="text" name="solicitante" id="solicitante" class="form-control" value="{{ old('solicitante', $presupuesto->solicitante ?? '') }}">
+                            </div>
+                            <div class="field-group">
+                                <label for="destinatario">Destinatario</label>
+                                <input type="text" name="destinatario" id="destinatario" class="form-control" value="{{ old('destinatario', $presupuesto->destinatario ?? '') }}">
+                            </div>
                         </div>
                         
                 </div>

@@ -77,6 +77,16 @@
                         <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
                     </div>
 
+                    <div class="field-group">
+                        <label for="solicitante">Solicitante</label>
+                        <input type="text" name="solicitante" id="solicitante" class="form-control" value="{{ old('solicitante', $presupuesto->solicitante ?? '') }}">
+                    </div>
+
+                    <div class="field-group">
+                        <label for="destinatario">Destinatario</label>
+                        <input type="text" name="destinatario" id="destinatario" class="form-control" value="{{ old('destinatario', $presupuesto->destinatario ?? '') }}">
+                    </div>
+
                     <div class="field-group field-full">
                         <label for="exclusiones">Exclusiones</label>
                         <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', 'Cualquier concepto no descrito en la oferta') }}</textarea>

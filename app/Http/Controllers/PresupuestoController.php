@@ -136,6 +136,8 @@ class PresupuestoController extends Controller
             ],
             'titulo' => 'nullable|string|max:255',
             'ot' => 'nullable|string|max:255',
+            'solicitante' => 'nullable|string|max:255',
+            'destinatario' => 'nullable|string|max:255',
             'validez_oferta' => 'nullable|string|max:255',
             'exclusiones' => 'nullable|string|max:2000',
             'archivo_pdf' => [$archivoPdfRule, 'file', 'mimes:pdf', 'max:10240'],
@@ -387,6 +389,8 @@ class PresupuestoController extends Controller
             'lista_articulos' => 'nullable|json',
             'validez_oferta' => 'nullable|string|max:255',
             'exclusiones' => 'nullable|string|max:2000',
+            'solicitante' => 'nullable|string|max:255', 
+            'destinatario' => 'nullable|string|max:255', 
         ];
 
         // Añadimos validación estricta si es superadmin
@@ -426,6 +430,8 @@ class PresupuestoController extends Controller
             'total' => round($totalComputed, 2),
             'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
+            'solicitante' => $validated['solicitante'] ?? null, 
+            'destinatario' => $validated['destinatario'] ?? null, 
         ];
 
         $updateData['documento'] = $validated['documento'];
