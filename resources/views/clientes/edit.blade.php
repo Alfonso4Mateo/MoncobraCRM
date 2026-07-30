@@ -105,6 +105,23 @@
                             <input type="text" id="direccion" name="direccion" value="{{ old('direccion', $cliente->direccion) }}" class="@error('direccion') is-invalid @enderror" required>
                         </div>
                     </div>
+
+                    <div class="edit-grid cols-3 edit-grid--location">
+                        <div class="field-group">
+                            <label for="localidad">Localidad</label>
+                            <input type="text" id="localidad" name="localidad" value="{{ old('localidad', $cliente->localidad) }}" class="@error('localidad') is-invalid @enderror" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="provincia">Provincia</label>
+                            <input type="text" id="provincia" name="provincia" value="{{ old('provincia', $cliente->provincia) }}" class="@error('provincia') is-invalid @enderror" required>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="codigo_postal">Código Postal</label>
+                            <input type="text" id="codigo_postal" name="codigo_postal" value="{{ old('codigo_postal', $cliente->codigo_postal) }}" class="@error('codigo_postal') is-invalid @enderror" required>
+                        </div>
+                    </div>
                 </section>
 
                 <footer class="edit-actions">

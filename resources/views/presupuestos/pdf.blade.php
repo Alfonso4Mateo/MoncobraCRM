@@ -5,34 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Presupuesto {{ $presupuesto->numero ?? '' }}</title>
     <style>
-        /* NUEVAS CLASES PARA LA TABLA */
-        .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        
-        /* AÑADIDO: font-weight: bold y el color principal para igualar a la sección de Moncobra */
-        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; font-weight: bold; color: #17385d; }
-        
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
         /* RESET BÁSICO */
         html, body { margin: 20px; padding: 20px; font-family: Arial, Helvetica, sans-serif; color: #17385d; }
         
-        /* EL BODY VUELVE A TENER SU MARGEN DE SEGURIDAD PARA EL PIE */
+        /* EL BODY TIENE UN MARGEN DE SEGURIDAD PARA EL PIE */
         body {
             position: relative;
-            padding-bottom: 80px; /* Reducido para dar más espacio al contenido principal */
+            padding-bottom: 80px; 
             box-sizing: border-box;
             min-height: 100%;
         }
 
-        /* ESTILOS DE TEXTO Y CAJAS */
+        /* ESTILOS DE TEXTO Y CAJAS COMUNES */
         .muted { color: #6b7b8f; font-size: 12px; }
-        .box-header { background: #2a6fb0; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        .box-body { background: #f0f6ff; padding: 8px; border: 3px solid #2a6fb0; border-top: none; }
         
-        .client-labels { background: #174a89; color: #fff; padding: 10px 8px; font-weight: 800; font-size: 13px; }
-        .client-content { background: #fff; padding: 10px 8px; border: 3px solid #2a6fb0; border-left: 1px solid #dbeaf9; }
+        /* CLASES COMPARTIDAS PARA AMBOS RECUADROS (MONCOBRA Y CLIENTE) */
+        .box-header-cell { background: #2a6fb0; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
+        .box-body-cell { background: #f0f6ff; padding: 8px; font-size: 13px; color: #17385d; line-height: 1.4; }
         
+        /* BLOQUES SECUNDARIOS (DOCUMENTO, NÚMERO, FECHA) */
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
@@ -40,8 +34,8 @@
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 15px; /* Reducido de 20px a 15px */
-            font-size: 10.5px; /* Reducido de 12px */
+            margin-top: 15px; 
+            font-size: 10.5px; 
             border-bottom: 1px solid #7db0e4; 
         }
         .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
@@ -50,8 +44,8 @@
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 5px 6px; /* Reducido de 8px a 5px verticalmente */
-            vertical-align: top; /* Cambiado a 'top' para que los textos largos queden mejor alineados */
+            padding: 5px 6px; 
+            vertical-align: top; 
             word-wrap: break-word; 
         }
 
@@ -59,7 +53,7 @@
             white-space: nowrap;
         }
 
-        /* BLOQUE DEL TOTAL (Flujo natural debajo de la tabla) */
+        /* BLOQUE DEL TOTAL */
         .total-block {
             width: 100%;
             margin-top: 10px;
@@ -67,7 +61,7 @@
         .total-box { background: #2a6fb0; color: #fff; padding: 6px 16px; border-radius: 5px; display: inline-block; font-size: 14px; white-space: nowrap; text-align: center; }
         .total-inline { display: inline; white-space: nowrap; font-weight: 700; }
         
-        /* BLOQUE DE VALIDEZ Y EXCLUSIONES (Anclado al fondo) */
+        /* BLOQUE DE VALIDEZ Y EXCLUSIONES */
         .footer-bottom {
             position: absolute;
             bottom: 0;
@@ -107,46 +101,37 @@
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
+            <!-- TABLA IZQUIERDA (MONCOBRA) -->
             <td width="48%" valign="top">
-                <div class="box-header">Moncobra, S.A.</div>
-                <div class="box-body">
-                    <strong>Eufrates 44</strong><br>
-                    <strong>Sevilla</strong><br>
-                    <strong>41020 Sevilla</strong><br>
-                    <strong>A78990413</strong>
-                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #f0f6ff; height: 125px;">
+                    <tr>
+                        <td class="box-header-cell" valign="middle" style="height: 1px;">Moncobra, S.A.</td>
+                    </tr>
+                    <tr>
+                        <td class="box-body-cell" valign="top">
+                            <strong>Eufrates 44</strong><br>
+                            <strong>Sevilla</strong><br>
+                            <strong>41020 Sevilla</strong><br>
+                            <strong>A78990413</strong>
+                        </td>
+                    </tr>
+                </table>
             </td>
             
             <td width="4%"></td>
             
+            <!-- TABLA DERECHA (CLIENTE) CLONADA -->
             <td width="48%" valign="top">
-                <!-- Tabla anidada donde el borde exterior lo tiene la propia tabla -->
-                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #f0f6ff; height: 125px;">
                     <tr>
-                        <td width="30%" class="client-labels-row" valign="top">Empresa</td>
-                        <!-- ELIMINADO: style="font-weight:bold;" (ahora lo maneja la clase) -->
-                        <td width="70%" class="client-content-row" valign="top">
-                            {{ optional($presupuesto->cliente)->empresa_nombre }}
-                        </td>
+                        <td class="box-header-cell" valign="middle" style="height: 1px;">{{ optional($presupuesto->cliente)->empresa_nombre ?? 'Cliente' }}</td>
                     </tr>
                     <tr>
-                        <td class="client-labels-row" valign="top">Dirección</td>
-                        <!-- ELIMINADO: la clase "muted" para que no quede gris y herede la negrita -->
-                        <td class="client-content-row" valign="top">
-                            {{ optional($presupuesto->cliente)->direccion ?? '' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="client-labels-row" valign="top">CP Localidad</td>
-                        <td class="client-content-row" valign="top">
-                            {{ optional($presupuesto->cliente)->codigo_postal ?? '' }} {{ optional($presupuesto->cliente)->localidad ?? '' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="client-labels-row" valign="top">CIF</td>
-                        <!-- ELIMINADO: style="font-weight:bold;" (ahora lo maneja la clase) -->
-                        <td class="client-content-row" valign="top">
-                            {{ optional($presupuesto->cliente)->cif_nif ?? '' }}
+                        <td class="box-body-cell" valign="top">
+                            <strong>{{ optional($presupuesto->cliente)->direccion ?? '' }}</strong><br>
+                            <strong>{{ optional($presupuesto->cliente)->provincia ?? '' }}</strong><br>
+                            <strong>{{ optional($presupuesto->cliente)->codigo_postal ?? '' }} {{ optional($presupuesto->cliente)->localidad ?? '' }}</strong><br>
+                            <strong>{{ optional($presupuesto->cliente)->cif_nif ?? '' }}</strong>
                         </td>
                     </tr>
                 </table>

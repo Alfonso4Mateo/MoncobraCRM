@@ -5,40 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Albarán {{ $albaran->numero ?? '' }}</title>
     <style>
-        /* NUEVAS CLASES PARA LA TABLA */
-        .client-labels-row { background: #174a89; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        /* APLICADO: Negrita y color unificado para toda la caja del cliente */
-        .client-content-row { padding: 6px 8px; border-left: 1px solid #dbeaf9; font-weight: bold; color: #17385d; }
-        
         /* MÁRGENES FÍSICOS DE LA PÁGINA */
         @page { size: A4; margin: 15mm; }
         
         /* RESET BÁSICO */
         html, body { margin: 20px; padding: 20px; font-family: Arial, Helvetica, sans-serif; color: #17385d; }
         
-        /* EL BODY VUELVE A LA NORMALIDAD (Sin rellenos forzados) */
+        /* EL BODY VUELVE A LA NORMALIDAD */
         body {
             box-sizing: border-box;
         }
 
-        /* ESTILOS DE TEXTO Y CAJAS */
+        /* ESTILOS DE TEXTO Y CAJAS COMUNES */
         .muted { color: #6b7b8f; font-size: 12px; }
-        .box-header { background: #2a6fb0; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
-        .box-body { background: #f0f6ff; padding: 8px; border: 3px solid #2a6fb0; border-top: none; }
         
-        .client-labels { background: #174a89; color: #fff; padding: 10px 8px; font-weight: 800; font-size: 13px; }
-        .client-content { background: #fff; padding: 10px 8px; border: 3px solid #2a6fb0; border-left: 1px solid #dbeaf9; }
+        /* CLASES COMPARTIDAS PARA RECUADROS (MONCOBRA, CLIENTE Y PRESUPUESTO ASOCIADO) */
+        .box-header-cell { background: #2a6fb0; color: #fff; padding: 6px 8px; font-weight: 800; font-size: 13px; }
+        .box-body-cell { background: #f0f6ff; padding: 8px; font-size: 13px; color: #17385d; line-height: 1.4; }
         
+        /* BLOQUES SECUNDARIOS (DOCUMENTO, NÚMERO, FECHA) */
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
-        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES (Optimizada en tamaño) */
+        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES */
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 15px; /* Reducido para ahorrar espacio */
-            font-size: 10.5px; /* Reducido para mayor capacidad vertical */
-            border-bottom: 1px solid #7db0e4; /* Cierra la tabla por abajo */
+            margin-top: 15px; 
+            font-size: 10.5px; 
+            border-bottom: 1px solid #7db0e4; 
         }
         .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
         .doc-table td { 
@@ -46,8 +41,8 @@
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 5px 6px; /* Padding vertical reducido */
-            vertical-align: top; /* Cambiado a top para textos largos */
+            padding: 5px 6px; 
+            vertical-align: top; 
             word-wrap: break-word; 
         }
 
@@ -55,7 +50,7 @@
             white-space: nowrap;
         }
 
-        /* BLOQUE DEL TOTAL (Flujo natural debajo de la tabla) */
+        /* BLOQUE DEL TOTAL */
         .total-block {
             width: 100%;
             margin-top: 10px;
@@ -87,7 +82,6 @@
 </head>
 <body>
 
-    <!-- APLICADO: Margen inferior de 15px -->
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="50%" valign="top">
@@ -103,70 +97,68 @@
     </table>
 
     @if (!empty($with_presupuesto) && !empty($presupuesto))
-        <!-- APLICADO: Margen inferior de 15px -->
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
             <tr>
                 <td width="100%" valign="top">
-                    <div class="box-header">PRESUPUESTO ASOCIADO</div>
-                    <div class="box-body">
-                        <strong>Nº:</strong> {{ $presupuesto->numero ?? '' }} &nbsp;&nbsp;
-                        <strong>Fecha:</strong> {{ optional($presupuesto->fecha)->format('d/m/Y') ?? '' }}<br>
-                        @if(!empty($presupuesto->validez_oferta))
-                            <div style="margin-top:8px;"><strong>Validez de la oferta:</strong> {{ $presupuesto->validez_oferta }}</div>
-                        @endif
-                        @if(!empty($presupuesto->exclusiones))
-                            <div style="margin-top:8px;"><strong>Exclusiones:</strong><br>{!! nl2br(e($presupuesto->exclusiones)) !!}</div>
-                        @endif
-                    </div>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #f0f6ff;">
+                        <tr>
+                            <td class="box-header-cell" valign="middle" style="height: 1px;">PRESUPUESTO ASOCIADO</td>
+                        </tr>
+                        <tr>
+                            <td class="box-body-cell" valign="top">
+                                <strong>Nº:</strong> {{ $presupuesto->numero ?? '' }} &nbsp;&nbsp;
+                                <strong>Fecha:</strong> {{ optional($presupuesto->fecha)->format('d/m/Y') ?? '' }}<br>
+                                @if(!empty($presupuesto->validez_oferta))
+                                    <div style="margin-top:8px;"><strong>Validez de la oferta:</strong> {{ $presupuesto->validez_oferta }}</div>
+                                @endif
+                                @if(!empty($presupuesto->exclusiones))
+                                    <div style="margin-top:8px;"><strong>Exclusiones:</strong><br>{!! nl2br(e($presupuesto->exclusiones)) !!}</div>
+                                @endif
+                            </td>
+                        </tr>
+                    </table>
                 </td>
             </tr>
         </table>
     @endif
 
-    <!-- APLICADO: Margen inferior de 15px -->
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
+            <!-- TABLA IZQUIERDA (MONCOBRA) REESTRUCTURADA -->
             <td width="48%" valign="top">
-                <div class="box-header">Moncobra, S.A.</div>
-                <div class="box-body">
-                    <strong>Eufrates 44</strong><br>
-                    <strong>Sevilla</strong><br>
-                    <strong>41020 Sevilla</strong><br>
-                    <strong>A78990413</strong>
-                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #f0f6ff; height: 125px;">
+                    <tr>
+                        <td class="box-header-cell" valign="middle" style="height: 1px;">Moncobra, S.A.</td>
+                    </tr>
+                    <tr>
+                        <td class="box-body-cell" valign="top">
+                            <strong>Eufrates 44</strong><br>
+                            <strong>Sevilla</strong><br>
+                            <strong>41020 Sevilla</strong><br>
+                            <strong>A78990413</strong>
+                        </td>
+                    </tr>
+                </table>
             </td>
             
             <td width="4%"></td>
             
+            <!-- TABLA DERECHA (CLIENTE) CLONADA -->
             <td width="48%" valign="top">
-                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #fff;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 3px solid #2a6fb0; background: #f0f6ff; height: 125px;">
                     <tr>
-                        <td width="30%" class="client-labels-row" valign="top">Empresa</td>
-                        <!-- LIMPIO: Se eliminaron los style y clases extra -->
-                        <td width="70%" class="client-content-row" valign="top">
-                            {{ optional($albaran->cliente)->empresa_nombre }}
-                        </td>
+                        <td class="box-header-cell" valign="middle" style="height: 1px;">{{ optional($albaran->cliente)->empresa_nombre ?? 'Cliente' }}</td>
                     </tr>
                     <tr>
-                        <td class="client-labels-row" valign="top">Dirección</td>
-                        <td class="client-content-row" valign="top">
-                            {{ optional($albaran->cliente)->direccion ?? '' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="client-labels-row" valign="top">CIF</td>
-                        <td class="client-content-row" valign="top">
-                            {{ optional($albaran->cliente)->cif_nif ?? '' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="client-labels-row" valign="top">Localidad CP</td>
-                        <td class="client-content-row" valign="top">
-                            {{ optional($albaran->cliente)->localidad ?? '' }} {{ optional($albaran->cliente)->codigo_postal ?? '' }}
+                        <td class="box-body-cell" valign="top">
+                            <strong>{{ optional($albaran->cliente)->direccion ?? '' }}</strong><br>
+                            <strong>{{ optional($albaran->cliente)->provincia ?? '' }}</strong><br>
+                            <strong>{{ optional($albaran->cliente)->codigo_postal ?? '' }} {{ optional($albaran->cliente)->localidad ?? '' }}</strong><br>
+                            <strong>{{ optional($albaran->cliente)->cif_nif ?? '' }}</strong>
                         </td>
                     </tr>
                 </table>
-            </td> <!-- CORREGIDO: Se eliminaron etiquetas de cierre duplicadas que estaban aquí -->
+            </td>
         </tr>
     </table>
 
@@ -178,7 +170,6 @@
         }
     @endphp
 
-    <!-- APLICADO: Margen inferior de 15px -->
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="23.5%" valign="top">
@@ -220,7 +211,6 @@
             <thead>
                 <tr>
                     <th width="5%">Pos.</th>
-                    <!-- APLICADO: Porcentajes condicionales dinámicos según si se muestran los precios o no -->
                     <th width="{{ !empty($with_presupuesto) ? '55%' : '75%' }}">Descripción</th>
                     <th width="{{ !empty($with_presupuesto) ? '8%' : '10%' }}" style="text-align:right;">Cant.</th>
                     <th width="{{ !empty($with_presupuesto) ? '7%' : '10%' }}" style="text-align:center;">Ud.</th>
@@ -242,7 +232,6 @@
                     @endphp
                     <tr>
                         <td>{{ $i + 1 }}</td>
-                        <!-- APLICADO: Respeto a los saltos de línea con pre-wrap y nl2br -->
                         <td style="white-space: pre-wrap;">{!! nl2br(e($line['descripcion'] ?? $line['articulo'] ?? '')) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>

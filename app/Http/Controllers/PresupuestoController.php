@@ -551,7 +551,7 @@ class PresupuestoController extends Controller
         }
 
         if ($formato === '' || !preg_match('/^.+-0000$/', $formato)) {
-            return 'PR-' . now()->format('y') . '-0000';
+            return 'PR-' . now()->format('Y') . '-0000';
         }
 
         return $formato;

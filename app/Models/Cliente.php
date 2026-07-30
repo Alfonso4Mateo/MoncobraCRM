@@ -29,6 +29,7 @@ class Cliente extends Model
         'cif_nif',
         'direccion',
         'localidad',
+        'provincia',
         'codigo_postal',
         'telefono',
         'email',

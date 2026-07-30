@@ -65,6 +65,11 @@
                     </div>
 
                     <div class="field-group field-md">
+                        <label for="provincia">Provincia</label>
+                        <input type="text" id="provincia" name="provincia" value="{{ old('provincia') }}" placeholder="Madrid" class="@error('provincia') is-invalid @enderror" required>
+                    </div>
+
+                    <div class="field-group field-md">
                         <label for="codigo_postal">Código Postal</label>
                         <input type="text" id="codigo_postal" name="codigo_postal" value="{{ old('codigo_postal') }}" placeholder="28001" class="@error('codigo_postal') is-invalid @enderror" required>
                     </div>
