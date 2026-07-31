@@ -687,7 +687,7 @@ class PedidoController extends Controller
         // 1. Validamos que los datos lleguen correctamente
         $request->validate([
             'importe' => 'required|numeric|min:0.01',
-            'concepto' => 'required|string|max:500',
+            'concepto' => 'required|string|max:2000',
         ]);
 
         // 2. Guardamos en la tabla relacionada
