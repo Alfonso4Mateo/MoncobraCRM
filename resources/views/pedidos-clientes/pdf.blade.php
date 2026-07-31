@@ -25,23 +25,35 @@
         .meta-header { background: #2a6fb0; color: #fff; padding: 6px; font-weight: 800; font-size: 12px; text-align: center; border: 1px solid #2a6fb0; }
         .meta-body { background: #fff; padding: 10px; font-weight: bold; text-align: center; border: 1px solid #2a6fb0; border-top: none; }
 
-        /* TABLA DE ARTÍCULOS SIN LÍNEAS HORIZONTALES (Optimizada en tamaño) */
+        /* TABLA DE ARTÍCULOS - FORMATO NORMAL (MÁS LEÍBLE Y ESPACIOSO) */
         .doc-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 15px; 
-            font-size: 10.5px; 
+            margin-top: 20px; 
+            font-size: 12px; 
             border-bottom: 1px solid #7db0e4; 
         }
-        .doc-table th { background: #2a6fb0; color: #fff; padding: 5px 6px; text-align: left; }
+        .doc-table th { background: #2a6fb0; color: #fff; padding: 8px 10px; text-align: left; }
         .doc-table td { 
             border-left: 1px solid #7db0e4; 
             border-right: 1px solid #7db0e4; 
             border-top: none;
             border-bottom: none;
-            padding: 5px 6px; 
+            padding: 8px 10px; 
             vertical-align: top; 
             word-wrap: break-word; 
+        }
+
+        /* CLASE DINÁMICA COMPACTA (SE ACTIVA SOLO SI HAY MUCHO TEXTO) */
+        .doc-table.compact {
+            margin-top: 15px;
+            font-size: 10.5px; 
+        }
+        .doc-table.compact th {
+            padding: 5px 6px;
+        }
+        .doc-table.compact td {
+            padding: 4px 6px; 
         }
 
         .evitar-salto {
@@ -164,10 +176,42 @@
             return $descripcion !== '' || $cantidad > 0 || $precio > 0;
         })->values();
         $bolsaTexto = trim((string) ($pedido->bolsa_texto ?? ''));
+
+        // --- LÓGICA DE COMPRESIÓN DINÁMICA ---
+        $usarFormatoCompacto = false;
+        $totalLineasVisuales = 0;
+
+        if ($lineasValidas->isNotEmpty()) {
+            foreach($lineasValidas as $line) {
+                $texto = trim((string) ($line['descripcion'] ?? $line['articulo'] ?? ''));
+                $longitud = strlen($texto);
+                $saltosLinea = substr_count($texto, "\n");
+                
+                // Estimamos el espacio visual consumido
+                $lineasEstimadas = $saltosLinea + ceil($longitud / 80) + 1;
+                $totalLineasVisuales += $lineasEstimadas;
+
+                // Si hay mucho texto, activamos el formato compacto
+                if ($longitud > 250 || $totalLineasVisuales > 15) {
+                    $usarFormatoCompacto = true;
+                    break; 
+                }
+            }
+        } elseif ($bolsaTexto !== '') {
+            // Si usa la bolsa de texto en vez de líneas de artículos
+            $longitud = strlen($bolsaTexto);
+            $saltosLinea = substr_count($bolsaTexto, "\n");
+            $lineasEstimadas = $saltosLinea + ceil($longitud / 80) + 1;
+            
+            if ($longitud > 250 || $lineasEstimadas > 15) {
+                $usarFormatoCompacto = true;
+            }
+        }
     @endphp
 
     @if ($lineasValidas->isNotEmpty() || $bolsaTexto !== '')
-    <table class="doc-table">
+    <!-- SE APLICA LA CLASE DINÁMICA A LA TABLA -->
+    <table class="doc-table {{ $usarFormatoCompacto ? 'compact' : '' }}">
         <thead>
             <tr>
                 <th width="5%">Pos.</th>
@@ -187,10 +231,15 @@
                         $totalLinea = (float) ($line['total'] ?? 0);
                         $medida = $line['medida'] ?? ($line['unidad'] ?? null);
                         $medida = is_string($medida) ? trim($medida) : $medida;
+
+                        // --- LIMPIEZA DE SÍMBOLOS '&' ---
+                        $textoDesc = $line['descripcion'] ?? $line['articulo'] ?? '';
+                        $textoLimpio = preg_replace('/&{2,}/', '', $textoDesc);
+                        $textoLimpio = preg_replace('/^\s*&\s*$/m', '', $textoLimpio);
                     @endphp
                     <tr>
                         <td>{{ $i + 1 }}</td>
-                        <td style="white-space: pre-wrap;">{!! nl2br(e($line['descripcion'] ?? $line['articulo'] ?? '')) !!}</td>
+                        <td style="white-space: pre-wrap;">{!! nl2br(e($textoLimpio)) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>
                         <td align="right" class="evitar-salto">{{ number_format($precio, 2, ',', '.') }} €</td>
@@ -198,9 +247,14 @@
                     </tr>
                 @endforeach
             @elseif ($bolsaTexto !== '')
+                @php
+                    // --- LIMPIEZA DE SÍMBOLOS '&' PARA BOLSA DE TEXTO ---
+                    $textoLimpioBolsa = preg_replace('/&{2,}/', '', $bolsaTexto);
+                    $textoLimpioBolsa = preg_replace('/^\s*&\s*$/m', '', $textoLimpioBolsa);
+                @endphp
                 <tr>
                     <td>1</td>
-                    <td style="white-space: pre-wrap;">{!! nl2br(e($bolsaTexto)) !!}</td>
+                    <td style="white-space: pre-wrap;">{!! nl2br(e($textoLimpioBolsa)) !!}</td>
                     <td align="right"></td>
                     <td align="center"></td>
                     <td align="right"></td>

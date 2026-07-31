@@ -228,6 +228,18 @@
                                         <a href="{{ route('pedidos-clientes.preview', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar PDF del pedido" title="Previsualizar PDF del pedido">
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
+                                        @if($pedido->estado !== 'facturado')
+                                            <form action="{{ route('pedidos-clientes.estado.update', $pedido) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Estás seguro de pasar este pedido a Facturado de forma manual?');">
+                                                @csrf
+                                                @method('PATCH')
+                                                
+                                                <input type="hidden" name="estado" value="facturado">
+                                                
+                                                <button type="submit" class="presupuesto-action-btn" style="color: #28a745; border-color: #28a745;" aria-label="Marcar como facturado" title="Marcar como facturado manualmente">
+                                                    <i class="fas fa-check-double"></i>
+                                                </button>
+                                            </form>
+                                        @endif
 
                                         @php
                                             $dropdownId = 'pedido-estado-dropdown-' . $pedido->id;
