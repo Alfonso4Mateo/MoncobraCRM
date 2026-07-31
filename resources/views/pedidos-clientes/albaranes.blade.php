@@ -221,6 +221,7 @@
                                             <th>Fecha</th>
                                             <th>Concepto</th>
                                             <th class="text-right">Importe</th>
+                                            <th class="text-center" style="width: 80px;">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -231,10 +232,19 @@
                                                 <td data-label="Importe" class="text-right">
                                                     <strong class="pedido-total">€{{ number_format((float) $facturacion->importe, 2, ',', '.') }}</strong>
                                                 </td>
+                                                <td data-label="Acciones" class="text-center">
+                                                    <form action="{{ route('facturacion-manual.destroy', $facturacion->id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta cuota? El saldo pendiente se recalculará.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Borrar cuota" style="border: none; background: none; color: #dc3545; cursor: pointer;">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="3">
+                                                <td colspan="4">
                                                     <div class="pedido-empty-state">
                                                         <i class="fas fa-receipt" style="font-size: 2rem; color: #a0aec0; margin-bottom: 10px; display: block;"></i>
                                                         <h4>No hay facturación manual registrada</h4>

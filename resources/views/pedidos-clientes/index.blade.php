@@ -160,7 +160,9 @@
                                 $totalPedido = round((float) ($pedido->ui_total ?? 0), 2);
                                 $pendienteFacturar = round(max(0, $totalPedido - (float) ($pedido->ui_total_albaranes ?? 0)), 2);
                             @endphp
-                            <tr>
+                            
+                            <!-- Modificación aquí: Aplicamos la clase condicional a la fila -->
+                            <tr class="{{ $pedido->bolsa ? 'bg-pedido-bolsa' : '' }}">
                                 <td data-label="Pedido-cliente" style="max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
                                     <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link" style="display:inline-block; max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
                                         {{ $pedido->referencia_manual}}
@@ -197,25 +199,49 @@
                                 <td data-label="Estado">
                                     <span class="{{ $pedido->ui_estado_class ?? 'pedido-chip pedido-chip--pending' }}">{{ $pedido->ui_estado_label ?? 'Pendiente' }}</span>
                                 </td>
-                                <td data-label="Albarán asociado">
+                                <td data-label="Documentos">
                                     @php
                                         $albaranesCount = (int) ($pedido->ui_albaranes_count ?? 0);
+                                        $facturacionesCount = (int) ($pedido->facturaciones_manuales_count ?? 0);
                                     @endphp
 
-                                    <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es" aria-label="Ver albarán/es">
-                                        <i class="fas fa-file-invoice" aria-hidden="true"></i>
-                                        Ver albarán/es ({{ $albaranesCount }})
-                                    </a>
+                                    @if($pedido->bolsa)
+                                        <!-- Lógica Híbrida para Pedidos Bolsa -->
+                                        <div style="display: flex; gap: 5px; flex-direction: column;">
+                                            
+                                            {{-- Si tiene albaranes, mostramos el botón --}}
+                                            @if($albaranesCount > 0)
+                                                <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#albaranes-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
+                                                    <i class="fas fa-file-invoice" aria-hidden="true"></i>
+                                                    Albaranes ({{ $albaranesCount }})
+                                                </a>
+                                            @endif
+
+                                            {{-- Si tiene facturación, o si no tiene NADA (para tener un botón donde hacer clic) --}}
+                                            @if($facturacionesCount > 0 || $albaranesCount === 0)
+                                                <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#facturacion-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver facturación manual" style="background-color: #f8f9fa;">
+                                                    <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
+                                                    Facturación ({{ $facturacionesCount }})
+                                                </a>
+                                            @endif
+
+                                        </div>
+                                    @else
+                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
+                                            <i class="fas fa-file-invoice" aria-hidden="true"></i>
+                                            Ver albarán/es ({{ $albaranesCount }})
+                                        </a>
+                                    @endif
                                 </td>
                                 <td data-label="Facturación">
                                     <div class="pedido-facturacion-cell">
                                         <div class="pedido-facturacion-line">
                                             <span class="pedido-facturacion-label">Total:</span>
-                                            <strong class="pedido-total">€{{ number_format($totalPedido, 2, ',', '.') }}</strong>
+                                            <strong class="pedido-total">€{{ number_format($pedido->ui_total, 2, ',', '.') }}</strong>
                                         </div>
                                         <div class="pedido-facturacion-line pedido-facturacion-line--pending">
                                             <span class="pedido-facturacion-label">Pendiente a facturar:</span>
-                                            <strong>€{{ number_format($pendienteFacturar, 2, ',', '.') }}</strong>
+                                            <strong>€{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}</strong>
                                         </div>
                                     </div>
                                 </td>

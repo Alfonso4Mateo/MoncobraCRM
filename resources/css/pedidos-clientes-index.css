@@ -1238,3 +1238,11 @@ body,
         grid-template-columns: 1fr;
     }
 }
+
+.pedidos-clientes-table tbody tr.bg-pedido-bolsa td {
+    background-color: #f0f8ff !important; 
+}
+
+.pedidos-clientes-table tbody tr.bg-pedido-bolsa:hover td {
+    background-color: #e1effa !important; 
+}

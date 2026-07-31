@@ -48,7 +48,10 @@ class PedidoController extends Controller
         $bolsa = $request->boolean('bolsa');
 
         $pedidosQuery = PedidoCliente::query()
-            ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot'])
+           ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot'])
+            ->withCount('albaranes as ui_albaranes_count')
+            ->withCount('facturacionesManuales as facturaciones_manuales_count')
+            ->withSum('facturacionesManuales as facturaciones_sum', 'importe')
             ->where('proyecto_id', $proyectoId);
 
         if ($search !== '') {
@@ -186,6 +189,9 @@ class PedidoController extends Controller
                 : null;
             $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
 
+            $pedido->ui_total_facturaciones = round((float) ($pedido->facturaciones_sum ?? 0), 2);
+            $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_albaranes - $pedido->ui_total_facturaciones, 2));
+
             return $pedido;
         });
 
@@ -308,7 +314,7 @@ class PedidoController extends Controller
                 'required',
                 'string',
                 'max:80',
-                Rule::unique('pedidos_clientes', 'numero_pedido')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+                Rule::unique('pedidos_clientes', 'numero_pedido')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)->whereNull('deleted_at')),
             ],
             'referencia_manual' => 'nullable|string|max:120',
             'bolsa_texto' => 'nullable|string|max:2000',
@@ -700,6 +706,15 @@ class PedidoController extends Controller
         return redirect()->route('pedidos-clientes.albaranes', $pedidoCliente)
                         ->with('success', 'Facturación añadida correctamente.');
     }
+
+    public function destroyFacturacion(Request $request, $id)
+    {
+        // Buscamos la cuota por su ID y la eliminamos
+        $facturacion = \App\Models\FacturacionManual::findOrFail($id);
+        $facturacion->delete();
+
+        return redirect()->back()->with('success', 'Cuota de facturación eliminada correctamente. Los totales se han recalculado.');
+    }
     
 
     /**
@@ -874,5 +889,26 @@ class PedidoController extends Controller
                 ]
             );
         }
+    }
+
+    public function actualizarDescripcion(Request $request, PedidoCliente $pedidoCliente)
+    {
+        // 1. Validamos que nos llegue la descripción y el índice (la posición de la línea)
+        $request->validate([
+            'linea_index' => 'required|integer|min:0',
+            'descripcion' => 'required|string',
+        ]);
+
+        $lineas = $pedidoCliente->lista_articulos;
+        $index = (int) $request->linea_index;
+
+        // 2. Comprobamos que el array existe y que esa posición concreta es real
+        if (is_array($lineas) && isset($lineas[$index])) {
+            $lineas[$index]['descripcion'] = $request->descripcion; 
+            $pedidoCliente->lista_articulos = $lineas;
+            $pedidoCliente->save();
+        }
+
+        return redirect()->back()->with('success', 'Descripción actualizada correctamente.');
     }
 }

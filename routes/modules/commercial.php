@@ -62,6 +62,8 @@ Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pe
 Route::get('pedidos-clientes/{pedidoCliente}/albaranes', [PedidoController::class, 'albaranesCliente'])->name('pedidos-clientes.albaranes');
 Route::get('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'showCliente'])->name('pedidos-clientes.show');
 Route::post('pedidos-clientes/{pedidoCliente}/facturar-cuota', [PedidoController::class, 'facturarCuota'])->name('pedidos-clientes.facturar-cuota');
+Route::put('/pedidos-clientes/{pedidoCliente}/actualizar-descripcion', [PedidoController::class, 'actualizarDescripcion'])->name('pedidos-clientes.actualizar-descripcion');
+Route::delete('/facturacion-manual/{id}', [App\Http\Controllers\PedidoController::class, 'destroyFacturacion'])->name('facturacion-manual.destroy');
 
 // Vistas de catálogo y consultas auxiliares.
 Route::resource('productos', ProductoController::class)->only(['index']);
