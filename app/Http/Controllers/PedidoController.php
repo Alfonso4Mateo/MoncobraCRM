@@ -649,7 +649,6 @@ class PedidoController extends Controller
 
         $totalAlbaranes = round((float) $albaranes->sum('total'), 2);
         $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
-        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranes), 2);
 
         $perPage = 10;
         $currentPage = max(1, (int) request()->query('page', 1));
@@ -662,9 +661,18 @@ class PedidoController extends Controller
             ['path' => request()->url(), 'query' => request()->query()]
         );
 
+        // 1. Obtener facturaciones manuales (cuotas)
+        $facturaciones = $pedidoCliente->facturacionesManuales()->orderBy('created_at', 'desc')->get();
+        $totalFacturadoDirecto = round((float) $facturaciones->sum('importe'), 2);
+
+        // 2. Calcular el pendiente final unificado (Pedido - Albaranes - Facturación Directa)
+        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranes - $totalFacturadoDirecto), 2);
+
+        // 3. Único retorno con todas las variables empaquetadas correctamente
         return view('pedidos-clientes.albaranes', [
             'pedidoCliente' => $pedidoCliente,
             'albaranes' => $albaranes,
+            'facturaciones' => $facturaciones,
             'totalPedido' => $totalPedido,
             'totalAlbaranes' => $totalAlbaranes,
             'pendienteFacturar' => $pendienteFacturar,
@@ -672,6 +680,27 @@ class PedidoController extends Controller
             'breadcrumb' => 'Albaranes del pedido',
         ]);
     }
+
+
+    public function facturarCuota(Request $request, PedidoCliente $pedidoCliente)
+    {
+        // 1. Validamos que los datos lleguen correctamente
+        $request->validate([
+            'importe' => 'required|numeric|min:0.01',
+            'concepto' => 'required|string|max:500',
+        ]);
+
+        // 2. Guardamos en la tabla relacionada
+        $pedidoCliente->facturacionesManuales()->create([
+            'importe' => $request->importe,
+            'concepto' => $request->concepto,
+        ]);
+
+        // 3. Redirigimos de vuelta a la misma pantalla con un mensaje de éxito
+        return redirect()->route('pedidos-clientes.albaranes', $pedidoCliente)
+                        ->with('success', 'Facturación añadida correctamente.');
+    }
+    
 
     /**
      * Show the form for editing the specified resource.

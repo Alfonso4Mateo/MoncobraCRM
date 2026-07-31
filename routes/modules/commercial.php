@@ -61,6 +61,7 @@ Route::delete('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'des
 Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pedidos-clientes.data');
 Route::get('pedidos-clientes/{pedidoCliente}/albaranes', [PedidoController::class, 'albaranesCliente'])->name('pedidos-clientes.albaranes');
 Route::get('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'showCliente'])->name('pedidos-clientes.show');
+Route::post('pedidos-clientes/{pedidoCliente}/facturar-cuota', [PedidoController::class, 'facturarCuota'])->name('pedidos-clientes.facturar-cuota');
 
 // Vistas de catálogo y consultas auxiliares.
 Route::resource('productos', ProductoController::class)->only(['index']);

@@ -107,4 +107,12 @@ class PedidoCliente extends Model
             'albaran_cliente_id'
         )->withTimestamps();
     }
+
+    /**
+     * Get the manual billings (cuotas) associated with the order.
+     */
+    public function facturacionesManuales(): HasMany
+    {
+        return $this->hasMany(FacturacionManual::class, 'pedido_id');
+    }
 }
