@@ -11,8 +11,7 @@ return new class extends Migration
         Schema::create('curso_personal', function (Blueprint $table) {
             $table->id();
             $table->foreignId('curso_id')->constrained('cursos')->cascadeOnDelete();
-            $table->unsignedInteger('personal_id');
-            $table->foreign('personal_id')->references('id')->on('personal')->cascadeOnDelete();
+            $table->foreignId('personal_id')->constrained('personal')->cascadeOnDelete();
             $table->date('fecha_realizacion')->nullable();
             $table->boolean('apto')->default(false);
             $table->text('descripcion_aptitud')->nullable();
