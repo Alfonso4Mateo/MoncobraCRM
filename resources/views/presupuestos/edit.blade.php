@@ -450,8 +450,22 @@
                 if (row instanceof HTMLElement) {
                     const index = Number.parseInt(row.dataset.index || '-1', 10);
                     if (index >= 0 && index < items.length) {
-                        selectedIndex = index;
-                        renderRows();
+                        // Solo realizamos cambios si seleccionamos una fila diferente
+                        if (selectedIndex !== index) {
+                            selectedIndex = index;
+                            
+                            // 1. Buscamos si hay una fila previamente seleccionada y le quitamos la clase
+                            const filaSeleccionadaPrevia = tbody.querySelector('.item-selected');
+                            if (filaSeleccionadaPrevia) {
+                                filaSeleccionadaPrevia.classList.remove('item-selected');
+                            }
+                            
+                            // 2. Le añadimos la clase de selección a la fila donde acabamos de hacer clic
+                            row.classList.add('item-selected');
+                            
+                            // 3. Actualizamos los botones de "Editar" y "Eliminar" para que se activen
+                            setButtonsState();
+                        }
                     }
                 }
             });

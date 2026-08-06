@@ -615,10 +615,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (row) {
-            selectedIndex = Number(row.dataset.index);
-        }
-
+        // 1. Si el clic es en un botón de acción (editar, eliminar, etc.), mantenemos la lógica
         if (target) {
             const index = Number(target.dataset.index);
             const action = target.dataset.action;
@@ -656,7 +653,30 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        renderRows();
+        // 2. Lógica para seleccionar la fila sin destruir el DOM
+        if (row) {
+            const index = Number(row.dataset.index);
+            
+            // Si estamos en modo edición normal y pulsamos una fila diferente
+            if (!isPedidoRestrictoMode() && selectedIndex !== index) {
+                selectedIndex = index;
+
+                // Quitamos la clase de selección de la fila anterior
+                const filaSeleccionadaPrevia = tableBody.querySelector('tr.is-selected');
+                if (filaSeleccionadaPrevia) {
+                    filaSeleccionadaPrevia.classList.remove('is-selected');
+                }
+
+                // Añadimos la clase a la fila actual
+                row.classList.add('is-selected');
+
+                // Actualizamos los botones laterales (Editar/Eliminar)
+                setSideButtonsState();
+            } else if (isPedidoRestrictoMode()) {
+                // En modo restrictivo (pedido cerrado), solo actualizamos el índice internamente
+                selectedIndex = index;
+            }
+        }
     });
 
     tableBody.addEventListener("change", (event) => {
