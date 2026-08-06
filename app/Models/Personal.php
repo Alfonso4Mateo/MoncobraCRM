@@ -29,10 +29,13 @@ class Personal extends Model
         'calzado',
         'casco',
         'guantes',
+        'gafas',
         'telefono',
         'descripcion',
         'ultima_revision_medica',
         'proxima_revision_medica',
+        'ultima_graduacion',
+        'proxima_graduacion',
         'activo',
     ];
 
@@ -40,6 +43,8 @@ class Personal extends Model
         'activo' => 'boolean',
         'ultima_revision_medica' => 'date',
         'proxima_revision_medica' => 'date',
+        'ultima_graduacion' => 'date',
+        'proxima_graduacion' => 'date',
         'departamento' => 'array',
     ];
 

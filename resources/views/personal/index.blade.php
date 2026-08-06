@@ -130,7 +130,7 @@
                     <table class="table personal-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>ID RRHH</th>
                                 <th>NOMBRE COMPLETO</th>
                                 <th>DEPARTAMENTO</th>
                                 <th>VINCULACIÓN</th>
@@ -140,6 +140,7 @@
                                 <th>PANTALÓN</th>
                                 <th>CALZADO</th>
                                 <th>GUANTES</th>
+                                <th>GAFAS</th>
                                 <th>ACCIONES</th>
                             </tr>
                         </thead>
@@ -154,10 +155,10 @@
                                         ->map(fn ($part) => strtoupper(mb_substr($part, 0, 1)))
                                         ->take(2)
                                         ->implode('');
-                                    $userCode = str_pad((string) $personal->id, 4, '0', STR_PAD_LEFT);
+                                    $userCode = str_pad((string) $personal->id_rrhh, 4, '0', STR_PAD_LEFT);
                                 @endphp
                                 <tr class="{{ $alertaRevision ? 'personal-row--alert' : '' }}">
-                                    <td data-label="ID">
+                                    <td data-label="ID RRHH">
                                         <span class="personal-code">{{ $userCode }}</span>
                                     </td>
                                     <td data-label="NOMBRE COMPLETO">
@@ -206,6 +207,9 @@
                                     </td>
                                     <td data-label="GUANTES">
                                         <span class="personal-size-badge">{{ $personal->guantes ?? '—' }}</span>
+                                    </td>
+                                    <td data-label="GAFAS">
+                                        <span class="personal-size-badge">{{ $personal->gafas ?? '—' }}</span>
                                     </td>
                                     <td data-label="ACCIONES" class="text-right">
                                         <div class="personal-actions">

@@ -278,6 +278,19 @@
                                         <label for="proxima_revision_medica">Próxima revisión médica</label>
                                         <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
                                     </div>
+
+                                    <div class="profile-edit-form-group">
+                                        <label for="ultima_graduacion">Última graduación</label>
+                                        <div class="profile-edit-inline">
+                                            <input type="date" id="ultima_graduacion" name="ultima_graduacion" value="{{ old('ultima_graduacion', optional($personal->ultima_graduacion)->format('Y-m-d')) }}" class="@error('ultima_graduacion') is-invalid @enderror">
+                                            <button type="button" id="set-graduacion-hoy" class="profile-edit-today-btn">Hoy</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="profile-edit-form-group">
+                                        <label for="proxima_graduacion">Próxima graduación</label>
+                                        <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -298,7 +311,7 @@
                                     <label for="camiseta">Camiseta</label>
                                     <select id="camiseta" name="camiseta" class="@error('camiseta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
+                                        @foreach(['2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -308,7 +321,7 @@
                                     <label for="chaqueta">Chaqueta</label>
                                     <select id="chaqueta" name="chaqueta" class="@error('chaqueta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
+                                        @foreach(['2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -318,7 +331,7 @@
                                     <label for="sudadera">Sudadera</label>
                                     <select id="sudadera" name="sudadera" class="@error('sudadera') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL'] as $value => $label)
+                                        @foreach(['2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -328,7 +341,7 @@
                                     <label for="pantalon">Pantalón</label>
                                     <select id="pantalon" name="pantalon" class="@error('pantalon') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['34' => '34','36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50','52' => '52','54' => '54','56' => '56','58' => '58','60' => '60','62' => '62','64' => '64'] as $value => $label)
+                                        @foreach(['30' => '30','32' => '32','34' => '34','36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50','52' => '52','54' => '54','56' => '56','58' => '58','60' => '60','62' => '62','64' => '64','66' => '66','68' => '68','70' => '70'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -338,7 +351,7 @@
                                     <label for="calzado">Calzado Seguridad</label>
                                     <select id="calzado" name="calzado" class="@error('calzado') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46'] as $value => $label)
+                                        @foreach(['34' => '34','35' => '35','36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46', '47' => '47', '48' => '48', '49' => '49', '50' => '50'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -348,7 +361,7 @@
                                     <label for="guantes">Guantes</label>
                                     <select id="guantes" name="guantes" class="@error('guantes') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
-                                        @foreach(['6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11'] as $value => $label)
+                                        @foreach(['5' => '5','6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11' ,'12' => '12'] as $value => $label)
                                             <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) === $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -359,6 +372,15 @@
                                     <select id="casco" name="casco" class="@error('casco') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         <option value="Estándar" @selected(old('casco', $personal->casco) === 'Estándar')>Estándar</option>
+                                    </select>
+                                </div>
+                                <div class="profile-edit-form-group">
+                                    <label for="gafas">Gafas</label>
+                                    <select id="gafas" name="gafas" class="@error('gafas') is-invalid @enderror">
+                                        <option value="">Selecciona tipo</option>
+                                        @foreach(['Graduadas' => 'Graduadas', 'Protección' => 'Protección'] as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('gafas', $personal->gafas) === $value)>{{ $label }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                             </div>
@@ -391,11 +413,15 @@
     <script>
         // Lógica de fechas
         (function() {
-            const btnHoy = document.getElementById('set-ultima-hoy');
-            const ultimaInput = document.getElementById('ultima_revision_medica');
-            const proximaInput = document.getElementById('proxima_revision_medica');
-
-            if (!btnHoy || !ultimaInput || !proximaInput) return;
+            // Elementos de Revisión Médica
+            const btnHoyMedica = document.getElementById('set-ultima-hoy');
+            const ultimaMedicaInput = document.getElementById('ultima_revision_medica');
+            const proximaMedicaInput = document.getElementById('proxima_revision_medica');
+            
+            // Elementos de Graduación (gafas)
+            const btnHoyGrad = document.getElementById('set-graduacion-hoy');
+            const ultimaGradInput = document.getElementById('ultima_graduacion');
+            const proximaGradInput = document.getElementById('proxima_graduacion');
 
             const formatDate = (date) => {
                 const year = date.getFullYear();
@@ -411,27 +437,41 @@
                 return new Date(parts[0], parts[1] - 1, parts[2]);
             };
 
-            const setNextFrom = (date) => {
-                if (!date) {
-                    proximaInput.value = '';
+            const setNextFrom = (date, targetInput) => {
+                if (!date || !targetInput) {
+                    if (targetInput) targetInput.value = '';
                     return;
                 }
                 const next = new Date(date);
-                next.setMonth(next.getMonth() + 12);
-                proximaInput.value = formatDate(next);
+                next.setMonth(next.getMonth() + 12); // Añade 1 año por defecto
+                targetInput.value = formatDate(next);
             };
 
-            btnHoy.addEventListener('click', function() {
-                const today = new Date();
+            // Eventos para Revisión Médica
+            if (btnHoyMedica && ultimaMedicaInput) {
+                btnHoyMedica.addEventListener('click', function() {
+                    const today = new Date();
+                    ultimaMedicaInput.value = formatDate(today);
+                    setNextFrom(today, proximaMedicaInput);
+                });
 
-                ultimaInput.value = formatDate(today);
-                setNextFrom(today);
-            });
+                ultimaMedicaInput.addEventListener('input', function() {
+                    setNextFrom(parseDate(ultimaMedicaInput.value), proximaMedicaInput);
+                });
+            }
 
-            ultimaInput.addEventListener('input', function() {
-                const parsed = parseDate(ultimaInput.value);
-                setNextFrom(parsed);
-            });
+            // Eventos para Graduación
+            if (btnHoyGrad && ultimaGradInput) {
+                btnHoyGrad.addEventListener('click', function() {
+                    const today = new Date();
+                    ultimaGradInput.value = formatDate(today);
+                    setNextFrom(today, proximaGradInput);
+                });
+
+                ultimaGradInput.addEventListener('input', function() {
+                    setNextFrom(parseDate(ultimaGradInput.value), proximaGradInput);
+                });
+            }
         })();
 
         // LÓGICA PARA LOS BOTONES DE DEPARTAMENTO (AJAX)

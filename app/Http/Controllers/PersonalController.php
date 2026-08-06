@@ -289,6 +289,7 @@ class PersonalController extends Controller
             ['label' => 'Calzado', 'value' => $personal->calzado ?: '—', 'icon' => 'fa-shoe-prints'],
             ['label' => 'Casco', 'value' => $personal->casco ?: '—', 'icon' => 'fa-hard-hat'],
             ['label' => 'Guantes', 'value' => $personal->guantes ?: '—', 'icon' => 'fa-hand-paper'],
+            ['label' => 'Gafas', 'value' => $personal->gafas ?: '—', 'icon' => 'fa-glasses'],
         ];
 
         return view('personal.show', compact('personal', 'historicoSalidas', 'tallas', 'cursosCatalogo'));
@@ -350,7 +351,7 @@ class PersonalController extends Controller
             ->orderBy('name')
             ->get();
 
-        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco'];
+        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
 
         return view('personal.tallas', [
             'personals' => $personals,
@@ -379,11 +380,14 @@ class PersonalController extends Controller
             'pantalon' => 'nullable|string|max:20',
             'calzado' => 'nullable|string|max:20',
             'casco' => 'nullable|string|max:20',
+            'gafas' => 'nullable|string|max:20',
             'guantes' => 'nullable|string|max:20',
             'telefono' => 'nullable|string|max:20',
             'descripcion' => 'nullable|string|max:500',
             'ultima_revision_medica' => 'nullable|date',
             'proxima_revision_medica' => 'nullable|date',
+            'ultima_graduacion' => 'nullable|date',
+            'proxima_graduacion' => 'nullable|date',
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
             'activo' => 'boolean',

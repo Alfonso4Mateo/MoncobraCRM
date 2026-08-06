@@ -252,6 +252,34 @@
         .profile-modal__btn--danger:hover {
             background: #991b1b;
         }
+        /* Nuevos estilos para la información médica en la derecha */
+        .profile-main-right {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .profile-right-metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px 16px;
+            padding: 18px;
+        }
+
+        .profile-right-metadata span {
+            display: block;
+            font-size: .67rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: #8a98ab;
+            margin-bottom: 6px;
+        }
+
+        .profile-right-metadata strong {
+            font-size: .9rem;
+            color: var(--profile-ink);
+        }
 
         @media (max-width: 768px) {
             .profile-filters {
@@ -293,6 +321,8 @@
             <section class="profile-main">
                 <article class="profile-card profile-card--main-sidebar">
                     <div class="profile-main-row">
+                        
+                        <!-- COLUMNA IZQUIERDA (Perfil Básico) -->
                         <div class="profile-main-left">
                             <div class="profile-status">{{ $personal->activo ? 'ACTIVO' : 'INACTIVO' }}</div>
 
@@ -319,18 +349,6 @@
                                     <span>ID RRHH</span>
                                     <strong>{{ $personal->id_rrhh ?: '—' }}</strong>
                                 </div>
-                               <div>
-                                    <span>DEPARTAMENTO</span>
-                                    <strong>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : '—' }}</strong>
-                                </div>
-                                <div>
-                                    <span>ÚLTIMA REVISIÓN MÉDICA</span>
-                                    <strong>{{ optional($personal->ultima_revision_medica)->format('d M Y') ?: '—' }}</strong>
-                                </div>
-                                <div>
-                                    <span>PRÓXIMA REVISIÓN MÉDICA</span>
-                                    <strong>{{ optional($personal->proxima_revision_medica)->format('d M Y') ?: '—' }}</strong>
-                                </div>
                                 <div>
                                     <span>ANTIGÜEDAD</span>
                                     <strong>{{ optional($personal->created_at)->format('d M Y') }}</strong>
@@ -338,21 +356,65 @@
                             </div>
                         </div>
 
-                        <article class="profile-card profile-card--tallas">
-                            <h3><i class="fas fa-ruler-combined"></i> Tallas y EPIs</h3>
-
-                            <div class="profile-size-list">
-                                @foreach ($tallas as $talla)
-                                    <div class="profile-size-row">
-                                        <div class="profile-size-label">
-                                            <i class="fas {{ $talla['icon'] }}"></i>
-                                            <span>{{ $talla['label'] }}</span>
+                        <!-- COLUMNA DERECHA (Tallas e Información Extra) -->
+                        <div class="profile-main-right">
+                            
+                            <!-- Tarjeta de Tallas -->
+                            <article class="profile-card--tallas">
+                                <h3><i class="fas fa-ruler-combined"></i> Tallas y EPIs</h3>
+                                <div class="profile-size-list">
+                                    @foreach ($tallas as $talla)
+                                        <div class="profile-size-row">
+                                            <div class="profile-size-label">
+                                                <i class="fas {{ $talla['icon'] }}"></i>
+                                                <span>{{ $talla['label'] }}</span>
+                                            </div>
+                                            <strong>{{ $talla['value'] }}</strong>
                                         </div>
-                                        <strong>{{ $talla['value'] }}</strong>
+                                    @endforeach
+                                </div>
+                            </article>
+
+                            <!-- Tarjeta de Información Médica y Corporativa -->
+                            <article class="profile-card--tallas">
+                                <h3><i class="fas fa-notes-medical"></i> Información Corporativa y Médica</h3>
+                                <div class="profile-right-metadata" style="align-items: start;">
+                                    
+                                    <!-- Columna 1: Corporativo -->
+                                    <div style="display: flex; flex-direction: column; gap: 18px;">
+                                        <div>
+                                            <span>DEPARTAMENTO</span>
+                                            <strong>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : '—' }}</strong>
+                                        </div>
                                     </div>
-                                @endforeach
-                            </div>
-                        </article>
+
+                                    <!-- Columna 2: Revisión Médica -->
+                                    <div style="display: flex; flex-direction: column; gap: 18px;">
+                                        <div>
+                                            <span>ÚLTIMA REVISIÓN MÉDICA</span>
+                                            <strong>{{ optional($personal->ultima_revision_medica)->format('d M Y') ?: '—' }}</strong>
+                                        </div>
+                                        <div>
+                                            <span>PRÓXIMA REVISIÓN MÉDICA</span>
+                                            <strong>{{ optional($personal->proxima_revision_medica)->format('d M Y') ?: '—' }}</strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Columna 3: Graduación (Gafas) -->
+                                    <div style="display: flex; flex-direction: column; gap: 18px;">
+                                        <div>
+                                            <span>ÚLTIMA GRADUACIÓN</span>
+                                            <strong>{{ optional($personal->ultima_graduacion)->format('d M Y') ?: '—' }}</strong>
+                                        </div>
+                                        <div>
+                                            <span>PRÓXIMA GRADUACIÓN</span>
+                                            <strong>{{ optional($personal->proxima_graduacion)->format('d M Y') ?: '—' }}</strong>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </article>
+                        </div>
                     </div>
                 </article>
 
