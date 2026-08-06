@@ -85,6 +85,92 @@
             border-color: var(--profile-ink);
         }
 
+        .profile-course-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .profile-course-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+            padding: 14px 16px;
+            border: 1px solid var(--profile-line);
+            border-radius: 14px;
+            background: #fafbfc;
+        }
+
+        .profile-course-row__actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .profile-course-row__meta h4 {
+            margin: 0 0 4px;
+            font-size: .98rem;
+            font-weight: 800;
+            color: var(--profile-ink);
+        }
+
+        .profile-course-row__meta p {
+            margin: 0;
+            color: var(--profile-muted);
+            font-size: .86rem;
+        }
+
+        .profile-course-form {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr .7fr 1.4fr auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .profile-course-form .course-field label {
+            display: block;
+            font-size: .72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #8a98ab;
+            margin-bottom: 6px;
+        }
+
+        .profile-course-form .course-field input,
+        .profile-course-form .course-field select,
+        .profile-course-form .course-field textarea {
+            width: 100%;
+            border: 1px solid var(--profile-line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            color: var(--profile-ink);
+        }
+
+        .profile-course-form .course-submit {
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 14px;
+            background: var(--profile-primary);
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        @media (max-width: 980px) {
+            .profile-course-form {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .profile-course-form {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .profile-action--danger {
             background: #b91c1c;
             color: #fff !important;
@@ -287,6 +373,105 @@
                         </div>
                     </article>
                 @endif
+
+                <article class="profile-card">
+                    <div class="profile-card__header">
+                        <div>
+                            <h3><i class="fas fa-graduation-cap"></i> Formación y Cursos</h3>
+                            <p>Histórico de cursos asignados al trabajador</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-card__body" style="padding: 20px;">
+                        <div class="profile-course-grid">
+                            @forelse($personal->cursos as $curso)
+                                <div class="profile-course-row">
+                                    <div class="profile-course-row__meta">
+                                        <h4>{{ $curso->nombre }}</h4>
+                                        <p>
+                                            Realizado: {{ optional($curso->pivot->fecha_realizacion)->format('d M Y') ?: 'Sin fecha' }}
+                                            · {{ $curso->pivot->descripcion_aptitud ?: 'Sin observaciones de aptitud' }}
+                                        </p>
+                                    </div>
+
+                                    <div class="profile-course-row__actions">
+                                        <span class="profile-chip {{ ($curso->pivot->apto ?? false) ? 'profile-chip--ok' : 'profile-chip--pending' }}">
+                                            {{ ($curso->pivot->apto ?? false) ? 'Apto' : 'No apto' }}
+                                        </span>
+
+                                        <form method="POST" action="{{ route('personal.cursos.destroy', [$personal->id, $curso->id]) }}" onsubmit="return confirm('¿Quitar este curso del trabajador?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="profile-icon-link" title="Quitar curso" style="border:0;background:transparent;cursor:pointer;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="profile-empty-state">
+                                    <i class="fas fa-book-open"></i>
+                                    <strong>No hay cursos asignados</strong>
+                                    <span>La formación aparecerá aquí cuando se vaya registrando.</span>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </article>
+
+                <article class="profile-card">
+                    <div class="profile-card__header">
+                        <div>
+                            <h3><i class="fas fa-circle-plus"></i> Asignar nuevo curso</h3>
+                            <p>Registra una nueva formación con fecha, aptitud y observaciones</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-card__body" style="padding: 20px;">
+                        @if($cursosCatalogo->isEmpty())
+                            <div class="profile-empty-state">
+                                <i class="fas fa-graduation-cap"></i>
+                                <strong>No hay cursos en el catálogo</strong>
+                                <span>Crea primero un curso para poder asignarlo al personal.</span>
+                            </div>
+                        @else
+                            <form method="POST" action="{{ route('personal.cursos.update', $personal->id) }}" class="profile-course-form">
+                                @csrf
+                                @method('PUT')
+
+                                <div class="course-field">
+                                    <label for="curso_id">Curso</label>
+                                    <select id="curso_id" name="curso_id" required>
+                                        <option value="">Selecciona un curso</option>
+                                        @foreach($cursosCatalogo as $cursoCatalogo)
+                                            <option value="{{ $cursoCatalogo->id }}">{{ $cursoCatalogo->nombre }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="course-field">
+                                    <label for="fecha_realizacion">Fecha realización</label>
+                                    <input type="date" id="fecha_realizacion" name="fecha_realizacion">
+                                </div>
+
+                                <div class="course-field">
+                                    <label for="apto">Apto</label>
+                                    <select id="apto" name="apto">
+                                        <option value="0">No</option>
+                                        <option value="1">Sí</option>
+                                    </select>
+                                </div>
+
+                                <div class="course-field">
+                                    <label for="descripcion_aptitud">Descripción aptitud</label>
+                                    <textarea id="descripcion_aptitud" name="descripcion_aptitud" rows="2" placeholder="Observaciones sobre la aptitud del trabajador"></textarea>
+                                </div>
+
+                                <button type="submit" class="course-submit">Asignar</button>
+                            </form>
+                        @endif
+                    </div>
+                </article>
 
                 <article class="profile-card profile-card--table">
                     <div class="profile-card__header">

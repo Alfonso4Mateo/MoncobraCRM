@@ -376,6 +376,14 @@ return [
             'active' => ['personal*'],
         ],
 
+        // Cursos
+        [
+            'text' => 'Cursos',
+            'url' => 'cursos',
+            'icon' => 'fas fa-fw fa-graduation-cap',
+            'active' => ['cursos*'],
+        ],
+
         // Sección inferior fija de utilidades
         [
             'header' => 'Herramientas',

@@ -7,6 +7,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/personal-index.css'])
+    <style>
+        .personal-course-status,
+        .personal-course-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 9px;
+            margin: 0 6px 6px 0;
+        }
+
+        .personal-course-status--ok,
+        .personal-course-pill--ok { background: #e8f5e9; color: #2e7d32; }
+        .personal-course-status--warn,
+        .personal-course-pill--warn { background: #fff8e1; color: #b8860b; }
+        .personal-course-status--muted,
+        .personal-course-pill--muted { background: #eef2f7; color: #667085; }
+        .personal-course-cell { min-width: 220px; }
+        .personal-course-list { margin-top: 6px; }
+    </style>
 @endsection
 
 @section('content')
@@ -19,6 +40,11 @@
             </div>
 
             <div class="personal-hero-actions">
+                <a href="{{ route('cursos.index') }}" class="personal-action-btn personal-action-btn--soft" style="margin-right:12px;">
+                    <i class="fas fa-graduation-cap" aria-hidden="true"></i>
+                    Catálogo de Cursos
+                </a>
+
                 <a href="{{ route('personal.tallas') }}" class="personal-action-btn personal-action-btn--soft" style="margin-right:12px;">
                     <i class="fas fa-tshirt" aria-hidden="true"></i>
                     Gestionar Tallas
@@ -196,7 +222,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="11">
+                                    <td colspan="12">
                                         <div class="personal-empty-state">
                                             <i class="fas fa-users-slash"></i>
                                             <strong>No hay personal para mostrar</strong>

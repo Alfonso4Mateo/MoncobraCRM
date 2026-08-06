@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Curso;
 use App\Models\Personal;
 use App\Models\SalidaStock;
 use App\Models\Proyecto;
@@ -14,7 +15,6 @@ class PersonalController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
-       
     }
 
     public function index(Request $request)
@@ -35,7 +35,10 @@ class PersonalController extends Controller
         $alertaNombre = in_array($alertaNombre, ['any', 'with', 'without'], true) ? $alertaNombre : 'any';
 
         $buildQuery = function () use ($query, $alertaNombre, $alertaLimite) {
-            $personalQuery = Personal::query()->with('proyectos');
+            $personalQuery = Personal::query()->with([
+                'proyectos',
+                'cursos' => fn ($query) => $query->orderBy('nombre'),
+            ]);
 
             if ($query !== '') {
                 $personalQuery->where(function ($subQuery) use ($query) {
@@ -103,6 +106,34 @@ class PersonalController extends Controller
                 ? ($personal->proxima_revision_medica && $personal->proxima_revision_medica->lte($alertaLimite))
                 : false;
 
+            $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
+            $cursosTotales = $personal->cursos->count();
+
+            $personal->cursos_resumen = $personal->cursos
+                ->take(3)
+                ->map(function ($curso) {
+                    $apto = (bool) ($curso->pivot->apto ?? false);
+
+                    return (object) [
+                        'nombre' => $curso->nombre,
+                        'apto' => $apto,
+                        'clase' => $apto ? 'personal-course-pill personal-course-pill--ok' : 'personal-course-pill personal-course-pill--warn',
+                    ];
+                })
+                ->values()
+                ->all();
+
+            if ($cursosTotales === 0) {
+                $personal->cursos_estado = 'Sin formación';
+                $personal->cursos_estado_clase = 'personal-course-status personal-course-status--muted';
+            } elseif ($cursosAptos === $cursosTotales) {
+                $personal->cursos_estado = 'Formación al día';
+                $personal->cursos_estado_clase = 'personal-course-status personal-course-status--ok';
+            } else {
+                $personal->cursos_estado = 'Revisar formación';
+                $personal->cursos_estado_clase = 'personal-course-status personal-course-status--warn';
+            }
+
             return $personal;
         });
         $personalTotal = Personal::count();
@@ -160,7 +191,11 @@ class PersonalController extends Controller
 
     public function show(Personal $personal, Request $request)
     {
-        $personal->load('proyectos');
+        $personal->load([
+            'proyectos',
+            'cursos' => fn ($query) => $query->orderBy('nombre'),
+        ]);
+        $cursosCatalogo = Curso::orderBy('nombre')->get();
 
         $nombreCompleto = trim(preg_replace('/\s+/', ' ', trim((string) $personal->name . ' ' . (string) $personal->apellido)));
         $nombreNormalizado = mb_strtolower($nombreCompleto);
@@ -256,7 +291,7 @@ class PersonalController extends Controller
             ['label' => 'Guantes', 'value' => $personal->guantes ?: '—', 'icon' => 'fa-hand-paper'],
         ];
 
-        return view('personal.show', compact('personal', 'historicoSalidas', 'tallas'));
+        return view('personal.show', compact('personal', 'historicoSalidas', 'tallas', 'cursosCatalogo'));
     }
 
     public function edit(Personal $personal)
@@ -267,7 +302,7 @@ class PersonalController extends Controller
             'personal' => $personal,
             'isCreate' => false,
             'proyectos' => Proyecto::orderBy('nombre')->get(),
-            'departamentos' => $departamentos, 
+            'departamentos' => $departamentos,
         ]);
     }
 

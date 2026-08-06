@@ -195,7 +195,7 @@
                 <div class="permisos-icon"><i class="fas fa-circle-info"></i></div>
                 <h5>Permisos por Rol</h5>
             </div>
-            <p>Los roles de Super Admin tienen acceso total. Los Admin pueden gestionar inventario y clientes. Los Usuarios solo visualizan tareas asignadas.</p>
+            <p>Los roles de Super Admin tienen acceso total. Los Admin pueden gestionar varias áreas con determinados permisos. Los Usuarios tendrán acceso limitado a ciertas funcionalidades.</p>
         </div>
     </div>
 @endsection

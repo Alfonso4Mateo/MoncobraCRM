@@ -91,7 +91,7 @@
                                 <tr>
                                     <td>AL-{{ str_pad((string) $p->id, 4, '0', STR_PAD_LEFT) }}</td>
                                     <td>{{ $p->name }} {{ $p->apellido }}</td>
-                                    <td>{{ $p->departamento ?? '—' }}</td>
+                                    <td>{{ $p->departamento->nombre ?? '—' }}</td>
                                     @foreach($columns as $c)
                                         <td>{{ $p->{$c} ?: '—' }}</td>
                                     @endforeach

@@ -40,5 +40,6 @@ Route::middleware('auth')->group(function () {
     require __DIR__ . '/modules/documents.php';
     require __DIR__ . '/modules/commercial.php';
     require __DIR__ . '/modules/operations.php';
+    require __DIR__ . '/modules/cursos.php';
     
 });

@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         // Le decimos a Laravel que ejecute tu seeder de Administrador
         $this->call([
             AdminUserSeeder::class,
+            CursosSeeder::class,
         ]);
     }
 }
