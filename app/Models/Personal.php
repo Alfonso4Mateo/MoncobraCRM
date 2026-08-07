@@ -30,12 +30,15 @@ class Personal extends Model
         'casco',
         'guantes',
         'gafas',
+        'sin_tallas',
         'telefono',
         'descripcion',
         'ultima_revision_medica',
         'proxima_revision_medica',
         'ultima_graduacion',
         'proxima_graduacion',
+        'reconocido_en',
+        'graduado_en',
         'activo',
     ];
 

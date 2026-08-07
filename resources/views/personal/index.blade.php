@@ -290,7 +290,7 @@
             let timer = null;
             input.addEventListener('input', function(){
                 clearTimeout(timer);
-                timer = setTimeout(()=> document.querySelector('.personal-search-form').submit(), 450);
+                timer = setTimeout(()=> document.querySelector('.personal-search-form').submit(), 800);
             });
         })();
     </script>

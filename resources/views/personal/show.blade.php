@@ -412,6 +412,18 @@
                                         </div>
                                     </div>
 
+                                    <!-- Columna 4: Empresas -->
+                                    <div style="display: flex; flex-direction: column; gap: 18px;">
+                                        <div>
+                                            <span for="reconocido_en">Reconocido en: </span>
+                                            <strong>{{ $personal->reconocido_en ?: '—' }}</strong>
+                                        </div>
+                                        <div>
+                                            <span for="graduado_en">Graduado en:</span>
+                                            <strong>{{ $personal->graduado_en ?: '—' }}</strong>
+                                        </div>
+                                    </div>
+
                                 </div>
                             </article>
                         </div>

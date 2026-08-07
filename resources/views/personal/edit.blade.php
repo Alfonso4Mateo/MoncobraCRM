@@ -291,6 +291,16 @@
                                         <label for="proxima_graduacion">Próxima graduación</label>
                                         <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
                                     </div>
+
+                                    <div class="profile-edit-form-group">
+                                        <label for="reconocido_en">Reconocido en:</label>
+                                        <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?: '—') }}" class="@error('reconocido_en') is-invalid @enderror">
+                                    </div>
+
+                                    <div class="profile-edit-form-group">
+                                        <label for="graduado_en">Graduado en:</label>
+                                        <input type="text" id="graduado_en" name="graduado_en" value="{{ old('graduado_en', $personal->graduado_en ?: '—' ) }}" class="@error('graduado_en') is-invalid @enderror">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -303,6 +313,16 @@
                                 <h3><i class="fas fa-ruler-combined"></i> Tallas y Equipamiento</h3>
                                 <p>Medidas corporales para la asignación de uniforme industrial</p>
                             </div>
+                        </div>
+
+                        <div class="profile-card__body" style="padding: 20px">
+                            <label for="sin_tallas" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <!-- EL TRUCO: Campo oculto que asegura que siempre se envíe un 0 si el checkbox está desmarcado -->
+                                <input type="hidden" name="sin_tallas" value="0">
+                                <!-- Tu checkbox original -->
+                                <input type="checkbox" id="sin_tallas" name="sin_tallas" value="1" @checked(old('sin_tallas', $personal->sin_tallas))>
+                                <span>Sin tallas asignadas</span>
+                            </label>
                         </div>
 
                         <div class="profile-card__body" style="padding: 20px;">

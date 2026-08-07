@@ -92,6 +92,7 @@ class PersonalController extends Controller
                         $row->telefono,
                         $row->departamento,
                         $row->activo ? 'Activo' : 'Inactivo',
+                        $row->sin_tallas ? 'Sí' : 'No',
                         $row->proyectos->pluck('nombre')->join(' | '),
                     ]);
                 }
@@ -180,6 +181,7 @@ class PersonalController extends Controller
         unset($validated['proyecto_ids']);
 
         $validated['activo'] = $request->boolean('activo', true);
+        $validated['sin_tallas'] = $request->boolean('sin_tallas', false);
 
         $personal = Personal::create($validated);
         if (is_array($proyectoIds)) {
@@ -318,6 +320,10 @@ class PersonalController extends Controller
             $validated['activo'] = $request->boolean('activo');
         }
 
+        if ($request->has('sin_tallas')) {
+            $validated['sin_tallas'] = $request->boolean('sin_tallas');
+        }
+
         $personal->update($validated);
         if (is_array($proyectoIds)) {
             $personal->proyectos()->sync($proyectoIds);
@@ -340,22 +346,85 @@ class PersonalController extends Controller
     public function tallas(Request $request)
     {
         $query = (string) $request->input('q', '');
+        $estado = (string) $request->input('estado', 'todos');
+        $export = $request->input('export'); 
+
+        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
 
         $personals = Personal::query()
             ->when($query !== '', function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                  ->orWhere('apellido', 'like', "%{$query}%")
-                  ->orWhere('dni_nie', 'like', "%{$query}%")
-                  ->orWhere('departamento', 'like', "%{$query}%");
+                $q->where(function ($subQ) use ($query) {
+                    $subQ->where('name', 'like', "%{$query}%")
+                        ->orWhere('apellido', 'like', "%{$query}%")
+                        ->orWhere('dni_nie', 'like', "%{$query}%")
+                        ->orWhere('departamento', 'like', "%{$query}%")
+                        ->orWhere('id_rrhh', 'like', "%{$query}%"); // Añadido para que también puedan buscar por el ID de RRHH
+                });
+            })
+            ->when($estado === 'falta_epi', function ($q) use ($columns) {
+                $q->where('sin_tallas', false)
+                ->where(function ($subQ) use ($columns) {
+                    foreach ($columns as $col) {
+                        $subQ->orWhereNull($col)->orWhere($col, '');
+                    }
+                });
+            })
+            ->when($estado === 'sin_departamento', function ($q) {
+                $q->whereNull('departamento')
+                ->orWhere('departamento', '')
+                ->orWhere('departamento', '[]');
+            })
+            // NUEVO FILTRO: Sin personal de oficina (Exige que sin_tallas sea false)
+            ->when($estado === 'sin_oficina', function ($q) {
+                $q->where('sin_tallas', false);
             })
             ->orderBy('name')
             ->get();
 
-        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
+        if ($export === 'csv') {
+            return response()->streamDownload(function () use ($personals, $columns) {
+                $handle = fopen('php://output', 'w');
+                
+                fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+                
+                // CAMBIO: La cabecera ahora dice ID RRHH
+                $headers = ['ID RRHH', 'Nombre', 'Apellido', 'Departamento'];
+                foreach ($columns as $col) {
+                    $headers[] = ucfirst($col);
+                }
+                fputcsv($handle, $headers, ';'); 
+
+                foreach ($personals as $p) {
+                    $deptos = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
+                    $deptosStr = !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO';
+
+                    $row = [
+                        // CAMBIO: Exportamos el ID de RRHH. Si está vacío, ponemos un guion.
+                        $p->id_rrhh ?: '—',
+                        $p->name,
+                        $p->apellido,
+                        $deptosStr
+                    ];
+
+                    foreach ($columns as $c) {
+                        if ($p->sin_tallas) {
+                            $row[] = 'N/A';
+                        } else {
+                            $row[] = $p->{$c} ?: 'Falta';
+                        }
+                    }
+
+                    fputcsv($handle, $row, ';');
+                }
+
+                fclose($handle);
+            }, 'listado_tallas_epis.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
 
         return view('personal.tallas', [
             'personals' => $personals,
             'query' => $query,
+            'estado' => $estado,
             'columns' => $columns,
         ]);
     }
@@ -388,8 +457,11 @@ class PersonalController extends Controller
             'proxima_revision_medica' => 'nullable|date',
             'ultima_graduacion' => 'nullable|date',
             'proxima_graduacion' => 'nullable|date',
+            'reconocido_en' => 'nullable|string|max:255',
+            'graduado_en' => 'nullable|string|max:255',
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
+            'sin_tallas' => 'boolean',
             'activo' => 'boolean',
             'id_rrhh' => [
                 'nullable',
