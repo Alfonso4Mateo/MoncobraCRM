@@ -347,9 +347,14 @@ class PersonalController extends Controller
     {
         $query = (string) $request->input('q', '');
         $estado = (string) $request->input('estado', 'todos');
+        // NUEVO: Capturamos el departamento elegido por el usuario
+        $departamentoFiltro = (string) $request->input('departamento', 'todos'); 
         $export = $request->input('export'); 
 
         $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
+        
+        // NUEVO: Nos traemos la lista de departamentos para el desplegable de la vista
+        $departamentosCatalogo = Departamento::orderBy('nombre')->get();
 
         $personals = Personal::query()
             ->when($query !== '', function ($q) use ($query) {
@@ -358,7 +363,7 @@ class PersonalController extends Controller
                         ->orWhere('apellido', 'like', "%{$query}%")
                         ->orWhere('dni_nie', 'like', "%{$query}%")
                         ->orWhere('departamento', 'like', "%{$query}%")
-                        ->orWhere('id_rrhh', 'like', "%{$query}%"); // Añadido para que también puedan buscar por el ID de RRHH
+                        ->orWhere('id_rrhh', 'like', "%{$query}%");
                 });
             })
             ->when($estado === 'falta_epi', function ($q) use ($columns) {
@@ -374,9 +379,12 @@ class PersonalController extends Controller
                 ->orWhere('departamento', '')
                 ->orWhere('departamento', '[]');
             })
-            // NUEVO FILTRO: Sin personal de oficina (Exige que sin_tallas sea false)
             ->when($estado === 'sin_oficina', function ($q) {
                 $q->where('sin_tallas', false);
+            })
+            // NUEVO FILTRO: Buscar dentro del array de departamentos
+            ->when($departamentoFiltro !== 'todos', function ($q) use ($departamentoFiltro) {
+                $q->where('departamento', 'like', "%{$departamentoFiltro}%");
             })
             ->orderBy('name')
             ->get();
@@ -387,7 +395,6 @@ class PersonalController extends Controller
                 
                 fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
                 
-                // CAMBIO: La cabecera ahora dice ID RRHH
                 $headers = ['ID RRHH', 'Nombre', 'Apellido', 'Departamento'];
                 foreach ($columns as $col) {
                     $headers[] = ucfirst($col);
@@ -399,7 +406,6 @@ class PersonalController extends Controller
                     $deptosStr = !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO';
 
                     $row = [
-                        // CAMBIO: Exportamos el ID de RRHH. Si está vacío, ponemos un guion.
                         $p->id_rrhh ?: '—',
                         $p->name,
                         $p->apellido,
@@ -421,10 +427,13 @@ class PersonalController extends Controller
             }, 'listado_tallas_epis.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
         }
 
+        // AÑADIDO: Pasamos las variables $departamentosCatalogo y $departamentoFiltro a la vista
         return view('personal.tallas', [
             'personals' => $personals,
             'query' => $query,
             'estado' => $estado,
+            'departamentoFiltro' => $departamentoFiltro,
+            'departamentosCatalogo' => $departamentosCatalogo,
             'columns' => $columns,
         ]);
     }

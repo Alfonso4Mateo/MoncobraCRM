@@ -48,26 +48,40 @@
                 <div class="personal-card__actions">
                     <!-- 1. FORMULARIO ENRIQUECIDO CON EL FILTRO DE ESTADO -->
                     <form method="GET" action="{{ route('personal.tallas') }}" class="personal-search-form" style="display:flex; gap:10px; align-items:center;">
+                        
+                        <!-- 1. Desplegable de Estados (El que ya teníamos) -->
                         <div class="personal-search-field">
                             <label for="estado" style="display:none">Estado</label>
                             <select name="estado" id="estado" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; font-family: inherit; color: #173e67;">
-                                <option value="todos" @selected(($estado ?? 'todos') === 'todos')>Todos los trabajadores</option>
+                                <option value="todos" @selected(($estado ?? 'todos') === 'todos')>Todos los estados</option>
                                 <option value="falta_epi" @selected(($estado ?? 'todos') === 'falta_epi')>Falta algún EPI</option>
                                 <option value="sin_departamento" @selected(($estado ?? 'todos') === 'sin_departamento')>Sin departamento asignado</option>
                                 <option value="sin_oficina" @selected(($estado ?? 'todos') === 'sin_oficina')>Sin personal de oficina</option>
                             </select>
                         </div>
+
+                        <!-- 2. Desplegable dinámico de Departamentos -->
+                        <div class="personal-search-field">
+                            <label for="departamento" style="display:none">Departamento</label>
+                            <select name="departamento" id="departamento" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; font-family: inherit; color: #173e67;">
+                                <option value="todos" @selected(($departamentoFiltro ?? 'todos') === 'todos')>Todos los departamentos</option>
+                                @foreach($departamentosCatalogo as $depto)
+                                    <option value="{{ $depto->nombre }}" @selected(($departamentoFiltro ?? '') === $depto->nombre)>
+                                        {{ strtoupper($depto->nombre) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- 3. Campo de texto  -->
                         <div class="personal-search-field">
                             <label for="q" style="display:none">Buscar</label>
                             <input type="search" id="q" name="q" placeholder="Buscar por nombre o apellidos..." value="{{ $query ?? '' }}" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; width: 250px;">
                         </div>
+                        
+                        <!-- 4. Botones  -->
                         <div class="personal-search-actions" style="display:flex; gap: 8px;">
-                            <!-- Botón normal para buscar en pantalla -->
-                            <button type="submit" class="personal-search-submit" style="padding: 9px 16px;">
-                                Filtrar
-                            </button>
-                            
-                            <!-- Botón para descargar. Envía la variable 'export' con el valor 'csv' -->
+                            <button type="submit" class="personal-search-submit" style="padding: 9px 16px;">Filtrar</button>
                             <button type="submit" name="export" value="csv" class="personal-search-submit" style="padding: 9px 16px; background-color: #10b981; border-color: #059669; display: flex; align-items: center; gap: 6px;" title="Descargar listado actual en Excel">
                                 <i class="fas fa-file-csv"></i> Exportar
                             </button>
