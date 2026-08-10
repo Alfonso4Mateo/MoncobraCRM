@@ -6,16 +6,25 @@
     @vite(['resources/css/personal-index.css'])
     <style>
         /* Efectos para hacer las tarjetas interactivas */
-        .js-filter-missing {
+        .js-filter-missing, .js-filter-size {
             cursor: pointer;
             transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
         }
-        .js-filter-missing:hover {
+        .js-filter-missing:hover, .js-filter-size:hover {
             transform: translateY(-2px);
+        }
+        .js-filter-missing:hover {
             box-shadow: 0 4px 6px rgba(185, 28, 28, 0.15) !important;
+        }
+        .js-filter-size:hover {
+            box-shadow: 0 4px 6px rgba(23, 62, 103, 0.15) !important;
         }
         .js-filter-missing.is-active {
             box-shadow: 0 0 0 2px #b91c1c, 0 4px 10px rgba(185, 28, 28, 0.2) !important;
+            transform: scale(1.05);
+        }
+        .js-filter-size.is-active {
+            box-shadow: 0 0 0 2px #1d4ed8, 0 4px 10px rgba(29, 78, 216, 0.2) !important;
             transform: scale(1.05);
         }
     </style>
@@ -83,7 +92,10 @@
                         <div class="personal-search-actions" style="display:flex; gap: 8px;">
                             <button type="submit" class="personal-search-submit" style="padding: 9px 16px;">Filtrar</button>
                             <button type="submit" name="export" value="csv" class="personal-search-submit" style="padding: 9px 16px; background-color: #10b981; border-color: #059669; display: flex; align-items: center; gap: 6px;" title="Descargar listado actual en Excel">
-                                <i class="fas fa-file-csv"></i> Exportar
+                                <i class="fas fa-file-csv"></i> Exportacion simple
+                            </button>
+                            <button type="submit" name="export" value="pdf" class="personal-search-submit" style="padding: 9px 16px; background-color: #05946486; border-color: #00412c; display: flex; align-items: center; gap: 6px;" title="Descargar listado actual en PDF">
+                                <i class="fas fa-file-pdf"></i> PDF (Próximamente)
                             </button>
                         </div>
                     </form>
@@ -111,7 +123,8 @@
                         @else
                             <div style="display:flex; gap:12px; flex-wrap:wrap">
                                 @foreach($counts as $size => $c)
-                                    <div style="background:#fff; border:1px solid #e6edf3; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    <!-- TARJETAS DE TALLAS INTERACTIVAS -->
+                                    <div class="js-filter-size" data-col="{{ $col }}" data-size="{{ $size }}" title="Haz clic para ver quién usa esta talla" style="background:#fff; border:1px solid #e6edf3; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                         <div style="font-weight:800; font-size: 1.1rem; color: #173e67;">{{ $size }}</div>
                                         <div style="color:#6b7280; font-size: 0.85rem;">{{ $c }} trabajador{{ $c > 1 ? 'es' : '' }}</div>
                                     </div>
@@ -168,8 +181,16 @@
                                 @endphp
                                 
                                 <!-- 3. FILAS PREPARADAS (Tienen la clase js-worker-row y el atributo data-faltas con todo lo que les falta) -->
-                                <tr class="js-worker-row" data-faltas="{{ implode(' ', $faltas) }}" style="{{ $p->sin_tallas ? 'opacity: 0.6; background-color: #f9fafb;' : '' }}">
+                                <tr class="js-worker-row" 
+                                    data-faltas="{{ implode(' ', $faltas) }}" 
+                                    @foreach($columns as $colName)
+                                        data-talla-{{ $colName }}="{{ mb_strtolower(trim($p->{$colName} ?? '')) }}"
+                                    @endforeach
+                                    style="{{ $p->sin_tallas ? 'opacity: 0.6; background-color: #f9fafb;' : '' }}">
+                                    
+                                    <!-- CELDA RESTAURADA: ID RRHH -->
                                     <td style="font-weight: 600; color: #6b7280;">{{ $p->id_rrhh ?: '—' }}</td>
+                                    
                                     <td style="font-weight: 700;">
                                         <a href="{{ route('personal.show', $p->id) }}" style="color: #173e67; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#1d4ed8'; this.style.textDecoration='underline'" onmouseout="this.style.color='#173e67'; this.style.textDecoration='none'">
                                             {{ $p->name }} {{ $p->apellido }}
@@ -209,52 +230,68 @@
 
 @section('js')
 <script>
-    // 4. LÓGICA JAVASCRIPT: El motor visual del frontend
     document.addEventListener('DOMContentLoaded', function() {
-        const cards = document.querySelectorAll('.js-filter-missing');
+        const missingCards = document.querySelectorAll('.js-filter-missing');
+        const sizeCards = document.querySelectorAll('.js-filter-size');
         const rows = document.querySelectorAll('.js-worker-row');
         const alertBox = document.getElementById('js-active-filter-alert');
         const filterNameSpan = document.getElementById('js-filter-name');
         const clearBtn = document.getElementById('js-clear-filter');
 
-        cards.forEach(card => {
+        // Función auxiliar para atenuar todas las tarjetas (reseteo visual)
+        const dimAllCards = () => {
+            missingCards.forEach(c => { c.classList.remove('is-active'); c.style.opacity = '0.4'; });
+            sizeCards.forEach(c => { c.classList.remove('is-active'); c.style.opacity = '0.4'; });
+        };
+
+        // 1. Lógica para filtrar por EPI Faltante
+        missingCards.forEach(card => {
             card.addEventListener('click', function() {
-                // Saber qué EPI hemos tocado (ej. "camiseta")
                 const colToFind = this.getAttribute('data-col');
                 
-                // Recorrer todas las filas de la tabla
                 rows.forEach(row => {
-                    // Coger el listado oculto que le metimos antes a la fila (ej. "camiseta guantes")
                     const missingList = row.getAttribute('data-faltas').split(' ');
-                    
-                    // Si lo que falta coincide con la tarjeta que he tocado, lo enseño. Si no, lo escondo.
-                    if (missingList.includes(colToFind)) {
-                        row.style.display = ''; // Vacío significa que coja el estilo original de la tabla
-                    } else {
-                        row.style.display = 'none'; // Desaparece del ojo humano
-                    }
+                    row.style.display = missingList.includes(colToFind) ? '' : 'none';
                 });
 
-                // Mostramos el mensaje azul de que el filtro JS está activo
-                filterNameSpan.textContent = colToFind;
+                filterNameSpan.innerHTML = `FALTA: <strong>${colToFind.toUpperCase()}</strong>`;
                 alertBox.style.display = 'flex';
                 
-                // Efecto de atenuar las demás tarjetas para saber cuál está seleccionada
-                cards.forEach(c => c.classList.remove('is-active'));
-                cards.forEach(c => c.style.opacity = '0.4');
+                dimAllCards();
                 this.style.opacity = '1';
                 this.classList.add('is-active');
             });
         });
 
-        // Botón para resetear todo a su estado natural
+        // 2. Lógica para filtrar por Talla Específica
+        sizeCards.forEach(card => {
+            card.addEventListener('click', function() {
+                const colToFind = this.getAttribute('data-col');
+                // Normalizamos a minúsculas para asegurar la comparación exacta
+                const sizeToFind = this.getAttribute('data-size').toLowerCase().trim(); 
+
+                rows.forEach(row => {
+                    // Leemos el atributo inyectado desde Laravel (ej: data-talla-sudadera)
+                    const workerSize = row.getAttribute('data-talla-' + colToFind);
+                    row.style.display = (workerSize === sizeToFind) ? '' : 'none';
+                });
+
+                filterNameSpan.innerHTML = `TALLA <strong>${this.getAttribute('data-size').toUpperCase()}</strong> DE <strong>${colToFind.toUpperCase()}</strong>`;
+                alertBox.style.display = 'flex';
+                
+                dimAllCards();
+                this.style.opacity = '1';
+                this.classList.add('is-active');
+            });
+        });
+
+        // 3. Botón para resetear todo a su estado natural
         clearBtn.addEventListener('click', function() {
             rows.forEach(row => row.style.display = '');
             alertBox.style.display = 'none';
-            cards.forEach(c => {
-                c.style.opacity = '1';
-                c.classList.remove('is-active');
-            });
+            
+            missingCards.forEach(c => { c.style.opacity = '1'; c.classList.remove('is-active'); });
+            sizeCards.forEach(c => { c.style.opacity = '1'; c.classList.remove('is-active'); });
         });
     });
 </script>

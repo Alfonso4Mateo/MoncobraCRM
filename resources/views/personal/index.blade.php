@@ -190,27 +190,19 @@
                                             <span class="personal-status personal-status--inactive">Personal Externo</span>
                                         @endif
                                     </td>
-                                    <td data-label="CAMISETA">
-                                        <span class="personal-size-badge">{{ $personal->camiseta ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="CHAQUETA">
-                                        <span class="personal-size-badge">{{ $personal->chaqueta ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="SUDADERA">
-                                        <span class="personal-size-badge">{{ $personal->sudadera ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="PANTALÓN">
-                                        <span class="personal-size-badge">{{ $personal->pantalon ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="CALZADO">
-                                        <span class="personal-size-badge">{{ $personal->calzado ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="GUANTES">
-                                        <span class="personal-size-badge">{{ $personal->guantes ?? '—' }}</span>
-                                    </td>
-                                    <td data-label="GAFAS">
-                                        <span class="personal-size-badge">{{ $personal->gafas ?? '—' }}</span>
-                                    </td>
+                                    @php
+                                        $columnasEpi = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'gafas'];
+                                    @endphp
+                                    
+                                    @foreach($columnasEpi as $prenda)
+                                        <td data-label="{{ strtoupper($prenda) }}">
+                                            @if($personal->sin_tallas)
+                                                <span style="color: #cbd5e1; font-size: 0.85rem;">N/A</span>
+                                            @else
+                                                <span class="personal-size-badge">{{ $personal->$prenda ?? '—' }}</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
                                     <td data-label="ACCIONES" class="text-right">
                                         <div class="personal-actions">
                                             <a href="{{ route('personal.show', $personal->id) }}" class="personal-action-icon" title="Ver">
@@ -251,31 +243,50 @@
             </article>
 
             <section class="personal-footer-grid">
+                @php
+                    // Calculamos dinámicamente el número TOTAL DE PRENDAS que faltan
+                    $tallasFaltantes = 0;
+                    $personalNecesitaEpi = \App\Models\Personal::where('sin_tallas', false)->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas']);
+                    
+                    $columnas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
+                    
+                    foreach ($personalNecesitaEpi as $p) {
+                        foreach ($columnas as $col) {
+                            if (empty($p->{$col})) {
+                                $tallasFaltantes++;
+                            }
+                        }
+                    }
+                @endphp
+
+                <!-- 1. Trabajadores Totales / Activos (Usando variables del Controller) -->
                 <article class="personal-foot-card personal-foot-card--blue">
                     <div class="personal-foot-card__title">
-                        <i class="fas fa-file-shield"></i>
-                        Permisos Pendientes EPIS
+                        <i class="fas fa-users"></i>
+                        Plantilla (Activa / Total)
                     </div>
-                    <strong class="personal-foot-card__value">24</strong>
-                    <p>Equipos sobre revisar</p>
+                    <strong class="personal-foot-card__value">{{ $personalActivos ?? 0 }} / {{ $personalTotal ?? 0 }}</strong>
+                    <p>Empleados registrados</p>
                 </article>
 
+                <!-- 2. Tallas Incompletas (Usando la consulta generada arriba) -->
                 <article class="personal-foot-card personal-foot-card--orange">
                     <div class="personal-foot-card__title">
                         <i class="fas fa-ruler-combined"></i>
                         Tallas No Registradas
                     </div>
-                    <strong class="personal-foot-card__value">12</strong>
-                    <p>A completar registro</p>
+                    <strong class="personal-foot-card__value">{{ $tallasFaltantes }}</strong>
+                    <p>Prendas individuales por asignar</p>
                 </article>
 
+                <!-- 3. Avisos Médicos (Usando la alerta de días del Controller) -->
                 <article class="personal-foot-card personal-foot-card--navy">
                     <div class="personal-foot-card__title">
-                        <i class="fas fa-calendar-check"></i>
-                        Próxima Revisión
+                        <i class="fas fa-notes-medical"></i>
+                        Avisos Médicos
                     </div>
-                    <strong class="personal-foot-card__value">SEP 2025</strong>
-                    <p>Vencimiento Programado</p>
+                    <strong class="personal-foot-card__value">{{ $avisosCount ?? 0 }}</strong>
+                    <p>Revisiones próximas o vencidas</p>
                 </article>
             </section>
         </div>

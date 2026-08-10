@@ -332,7 +332,7 @@
                                     <select id="camiseta" name="camiseta" class="@error('camiseta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -342,7 +342,7 @@
                                     <select id="chaqueta" name="chaqueta" class="@error('chaqueta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -352,7 +352,7 @@
                                     <select id="sudadera" name="sudadera" class="@error('sudadera') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -362,7 +362,7 @@
                                     <select id="pantalon" name="pantalon" class="@error('pantalon') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','30' => '30','32' => '32','34' => '34','36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50','52' => '52','54' => '54','56' => '56','58' => '58','60' => '60','62' => '62','64' => '64','66' => '66','68' => '68','70' => '70'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -372,7 +372,7 @@
                                     <select id="calzado" name="calzado" class="@error('calzado') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','34' => '34','35' => '35','36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46', '47' => '47', '48' => '48', '49' => '49', '50' => '50'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -382,7 +382,7 @@
                                     <select id="guantes" name="guantes" class="@error('guantes') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','5' => '5','6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11' ,'12' => '12'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -392,7 +392,7 @@
                                     <select id="casco" name="casco" class="@error('casco') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','Estándar' => 'Estándar'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('casco', $personal->casco) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('casco', $personal->casco) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -401,7 +401,7 @@
                                     <select id="gafas" name="gafas" class="@error('gafas') is-invalid @enderror">
                                         <option value="">Selecciona tipo</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','Graduadas' => 'Graduadas', 'Protección' => 'Protección'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('gafas', $personal->gafas) === $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('gafas', $personal->gafas) == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
