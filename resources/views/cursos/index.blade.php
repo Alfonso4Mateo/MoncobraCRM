@@ -376,6 +376,19 @@
                 </a>
             </div>
         </header>
+        
+        @php
+            // Extraemos todos los departamentos únicos de forma global
+            $listaDepartamentos = collect();
+            foreach($personals as $p) {
+                $ds = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
+                $listaDepartamentos = $listaDepartamentos->merge($ds);
+            }
+            $listaDepartamentos = $listaDepartamentos->map(fn($d) => trim($d))->filter()->unique()->sort();
+            
+            // Capturamos el departamento que venga en la URL (si existe)
+            $currentDepto = request('departamento', 'all');
+        @endphp
 
         <section class="cursos-shell {{ !$selectedPersonal ? 'cursos-shell--directory' : '' }}">
             
@@ -388,23 +401,33 @@
                         </div>
                     </div>
 
-                    <form method="GET" action="{{ route('cursos.index') }}" class="cursos-filter-row">
-                        <select name="categoria" onchange="this.form.submit()">
-                            <option value="all" @selected($categoria === 'all')>Todas las categorías</option>
+                    <!-- FILTROS (Sin recarga de página) -->
+                    <div class="cursos-filter-row">
+                        <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar trabajador..." autocomplete="off">
+                        
+                        <select id="js-worker-category">
+                            <option value="all" @selected(($categoria ?? 'all') === 'all')>Todas las categorías</option>
                             @foreach($categorias as $categoriaOption)
-                                <option value="{{ $categoriaOption }}" @selected($categoria === $categoriaOption)>{{ $categoriaOption }}</option>
+                                <option value="{{ $categoriaOption }}" @selected(($categoria ?? '') === $categoriaOption)>{{ $categoriaOption }}</option>
                             @endforeach
                         </select>
-                        <input type="search" name="q" value="{{ $query }}" placeholder="Buscar trabajador...">
-                    </form>
 
-                @forelse($personals as $personal)
+                        <!-- NUEVO: Selector de departamentos en la barra lateral -->
+                        <select id="js-worker-depto">
+                            <option value="all">Todos los departamentos</option>
+                            @foreach($listaDepartamentos as $depto)
+                                <option value="{{ mb_strtolower($depto) }}" @selected($currentDepto === mb_strtolower($depto))>{{ strtoupper($depto) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    @forelse($personals as $personal)
                     @php
+                        $workerCats = mb_strtolower($personal->cursos->pluck('categoria')->filter()->unique()->implode(' '));
                         $nombreCompleto = trim($personal->name . ' ' . $personal->apellido);
                         $cursosCount = $personal->cursos->count();
                         $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
                         
-                        // LÓGICA DE ALERTAS PARA LA BARRA LATERAL (AHORA NO EXCLUYENTES)
                         $hasCaducado = false;
                         $hasAviso = false;
                         $hoy = \Carbon\Carbon::now()->startOfDay();
@@ -421,15 +444,23 @@
                                     $hasAviso = true;
                                 }
                                 
-                                // Optimizacion: Si ya hemos detectado ambos problemas, no hace falta seguir buscando
-                                if ($hasCaducado && $hasAviso) {
-                                    break; 
-                                }
+                                if ($hasCaducado && $hasAviso) break; 
                             }
                         }
+
+                        // CALCULAMOS LOS DEPARTAMENTOS TAMBIÉN PARA LA BARRA LATERAL
+                        $deptosActuales = is_string($personal->departamento)
+                            ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento)
+                            : (array) $personal->departamento;
                     @endphp
                     
-                    <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" class="personal-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }}">
+                    <!-- AÑADIMOS EL DATA-DEPTO AL ENLACE -->
+                    <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
+                       class="personal-item js-worker-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }}"
+                       data-name="{{ mb_strtolower($nombreCompleto) }}"
+                       data-cats="{{ $workerCats }}"
+                       data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}">
+                       
                         <div class="personal-item__top">
                             <div class="personal-item__name">
                                 {{ $nombreCompleto }}
@@ -453,7 +484,7 @@
                             {{ $personal->departamento ? implode(', ', (array) $personal->departamento) : 'Sin departamento' }}
                         </div>
                     </a>
-               @empty
+                    @empty
                         <div class="cursos-empty">No hay trabajadores para mostrar.</div>
                     @endforelse
                 </aside>
@@ -462,9 +493,7 @@
             <main class="cursos-main">
                <div class="cursos-panel">
                     @if(!$selectedPersonal)
-                        <!-- ========================================== -->
                         <!-- PANTALLA DE INICIO: DIRECTORIO DE PLANTILLA-->
-                        <!-- ========================================== -->
                         <div class="cursos-section-title" style="margin-bottom: 20px;">
                             <div>
                                 <h3>Directorio de Plantilla</h3>
@@ -472,13 +501,35 @@
                             </div>
                         </div>
 
-                        <div class="trabajadores-grid">
+                        <!-- BARRA DE FILTROS EN EL DIRECTORIO -->
+                        @php
+                            // Extraemos todos los departamentos únicos de los trabajadores cargados
+                            $listaDepartamentos = collect();
+                            foreach($personals as $p) {
+                                $ds = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
+                                $listaDepartamentos = $listaDepartamentos->merge($ds);
+                            }
+                            $listaDepartamentos = $listaDepartamentos->map(fn($d) => trim($d))->filter()->unique()->sort();
+                        @endphp
+
+                        <div class="cursos-filter-row" style="flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                            <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar por nombre..." style="flex: 1; min-width: 200px;" autocomplete="off">
+
+                            <select id="js-worker-depto" style="width: auto; min-width: 180px;">
+                                <option value="all">Todos los departamentos</option>
+                                @foreach($listaDepartamentos as $depto)
+                                    <option value="{{ mb_strtolower($depto) }}" @selected($currentDepto === mb_strtolower($depto))>{{ strtoupper($depto) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                       <div class="trabajadores-grid">
                             @forelse($personals as $personal)
                                 @php
+                                    $workerCats = mb_strtolower($personal->cursos->pluck('categoria')->filter()->unique()->implode(' '));
                                     $nombreCompleto = trim($personal->name . ' ' . $personal->apellido);
                                     $cursosCount = $personal->cursos->count();
                                     
-                                    // Calculamos las alertas para la tarjeta visual
                                     $hasCaducado = false;
                                     $hasAviso = false;
                                     $hoy = \Carbon\Carbon::now()->startOfDay();
@@ -494,7 +545,7 @@
                                             } elseif ($hoy->gte($fAviso)) {
                                                 $hasAviso = true;
                                             }
-                                            if ($hasCaducado && $hasAviso) break; // Optimización
+                                            if ($hasCaducado && $hasAviso) break; 
                                         }
                                     }
                                     
@@ -502,8 +553,13 @@
                                         ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento)
                                         : (array) $personal->departamento;
                                 @endphp
-
-                                <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" class="trabajador-card">
+                                
+                                <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
+                                    class="trabajador-card js-worker-item"
+                                    data-name="{{ mb_strtolower($nombreCompleto) }}"
+                                    data-cats="{{ $workerCats }}"
+                                    data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}">
+                                    
                                     <div class="trabajador-card__header">
                                         <div>
                                             <h4 class="trabajador-card__name">{{ $nombreCompleto }}</h4>
@@ -531,16 +587,14 @@
                         </div>
 
                     @else
-                        <!-- ========================================== -->
                         <!-- VISTA DE DETALLE: TRABAJADOR Y ACORDEONES  -->
-                        <!-- ========================================== -->
                         @php
                             $deptosActuales = is_string($selectedPersonal->departamento)
                                 ? json_decode($selectedPersonal->departamento, true) ?? explode(',', $selectedPersonal->departamento)
                                 : (array) $selectedPersonal->departamento;
                         @endphp
 
-                        <!-- NUEVO BOTÓN: Volver al directorio -->
+                        <!-- Volver al directorio -->
                         <div style="margin-bottom: 16px;">
                             <a href="{{ route('cursos.index') }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; background: #fff; border: 1px solid #dbe3ef; border-radius: 10px; color: #173e67; text-decoration: none; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(15,23,42,0.02); transition: all 0.2s;">
                                 <i class="fas fa-arrow-left"></i> Volver al directorio
@@ -964,6 +1018,62 @@
                     }
                 });
             });
+        })();
+        // FILTRADO REACTIVO DE TRABAJADORES (CLIENT-SIDE)
+        (function() {
+            const categorySelect = document.getElementById('js-worker-category');
+            const searchInput = document.getElementById('js-worker-search');
+            const deptoSelect = document.getElementById('js-worker-depto');
+            const workerItems = document.querySelectorAll('.js-worker-item');
+
+            const filterWorkers = () => {
+                if (!workerItems.length) return;
+
+                const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
+                const category = categorySelect ? categorySelect.value.toLowerCase() : 'all';
+                const depto = deptoSelect ? deptoSelect.value.toLowerCase() : 'all';
+
+                workerItems.forEach(item => {
+                    const name = item.getAttribute('data-name') || '';
+                    const cats = item.getAttribute('data-cats') || '';
+                    const workerDepto = item.getAttribute('data-depto') || '';
+
+                    // Lógica de coincidencia
+                    const matchesSearch = term === '' || name.includes(term);
+                    const matchesCategory = category === 'all' || cats.includes(category);
+                    const matchesDepto = depto === 'all' || workerDepto.includes(depto);
+
+                    // Mostrar u ocultar instantáneamente
+                    if (matchesSearch && matchesCategory && matchesDepto) {
+                        item.style.display = ''; 
+                    } else {
+                        item.style.display = 'none'; 
+                    }
+
+                    // Magia: Modificamos la URL y AHORA INCLUIMOS EL DEPARTAMENTO
+                    try {
+                        const url = new URL(item.href);
+                        
+                        if (term) url.searchParams.set('q', term); else url.searchParams.delete('q');
+                        if (category !== 'all') url.searchParams.set('categoria', category); else url.searchParams.delete('categoria');
+                        // NUEVA LÍNEA PARA EL DEPARTAMENTO:
+                        if (depto !== 'all') url.searchParams.set('departamento', depto); else url.searchParams.delete('departamento');
+                        
+                        item.setAttribute('href', url.toString());
+                    } catch (e) {
+                        console.error('Error al procesar la URL del trabajador', e);
+                    }
+                });
+            };
+
+            // Escuchadores de eventos
+            if (categorySelect) categorySelect.addEventListener('change', filterWorkers);
+            if (searchInput) searchInput.addEventListener('input', filterWorkers);
+            if (deptoSelect) deptoSelect.addEventListener('change', filterWorkers);
+
+            // NUEVO: Ejecutamos el filtro inmediatamente al cargar la página 
+            // para que aplique los filtros visualmente si la URL traía memoria
+            filterWorkers();
         })();
     </script>
 @endsection

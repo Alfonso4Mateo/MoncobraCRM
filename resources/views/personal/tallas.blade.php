@@ -27,6 +27,23 @@
             box-shadow: 0 0 0 2px #1d4ed8, 0 4px 10px rgba(29, 78, 216, 0.2) !important;
             transform: scale(1.05);
         }
+       /* Botón CSV (Verde) */
+        .personal-btn-csv {
+            background: #10b981 !important;
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2) !important;
+        }
+        .personal-btn-csv:hover {
+            background: #059669 !important;
+        }
+
+        /* Botón PDF (Rojo oscuro) */
+        .personal-btn-pdf {
+            background: #ef4444 !important;
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.2) !important;
+        }
+        .personal-btn-pdf:hover {
+            background: #dc2626 !important;
+        }
     </style>
 @endsection
 
@@ -90,11 +107,13 @@
                         
                         <!-- 4. Botones  -->
                         <div class="personal-search-actions" style="display:flex; gap: 8px;">
-                            <button type="submit" class="personal-search-submit" style="padding: 9px 16px;">Filtrar</button>
-                            <button type="submit" name="export" value="csv" class="personal-search-submit" style="padding: 9px 16px; background-color: #10b981; border-color: #059669; display: flex; align-items: center; gap: 6px;" title="Descargar listado actual en Excel">
-                                <i class="fas fa-file-csv"></i> Exportacion simple
+                            <button type="submit" class="personal-search-submit">
+                                Filtrar
                             </button>
-                            <button type="submit" name="export" value="pdf" class="personal-search-submit" style="padding: 9px 16px; background-color: #05946486; border-color: #00412c; display: flex; align-items: center; gap: 6px;" title="Descargar listado actual en PDF">
+                            <button type="submit" name="export" value="csv" class="personal-search-submit personal-btn-csv" title="Descargar listado actual en Excel">
+                                <i class="fas fa-file-csv"></i> Exportación simple
+                            </button>
+                            <button type="submit" name="export" value="pdf" class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
                                 <i class="fas fa-file-pdf"></i> PDF (Próximamente)
                             </button>
                         </div>

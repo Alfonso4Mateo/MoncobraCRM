@@ -229,60 +229,99 @@ class CursoController extends Controller
         return $todas;
     }
 
-    public function export($id)
-{
-    // 1. Recuperamos el curso y sus trabajadores con los datos de la tabla pivote
-    $curso = Curso::with(['personal' => function($query) {
-        // Ajusta el nombre de la relación si no es 'trabajadores'
-        $query->withPivot('fecha_realizacion', 'apto'); 
-    }])->findOrFail($id);
+public function export($id)
+    {
+        // 1. Recuperamos el curso y sus trabajadores con los datos de la tabla pivote
+        $curso = \App\Models\Curso::with(['personal' => function($query) {
+            $query->withPivot('fecha_realizacion', 'apto'); 
+        }])->findOrFail($id);
 
-    // 2. Definimos el nombre del archivo
-    $fileName = 'asistentes_curso_' . $curso->id . '_' . date('Y-m-d') . '.csv';
+        // 2. Definimos el nombre del archivo
+        $fileName = 'asistentes_curso_' . $curso->id . '_' . date('Y-m-d') . '.csv';
 
-    // 3. Preparamos las cabeceras HTTP para forzar la descarga en el navegador
-    $headers = [
-        "Content-type"        => "text/csv",
-        "Content-Disposition" => "attachment; filename=$fileName",
-        "Pragma"              => "no-cache",
-        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-        "Expires"             => "0"
-    ];
+        // 3. Preparamos las cabeceras HTTP para forzar la descarga en el navegador
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
 
-    // 4. Creamos la función de retorno que escribirá los datos
-    $callback = function() use($curso) {
-        // Abrimos un flujo de salida directamente hacia el navegador
-        $file = fopen('php://output', 'w');
+        // 4. Creamos la función de retorno que escribirá los datos
+        $callback = function() use($curso) {
+            // Abrimos un flujo de salida directamente hacia el navegador
+            $file = fopen('php://output', 'w');
 
-        // (Opcional pero recomendado) Añadimos el BOM para que Excel lea las tildes y ñ correctamente
-        fputs($file, $bom =(chr(0xEF) . chr(0xBB) . chr(0xBF)));
+            // Añadimos el BOM para que Excel lea las tildes y ñ correctamente
+            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-        // Escribimos la primera fila (las cabeceras de las columnas)
-        fputcsv($file, ['Trabajador', 'Identificador', 'Fecha Realización', 'Caducidad', 'Estado'], ';');
+            // Escribimos la primera fila (Cabeceras actualizadas con Departamento)
+            fputcsv($file, ['ID RRHH', 'Trabajador', 'Departamento', 'Fecha Realización', 'Caducidad', 'Estado'], ';');
 
-        // Recorremos los trabajadores y escribimos una fila por cada uno
-        foreach ($curso->personal as $trabajador) {
-            
-            // Calculamos la caducidad igual que en la vista
-            $fechaRealizacion = \Carbon\Carbon::parse($trabajador->pivot->fecha_realizacion);
-            $caducidad = $curso->meses_validez 
-                            ? $fechaRealizacion->addMonths($curso->meses_validez)->format('d/m/Y')
-                            : 'Sin caducidad';
+            $hoy = \Carbon\Carbon::now()->startOfDay();
 
-            // Escribimos la fila en el CSV (separado por punto y coma para el Excel europeo)
-            fputcsv($file, [
-                $trabajador->nombre . ' ' . $trabajador->apellidos, // Ajusta los campos según tu base de datos
-                $trabajador->identificador, // DNI o el campo que uses
-                \Carbon\Carbon::parse($trabajador->pivot->fecha_realizacion)->format('d/m/Y'),
-                $caducidad,
-                $trabajador->pivot->apto ? 'Apto' : 'No Apto' // O la lógica de estado que prefieras
-            ], ';');
-        }
+            // Recorremos los trabajadores y escribimos una fila por cada uno
+            foreach ($curso->personal as $trabajador) {
+                
+                // CORRECCIÓN 1: Campos correctos para nombre y apellido
+                $nombreCompleto = trim($trabajador->name . ' ' . $trabajador->apellido);
+                
+                // CORRECCIÓN 2: Asegurar el ID RRHH
+                $idRrhh = $trabajador->id_rrhh ?: '—';
 
-        fclose($file);
-    };
+                // NUEVO 3: Procesar Departamento (Misma lógica que en las vistas)
+                $deptos = is_string($trabajador->departamento) 
+                    ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
+                    : (array) $trabajador->departamento;
+                $departamentoStr = !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO';
 
-    // 5. Retornamos la respuesta en flujo
-    return new StreamedResponse($callback, 200, $headers);
+                // CORRECCIÓN 4: Prevención de errores con fechas nulas y lógica de estado real
+                $fechaRealizacionRaw = $trabajador->pivot->fecha_realizacion;
+                $esApto = (bool) $trabajador->pivot->apto;
+                
+                $fechaRealizacionFormat = '—';
+                $caducidadFormat = '—';
+                $estado = 'Vigente';
+
+                if (!$esApto) {
+                    $estado = 'No Apto';
+                } elseif ($fechaRealizacionRaw) {
+                    $fechaRealizacion = \Carbon\Carbon::parse($fechaRealizacionRaw)->startOfDay();
+                    $fechaRealizacionFormat = $fechaRealizacion->format('d/m/Y');
+                    
+                    if ($curso->meses_validez) {
+                        $fechaCaducidad = $fechaRealizacion->copy()->addMonths($curso->meses_validez);
+                        $fechaAviso = $fechaCaducidad->copy()->subDays($curso->dias_aviso_previo ?? 30);
+                        $caducidadFormat = $fechaCaducidad->format('d/m/Y');
+
+                        if ($hoy->gt($fechaCaducidad)) {
+                            $estado = 'Caducado';
+                        } elseif ($hoy->gte($fechaAviso)) {
+                            $estado = 'En Aviso';
+                        }
+                    } else {
+                        $caducidadFormat = 'Sin caducidad';
+                    }
+                } else {
+                    $estado = 'Pendiente de fecha';
+                }
+
+                // Escribimos la fila en el CSV
+                fputcsv($file, [
+                    $idRrhh,
+                    $nombreCompleto,
+                    $departamentoStr,
+                    $fechaRealizacionFormat,
+                    $caducidadFormat,
+                    $estado
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        // 5. Retornamos la respuesta en flujo usando la clase de Symfony de Laravel
+        return new \Symfony\Component\HttpFoundation\StreamedResponse($callback, 200, $headers);
     }
 }
