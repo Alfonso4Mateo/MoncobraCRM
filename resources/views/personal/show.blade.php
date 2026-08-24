@@ -182,6 +182,12 @@
                                             <span>DEPARTAMENTO</span>
                                             <strong>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : '—' }}</strong>
                                         </div>
+
+                                        <div>
+                                            <span>PUESTO</span>
+                                            <strong>{{ $personal->puesto ?: '—' }}</strong>
+                                        </div>
+
                                         <div>
                                             <span>TELÉFONO</span>
                                             <strong>{{ $personal->telefono ?: '—' }}</strong>

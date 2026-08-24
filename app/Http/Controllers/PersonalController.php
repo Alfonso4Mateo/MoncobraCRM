@@ -564,6 +564,7 @@ class PersonalController extends Controller
             ],
             'departamento'   => 'nullable|array',
             'departamento.*' => 'string|max:255',
+            'puesto' => 'nullable|string|max:255',
             'tipo_personal' => 'nullable|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
             'chaqueta' => 'nullable|string|max:20',
@@ -665,7 +666,7 @@ class PersonalController extends Controller
             
             fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
             
-            fputcsv($handle, ['ID RRHH', 'Nombre', 'Apellido', 'DNI/NIE', 'Telefono', 'Departamento', 'Estado', 'Proyectos'], ';');
+            fputcsv($handle, ['ID RRHH', 'Nombre', 'Apellido', 'DNI/NIE', 'Telefono', 'Departamento', 'Puesto', 'Estado', 'Proyectos'], ';');
 
             foreach ($rows as $row) {
                 $deptos = is_string($row->departamento) ? json_decode($row->departamento, true) ?? explode(',', $row->departamento) : (array) $row->departamento;
@@ -678,6 +679,8 @@ class PersonalController extends Controller
                     $row->dni_nie,
                     $row->telefono,
                     $deptosStr,
+                    $row->puesto ?: '—',
+                    $row->activo ? 'Activo' : 'Inactivo',
                 ], ';');
             }
 

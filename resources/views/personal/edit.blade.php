@@ -256,6 +256,11 @@
                                 </div>
 
                                 <div class="profile-edit-form-group">
+                                    <label for="puesto">Puesto</label>
+                                    <input type="text" id="puesto" name="puesto" value="{{ old('puesto', $personal->puesto ?? '') }}" class="@error('puesto') is-invalid @enderror">
+                                </div>
+
+                                <div class="profile-edit-form-group">
                                     <label for="telefono">Teléfono</label>
                                     <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000" class="@error('telefono') is-invalid @enderror">
                                 </div>

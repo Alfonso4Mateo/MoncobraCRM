@@ -20,6 +20,7 @@ class Personal extends Model
         'apellido',
         'dni_nie',
         'departamento',
+        'puesto',
         'id_rrhh',
         'tipo_personal',
         'camiseta',
@@ -50,6 +51,7 @@ class Personal extends Model
         'ultima_graduacion' => 'date',
         'proxima_graduacion' => 'date',
         'departamento' => 'array',
+        'puesto' => 'string',
     ];
 
     public function proyectos(): BelongsToMany

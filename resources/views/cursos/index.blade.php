@@ -222,7 +222,50 @@
         .erp-add-btn { background: #f8fafc; border: 1px dashed #cbd5e1; color: #64748b; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.2s; height: 28px; display: inline-flex; align-items: center; justify-content: center; }
         .erp-add-btn:hover { background: #f1f5f9; color: #173e67; border-color: #94a3b8; }
         .erp-select-input { display: none; border: 1px solid #173e67; border-radius: 999px; padding: 0 12px; font-size: 0.8rem; font-weight: 600; color: #173e67; outline: none; box-shadow: 0 4px 12px rgba(23, 62, 103, 0.1); cursor: pointer; height: 28px; line-height: 28px; }
-    
+
+        /* ESTILOS DE INACTIVOS */
+        .personal-item.is-inactive {
+            opacity: 0.65;
+            background: #f1f5f9;
+            border-color: #e2e8f0;
+        }
+        .trabajador-card.is-inactive {
+            opacity: 0.65;
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            filter: grayscale(80%);
+        }
+        .filter-toggle-inactive {
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            font-size: 0.85rem; 
+            font-weight: 700; 
+            color: #64748b; 
+            cursor: pointer; 
+            user-select: none;
+        }
+
+        /* ETIQUETA DE NUEVO INGRESO */
+        .badge-nuevo {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            font-size: 0.6rem;
+            padding: 3px 6px;
+            border-radius: 6px;
+            margin-left: 6px;
+            font-weight: 800;
+            text-transform: uppercase;
+            vertical-align: middle;
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            animation: pulse-soft 2s infinite;
+        }
+        @keyframes pulse-soft {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
         @media (max-width: 1100px) {
             .cursos-shell { grid-template-columns: 1fr; }
             .cursos-sidebar { border-right: 0; padding-right: 0; border-bottom: 1px solid #eef2f7; padding-bottom: 18px; }
@@ -284,6 +327,20 @@
         </header>
         
         @php
+            // 1. Calculamos la fecha de hoy para poder comparar
+            $hoy = \Carbon\Carbon::now()->startOfDay();
+
+            // 2. ORDENACIÓN INTELIGENTE: Primero Nuevos, luego Alfabéticamente
+            $personals = $personals->sortBy(function($personal) use ($hoy) {
+                $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
+                
+                // Si es nuevo recibe un "0-", si es antiguo un "1-". 
+                // Al pegarle el nombre detrás (ej: "0-alfonso"), Laravel ordena 
+                // primero los 0 alfabéticamente, y luego los 1 alfabéticamente.
+                return ($esNuevo ? '0-' : '1-') . mb_strtolower(trim($personal->name . ' ' . $personal->apellido));
+            });
+
+            // 3. Extracción de departamentos (lo que ya tenías)
             $listaDepartamentos = collect();
             foreach($personals as $p) {
                 $ds = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
@@ -322,6 +379,13 @@
                                 <option value="{{ mb_strtolower($depto) }}" @selected($currentDepto === mb_strtolower($depto))>{{ strtoupper($depto) }}</option>
                             @endforeach
                         </select>
+
+                        <!-- NUEVO: FILTRO DE ESTADO FORMATIVO -->
+                        <select id="js-worker-status-filter" style="margin-top: 10px;">
+                            <option value="all">Cualquier estado formativo</option>
+                            <option value="nuevos">🌟 Nuevas altas (14 días)</option>
+                            <option value="sin_cursos">⚠️ Sin cursos asignados</option>
+                        </select>
                     </div>
 
                     @forelse($personals as $personal)
@@ -334,6 +398,7 @@
                         $hasCaducado = false;
                         $hasAviso = false;
                         $hoy = \Carbon\Carbon::now()->startOfDay();
+                        $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
 
                         foreach ($personal->cursos as $c) {
                             if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
@@ -357,14 +422,21 @@
                     @endphp
                     
                     <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
-                       class="personal-item js-worker-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }}"
-                       data-name="{{ mb_strtolower($nombreCompleto) }}"
-                       data-cats="{{ $workerCats }}"
-                       data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}">
+                        class="personal-item js-worker-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }} {{ !$personal->activo ? 'is-inactive' : '' }}"
+                        data-name="{{ mb_strtolower($nombreCompleto) }}"
+                        data-cats="{{ $workerCats }}"
+                        data-activo="{{ $personal->activo ? '1' : '0' }}"
+                        data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
+                        data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                        data-cursos="{{ $cursosCount }}">
+                        
                        
                         <div class="personal-item__top">
                             <div class="personal-item__name">
                                 {{ $nombreCompleto }}
+                                    @if($esNuevo)
+                                        <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
+                                    @endif
                                 
                                 @if($hasCaducado)
                                     <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 4px;" title="Tiene cursos caducados"></i>
@@ -411,6 +483,18 @@
                                         <option value="{{ mb_strtolower($depto) }}" @selected($currentDepto === mb_strtolower($depto))>{{ strtoupper($depto) }}</option>
                                     @endforeach
                                 </select>
+
+                                <!-- NUEVO: FILTRO DE ESTADO FORMATIVO -->
+                                <select id="js-worker-status-filter" style="width: auto; min-width: 220px;">
+                                    <option value="all">Cualquier estado formativo</option>
+                                    <option value="nuevos">🌟 Nuevas altas (14 días)</option>
+                                    <option value="sin_cursos">⚠️ Sin cursos asignados</option>
+                                </select>
+
+                                <label class="filter-toggle-inactive mb-0 ml-2">
+                                    <input type="checkbox" id="js-toggle-inactive-grid" checked>
+                                    Mostrar inactivos
+                                </label>
                             </div>
 
                             <div class="trabajadores-grid">
@@ -423,6 +507,7 @@
                                         $hasCaducado = false;
                                         $hasAviso = false;
                                         $hoy = \Carbon\Carbon::now()->startOfDay();
+                                        $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
 
                                         foreach ($personal->cursos as $c) {
                                             if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
@@ -445,14 +530,20 @@
                                     @endphp
                                     
                                     <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
-                                        class="trabajador-card js-worker-item"
+                                        class="trabajador-card js-worker-item {{ !$personal->activo ? 'is-inactive' : '' }}"
                                         data-name="{{ mb_strtolower($nombreCompleto) }}"
                                         data-cats="{{ $workerCats }}"
-                                        data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}">
-                                        
+                                        data-activo="{{ $personal->activo ? '1' : '0' }}"
+                                        data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
+                                        data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                                        data-cursos="{{ $cursosCount }}">
+
                                         <div class="trabajador-card__header">
                                             <div>
                                                 <h4 class="trabajador-card__name">{{ $nombreCompleto }}</h4>
+                                                    @if($esNuevo)
+                                                        <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
+                                                    @endif
                                                 <div class="trabajador-card__depto">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
                                             </div>
                                             <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
@@ -496,21 +587,35 @@
                             </a>
                         </div>
 
+                        <div>
+                            <label class="filter-toggle-inactive mt-2">
+                                <input type="checkbox" id="js-toggle-inactive-sidebar" checked>
+                                Mostrar inactivos
+                            </label>
+                        </div>
+
                         <div class="cursos-main-header">
                             <div class="worker-strip">
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">Trabajador</div>
                                     <div class="worker-strip__value">{{ $selectedPersonal->name }} {{ $selectedPersonal->apellido }}</div>
                                 </div>
+
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">DNI/NIE</div>
                                     <div class="worker-strip__value {{ $selectedPersonal->dni_nie ? '' : 'worker-strip__value--muted' }}">{{ $selectedPersonal->dni_nie ?: '—' }}</div>
                                 </div>
+
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">Departamento RRHH</div>
                                     <div class="worker-strip__value {{ !empty($deptosActuales) ? '' : 'worker-strip__value--muted' }}">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : '—' }}</div>
                                 </div>
-                                
+
+                                <div class="worker-strip__item">
+                                    <div class="worker-strip__label">Puesto</div>
+                                    <div class="worker-strip__value {{ $selectedPersonal->puesto ? '' : 'worker-strip__value--muted' }}">{{ $selectedPersonal->puesto ?: '—' }}</div>
+                                </div>
+
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">Teléfono</div>
                                     <div class="worker-strip__value {{ $selectedPersonal->telefono ? '' : 'worker-strip__value--muted' }}">{{ $selectedPersonal->telefono ?: '—' }}</div>
@@ -1109,11 +1214,37 @@
             }
         });
 
+        // -------------------------------------------------------------
+        // FILTRO DE TRABAJADORES (BUSCADOR, CATEGORÍA, DEPTO E INACTIVOS)
+        // -------------------------------------------------------------
         (function() {
             const categorySelect = document.getElementById('js-worker-category');
             const searchInput = document.getElementById('js-worker-search');
             const deptoSelect = document.getElementById('js-worker-depto');
+            
+            // Nuevo selector de estado formativo
+            const statusFilter = document.getElementById('js-worker-status-filter');
+            
+            const toggleInactiveSidebar = document.getElementById('js-toggle-inactive-sidebar');
+            const toggleInactiveGrid = document.getElementById('js-toggle-inactive-grid');
             const workerItems = document.querySelectorAll('.js-worker-item');
+
+            const storageKey = 'mostrarInactivosCursos'; 
+            const savedState = localStorage.getItem(storageKey);
+            const isChecked = savedState !== null ? savedState === 'true' : true;
+            
+            if (toggleInactiveSidebar) toggleInactiveSidebar.checked = isChecked;
+            if (toggleInactiveGrid) toggleInactiveGrid.checked = isChecked;
+
+            const saveStateAndFilter = (e) => {
+                const newState = e.target.checked;
+                localStorage.setItem(storageKey, newState); 
+                
+                if (toggleInactiveSidebar && e.target !== toggleInactiveSidebar) toggleInactiveSidebar.checked = newState;
+                if (toggleInactiveGrid && e.target !== toggleInactiveGrid) toggleInactiveGrid.checked = newState;
+                
+                filterWorkers(); 
+            };
 
             const filterWorkers = () => {
                 if (!workerItems.length) return;
@@ -1121,26 +1252,50 @@
                 const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
                 const category = categorySelect ? categorySelect.value.toLowerCase() : 'all';
                 const depto = deptoSelect ? deptoSelect.value.toLowerCase() : 'all';
+                const status = statusFilter ? statusFilter.value : 'all'; // Capturamos el filtro de estado
+                
+                let showInactive = true;
+                if (toggleInactiveSidebar) showInactive = toggleInactiveSidebar.checked;
+                else if (toggleInactiveGrid) showInactive = toggleInactiveGrid.checked;
 
                 workerItems.forEach(item => {
                     const name = item.getAttribute('data-name') || '';
                     const cats = item.getAttribute('data-cats') || '';
                     const workerDepto = item.getAttribute('data-depto') || '';
+                    const isActivo = item.getAttribute('data-activo') === '1'; 
+                    
+                    // Capturamos los datos nuevos
+                    const isNuevo = item.getAttribute('data-nuevo') === '1';
+                    const numCursos = parseInt(item.getAttribute('data-cursos') || '0', 10);
 
                     const matchesSearch = term === '' || name.includes(term);
                     const matchesCategory = category === 'all' || cats.includes(category);
                     const matchesDepto = depto === 'all' || workerDepto.includes(depto);
+                    const matchesActivo = showInactive || isActivo;
 
-                    item.style.display = (matchesSearch && matchesCategory && matchesDepto) ? '' : 'none'; 
+                    // Lógica del filtro de estado
+                    let matchesStatus = true;
+                    if (status === 'nuevos' && !isNuevo) matchesStatus = false;
+                    if (status === 'sin_cursos' && numCursos > 0) matchesStatus = false;
+
+                    item.style.display = (matchesSearch && matchesCategory && matchesDepto && matchesActivo && matchesStatus) ? '' : 'none'; 
                 });
             };
 
             if (categorySelect) categorySelect.addEventListener('change', filterWorkers);
             if (searchInput) searchInput.addEventListener('input', filterWorkers);
             if (deptoSelect) deptoSelect.addEventListener('change', filterWorkers);
+            if (statusFilter) statusFilter.addEventListener('change', filterWorkers); // Listener del nuevo filtro
+            
+            if (toggleInactiveSidebar) toggleInactiveSidebar.addEventListener('change', saveStateAndFilter);
+            if (toggleInactiveGrid) toggleInactiveGrid.addEventListener('change', saveStateAndFilter);
+            
             filterWorkers();
         })();
 
+        // -------------------------------------------------------------
+        // LÓGICA DE PERFILES FORMATIVOS (AÑADIR / QUITAR)
+        // -------------------------------------------------------------
         (function() {
             const btnAdd = document.getElementById('js-btn-add-puesto');
             const selectAdd = document.getElementById('js-select-add-puesto');
@@ -1194,21 +1349,17 @@
                         });
                         
                         if (response.ok) {
-                            // 1. Extraemos el texto del chip ignorando el botón de borrar
+                            // Extraemos el texto del chip ignorando el botón de borrar
                             const puestoNombre = chip.firstChild.textContent.trim();
-                            
-                            // 2. Buscamos el desplegable
                             const selectAdd = document.getElementById('js-select-add-puesto');
                             
                             if (selectAdd) {
-                                // 3. Creamos la opción y la añadimos a la lista
                                 const opt = document.createElement('option');
                                 opt.value = puestoId;
                                 opt.textContent = puestoNombre;
                                 selectAdd.appendChild(opt);
                             }
                             
-                            // 4. Finalmente destruimos el chip visualmente
                             chip.remove(); 
                         } else { 
                             chip.style.opacity = '1'; 

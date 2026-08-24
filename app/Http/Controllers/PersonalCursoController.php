@@ -60,6 +60,7 @@ class PersonalCursoController extends Controller
                 'meta' => [
                     'nombre_trabajador' => trim($personal->name . ' ' . $personal->apellido),
                     'id_rrhh' => $personal->id_rrhh ?? '—',
+                    'puesto' => $personal->puesto ?? '—',
                     'curso_id' => $cursoId,
                     'uploaded_at' => now()->toDateTimeString(),
                     'uploaded_by' => auth()->id(),
