@@ -27,11 +27,15 @@ class DocumentosController extends Controller
 
     public function index(Request $request)
     {
-        $tipos = $this->documentTypes();
-        $tipoActual = (string) $request->query('tipo', 'albaranes');
+        $this->authorize('documentos.view');
 
+        $tipos = $this->documentTypes();
+        $tipoActual = (string) $request->query('tipo');
+
+        // LÓGICA INTELIGENTE: Si el tipo solicitado no está permitido (o viene vacío),
+        // forzamos al usuario a ver la primera pestaña a la que sí tenga acceso.
         if (! array_key_exists($tipoActual, $tipos)) {
-            $tipoActual = 'albaranes';
+            $tipoActual = array_key_first($tipos) ?? 'cargados';
         }
 
         $counts = $this->documentCounts();
@@ -80,6 +84,8 @@ class DocumentosController extends Controller
 
     public function create()
     {
+        $this->authorize('documentos.create');
+
         return view('documentos.create', [
             'tiposCarga' => $this->uploadTypes(),
         ]);
@@ -87,6 +93,10 @@ class DocumentosController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('documentos.create');
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
         $this->validate($request, [
             'documentos' => 'required|array|min:1',
             'documentos.*' => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,xml',
@@ -94,7 +104,9 @@ class DocumentosController extends Controller
             'numero_documento' => 'nullable|string|max:120',
             'ot_documento' => 'nullable|string|max:120',
             'cliente_documento' => 'nullable|string|max:191',
-            'tipo' => 'nullable|string|in:albaranes,presupuestos,pedidos,epi,factura,salidas,otros',
+            'tipo' => 'nullable|string|in:albaranes,presupuestos,pedidos,epi,factura,salidas,certificados,otros',
+            'nombre_trabajador' => 'nullable|string',
+            'id_rrhh' => 'nullable|string',
         ]);
 
         $tipo = $request->input('tipo') ?: 'otros';
@@ -102,27 +114,39 @@ class DocumentosController extends Controller
         $createdPaths = [];
 
         try {
-            DB::transaction(function () use ($request, $tipo, &$created, &$createdPaths) {
+            DB::transaction(function () use ($request, $tipo, &$created, &$createdPaths, $proyectoId) {
+                
+                $baseMeta = [
+                    'uploaded_at' => now()->toDateTimeString(),
+                    'uploaded_by' => auth()->id(),
+                ];
+                
+                $clienteStr = $request->input('cliente_documento');
+
+                if ($tipo === 'certificados') {
+                    $baseMeta['nombre_trabajador'] = $request->input('nombre_trabajador');
+                    $baseMeta['id_rrhh'] = $request->input('id_rrhh');
+                    $clienteStr = $request->input('nombre_trabajador') . ' (ID: ' . $request->input('id_rrhh') . ')';
+                }
+
                 foreach ($request->file('documentos', []) as $file) {
                     $storedName = now()->format('YmdHis') . '_' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $file->getClientOriginalName());
                     $path = Storage::disk('public')->putFileAs('documentos/' . $tipo, $file, $storedName);
                     $createdPaths[] = $path;
 
                     Documento::create([
+                        'proyecto_id' => $proyectoId,
                         'tipo' => $tipo,
                         'numero_documento' => $request->input('numero_documento'),
                         'fecha_documento' => $request->input('fecha_documento'),
                         'ot' => $request->input('ot_documento'),
-                        'cliente' => $request->input('cliente_documento'),
+                        'cliente' => $clienteStr,
                         'original_name' => $file->getClientOriginalName(),
                         'stored_name' => $storedName,
                         'path' => $path,
                         'mime_type' => $file->getClientMimeType(),
                         'size' => $file->getSize(),
-                        'meta' => [
-                            'uploaded_at' => now()->toDateTimeString(),
-                            'uploaded_by' => auth()->id(),
-                        ],
+                        'meta' => $baseMeta, 
                         'user_id' => auth()->id(),
                     ]);
 
@@ -147,11 +171,15 @@ class DocumentosController extends Controller
             ? 'Documento cargado correctamente.'
             : $created . ' documentos cargados correctamente.';
 
-        return redirect()->route('documentos.index', ['tipo' => 'cargados'])->with('status', $message);
+        $redirectTipo = $tipo === 'certificados' ? 'certificados' : 'cargados';
+        
+        return redirect()->route('documentos.index', ['tipo' => $redirectTipo])->with('status', $message);
     }
 
     public function download(Documento $documento)
     {
+        $this->authorize('documentos.download');
+
         abort_unless(Storage::disk('public')->exists($documento->path), 404);
 
         return Storage::disk('public')->download($documento->path, $documento->original_name);
@@ -159,6 +187,8 @@ class DocumentosController extends Controller
 
     public function preview(Documento $documento)
     {
+        $this->authorize('documentos.download');
+
         abort_unless(Storage::disk('public')->exists($documento->path), 404);
 
         $absPath = Storage::disk('public')->path($documento->path);
@@ -172,49 +202,107 @@ class DocumentosController extends Controller
 
     public function destroy(Documento $documento)
     {
+        $this->authorize('documentos.delete');
+
         $documento->delete();
 
         return redirect()->route('documentos.index', ['tipo' => 'cargados'])
             ->with('status', 'Documento eliminado correctamente.');
     }
 
+    // ====================================================================
+    // CONSTRUCCIÓN DINÁMICA BASADA EN PERMISOS
+    // ====================================================================
+
     private function documentTypes(): array
     {
-        return [
-            'albaranes' => ['label' => 'Albaranes', 'icon' => 'fa-file-lines'],
-            'presupuestos' => ['label' => 'Presupuestos', 'icon' => 'fa-file-invoice'],
-            'pedidos' => ['label' => 'Pedidos', 'icon' => 'fa-cart-shopping'],
-            'entradas' => ['label' => 'Registro entrada', 'icon' => 'fa-truck'],
-            'salidas' => ['label' => 'Registro salida', 'icon' => 'fa-box-open'],
-            'traslados' => ['label' => 'Traslados', 'icon' => 'fa-shuffle'],
-            'cargados' => ['label' => 'Cargados', 'icon' => 'fa-cloud-arrow-up'],
-        ];
+        $user = auth()->user();
+        $tipos = [];
+
+        if ($user->can('albaranes.view')) {
+            $tipos['albaranes'] = ['label' => 'Albaranes', 'icon' => 'fa-file-lines'];
+        }
+        if ($user->can('presupuestos.view')) {
+            $tipos['presupuestos'] = ['label' => 'Presupuestos', 'icon' => 'fa-file-invoice'];
+        }
+        if ($user->can('pedidos.view')) {
+            $tipos['pedidos'] = ['label' => 'Pedidos', 'icon' => 'fa-cart-shopping'];
+        }
+        if ($user->can('inventario.view')) {
+            $tipos['entradas'] = ['label' => 'Registro entrada', 'icon' => 'fa-truck'];
+            $tipos['salidas'] = ['label' => 'Registro salida', 'icon' => 'fa-box-open'];
+            $tipos['traslados'] = ['label' => 'Traslados', 'icon' => 'fa-shuffle'];
+        }
+        if ($user->can('cursos.view')) {
+            $tipos['certificados'] = ['label' => 'Certificados', 'icon' => 'fa-certificate'];
+        }
+        
+        // El cajón de sastre general, disponible si tiene acceso al módulo.
+        $tipos['cargados'] = ['label' => 'Cargados', 'icon' => 'fa-cloud-arrow-up'];
+
+        return $tipos;
     }
 
     private function uploadTypes(): array
     {
-        return [
-            'albaranes' => ['label' => 'Albaranes'],
-            'presupuestos' => ['label' => 'Presupuestos'],
-            'pedidos' => ['label' => 'Pedidos'],
-            'epi' => ['label' => 'EPI'],
-            'factura' => ['label' => 'Factura'],
-            'salidas' => ['label' => 'Salida de material'],
-            'otros' => ['label' => 'Otros'],
-        ];
+        $user = auth()->user();
+        $tipos = [];
+
+        if ($user->can('albaranes.view')) {
+            $tipos['albaranes'] = ['label' => 'Albaranes'];
+        }
+        if ($user->can('presupuestos.view')) {
+            $tipos['presupuestos'] = ['label' => 'Presupuestos'];
+        }
+        if ($user->can('pedidos.view')) {
+            $tipos['pedidos'] = ['label' => 'Pedidos'];
+        }
+        if ($user->can('personal.tallas')) {
+            $tipos['epi'] = ['label' => 'EPI'];
+        }
+        if ($user->can('inventario.view')) {
+            $tipos['salidas'] = ['label' => 'Salida de material'];
+        }
+        if ($user->can('cursos.view')) {
+            $tipos['certificados'] = ['label' => 'Certificados'];
+        }
+
+        $tipos['factura'] = ['label' => 'Factura'];
+        $tipos['otros'] = ['label' => 'Otros'];
+
+        return $tipos;
     }
 
     private function documentCounts(): array
     {
-        return [
-            'albaranes' => AlbaranCliente::count(),
-            'presupuestos' => Presupuesto::count(),
-            'pedidos' => PedidoCliente::count(),
-            'entradas' => EntradaStock::count(),
-            'salidas' => SalidaStock::count(),
-            'traslados' => TrasladoStock::count(),
-            'cargados' => Documento::count(),
-        ];
+        $user = auth()->user();
+        $counts = [];
+        
+        // Recuperamos el muro invisible (Sede) para aislar los certificados
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        // Hacemos las queries solo si el usuario tiene permiso, ahorrando memoria SQL
+        if ($user->can('albaranes.view')) $counts['albaranes'] = AlbaranCliente::count();
+        if ($user->can('presupuestos.view')) $counts['presupuestos'] = Presupuesto::count();
+        if ($user->can('pedidos.view')) $counts['pedidos'] = PedidoCliente::count();
+        if ($user->can('inventario.view')) {
+            $counts['entradas'] = EntradaStock::count();
+            $counts['salidas'] = SalidaStock::count();
+            $counts['traslados'] = TrasladoStock::count();
+        }
+        if ($user->can('cursos.view')) {
+            // Contador filtrado por la sede actual y tipo certificado
+            $counts['certificados'] = Documento::where('proyecto_id', $proyectoId)
+                                               ->where('tipo', 'certificados')
+                                               ->count();
+        }
+        
+        // Contador de "cargados" que excluye los certificados para que no se sumen doble, también filtrado por sede
+        $counts['cargados'] = Documento::where('proyecto_id', $proyectoId)
+                                       ->where('tipo', '!=', 'certificados')
+                                       ->count();
+
+        return $counts;
     }
 
     private function buildDocumentos(string $tipo): Collection
@@ -227,19 +315,49 @@ class DocumentosController extends Controller
             'salidas' => $this->fromSalidas(),
             'traslados' => $this->fromTraslados(),
             'cargados' => $this->fromCargados(),
+            'certificados' => $this->fromCertificados(),
             default => collect(),
         };
     }
 
     private function fromCargados(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return Documento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('tipo', '!=', 'certificados') // EXCLUIMOS LOS CERTIFICADOS AQUÍ
             ->orderByDesc('fecha_documento')
             ->orderByDesc('id')
             ->limit(30)
             ->get()
             ->map(function (Documento $documento) {
                 $estado = 'ARCHIVADO';
+                $acciones = [];
+
+                if (auth()->user()->can('documentos.download')) {
+                    $acciones[] = [
+                        'label' => 'Previsualizar', 
+                        'icon' => 'fa-eye', 
+                        'url' => route('documentos.preview', $documento), 
+                        'preview' => true
+                    ];
+                    $acciones[] = [
+                        'label' => 'Descargar', 
+                        'icon' => 'fa-cloud-arrow-down', 
+                        'url' => route('documentos.download', $documento)
+                    ];
+                }
+
+                if (auth()->user()->can('documentos.delete')) {
+                    $acciones[] = [
+                        'label' => 'Borrar', 
+                        'icon' => 'fa-trash', 
+                        'url' => route('documentos.destroy', $documento), 
+                        'method' => 'DELETE', 
+                        'confirm' => '¿Seguro que quieres borrar este documento?'
+                    ];
+                }
 
                 return [
                     'id' => (string) $documento->id,
@@ -259,18 +377,17 @@ class DocumentosController extends Controller
                         ['label' => 'Mime', 'value' => $documento->mime_type ?: '—'],
                     ],
                     'lineas' => [],
-                    'acciones' => [
-                        ['label' => 'Previsualizar', 'icon' => 'fa-eye', 'url' => route('documentos.preview', $documento), 'preview' => true],
-                        ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('documentos.download', $documento)],
-                        ['label' => 'Borrar', 'icon' => 'fa-trash', 'url' => route('documentos.destroy', $documento), 'method' => 'DELETE', 'confirm' => '¿Seguro que quieres borrar este documento?'],
-                    ],
+                    'acciones' => $acciones,
                 ];
             });
     }
 
     private function fromAlbaranes(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return AlbaranCliente::with('cliente')
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -278,6 +395,29 @@ class DocumentosController extends Controller
             ->map(function (AlbaranCliente $albaran) {
                 $estado = $this->estadoMap($albaran->estado);
                 $codigo = $albaran->numero ?: ($albaran->documento ?: 'ALB-' . str_pad((string) $albaran->id, 4, '0', STR_PAD_LEFT));
+
+                $acciones = [];
+
+                if (auth()->user()->can('albaranes.download')) {
+                    $acciones[] = [
+                        'label' => 'Ver PDF', 
+                        'icon' => 'fa-file-pdf', 
+                        'url' => route('albaranes.pdf', $albaran)
+                    ];
+                    $acciones[] = [
+                        'label' => 'Descargar', 
+                        'icon' => 'fa-cloud-arrow-down', 
+                        'url' => route('albaranes.pdf.file', $albaran)
+                    ];
+                }
+
+                if (auth()->user()->can('albaranes.manage')) {
+                    $acciones[] = [
+                        'label' => 'Editar', 
+                        'icon' => 'fa-pen', 
+                        'url' => route('albaranes.edit', $albaran)
+                    ];
+                }
 
                 return [
                     'id' => (string) $albaran->id,
@@ -297,14 +437,17 @@ class DocumentosController extends Controller
                         ['label' => 'Documento', 'value' => $albaran->documento ?: '—'],
                     ],
                     'lineas' => $this->lineasFromArray($albaran->lista_articulos),
-                    'acciones' => $this->accionesAlbaran($albaran),
+                    'acciones' => $acciones,
                 ];
             });
     }
 
     private function fromPresupuestos(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return Presupuesto::with(['cliente', 'pedidosClientes'])
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -312,6 +455,32 @@ class DocumentosController extends Controller
             ->map(function (Presupuesto $presupuesto) {
                 $estado = $this->estadoMap($presupuesto->estado);
                 $codigo = $presupuesto->numero ?: ($presupuesto->documento ?: 'PRE-' . str_pad((string) $presupuesto->id, 4, '0', STR_PAD_LEFT));
+
+                $acciones = [];
+
+                if (auth()->user()->can('presupuestos.view')) {
+                    $acciones[] = [
+                        'label' => 'Ver detalle', 
+                        'icon' => 'fa-eye', 
+                        'url' => route('presupuestos.show', $presupuesto)
+                    ];
+                }
+
+                if (auth()->user()->can('presupuestos.download')) {
+                    $acciones[] = [
+                        'label' => 'Ver documento', 
+                        'icon' => 'fa-file-pdf', 
+                        'url' => route('presupuestos.pdf', $presupuesto)
+                    ];
+                }
+
+                if (auth()->user()->can('presupuestos.manage')) {
+                    $acciones[] = [
+                        'label' => 'Editar', 
+                        'icon' => 'fa-pen', 
+                        'url' => route('presupuestos.edit', $presupuesto)
+                    ];
+                }
 
                 return [
                     'id' => (string) $presupuesto->id,
@@ -332,14 +501,17 @@ class DocumentosController extends Controller
                         ['label' => 'Pedido', 'value' => $presupuesto->pedidosClientes?->numero_pedido ?: '—'],
                     ],
                     'lineas' => $this->lineasFromArray($presupuesto->lista_articulos),
-                    'acciones' => $this->accionesPresupuesto($presupuesto),
+                    'acciones' => $acciones,
                 ];
             });
     }
 
     private function fromPedidos(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return PedidoCliente::with('cliente')
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha_pedido')
             ->orderByDesc('id')
             ->limit(30)
@@ -347,6 +519,16 @@ class DocumentosController extends Controller
             ->map(function (PedidoCliente $pedido) {
                 $estado = $this->estadoMap($pedido->estado);
                 $codigo = $pedido->numero_pedido ?: 'PED-' . str_pad((string) $pedido->id, 4, '0', STR_PAD_LEFT);
+
+                $acciones = [];
+
+                if (auth()->user()->can('pedidos.view')) {
+                    $acciones[] = [
+                        'label' => 'Ver detalle', 
+                        'icon' => 'fa-eye', 
+                        'url' => route('pedidos-clientes.show', $pedido)
+                    ];
+                }
 
                 return [
                     'id' => (string) $pedido->id,
@@ -366,14 +548,17 @@ class DocumentosController extends Controller
                         ['label' => 'Presupuesto', 'value' => $pedido->presupuesto_id ?: '—'],
                     ],
                     'lineas' => $this->lineasFromArray($pedido->lista_articulos),
-                    'acciones' => $this->accionesPedido($pedido),
+                    'acciones' => $acciones,
                 ];
             });
     }
 
     private function fromEntradas(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return EntradaStock::query()
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -381,6 +566,16 @@ class DocumentosController extends Controller
             ->map(function (EntradaStock $entrada) {
                 $estado = $this->estadoMap($entrada->estado);
                 $total = $this->itemsTotal($entrada->items);
+
+                $acciones = [];
+
+                if (auth()->user()->can('inventario.view')) { 
+                    $acciones[] = [
+                        'label' => 'Ver detalle', 
+                        'icon' => 'fa-eye', 
+                        'url' => route('inventario.acciones.show', ['tipo' => 'entrada', 'id' => $entrada->id])
+                    ];
+                }
 
                 return [
                     'id' => (string) $entrada->id,
@@ -400,14 +595,17 @@ class DocumentosController extends Controller
                         ['label' => 'Estado', 'value' => $estado['label']],
                     ],
                     'lineas' => $this->lineasFromArray($entrada->items),
-                    'acciones' => $this->accionesMovimiento('entrada', $entrada->id),
+                    'acciones' => $acciones,
                 ];
             });
     }
 
     private function fromSalidas(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return SalidaStock::query()
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -415,14 +613,23 @@ class DocumentosController extends Controller
             ->map(function (SalidaStock $salida) {
                 $estado = $this->estadoMap($salida->estado);
                 $total = $this->itemsTotal($salida->items);
-                $acciones = $this->accionesMovimiento('salida', $salida->id);
 
-                if (!empty($salida->documento_meta)) {
-                    array_unshift($acciones, [
+                $acciones = [];
+
+                if (!empty($salida->documento_meta) && auth()->user()->can('documentos.download')) {
+                    $acciones[] = [
                         'label' => 'Ver documento',
                         'icon' => 'fa-file-pdf',
                         'url' => route('inventario.salida.documento', $salida),
-                    ]);
+                    ];
+                }
+
+                if (auth()->user()->can('inventario.view')) {
+                    $acciones[] = [
+                        'label' => 'Ver detalle',
+                        'icon' => 'fa-eye',
+                        'url' => route('inventario.acciones.show', ['tipo' => 'salida', 'id' => $salida->id])
+                    ];
                 }
 
                 return [
@@ -450,7 +657,10 @@ class DocumentosController extends Controller
 
     private function fromTraslados(): Collection
     {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
         return TrasladoStock::query()
+            ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->limit(30)
@@ -458,6 +668,16 @@ class DocumentosController extends Controller
             ->map(function (TrasladoStock $traslado) {
                 $estado = $this->estadoMap($traslado->estado);
                 $total = $this->itemsTotal($traslado->items);
+
+                $acciones = [];
+
+                if (auth()->user()->can('inventario.view')) {
+                    $acciones[] = [
+                        'label' => 'Ver detalle',
+                        'icon' => 'fa-eye',
+                        'url' => route('inventario.acciones.show', ['tipo' => 'traslado', 'id' => $traslado->id])
+                    ];
+                }
 
                 return [
                     'id' => (string) $traslado->id,
@@ -477,7 +697,52 @@ class DocumentosController extends Controller
                         ['label' => 'Almacen destino', 'value' => $traslado->almacen_actual ?: '—'],
                     ],
                     'lineas' => $this->lineasFromArray($traslado->items),
-                    'acciones' => $this->accionesMovimiento('traslado', $traslado->id),
+                    'acciones' => $acciones,
+                ];
+            });
+    }
+
+    private function fromCertificados(): Collection
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        return Documento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('tipo', 'certificados')
+            ->orderByDesc('fecha_documento')
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get()
+            ->map(function (Documento $documento) {
+                $acciones = [];
+                if (auth()->user()->can('documentos.download')) {
+                    $acciones[] = ['label' => 'Previsualizar', 'icon' => 'fa-eye', 'url' => route('documentos.preview', $documento), 'preview' => true];
+                    $acciones[] = ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('documentos.download', $documento)];
+                }
+                if (auth()->user()->can('documentos.delete')) {
+                    $acciones[] = ['label' => 'Borrar', 'icon' => 'fa-trash', 'url' => route('documentos.destroy', $documento), 'method' => 'DELETE', 'confirm' => '¿Seguro que quieres borrar este certificado?'];
+                }
+
+                $metaDatos = is_array($documento->meta) ? $documento->meta : json_decode($documento->meta, true) ?? [];
+
+                return [
+                    'id' => (string) $documento->id,
+                    'codigo' => 'CERT-' . str_pad((string) $documento->id, 4, '0', STR_PAD_LEFT),
+                    'fecha' => optional($documento->fecha_documento)->format('d/m/Y') ?: optional($documento->created_at)->format('d/m/Y') ?: '—',
+                    'persona' => $documento->cliente ?: 'Trabajador sin asignar',
+                    'estado' => 'VIGENTE',
+                    'estado_clase' => 'status-success',
+                    'total' => $documento->size ? number_format($documento->size / 1024, 2, ',', '.') . ' KB' : '—',
+                    'totales' => ['base' => '—', 'iva' => '—', 'total' => '—'],
+                    'tipo' => 'certificados',
+                    'titulo' => $documento->original_name,
+                    'meta' => [
+                        ['label' => 'Trabajador', 'value' => $metaDatos['nombre_trabajador'] ?? '—'],
+                        ['label' => 'ID RRHH', 'value' => $metaDatos['id_rrhh'] ?? '—'],
+                        ['label' => 'Subido el', 'value' => $metaDatos['uploaded_at'] ?? '—'],
+                    ],
+                    'lineas' => [],
+                    'acciones' => $acciones,
                 ];
             });
     }
@@ -607,37 +872,6 @@ class DocumentosController extends Controller
         ];
     }
 
-    private function accionesAlbaran(AlbaranCliente $albaran): array
-    {
-        return [
-            ['label' => 'Ver PDF', 'icon' => 'fa-file-pdf', 'url' => route('albaranes.pdf', $albaran)],
-            ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('albaranes.pdf.file', $albaran)],
-            ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('albaranes.edit', $albaran)],
-        ];
-    }
-
-    private function accionesPresupuesto(Presupuesto $presupuesto): array
-    {
-        return [
-            ['label' => 'Ver documento', 'icon' => 'fa-file-pdf', 'url' => route('presupuestos.pdf', $presupuesto)],
-            ['label' => 'Ver detalle', 'icon' => 'fa-eye', 'url' => route('presupuestos.show', $presupuesto)],
-            ['label' => 'Editar', 'icon' => 'fa-pen', 'url' => route('presupuestos.edit', $presupuesto)],
-        ];
-    }
-
-    private function accionesPedido(PedidoCliente $pedido): array
-    {
-        return [
-            ['label' => 'Ver detalle', 'icon' => 'fa-eye', 'url' => route('pedidos-clientes.show', $pedido)],
-        ];
-    }
-
-    private function accionesMovimiento(string $tipo, int $id): array
-    {
-        return [
-            ['label' => 'Ver detalle', 'icon' => 'fa-eye', 'url' => route('inventario.acciones.show', ['tipo' => $tipo, 'id' => $id])],
-        ];
-    }
 
     private function fallbackDocuments(string $tipo): array
     {
@@ -646,12 +880,9 @@ class DocumentosController extends Controller
         return match ($tipo) {
             'albaranes' => [
                 $this->fallbackRow('1', 'ALB-2024-0124', $fechaBase->copy()->subDays(2), 'Aceros Industriales', 'COMPLETADO', 'status-success', '14.560,00 €'),
-                $this->fallbackRow('2', 'ALB-2024-0125', $fechaBase->copy()->subDays(3), 'Suministros Globales', 'PENDIENTE', 'status-warning', '2.430,50 €'),
-                $this->fallbackRow('3', 'ALB-2024-0126', $fechaBase->copy()->subDays(5), 'Mecanica Precision', 'COMPLETADO', 'status-success', '8.900,00 €'),
             ],
             'presupuestos' => [
                 $this->fallbackRow('1', 'PRE-2024-032', $fechaBase->copy()->subDays(1), 'Logistica Norte', 'BORRADOR', 'status-muted', '1.200,00 €'),
-                $this->fallbackRow('2', 'PRE-2024-031', $fechaBase->copy()->subDays(4), 'Aceros Industriales', 'PENDIENTE', 'status-warning', '6.450,00 €'),
             ],
             'pedidos' => [
                 $this->fallbackRow('1', 'PED-2024-087', $fechaBase->copy()->subDays(2), 'Suministros Globales', 'EN PROCESO', 'status-info', '3.120,00 €'),

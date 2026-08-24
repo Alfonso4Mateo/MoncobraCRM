@@ -132,6 +132,10 @@
                                             <a href="{{ route('users.edit', $user->id) }}" class="btn btn-sm btn-info" title="Editar">
                                                 <i class="fas fa-pen"></i>
                                             </a>
+                                            
+                                            <a href="{{ route('users.permissions.edit', $user->id) }}" class="btn btn-sm btn-warning" title="Gestionar Permisos">
+                                                <i class="fas fa-key"></i>
+                                            </a>
                                         @else
                                             <button class="btn btn-sm btn-secondary disabled" title="No puedes editar este usuario" disabled>
                                                 <i class="fas fa-lock"></i>

@@ -28,11 +28,21 @@ class Curso extends Model
         'dias_aviso_previo' => 'integer',
     ];
 
-    public function personal(): BelongsToMany
+    public function personal()
     {
-        return $this->belongsToMany(Personal::class)
-            ->using(PersonalCurso::class)
-            ->withPivot(['fecha_realizacion', 'apto', 'descripcion_aptitud'])
-            ->withTimestamps();
+        return $this->belongsToMany(Personal::class, 'curso_personal')
+                    ->withPivot('fecha_realizacion', 'apto', 'descripcion_aptitud', 'archivo_diploma')
+                    ->withTimestamps();
+    }
+
+    public function puestos()
+    {
+        return $this->belongsToMany(Puesto::class, 'curso_puesto')
+                    ->withPivot('es_obligatorio')
+                    ->withTimestamps();
+    }
+    public function proyectos()
+    {
+        return $this->belongsToMany(Proyecto::class, 'curso_proyecto');
     }
 }

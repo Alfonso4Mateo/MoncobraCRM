@@ -26,25 +26,32 @@
         </div>
 
         <div class="presupuesto-detail-header__actions">
-            <a href="{{ route('presupuestos.preview', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
-                <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                Previsualizar
-            </a>
-            <a href="{{ route('presupuestos.pdf.download', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
-                <i class="fas fa-download" aria-hidden="true"></i>
-                Descargar PDF
-            </a>
-            @if ($puedeEditar)
-                <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft" title="Editar presupuesto">
-                    <i class="fas fa-pen" aria-hidden="true"></i>
-                    Editar
+            
+            @can('presupuestos.download')
+                <a href="{{ route('presupuestos.preview', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
+                    <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                    Previsualizar
                 </a>
-            @else
-                <button type="button" class="presupuesto-detail-btn presupuesto-detail-btn--soft" disabled title="No puedes editar presupuestos {{ $estado }}s">
-                    <i class="fas fa-pen" aria-hidden="true"></i>
-                    Editar
-                </button>
-            @endif
+                <a href="{{ route('presupuestos.pdf.download', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft">
+                    <i class="fas fa-download" aria-hidden="true"></i>
+                    Descargar PDF
+                </a>
+            @endcan
+
+            @can('presupuestos.manage')
+                @if ($puedeEditar)
+                    <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--soft" title="Editar presupuesto">
+                        <i class="fas fa-pen" aria-hidden="true"></i>
+                        Editar
+                    </a>
+                @else
+                    <button type="button" class="presupuesto-detail-btn presupuesto-detail-btn--soft" disabled title="No puedes editar presupuestos {{ $estado }}s">
+                        <i class="fas fa-pen" aria-hidden="true"></i>
+                        Editar
+                    </button>
+                @endif
+            @endcan
+
             <a href="{{ route('presupuestos.index') }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
                 <i class="fas fa-arrow-left" aria-hidden="true"></i>
                 Volver
@@ -122,7 +129,6 @@
                         <strong>{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
                     </div>
                     
-                    <!-- NUEVOS CAMPOS AÑADIDOS -->
                     <div class="summary-item">
                         <span>Solicitante</span>
                         <strong>{{ $presupuesto->solicitante ?: 'N/D' }}</strong>
@@ -131,7 +137,6 @@
                         <span>Destinatario</span>
                         <strong>{{ $presupuesto->destinatario ?: 'N/D' }}</strong>
                     </div>
-                    <!-- FIN NUEVOS CAMPOS -->
 
                     <div class="summary-item">
                         <span>Total</span>
@@ -173,9 +178,13 @@
                                     @endphp
                                     <tr>
                                         <td data-label="Nº Pedido">
-                                            <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link">
-                                                {{ $pedido->numero_pedido ?: ('PED-' . $pedido->id) }}
-                                            </a>
+                                            @can('pedidos.view')
+                                                <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link">
+                                                    {{ $pedido->numero_pedido ?: ('PED-' . $pedido->id) }}
+                                                </a>
+                                            @else
+                                                <span class="pedido-muted">{{ $pedido->numero_pedido ?: ('PED-' . $pedido->id) }}</span>
+                                            @endcan
                                         </td>
                                         <td data-label="Cliente">
                                             {{ $pedido->cliente?->empresa_nombre ?? 'Sin cliente' }}
@@ -188,9 +197,13 @@
                                         </td>
                                         <td data-label="Albarán">
                                             @if ($pedido->albaran)
-                                                <a href="{{ route('albaranes.show', $pedido->albaran) }}" class="pedido-code-link pedido-code-link--soft">
-                                                    {{ $pedido->albaran->numero ?? 'Ver albarán' }}
-                                                </a>
+                                                @can('albaranes.view')
+                                                    <a href="{{ route('albaranes.show', $pedido->albaran) }}" class="pedido-code-link pedido-code-link--soft">
+                                                        {{ $pedido->albaran->numero ?? 'Ver albarán' }}
+                                                    </a>
+                                                @else
+                                                    <span class="pedido-muted">{{ $pedido->albaran->numero ?? 'Ver albarán' }}</span>
+                                                @endcan
                                             @else
                                                 <span class="pedido-muted">—</span>
                                             @endif

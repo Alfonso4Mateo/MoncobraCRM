@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
+use App\Notifications\AccesoERPNotification;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -21,13 +23,10 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
-        'apellido',
-        'dni_nie',
         'email',
         'password',
         'role',
-        'departamento',
-        'tipo_personal',
+        'departamento', // Este es el que ahora usamos como "Cargo / Función"
         'descripcion',
         'telefono',
         'avatar',
@@ -35,8 +34,6 @@ class User extends Authenticatable
         'ultimo_acceso',
         'dashboard_panel_order',
         'personal_alerta_dias',
-        'ruta_dni',      // Añadido para guardar el archivo del DNI
-        'ruta_contrato', // Añadido para guardar el archivo del contrato
     ];
 
     /**
@@ -109,5 +106,10 @@ class User extends Authenticatable
 
         $projectIds = Proyecto::query()->pluck('id')->all();
         $this->proyectos()->sync($projectIds);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new AccesoERPNotification($token));
     }
 }

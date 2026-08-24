@@ -29,10 +29,12 @@
                 <button type="button" class="clientes-icon-btn" aria-label="Configuración">
                     <i class="fas fa-cog"></i>
                 </button>
+                @can('clientes.manage')
                 <a href="{{ route('clientes.create') }}" class="clientes-add-btn">
                     Añadir Cliente
                     <i class="fas fa-plus"></i>
                 </a>
+                @endcan
             </div>
         </header>
 
@@ -100,9 +102,13 @@
                                 <td>
                                     <div class="cliente-main">
                                         <div>
+                                            @can('clientes.historial')
                                             <a href="{{ route('clientes.show', $cliente->id) }}" class="cliente-name-link">
                                                 <div class="cliente-name">{{ $cliente->empresa_nombre }}</div>
                                             </a>
+                                            @else
+                                                <div class="cliente-name" style="color: #1e293b;">{{ $cliente->empresa_nombre }}</div>
+                                            @endcan
                                         </div>
                                     </div>
                                 </td>
@@ -119,6 +125,7 @@
                                 </td>
                                 <td>
                                     <div class="cliente-actions">
+                                        @can('clientes.manage')
                                         <form action="{{ route('clientes.favorito.toggle', $cliente->id) }}" method="POST" class="cliente-favorite-form">
                                             @csrf
                                             <input type="hidden" name="estado" value="{{ $estado }}">
@@ -135,6 +142,8 @@
                                         <a href="{{ route('clientes.edit', $cliente->id) }}" class="cliente-action-icon" title="Editar cliente" aria-label="Editar cliente">
                                             <i class="fas fa-pen"></i>
                                         </a>
+                                        @endcan
+                                        @can('clientes.delete')
                                         <button
                                             type="button"
                                             class="cliente-action-icon"
@@ -146,10 +155,13 @@
                                         >
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                        @endcan
+                                        @can('clientes.historial')   
                                         <a href="{{ route('clientes.show', $cliente->id) }}" class="cliente-expediente-btn">
                                             <i class="fas fa-history"></i>
                                             Expediente
                                         </a>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

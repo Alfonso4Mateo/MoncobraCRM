@@ -22,6 +22,24 @@
     </div>
 @endsection
 
+@section('content_header')
+    <div class="pedidos-clientes-header">
+        <div class="pedidos-clientes-header__copy">
+            <h1>Pedidos de Clientes</h1>
+            <p>Trazabilidad completa desde presupuesto hasta albarán.</p>
+        </div>
+
+        <div class="pedidos-clientes-header__actions">
+            @can('pedidos.manage')
+            <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                Nuevo Pedido
+            </a>
+            @endcan
+        </div>
+    </div>
+@endsection
+
 @section('content')
     @php
         $estadosFiltro = ['' => 'Todos'] + ($estadosFiltro ?? []);
@@ -94,10 +112,12 @@
                 </div>
 
                 <div class="pedidos-clientes-card__actions">
+                    @canany(['clientes.export', 'pedidos.download'])
                     <a href="{{ route('pedidos-clientes.index', array_merge(request()->query(), ['export' => 'csv'])) }}" class="pedido-action-btn pedido-action-btn--soft">
                         <i class="fas fa-download" aria-hidden="true"></i>
                         Exportar
                     </a>
+                    @endcanany
                 </div>
             </header>
 
@@ -161,12 +181,17 @@
                                 $pendienteFacturar = round(max(0, $totalPedido - (float) ($pedido->ui_total_albaranes ?? 0)), 2);
                             @endphp
                             
-                            <!-- Modificación aquí: Aplicamos la clase condicional a la fila -->
                             <tr class="{{ $pedido->bolsa ? 'bg-pedido-bolsa' : '' }}">
                                 <td data-label="Pedido-cliente" style="max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                    @can('pedidos.view')
                                     <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link" style="display:inline-block; max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
-                                        {{ $pedido->referencia_manual}}
+                                        {{ $pedido->referencia_manual ?: 'Sin referencia' }}
                                     </a>
+                                    @else
+                                    <span style="display:inline-block; max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
+                                        {{ $pedido->referencia_manual ?: 'Sin referencia' }}
+                                    </span>
+                                    @endcan
                                 </td>
                                 <td data-label="Nº-Ref-Interna" style="max-width: 140px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
                                     <span style="display:inline-block; max-width: 140px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
@@ -175,9 +200,13 @@
                                 </td>  
                                 <td data-label="Presupuesto origen">
                                     @if ($pedido->presupuesto_id && $pedido->ui_presupuesto_numero)
+                                        @can('presupuestos.view')
                                         <a href="{{ route('presupuestos.show', $pedido->presupuesto_id) }}" class="pedido-code-link pedido-code-link--soft">
                                             {{ $pedido->ui_presupuesto_numero }}
                                         </a>
+                                        @else
+                                        <span class="pedido-muted">{{ $pedido->ui_presupuesto_numero }}</span>
+                                        @endcan
                                     @else
                                         <span class="pedido-muted">—</span>
                                     @endif
@@ -206,73 +235,78 @@
                                     @endphp
 
                                     @if($pedido->bolsa)
-                                        <!-- Lógica Híbrida para Pedidos Bolsa -->
                                         <div style="display: flex; gap: 5px; flex-direction: column;">
-                                            
-                                            {{-- Si tiene albaranes, mostramos el botón --}}
                                             @if($albaranesCount > 0)
+                                                @can('albaranes.view')
                                                 <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#albaranes-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
                                                     <i class="fas fa-file-invoice" aria-hidden="true"></i>
                                                     Albaranes ({{ $albaranesCount }})
                                                 </a>
+                                                @else
+                                                <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;"><i class="fas fa-lock"></i> Albaranes</span>
+                                                @endcan
                                             @endif
 
-                                            {{-- Si tiene facturación, o si no tiene NADA (para tener un botón donde hacer clic) --}}
                                             @if($facturacionesCount > 0 || $albaranesCount === 0)
+                                                @can('pedidos.manage')
                                                 <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#facturacion-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver facturación manual" style="background-color: #f8f9fa;">
                                                     <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
                                                     Facturación ({{ $facturacionesCount }})
                                                 </a>
+                                                @endcan
                                             @endif
-
                                         </div>
                                     @else
+                                        @can('albaranes.view')
                                         <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
                                             <i class="fas fa-file-invoice" aria-hidden="true"></i>
                                             Ver albarán/es ({{ $albaranesCount }})
                                         </a>
+                                        @else
+                                        <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;"><i class="fas fa-lock"></i> Albaranes</span>
+                                        @endcan
                                     @endif
                                 </td>
                                 <td data-label="Facturación">
                                     <div class="pedido-facturacion-cell">
                                         <div class="pedido-facturacion-line">
                                             <span class="pedido-facturacion-label">Total:</span>
-                                            <strong class="pedido-total">€{{ number_format($pedido->ui_total, 2, ',', '.') }}</strong>
+                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 2, ',', '.') }}€</strong>
                                         </div>
                                         <div class="pedido-facturacion-line pedido-facturacion-line--pending">
                                             <span class="pedido-facturacion-label">Pendiente a facturar:</span>
-                                            <strong>€{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}</strong>
+                                            <strong>{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}€</strong>
                                         </div>
                                     </div>
                                 </td>
                                 <td data-label="Acciones">
                                     <div class="presupuesto-action-group">
+                                        @can('pedidos.view')
                                         <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver pedido" title="Ver pedido">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                        @endcan
 
+                                        @can('pedidos.download')
                                         <a href="{{ route('pedidos-clientes.preview', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar PDF del pedido" title="Previsualizar PDF del pedido">
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
+                                        @endcan
+
+                                        @can('pedidos.manage')
                                         @if($pedido->estado !== 'facturado')
                                             <form action="{{ route('pedidos-clientes.estado.update', $pedido) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Estás seguro de pasar este pedido a Facturado de forma manual?');">
                                                 @csrf
                                                 @method('PATCH')
-                                                
                                                 <input type="hidden" name="estado" value="facturado">
-                                                
                                                 <button type="submit" class="presupuesto-action-btn" style="color: #28a745; border-color: #28a745;" aria-label="Marcar como facturado" title="Marcar como facturado manualmente">
                                                     <i class="fas fa-check-double"></i>
                                                 </button>
                                             </form>
                                         @endif
+                                        @endcan
 
-                                        @php
-                                            $dropdownId = 'pedido-estado-dropdown-' . $pedido->id;
-                                        @endphp
-
-
-                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+                                        @can('pedidos.delete')
                                             <button
                                                 type="button"
                                                 class="presupuesto-action-btn presupuesto-action-btn--danger"
@@ -286,13 +320,13 @@
                                             >
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
-                                        @endif
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9">
+                                <td colspan="10">
                                     <div class="pedido-empty-state">
                                         <i class="fas fa-truck"></i>
                                         <h4>No hay pedidos de cliente para mostrar</h4>

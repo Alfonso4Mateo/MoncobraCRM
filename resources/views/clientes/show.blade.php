@@ -23,7 +23,7 @@
                 <span><i class="fas fa-chevron-right" aria-hidden="true"></i></span>
                 <strong>{{ $cliente->empresa_nombre }}</strong>
                 <span><i class="fas fa-chevron-right" aria-hidden="true"></i></span>
-                <span>Historial de Pedidos</span>
+                <span>Historial de Operaciones</span>
             </nav>
         </header>
 
@@ -33,10 +33,12 @@
                 <p>Gestión integral del flujo de pedidos y trazabilidad de fabricación.</p>
             </div>
             <div class="cliente-show-actions">
+                @can('presupuestos.manage')
                 <a href="{{ route('presupuestos.create', ['cliente_id' => $cliente->id, 'volver_cliente' => 1]) }}" class="btn-nuevo-presupuesto">
                     <i class="fas fa-plus" aria-hidden="true"></i>
                     Nuevo Presupuesto
                 </a>
+                @endcan
             </div>
         </section>
 
@@ -49,15 +51,21 @@
 
                 <div class="cliente-show-card-controls">
                     <nav class="cliente-show-tabs" aria-label="Seleccionar historial">
+                        @can('presupuestos.view')
                         <a href="{{ route('clientes.show', ['cliente' => $cliente->id, 'historial' => 'presupuestos']) }}" class="cliente-show-tab {{ $historialActivo === 'presupuestos' ? 'is-active' : '' }}">
                             Presupuestos
                         </a>
+                        @endcan
+                        @can('pedidos.view')
                         <a href="{{ route('clientes.show', ['cliente' => $cliente->id, 'historial' => 'pedidos']) }}" class="cliente-show-tab {{ $historialActivo === 'pedidos' ? 'is-active' : '' }}">
                             Pedidos
                         </a>
+                        @endcan
+                        @can('albaranes.view')
                         <a href="{{ route('clientes.show', ['cliente' => $cliente->id, 'historial' => 'albaranes']) }}" class="cliente-show-tab {{ $historialActivo === 'albaranes' ? 'is-active' : '' }}">
                             Albaranes
                         </a>
+                        @endcan
                     </nav>
                 </div>
             </header>
@@ -112,13 +120,17 @@
                                 <tr>
                                     <td class="ot-cell">{{ $presupuesto->ot ?: 'OT-' . str_pad((string) $presupuesto->id, 4, '0', STR_PAD_LEFT) }}</td>
                                     <td>
-                                        @if ($presupuesto->archivo_pdf)
-                                            <a href="{{ route('presupuestos.pdf', $presupuesto->id) }}" target="_blank" rel="noopener" class="presupuesto-numero-link">
-                                                {{ $presupuesto->numero ?: 'SIN-NÚMERO' }}
-                                            </a>
+                                        @canany(['presupuestos.download', 'clientes.export'])
+                                            @if ($presupuesto->archivo_pdf)
+                                                <a href="{{ route('presupuestos.pdf', $presupuesto->id) }}" target="_blank" rel="noopener" class="presupuesto-numero-link">
+                                                    {{ $presupuesto->numero ?: 'SIN-NÚMERO' }}
+                                                </a>
+                                            @else
+                                                <span class="presupuesto-numero-disabled">{{ $presupuesto->numero ?: 'SIN-NÚMERO' }}</span>
+                                            @endif
                                         @else
                                             <span class="presupuesto-numero-disabled">{{ $presupuesto->numero ?: 'SIN-NÚMERO' }}</span>
-                                        @endif
+                                        @endcanany
                                     </td>
                                     <td>{{ $presupuesto->fecha ? $presupuesto->fecha->format('d/m/Y') : 'N/D' }}</td>
                                     <td>{{ $presupuesto->titulo ?: ($presupuesto->documento ?: 'Sin descripción') }}</td>
@@ -133,14 +145,18 @@
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        @if ($presupuesto->archivo_pdf)
-                                            <a href="{{ route('presupuestos.pdf', $presupuesto->id) }}" target="_blank" rel="noopener" class="accion-pdf-btn">
-                                                <i class="far fa-file-pdf" aria-hidden="true"></i>
-                                                Ver PDF
-                                            </a>
+                                        @canany(['presupuestos.download', 'clientes.export'])
+                                            @if ($presupuesto->archivo_pdf)
+                                                <a href="{{ route('presupuestos.pdf', $presupuesto->id) }}" target="_blank" rel="noopener" class="accion-pdf-btn">
+                                                    <i class="far fa-file-pdf" aria-hidden="true"></i>
+                                                    Ver PDF
+                                                </a>
+                                            @else
+                                                <span class="accion-sin-pdf">Sin PDF</span>
+                                            @endif
                                         @else
-                                            <span class="accion-sin-pdf">Sin PDF</span>
-                                        @endif
+                                            <span class="text-muted" title="Sin permisos de descarga"><i class="fas fa-lock"></i></span>
+                                        @endcanany
                                     </td>
                                 </tr>
                             @empty
@@ -199,9 +215,13 @@
                             @forelse ($pedidos as $pedido)
                                 <tr>
                                     <td>
+                                        @can('pedidos.view')
                                         <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="presupuesto-numero-link">
                                             {{ $pedido->numero_pedido }}
                                         </a>
+                                        @else
+                                        <span class="presupuesto-numero-disabled">{{ $pedido->numero_pedido }}</span>
+                                        @endcan
                                     </td>
                                     <td>
                                         @if ($pedido->ui_presupuesto_numero)
@@ -221,12 +241,16 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="cliente-show-action-group">
+                                            @can('pedidos.view')
                                             <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="cliente-show-mini-btn">
                                                 Ver pedido
                                             </a>
+                                            @endcan
+                                            @can('albaranes.view')
                                             <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="cliente-show-mini-btn cliente-show-mini-btn--soft">
                                                 Albaranes
                                             </a>
+                                            @endcan
                                         </div>
                                     </td>
                                 </tr>
@@ -285,9 +309,13 @@
                             @forelse ($albaranes as $albaran)
                                 <tr>
                                     <td>
-                                        <a href="{{ route('albaranes.pdf', $albaran) }}" target="_blank" rel="noopener" class="presupuesto-numero-link">
-                                            {{ $albaran->numero ?: 'SIN-NÚMERO' }}
-                                        </a>
+                                        @canany(['albaranes.download', 'clientes.export'])
+                                            <a href="{{ route('albaranes.pdf', $albaran) }}" target="_blank" rel="noopener" class="presupuesto-numero-link">
+                                                {{ $albaran->numero ?: 'SIN-NÚMERO' }}
+                                            </a>
+                                        @else
+                                            <span class="presupuesto-numero-disabled">{{ $albaran->numero ?: 'SIN-NÚMERO' }}</span>
+                                        @endcanany
                                     </td>
                                     <td>
                                         @if ($albaran->ui_pedido_id)
@@ -314,16 +342,20 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="cliente-show-action-group">
-                                            @if ($albaran->archivo_pdf)
-                                                <a href="{{ route('albaranes.pdf', $albaran) }}" target="_blank" rel="noopener" class="cliente-show-mini-btn">
-                                                    Ver PDF
+                                            @canany(['albaranes.download', 'clientes.export'])
+                                                @if ($albaran->archivo_pdf)
+                                                    <a href="{{ route('albaranes.pdf', $albaran) }}" target="_blank" rel="noopener" class="cliente-show-mini-btn">
+                                                        Ver PDF
+                                                    </a>
+                                                @else
+                                                    <span class="accion-sin-pdf">Sin PDF</span>
+                                                @endif
+                                                <a href="{{ route('albaranes.preview', $albaran) }}" class="cliente-show-mini-btn cliente-show-mini-btn--soft">
+                                                    Previsualizar
                                                 </a>
                                             @else
-                                                <span class="accion-sin-pdf">Sin PDF</span>
-                                            @endif
-                                            <a href="{{ route('albaranes.preview', $albaran) }}" class="cliente-show-mini-btn cliente-show-mini-btn--soft">
-                                                Previsualizar
-                                            </a>
+                                                <span class="text-muted" title="Sin permisos de descarga"><i class="fas fa-lock"></i></span>
+                                            @endcanany
                                         </div>
                                     </td>
                                 </tr>

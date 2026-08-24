@@ -35,6 +35,9 @@ class PresupuestoController extends Controller
 
     public function index(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.view');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $search = trim((string) $request->input('search', ''));
         $fechaDesde = trim((string) $request->input('fecha_desde', ''));
@@ -95,6 +98,9 @@ class PresupuestoController extends Controller
 
     public function create(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId)['numero'];
@@ -113,6 +119,9 @@ class PresupuestoController extends Controller
 
     public function store(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $redirectClienteId = (int) $request->input('redirect_cliente_id', 0);
@@ -166,6 +175,12 @@ class PresupuestoController extends Controller
 
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
+        $lineasFiltradas = array_map(function (array $linea) {
+        $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
+        $linea['medida'] = $medida === '' ? 'und' : $medida;
+        return $linea;
+        }, $lineasFiltradas);
+
         $this->validateLineasPayload($lineasFiltradas);
 
         $validated['lista_articulos'] = $this->lineNormalizer->normalize($lineasFiltradas);
@@ -215,6 +230,9 @@ class PresupuestoController extends Controller
 
     public function show(Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.view');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
@@ -232,6 +250,9 @@ class PresupuestoController extends Controller
 
     public function viewPdf(Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
@@ -243,6 +264,9 @@ class PresupuestoController extends Controller
 
     public function downloadPdf(Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
@@ -254,6 +278,9 @@ class PresupuestoController extends Controller
 
     public function preview(Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
@@ -271,6 +298,9 @@ class PresupuestoController extends Controller
 
     public function edit(Request $request, Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
@@ -295,10 +325,8 @@ class PresupuestoController extends Controller
 
     public function editCorrelativo(Request $request)
     {
-        $user = $request->user();
-        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId);
@@ -328,10 +356,8 @@ class PresupuestoController extends Controller
 
     public function updateCorrelativo(Request $request)
     {
-        $user = $request->user();
-        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
@@ -356,6 +382,9 @@ class PresupuestoController extends Controller
 
     public function updateEstado(Request $request, Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         if ((int) $presupuesto->proyecto_id !== (int) $proyectoId) {
@@ -375,6 +404,9 @@ class PresupuestoController extends Controller
 
     public function update(Request $request, Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.manage');
+
         $proyectoId = $presupuesto->proyecto_id ?: $this->resolveActiveProyectoId($request);
 
         if ((int) $presupuesto->proyecto_id !== (int) $proyectoId) {
@@ -382,7 +414,6 @@ class PresupuestoController extends Controller
         }
 
         $user = $request->user();
-        $isSuperadmin = $user && $user->role === 'superadmin';
 
         // Reglas base
         $rules = [
@@ -393,28 +424,34 @@ class PresupuestoController extends Controller
             'destinatario' => 'nullable|string|max:255', 
         ];
 
-        // Añadimos validación estricta si es superadmin
-            $rules['documento'] = 'required|string|max:50';
-            $rules['numero'] = [
-            'nullable',
-            'string',
-            'max:50',
-            Rule::unique('presupuestos', 'numero')
-                ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
-                ->whereNull('deleted_at')
-                ->ignore($presupuesto->id),
-            ];
-            $rules['fecha'] = 'required|date';
-            $rules['cliente_id'] = [
-                'required',
-                Rule::exists('clientes', 'id')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
-            ];
-            $rules['titulo'] = 'nullable|string|max:255';
-            $rules['ot'] = 'nullable|string|max:255';
+        // Añadimos validación estricta para todos
+        $rules['documento'] = 'required|string|max:50';
+        $rules['numero'] = [
+        'nullable',
+        'string',
+        'max:50',
+        Rule::unique('presupuestos', 'numero')
+            ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+            ->whereNull('deleted_at')
+            ->ignore($presupuesto->id),
+        ];
+        $rules['fecha'] = 'required|date';
+        $rules['cliente_id'] = [
+            'required',
+            Rule::exists('clientes', 'id')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+        ];
+        $rules['titulo'] = 'nullable|string|max:255';
+        $rules['ot'] = 'nullable|string|max:255';
     
         $validated = $request->validate($rules);
 
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
+
+        $lineasFiltradas = array_map(function (array $linea) {
+        $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
+        $linea['medida'] = $medida === '' ? 'und' : $medida;
+        return $linea;
+        }, $lineasFiltradas);
 
         $this->validateLineasPayload($lineasFiltradas);
 
@@ -472,15 +509,13 @@ class PresupuestoController extends Controller
 
     public function destroy(Presupuesto $presupuesto)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('presupuestos.delete');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
             abort(404);
-        }
-
-        $user = request()->user();
-        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
         }
 
         if ($presupuesto->pedidoCliente()->exists()) {

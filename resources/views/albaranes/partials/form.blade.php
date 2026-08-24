@@ -204,7 +204,7 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_medida">Medida</label>
-                            <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                            <input type="text" id="linea_medida" value="und" placeholder="u, kg, m...">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_precio">P. unitario</label>
@@ -231,7 +231,7 @@
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_medida">Medida</label>
-                            <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                            <input type="text" id="linea_medida" value="und" placeholder="u, kg, m...">
                         </div>
                         <div class="field-group flex-1">
                             <label for="linea_precio">P. unitario</label>

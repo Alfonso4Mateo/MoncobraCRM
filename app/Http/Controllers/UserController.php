@@ -33,8 +33,22 @@ class UserController extends Controller
     {
         $currentUser = auth()->user();
         
-        // Admin y Superadmin ven a TODOS los usuarios
-        $users = User::with('proyectos')->paginate(10);
+        // 1. Si es Super Admin (Tú), cargamos a TODOS los usuarios del sistema sin filtros.
+        if ($currentUser->role === 'superadmin') {
+            $users = User::with('proyectos')->paginate(10);
+        } 
+        // 2. Si es Admin (Gerente) o Usuario normal, filtramos por sus sedes/proyectos.
+        else {
+            // Sacamos los IDs de las sedes (Cádiz, Murcia, etc.) del gerente actual
+            $misProyectosIds = $currentUser->proyectos->pluck('id')->toArray();
+
+            // Buscamos usuarios que compartan al menos un proyecto con el gerente
+            $users = User::with('proyectos')
+                ->whereHas('proyectos', function ($query) use ($misProyectosIds) {
+                    $query->whereIn('proyectos.id', $misProyectosIds);
+                })
+                ->paginate(10);
+        }
 
         return view('usuarios.index', compact('users', 'currentUser'));
     }
@@ -65,7 +79,6 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'role' => 'required|in:user,admin,superadmin',
             'departamento' => 'nullable|string|max:255',
-            'tipo_personal' => 'required|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
             'chaqueta' => 'nullable|string|max:20',
             'sudadera' => 'nullable|string|max:20',
@@ -94,7 +107,6 @@ class UserController extends Controller
             'password' => Hash::make(Str::random(32)), // Generamos un password aleatorio
             'role' => $validated['role'],
             'departamento' => $validated['departamento'] ?? null,
-            'tipo_personal' => $validated['tipo_personal'],
             'camiseta' => $validated['camiseta'] ?? null,
             'chaqueta' => $validated['chaqueta'] ?? null,
             'sudadera' => $validated['sudadera'] ?? null,
@@ -125,14 +137,16 @@ class UserController extends Controller
      * Mostrar formulario de edición
      */
     public function edit(User $user)
-    {
-        $this->authorize('edit-user', $user);
+{
+    $this->authorize('edit-user', $user);
 
-        // AÑADIDO: Pasamos los proyectos a la vista para poder asignarlos
-        $proyectos = Proyecto::orderBy('nombre')->get();
+    $proyectos = Proyecto::orderBy('nombre')->get();
+    
+    //Obtenemos todos los permisos disponibles en el sistema agrupados o completos
+    $permisosDisponibles = \Spatie\Permission\Models\Permission::all();
 
-        return view('usuarios.edit', compact('user', 'proyectos'));
-    }
+    return view('usuarios.edit', compact('user', 'proyectos', 'permisosDisponibles'));
+}
 
     /**
      * Actualizar usuario
@@ -148,35 +162,33 @@ class UserController extends Controller
             'telefono' => 'nullable|string|max:20',
             'descripcion' => 'nullable|string',
             'activo' => 'boolean',
-            // AÑADIDO: Validamos los proyectos que llegan desde los checkboxes
             'proyecto_ids' => 'nullable|array',
             'proyecto_ids.*' => 'exists:proyectos,id',
+            //Validamos los permisos que llegan por array desde los checkboxes
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'string|exists:permissions,name',
         ]);
 
-        // Validar que no intente cambiar su propio rol
+        // Validar que no intente cambiar su propio rol...
         if ($request->user()->id === $user->id && $request->input('role') !== $user->role) {
             return back()->withErrors(['role' => 'No puedes cambiar tu propio rol.']);
         }
 
-        // Validar cambio de rol según permisos
-        if ($request->input('role') !== $user->role) {
-            $this->authorize('change-user-role', $user);
-            // Un admin no puede asignar 'superadmin'
-            if ($request->user()->role === 'admin' && $request->input('role') === 'superadmin') {
-                return back()->withErrors(['role' => 'No tienes permisos para asignar ese rol.']);
-            }
-        }
-
         $user->update($validated);
 
-        // AÑADIDO: Sincronizar los proyectos asignados
+        // Sincronizar proyectos
         if ($user->role === 'superadmin') {
             $user->syncAllProjectsIfSuperadmin();
+            // Opcional: un superadmin tiene todos los permisos automáticamente
+            $user->syncPermissions(\Spatie\Permission\Models\Permission::all());
         } else {
             $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
+            
+            //Validamos los permisos que llegan por array desde los checkboxes
+            $user->syncPermissions($validated['permissions'] ?? []);
         }
 
-        return redirect()->route('users.index')->with('success', 'Usuario actualizado correctamente.');
+        return redirect()->route('users.index')->with('success', 'Usuario y permisos actualizados correctamente.');
     }
 
     /**
@@ -352,7 +364,6 @@ class UserController extends Controller
             'apellido' => 'nullable|string|max:255',
             'dni_nie' => 'nullable|string|max:20|unique:users,dni_nie,' . $user->id,
             'departamento' => 'nullable|string|max:255',
-            'tipo_personal' => 'nullable|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
             'chaqueta' => 'nullable|string|max:20',
             'sudadera' => 'nullable|string|max:20',
@@ -372,7 +383,6 @@ class UserController extends Controller
             'apellido' => $validated['apellido'] ?? $user->apellido,
             'dni_nie' => $validated['dni_nie'] ?? $user->dni_nie,
             'departamento' => $validated['departamento'] ?? $user->departamento,
-            'tipo_personal' => $validated['tipo_personal'] ?? $user->tipo_personal,
             'camiseta' => $validated['camiseta'] ?? $user->camiseta,
             'chaqueta' => $validated['chaqueta'] ?? $user->chaqueta,
             'sudadera' => $validated['sudadera'] ?? $user->sudadera,
@@ -388,5 +398,55 @@ class UserController extends Controller
         $user->proyectos()->sync($validated['proyecto_ids'] ?? []);
 
         return redirect()->route('personal.show', $user->id)->with('success', 'Ficha actualizada correctamente.');
+    }
+
+    /**
+     * Mostrar la vista dedicada para gestionar los permisos de un usuario
+     */
+    public function permissionsEdit(User $user)
+    {
+        $this->authorize('edit-user', $user);
+
+        $permisosDisponibles = \Spatie\Permission\Models\Permission::all();
+
+        return view('usuarios.permissions', compact('user', 'permisosDisponibles'));
+    }
+
+    /**
+     * Guardar los permisos actualizados desde la vista dedicada
+     */
+    public function permissionsUpdate(Request $request, User $user)
+    {
+        $this->authorize('edit-user', $user);
+
+        $validated = $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'string|exists:permissions,name',
+        ]);
+
+        if ($user->role === 'superadmin') {
+            $user->syncPermissions(\Spatie\Permission\Models\Permission::all());
+        } else {
+            $user->syncPermissions($validated['permissions'] ?? []);
+        }
+
+        return redirect()->route('users.index')->with('success', 'Permisos de acceso actualizados correctamente.');
+    }
+
+    public function sendPasswordResetLink(User $user)
+    {
+        // Verificamos que quien pulsa el botón tenga permisos para gestionar usuarios
+        $this->authorize('users.manage');
+
+        // Usamos el broker nativo de Laravel para enviar el email
+        $status = Password::broker()->sendResetLink(
+            ['email' => $user->email]
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return redirect()->back()->with('success', 'Enlace de recuperación enviado al correo: ' . $user->email);
+        }
+
+        return redirect()->back()->with('error', 'Hubo un problema al intentar enviar el correo.');
     }
 }

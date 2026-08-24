@@ -187,7 +187,7 @@
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_medida">Medida</label>
-                            <input type="text" id="line_medida" class="pedido-input" placeholder="u, kg, m...">
+                            <input type="text" id="line_medida" value="und" class="pedido-input" placeholder="u, kg, m...">
                         </div>
                         <div class="pedido-field pedido-field--compact">
                             <label for="line_precio">P. unitario</label>
@@ -451,7 +451,7 @@
             const resetLineForm = () => {
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
-                medidaInput.value = '';
+                medidaInput.value = 'und';
                 precioInput.value = '0';
                 margenInput.value = '0';
                 autoResizeDescripcion();
@@ -476,8 +476,6 @@
                     return;
                 }
 
-                bolsaCheckbox.disabled = true;
-                bolsaCheckbox.checked = false;
                 syncBolsaUi();
 
                 if (presupuesto.cliente_id) {
@@ -509,7 +507,7 @@
 
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, parseValue(cantidadInput.value));
-                const medida = medidaInput.value.trim();
+                const medida = medidaInput.value.trim() || 'und';
                 const precioUnitario = Math.max(0, parseValue(precioInput.value));
                 const margen = Math.max(0, parseValue(margenInput.value));
 
@@ -570,12 +568,6 @@
             });
 
             bolsaCheckbox.addEventListener('change', () => {
-                if (bolsaCheckbox.checked && presupuestoSelect.value) {
-                    bolsaCheckbox.checked = false;
-                    window.alert('El modo bolsa solo está disponible cuando el pedido no viene de un presupuesto.');
-                    return;
-                }
-
                 syncBolsaUi();
             });
 

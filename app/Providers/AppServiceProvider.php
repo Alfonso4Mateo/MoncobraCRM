@@ -26,67 +26,27 @@ class AppServiceProvider extends ServiceProvider
     {
         Paginator::useBootstrapFive();
 
-        $isAdminOrSuperadmin = function (User $user): bool {
-            return in_array($user->role, ['admin', 'superadmin']);
-        };
-
-        // Gate para gestionar usuarios (solo admin y superadmin)
-        Gate::define('manage-users', $isAdminOrSuperadmin);
-
-        // Gate para ver todos los usuarios
-        Gate::define('view-users', $isAdminOrSuperadmin);
-
-        // Gate para ver detalles de un usuario específico
-        Gate::define('view-user', function (User $user, User $targetUser) {
-            // Solo admin y superadmin pueden ver detalles de cualquier usuario
-            return in_array($user->role, ['admin', 'superadmin']);
-        });
-
-        // Gate para editar un usuario específico
-        Gate::define('edit-user', function (User $user, User $targetUser) {
-            // Un superadmin puede editar a todos menos sí mismo
+        // 1. LA LLAVE MAESTRA (Soluciona el error 403 de Spatie)
+        // Esto intercepta cualquier comprobación de permisos. Si eres superadmin, entras a todo.
+        Gate::before(function (User $user, $ability) {
+            // Como usas $user->role directamente en tu tabla, lo validamos así
             if ($user->role === 'superadmin') {
-                return $user->id !== $targetUser->id;
+                return true;
             }
-            // Un admin puede editar a usuarios y otros admins
-            if ($user->role === 'admin') {
-                return in_array($targetUser->role, ['user', 'admin']) && $user->id !== $targetUser->id;
-            }
-            return false;
+            return null; // Si no es superadmin, sigue con las comprobaciones normales
         });
 
-        // Gate para eliminar un usuario
-        Gate::define('delete-user', function (User $user, User $targetUser) {
-            // Un superadmin puede eliminar cualquiera menos sí mismo
-            if ($user->role === 'superadmin') {
-                return $user->id !== $targetUser->id;
-            }
-            // Un admin solo puede eliminar usuarios regulares
-            if ($user->role === 'admin') {
-                return $targetUser->role === 'user' && $user->id !== $targetUser->id;
-            }
-            return false;
-        });
+        // NOTA IMPORTANTE: 
+        // Hemos ELIMINADO los Gate::define de 'edit-user', 'delete-user', etc.
+        // Laravel ahora enviará esas peticiones automáticamente a la clase UserPolicy 
+        // que creamos, donde está programada la barrera de los proyectos.
 
-        // Gate para cambiar el rol de un usuario
-        Gate::define('change-user-role', function (User $user, User $targetUser) {
-            // Un superadmin puede cambiar roles a cualquiera menos sí mismo
-            if ($user->role === 'superadmin') {
-                return $user->id !== $targetUser->id;
-            }
-            // Un admin puede cambiar roles de usuarios y otros admins (pero no superadmin)
-            if ($user->role === 'admin') {
-                return in_array($targetUser->role, ['user', 'admin']) && $user->id !== $targetUser->id;
-            }
-            return false;
-        });
-
-        // Gate para gestionar proyectos (solo superadmin)
+        // 2. Gate aislado para proyectos (Si no tienes un ProyectoPolicy, está bien dejarlo aquí)
         Gate::define('manage-projects', function (User $user) {
             return $user->role === 'superadmin';
         });
 
-        // Personalización del correo de creación/restablecimiento de contraseña
+        // 3. Personalización del correo de creación/restablecimiento de contraseña
         ResetPassword::toMailUsing(function (object $notifiable, string $token) {
             // Generamos la URL segura con el token y el email del trabajador
             $url = url(route('password.reset', [

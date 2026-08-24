@@ -27,6 +27,7 @@ class Documento extends Model
         'size',
         'meta',
         'user_id',
+        'proyecto_id',
     ];
 
     protected $casts = [

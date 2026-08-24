@@ -42,9 +42,11 @@
                     <a href="{{ route('cursos.index') }}" class="cursos-btn cursos-btn--soft">
                         <i class="fas fa-arrow-left mr-2"></i> Volver al catálogo
                     </a>
+                @can('cursos.create')
                     <a href="{{ route('cursos.create') }}" class="cursos-btn cursos-btn--primary">
                         <i class="fas fa-plus mr-2"></i> Nuevo curso
                     </a>
+                @endcan
                 </div>
             </div>
 
@@ -114,17 +116,25 @@
                                     </td>
                                     <td class="text-right">
                                         <div class="btn-group">
+                                        @can('cursos.view')
                                             <a href="{{ route('cursos.show', $curso->id) }}" class="btn btn-sm btn-info text-white" title="Ver ficha del curso">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                        @endcan
+
+                                        @can('cursos.edit')
                                             <a href="{{ route('cursos.edit', $curso->id) }}" class="btn btn-sm btn-secondary">
                                                 Editar
                                             </a>
+                                        @endcan
+                                        
+                                        @can('cursos.delete')
                                             <form action="{{ route('cursos.destroy', $curso->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar este curso?');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-danger" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">Borrar</button>
                                             </form>
+                                        @endcan
                                         </div>
                                     </td>
                                 </tr>

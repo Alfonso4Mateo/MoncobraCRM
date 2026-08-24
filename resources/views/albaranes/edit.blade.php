@@ -18,12 +18,14 @@
             </div>
 
             <div class="top-actions">
-                <a href="{{ route('albaranes.pdf.file', $albaran) }}" class="icon-btn" title="PDF" target="_blank">
-                    <i class="far fa-file-pdf"></i>
-                </a>
-                <button type="button" class="icon-btn" title="Imprimir" onclick="window.print()">
-                    <i class="fas fa-print"></i>
-                </button>
+                @can('albaranes.download')
+                    <a href="{{ route('albaranes.pdf.file', $albaran) }}" class="icon-btn" title="PDF" target="_blank">
+                        <i class="far fa-file-pdf"></i>
+                    </a>
+                    <button type="button" class="icon-btn" title="Imprimir" onclick="window.print()">
+                        <i class="fas fa-print"></i>
+                    </button>
+                @endcan
             </div>
         </header>
 
@@ -60,7 +62,6 @@
                         <div class="form-grid cols-3">
                             <div class="field">
                                 <label for="documento">Documento</label>
-                                <!-- Quitamos el readonly -->
                                 <input type="text" id="documento" name="documento" value="{{ old('documento', $albaran->documento ?? '') }}" required>
                             </div>
                             <div class="field">
@@ -74,7 +75,6 @@
 
                             <div class="field">
                                 <label for="cliente_id">Cliente</label>
-                                <!-- Quitamos el disabled y eliminamos el input hidden duplicado -->
                                 <select id="cliente_id" name="cliente_id" required>
                                     <option value="">Selecciona cliente...</option>
                                     @foreach ($clientes as $cliente)
@@ -86,12 +86,10 @@
                             </div>
                             <div class="field">
                                 <label for="ot">OT</label>
-                                <!-- Quitamos el readonly -->
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
                             </div>
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <!-- Quitamos el readonly -->
                                 <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}">
                             </div>
 

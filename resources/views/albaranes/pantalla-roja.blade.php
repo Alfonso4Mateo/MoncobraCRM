@@ -15,12 +15,14 @@
             </div>
 
             <div class="top-actions">
-                <button type="button" class="icon-btn" title="PDF">
-                    <i class="far fa-file-pdf"></i>
-                </button>
-                <button type="button" class="icon-btn" title="Imprimir">
-                    <i class="fas fa-print"></i>
-                </button>
+                @can('albaranes.download')
+                    <button type="button" class="icon-btn" title="PDF">
+                        <i class="far fa-file-pdf"></i>
+                    </button>
+                    <button type="button" class="icon-btn" title="Imprimir">
+                        <i class="fas fa-print"></i>
+                    </button>
+                @endcan
             </div>
         </header>
 
@@ -101,7 +103,6 @@
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
                         <div class="line-row">
-                            <!-- Campo 'Código referencia' eliminado; se usa columna 'Línea' numerada -->
                             <div class="field flex-3">
                                 <label for="linea_descripcion">Descripción</label>
                                 <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>

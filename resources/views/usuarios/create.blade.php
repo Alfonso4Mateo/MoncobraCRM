@@ -68,13 +68,8 @@
                         </div>
 
                         <div class="field-group">
-                            <label for="departamento">Departamento</label>
-                            <select id="departamento" name="departamento">
-                                @php($departamentos = ['' => 'Selecciona departamento', 'Producción' => 'Producción', 'Logística' => 'Logística', 'Mantenimiento' => 'Mantenimiento', 'Calidad' => 'Calidad', 'Administración' => 'Administración'])
-                                @foreach($departamentos as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('departamento') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
+                            <label for="departamento">Cargo / Función principal</label>
+                            <input type="text" id="departamento" name="departamento" value="{{ old('departamento') }}" placeholder="Ej. Técnico PRL, Comercial, Administrativo...">
                         </div>
 
                         <div class="field-group">
@@ -101,20 +96,6 @@
                                 <i class="fas fa-envelope-open-text" style="color: #0dcaf0; margin-right: 8px;"></i>
                                 <strong>Configuración de contraseña:</strong> Al guardar el trabajador, se le enviará automáticamente un correo electrónico a la dirección proporcionada con un enlace seguro para que configure su propia contraseña.
                             </p>
-                        </div>
-
-                        <div class="field-group field-group--full mt-3">
-                            <label>Tipo de personal</label>
-                            <div class="choice-grid">
-                                <label class="choice-card">
-                                    <input type="radio" name="tipo_personal" value="indefinido" @checked(old('tipo_personal', 'indefinido') === 'indefinido')>
-                                    <span>Indefinido</span>
-                                </label>
-                                <label class="choice-card">
-                                    <input type="radio" name="tipo_personal" value="temporal" @checked(old('tipo_personal') === 'temporal')>
-                                    <span>Temporal / ETT</span>
-                                </label>
-                            </div>
                         </div>
 
                         <div class="field-group field-group--full" id="proyectos-container" style="margin-top: 1rem;">

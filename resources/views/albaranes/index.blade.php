@@ -5,7 +5,6 @@
 @section('header-title')
     <i class="fas fa-file-alt"></i> Albaranes Clientes
 @endsection
-
 @section('content')
     @php
         $textoVariacionMensual = ($variacionMensual >= 0 ? '+' : '') . number_format($variacionMensual, 1, ',', '.') . '% vs mes ant.';
@@ -33,16 +32,16 @@
 
         <header class="albaranes-toolbar">
             <div class="albaranes-toolbar-actions">
-                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                @can('albaranes.manage')
                     <a href="{{ route('albaranes.correlativo.edit') }}" class="toolbar-main-btn toolbar-main-btn--muted" title="Ajustar correlativo de albaranes">
                         Ajustar correlativo
                         <i class="fas fa-hashtag"></i>
                     </a>
-                @endif
-                <a href="{{ route('albaranes.create') }}" class="toolbar-main-btn">
-                    Crear Albarán
-                    <i class="fas fa-plus"></i>
-                </a>
+                    <a href="{{ route('albaranes.create') }}" class="toolbar-main-btn">
+                        Crear Albarán
+                        <i class="fas fa-plus"></i>
+                    </a>
+                @endcan
             </div>
         </header>
 
@@ -128,15 +127,23 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <a href="{{ route('albaranes.pdf', $albaran) }}" class="code-link">
-                                        {{ $albaran->numero }}
-                                    </a>
+                                    @can('albaranes.download')
+                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="code-link">
+                                            {{ $albaran->numero }}
+                                        </a>
+                                    @else
+                                        <span class="code-link" style="color: #64748b; cursor: not-allowed; text-decoration: none;">{{ $albaran->numero }}</span>
+                                    @endcan
                                 </td>
                                 <td>
                                     @if (!empty($albaran->ui_presupuesto_id) && !empty($albaran->ui_presupuesto_numero))
-                                        <a href="{{ route('presupuestos.show', $albaran->ui_presupuesto_id) }}" class="code-link">
-                                            {{ $albaran->ui_presupuesto_numero }}
-                                        </a>
+                                        @can('presupuestos.view')
+                                            <a href="{{ route('presupuestos.show', $albaran->ui_presupuesto_id) }}" class="code-link">
+                                                {{ $albaran->ui_presupuesto_numero }}
+                                            </a>
+                                        @else
+                                            <span class="muted">{{ $albaran->ui_presupuesto_numero }}</span>
+                                        @endcan
                                     @else
                                         <span class="muted">-</span>
                                     @endif
@@ -149,13 +156,21 @@
                                 <td>{{ $albaran->titulo ?: '-' }}</td>
                                 <td>
                                     @if ($albaran->ui_pedido_id)
-                                        <a href="{{ route('pedidos-clientes.show', $albaran->ui_pedido_id) }}" class="code-link">
-                                            {{ $pedidoNumero }}
-                                        </a>
+                                        @can('pedidos.view')
+                                            <a href="{{ route('pedidos-clientes.show', $albaran->ui_pedido_id) }}" class="code-link">
+                                                {{ $pedidoNumero }}
+                                            </a>
+                                        @else
+                                            <span class="muted">{{ $pedidoNumero }}</span>
+                                        @endcan
                                     @elseif ($pedidoNumero !== '')
-                                        <a href="{{ route('pedidos.show', $pedidoNumero) }}" class="code-link">
-                                            {{ $pedidoNumero }}
-                                        </a>
+                                        @can('pedidos.view')
+                                            <a href="{{ route('pedidos.show', $pedidoNumero) }}" class="code-link">
+                                                {{ $pedidoNumero }}
+                                            </a>
+                                        @else
+                                            <span class="muted">{{ $pedidoNumero }}</span>
+                                        @endcan
                                     @else
                                         <span class="muted">-</span>
                                     @endif
@@ -166,17 +181,22 @@
                                 </td>
                                 <td>
                                     <div class="presupuesto-action-group">
-                                        <a href="{{ route('albaranes.preview', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar albarán" title="Previsualizar albarán">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán">
-                                            <i class="fas fa-file-pdf"></i>
-                                        </a>
-                                        <a href="{{ route('albaranes.edit', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
-                                            <i class="fas fa-pen"></i>
-                                        </a>
+                                        @can('albaranes.download')
+                                            <a href="{{ route('albaranes.preview', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar albarán" title="Previsualizar albarán">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                        @endcan
 
-                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+                                        @can('albaranes.manage')
+                                            <a href="{{ route('albaranes.edit', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
+                                                <i class="fas fa-pen"></i>
+                                            </a>
+                                        @endcan
+
+                                        @can('albaranes.delete')
                                             <button
                                                 type="button"
                                                 class="presupuesto-action-btn presupuesto-action-btn--danger"
@@ -191,35 +211,37 @@
                                             >
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
-                                        @endif
+                                        @endcan
 
-                                        @php
-                                            $dropdownId = 'albaran-estado-dropdown-' . $albaran->id;
-                                        @endphp
-                                        <div class="dropdown presupuesto-dropdown">
-                                            <button
-                                                type="button"
-                                                class="presupuesto-action-btn--state dropdown-toggle"
-                                                id="{{ $dropdownId }}"
-                                                data-toggle="dropdown"
-                                                aria-haspopup="true"
-                                                aria-expanded="false"
-                                                aria-label="Cambiar estado"
-                                                title="Cambiar estado"
-                                            >
-                                                <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
-                                            </button>
-                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
-                                                <h6 class="dropdown-header">Cambiar estado</h6>
-                                                <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" class="estado-menu-form">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="recibido">Recibido</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="entregado">Entregado</button>
-                                                </form>
+                                        @can('albaranes.manage')
+                                            @php
+                                                $dropdownId = 'albaran-estado-dropdown-' . $albaran->id;
+                                            @endphp
+                                            <div class="dropdown presupuesto-dropdown">
+                                                <button
+                                                    type="button"
+                                                    class="presupuesto-action-btn--state dropdown-toggle"
+                                                    id="{{ $dropdownId }}"
+                                                    data-toggle="dropdown"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="false"
+                                                    aria-label="Cambiar estado"
+                                                    title="Cambiar estado"
+                                                >
+                                                    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
+                                                    <h6 class="dropdown-header">Cambiar estado</h6>
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" class="estado-menu-form">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="recibido">Recibido</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="entregado">Entregado</button>
+                                                    </form>
+                                                </div>
                                             </div>
-                                        </div>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -244,6 +266,7 @@
             </footer>
         </article>
 
+        <!-- Modales de borrado (igual que antes) -->
         <form id="albaran-delete-form" method="POST" class="d-none">
             @csrf
             @method('DELETE')

@@ -22,6 +22,7 @@ use App\Http\Controllers\ProyectoContextController;
 use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\ClaseController;
 use App\Http\Controllers\ProyectoController;
+use App\Http\Controllers\AyudaController;
 
 // Página inicial: redirige al dashboard si hay sesión, o al login si no.
 Route::get('/', function () {

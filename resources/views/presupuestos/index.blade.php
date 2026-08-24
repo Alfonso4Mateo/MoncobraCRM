@@ -29,6 +29,32 @@
     </div>
 @endsection
 
+@section('content_header')
+    <div class="presupuestos-header">
+        <div class="presupuestos-header__copy">
+            <h1>Seguimiento de Presupuestos</h1>
+            <p>Visualiza, filtra y gestiona las ofertas comerciales del proyecto activo.</p>
+        </div>
+
+        <div class="presupuestos-actions">
+            @can('presupuestos.manage')
+                <!-- Correlativo está vinculado a la gestión -->
+                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                    <a href="{{ route('presupuestos.correlativo.edit') }}" class="presupuestos-create-btn">
+                        <i class="fas fa-cog"></i>
+                        Ajustar correlativo
+                    </a>
+                @endif
+
+                <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
+                    <i class="fas fa-plus"></i>
+                    Nuevo Presupuesto
+                </a>
+            @endcan
+        </div>
+    </div>
+@endsection
+
 @section('content')
     <div class="presupuestos-shell">
         @if (session('success'))
@@ -166,13 +192,21 @@
                                 </td>
                                 <td data-label="Acciones" class="text-right">
                                     <div class="presupuesto-action-group">
+                                        
+                                        <!-- Ver Detalle -->
                                         <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver presupuesto" title="Ver presupuesto">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
-                                            <i class="fas fa-pen"></i>
-                                        </a>
-                                        @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'superadmin'], true))
+
+                                        <!-- Editar -->
+                                        @can('presupuestos.manage')
+                                            <a href="{{ route('presupuestos.edit', $presupuesto) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar presupuesto" title="Editar presupuesto">
+                                                <i class="fas fa-pen"></i>
+                                            </a>
+                                        @endcan
+
+                                        <!-- Eliminar -->
+                                        @can('presupuestos.delete')
                                             <button
                                                 type="button"
                                                 class="presupuesto-action-btn presupuesto-action-btn--danger"
@@ -184,7 +218,9 @@
                                             >
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
-                                        @endif
+                                        @endcan
+
+                                        <!-- Crear Pedido (OJO: En el futuro requerirá permiso de pedidos.manage) -->
                                         @if(in_array($estado, ['pendiente', 'pendiente pedido'], true))
                                             <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
                                                 <i class="fas fa-cart-plus"></i>
@@ -195,34 +231,37 @@
                                             </button>
                                         @endif
 
-                                        @php
-                                            $dropdownId = 'presupuesto-estado-dropdown-' . $presupuesto->id;
-                                        @endphp
-                                        <div class="dropdown presupuesto-dropdown">
-                                            <button
-                                                type="button"
-                                                class="presupuesto-action-btn--state dropdown-toggle"
-                                                id="{{ $dropdownId }}"
-                                                data-toggle="dropdown"
-                                                aria-haspopup="true"
-                                                aria-expanded="false"
-                                                aria-label="Más acciones"
-                                                title="Más acciones"
-                                            >
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
-                                                <h6 class="dropdown-header">Cambiar estado</h6>
-                                                <form method="POST" action="{{ route('presupuestos.estado.update', $presupuesto) }}" class="presupuesto-estado-menu-form">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="aceptado">Aceptado</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="rechazado">Rechazado</button>
-                                                    <button class="dropdown-item" type="submit" name="estado" value="pendiente pedido">Pendiente pedido</button>
-                                                </form>
+                                        <!-- Cambiar Estado (Requiere manage) -->
+                                        @can('presupuestos.manage')
+                                            @php
+                                                $dropdownId = 'presupuesto-estado-dropdown-' . $presupuesto->id;
+                                            @endphp
+                                            <div class="dropdown presupuesto-dropdown">
+                                                <button
+                                                    type="button"
+                                                    class="presupuesto-action-btn--state dropdown-toggle"
+                                                    id="{{ $dropdownId }}"
+                                                    data-toggle="dropdown"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="false"
+                                                    aria-label="Más acciones"
+                                                    title="Más acciones"
+                                                >
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
+                                                    <h6 class="dropdown-header">Cambiar estado</h6>
+                                                    <form method="POST" action="{{ route('presupuestos.estado.update', $presupuesto) }}" class="presupuesto-estado-menu-form">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="aceptado">Aceptado</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="rechazado">Rechazado</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente pedido">Pendiente pedido</button>
+                                                    </form>
+                                                </div>
                                             </div>
-                                        </div>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -247,6 +286,7 @@
         </div>
     </div>
 
+    <!-- Modales para borrado (igual que antes) -->
     <form id="presupuesto-delete-form" method="POST" class="d-none">
         @csrf
         @method('DELETE')

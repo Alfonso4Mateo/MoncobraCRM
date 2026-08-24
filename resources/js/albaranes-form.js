@@ -108,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         descripcionInput.value = "";
         cantidadInput.value = "1";
-        medidaInput.value = "";
+        medidaInput.value = "und";
         precioInput.value = "0";
         margenInput.value = "0";
         autosizeDescripcion();
@@ -408,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const articulo = '';
         const descripcion = descripcionInput.value.trim();
         const cantidad = round2(cantidadInput.value);
-        const medida = medidaInput.value.trim();
+        const medida = medidaInput.value.trim() || 'und';
         const precioUnitario = round2(precioInput.value);
         const margen = round2(margenInput.value);
 

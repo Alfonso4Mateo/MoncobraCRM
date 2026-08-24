@@ -19,6 +19,45 @@
     </div>
 @endsection
 
+@section('content_header')
+    <div class="presupuestos-header">
+        <div class="presupuestos-header__copy">
+            <h1>Seguimiento de Presupuestos</h1>
+            <p>Visualiza, filtra y gestiona las ofertas comerciales del proyecto activo.</p>
+        </div>
+
+        <div class="presupuestos-actions">
+            @can('presupuestos.manage')
+                <!-- Correlativo está vinculado a la gestión -->
+                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
+                    <a href="{{ route('presupuestos.correlativo.edit') }}" class="presupuestos-create-btn">
+                        <i class="fas fa-cog"></i>
+                        Ajustar correlativo
+                    </a>
+                @endif
+
+                <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
+                    <i class="fas fa-plus"></i>
+                    Nuevo Presupuesto
+                </a>
+            @endcan
+        </div>
+    </div>
+@endsection
+
+@section('content_header')
+    <div class="presupuesto-detail-header">
+        <div class="presupuesto-detail-header__copy">
+            <h1>Editar Artículos del Presupuesto</h1>
+            <p>Modifica los productos, cantidades, unidades de medida y márgenes del presupuesto.</p>
+        </div>
+        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+            Volver al detalle
+        </a>
+    </div>
+@endsection
+
 @section('content')
     <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate>
         @csrf

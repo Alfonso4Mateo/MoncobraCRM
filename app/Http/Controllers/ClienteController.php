@@ -21,6 +21,9 @@ class ClienteController extends Controller
      */
     public function index()
     {
+        // --- GUARDIA DE LA MURALLA (Interruptor Maestro) ---
+        $this->authorize('clientes.view');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         $buscar = trim((string) request('buscar', ''));
@@ -53,6 +56,9 @@ class ClienteController extends Controller
 
     public function toggleFavorito(Request $request, Cliente $cliente)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         if ((int) $cliente->proyecto_id !== $proyectoId) {
@@ -79,6 +85,9 @@ class ClienteController extends Controller
      */
     public function create()
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.manage');
+
         return view('clientes.create');
     }
 
@@ -87,6 +96,9 @@ class ClienteController extends Controller
      */
     public function store(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
@@ -113,6 +125,9 @@ class ClienteController extends Controller
      */
     public function show(Cliente $cliente)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.historial');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $cliente->proyecto_id !== $proyectoId) {
@@ -359,6 +374,9 @@ class ClienteController extends Controller
      */
     public function edit(Cliente $cliente)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.manage');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $cliente->proyecto_id !== $proyectoId) {
@@ -373,6 +391,9 @@ class ClienteController extends Controller
      */
     public function update(Request $request, Cliente $cliente)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         if ((int) $cliente->proyecto_id !== $proyectoId) {
@@ -401,6 +422,9 @@ class ClienteController extends Controller
      */
     public function destroy(Cliente $cliente)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('clientes.delete');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $cliente->proyecto_id !== $proyectoId) {

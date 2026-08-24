@@ -324,30 +324,36 @@ return [
         [
             'text' => 'Área Clientes',
             'icon' => 'fas fa-fw fa-users',
+            // El menú padre se mostrará si el usuario tiene acceso a AL MENOS UNO de los submódulos
+            'can'  => ['clientes.view', 'presupuestos.view', 'pedidos.view', 'albaranes.view'],
             'submenu' => [
                 [
                     'text' => 'Gestión de Clientes',
                     'url' => 'clientes',
                     'icon' => 'fas fa-fw fa-users',
                     'active' => ['clientes*'],
+                    'can' => 'clientes.view', // Candado específico
                 ],
                 [
                     'text' => 'Presupuestos',
                     'url' => 'presupuestos',
                     'icon' => 'fas fa-fw fa-file-invoice-dollar',
                     'active' => ['presupuestos*'],
+                    'can' => 'presupuestos.view', // Candado específico
                 ],
                 [
                     'text' => 'Pedidos Clientes',
                     'url' => 'pedidos-clientes',
                     'icon' => 'fas fa-fw fa-briefcase',
                     'active' => ['pedidos-clientes*'],
+                    'can' => 'pedidos.view', // Candado específico
                 ],
                 [
                     'text' => 'Albaranes Clientes',
                     'url' => 'albaranes',
                     'icon' => 'fas fa-fw fa-file-alt',
                     'active' => ['albaranes', 'albaranes/*'],
+                    'can' => 'albaranes.view', // Candado específico
                 ],
             ],
         ],
@@ -358,6 +364,7 @@ return [
             'url' => 'inventario',
             'icon' => 'fas fa-fw fa-warehouse',
             'active' => ['inventario*'],
+            'can' => 'inventario.view', // <-- Corregido (antes ponía inventory.view)
         ],
 
         // Documentos
@@ -366,6 +373,7 @@ return [
             'url' => 'documentos',
             'icon' => 'fas fa-fw fa-folder-open',
             'active' => ['documentos*'],
+            'can' => 'documentos.view', // <-- Muro de Spatie añadido
         ],
 
         // Personal (vista dedicada)
@@ -374,6 +382,7 @@ return [
             'url' => 'personal',
             'icon' => 'fas fa-fw fa-users',
             'active' => ['personal*'],
+            'can' => 'personal.view', // <-- Este ya lo tenías bien
         ],
 
         // Cursos
@@ -382,6 +391,7 @@ return [
             'url' => 'cursos',
             'icon' => 'fas fa-fw fa-graduation-cap',
             'active' => ['cursos*'],
+            'can' => 'cursos.view', // <-- Este ya lo tenías bien
         ],
 
         // Sección inferior fija de utilidades
@@ -400,13 +410,22 @@ return [
             'classes' => 'sidebar-tools-item',
         ],
 
+        // Panel de ayuda
+        [
+            'text' => 'Ayuda',
+            'url' => 'herramientas/ayuda',
+            'icon' => 'fas fa-fw fa-question-circle',
+            'active' => ['herramientas/ayuda*'],
+            'classes' => 'sidebar-tools-item',
+        ],
+
         // Panel de Usuarios - Solo para admin/superadmin
         [
             'text' => 'Panel de Usuarios',
             'url' => 'users',
             'icon' => 'fas fa-fw fa-users-cog',
             'active' => ['users*'],
-            'can' => 'manage-users',
+            'can' => 'users.view', // <-- Corregido para sincronizarse con tu seeder (antes era manage-users)
             'classes' => 'sidebar-tools-item',
         ],
 
@@ -416,7 +435,7 @@ return [
             'url' => 'herramientas/gestion-proyectos',
             'icon' => 'fas fa-fw fa-code-branch',
             'active' => ['herramientas/gestion-proyectos*'],
-            'can' => 'manage-projects',
+            'can' => 'manage-projects', // Si en el futuro lo añades a Spatie, recuerda actualizar este también
             'classes' => 'sidebar-tools-item',
         ],
     ],

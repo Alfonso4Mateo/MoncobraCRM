@@ -89,6 +89,12 @@
 
                             <label for="cliente_documento">Proveedor / Cliente</label>
                             <input id="cliente_documento" name="cliente_documento" type="text" placeholder="Buscar entidad..." value="{{ old('cliente_documento') }}">
+
+                            <label for="nombre_trabajador">Nombre del trabajador (RRHH)</label>
+                            <input id="nombre_trabajador" name="nombre_trabajador" type="text" placeholder="Ej: Alfonso Mateo">
+
+                            <label for="id_rrhh">ID RRHH</label>
+                            <input id="id_rrhh" name="id_rrhh" type="text" placeholder="Ej: 104852">
                         </div>
 
                         <div class="docs-detected-actions">
@@ -416,6 +422,17 @@
             const discardBtn = document.getElementById('discard-detected');
             if (discardBtn) discardBtn.addEventListener('click', function(e){ e.preventDefault(); discardDetected(); });
         }
+
+        const camposRrhh = document.getElementById('campos_rrhh');
+            tipoSelect.addEventListener('change', function() {
+                if(this.value === 'certificados') {
+                    camposRrhh.style.display = 'grid';
+                } else {
+                    camposRrhh.style.display = 'none';
+                    document.getElementById('nombre_trabajador').value = '';
+                    document.getElementById('id_rrhh').value = '';
+                    }
+                });
     });
 </script>
 @endsection

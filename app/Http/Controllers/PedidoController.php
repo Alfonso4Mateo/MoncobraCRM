@@ -30,16 +30,29 @@ class PedidoController extends Controller
         'facturado' => 'Facturado',
         'facturado_parcial' => 'Facturado parcial',
     ];
+    
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
+        // Redirige al index real de clientes
         return $this->indexClientes($request);
     }
 
     public function indexClientes(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('pedidos.view');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
         $search = trim((string) $request->input('search', ''));
         $estado = trim((string) $request->input('estado', ''));
@@ -217,6 +230,9 @@ class PedidoController extends Controller
 
     public function createCliente(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('pedidos.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
         $presupuestoEstadosPermitidos = ['pendiente'];
 
@@ -301,6 +317,9 @@ class PedidoController extends Controller
 
     public function storeCliente(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('pedidos.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $request->merge([
@@ -386,7 +405,6 @@ class PedidoController extends Controller
             $this->validateLineasPayload($lineasFiltradas);
 
             $lineas = collect($lineasFiltradas)
-            // 1. Añadimos ", int $index" como segundo parámetro
             ->map(function (array $linea, int $index) {
                 $cantidad = max(0, (float) ($linea['cantidad'] ?? 0));
                 $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
@@ -395,15 +413,13 @@ class PedidoController extends Controller
                 $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
 
                 $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                $medida = $medida !== '' ? $medida : null;
+                $medida = $medida !== '' ? $medida : 'und';
 
-                // 2. Lógica del contador: 
-                // Si el usuario no escribió un código de artículo, le asignamos la línea (1, 2, 3...)
                 $articuloOriginal = trim((string) ($linea['articulo'] ?? ''));
                 $articuloFinal = $articuloOriginal === '' ? (string) ($index + 1) : $articuloOriginal;
 
                 return [
-                    'articulo' => $articuloFinal, // 3. Guardamos el artículo generado
+                    'articulo' => $articuloFinal,
                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                     'cantidad' => round($cantidad, 2),
                     'medida' => $medida,
@@ -483,6 +499,8 @@ class PedidoController extends Controller
      */
     public function create()
     {
+        $this->authorize('pedidos.manage');
+
         return view('pedidos.create', [
             'titulo' => 'Crear Nuevo Pedido',
             'breadcrumb' => 'Nuevo Pedido'
@@ -494,7 +512,7 @@ class PedidoController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $this->authorize('pedidos.manage');
     }
 
     /**
@@ -502,6 +520,8 @@ class PedidoController extends Controller
      */
     public function show(string $id)
     {
+        $this->authorize('pedidos.view');
+
         return view('pedidos.show', [
             'id' => $id,
             'titulo' => 'Detalle del Pedido',
@@ -511,6 +531,8 @@ class PedidoController extends Controller
 
     public function showCliente(PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.view');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
@@ -526,6 +548,8 @@ class PedidoController extends Controller
 
     public function viewPdf(PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
@@ -537,6 +561,8 @@ class PedidoController extends Controller
 
     public function downloadPdf(PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
@@ -548,6 +574,8 @@ class PedidoController extends Controller
 
     public function preview(PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.download');
+
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
@@ -568,6 +596,8 @@ class PedidoController extends Controller
      */
     public function data(Request $request)
     {
+        $this->authorize('pedidos.view');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $pedido = null;
@@ -623,24 +653,11 @@ class PedidoController extends Controller
 
     public function albaranesCliente(PedidoCliente $pedidoCliente)
     {
-        // Try to get proyecto from session, fallback to pedido's proyecto
+        $this->authorize('pedidos.view');
+
         $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
         $proyectoId = $sessionProyectoId > 0 ? $sessionProyectoId : (int) ($pedidoCliente->proyecto_id ?? 0);
 
-        // Validate that user has access to this proyecto
-        $user = request()->user();
-        if (!$user) {
-            abort(401);
-        }
-
-        $hasAccess = $user->role === 'superadmin'
-            || $user->proyectos()->where('proyectos.id', $proyectoId)->exists();
-
-        if (!$hasAccess) {
-            abort(403);
-        }
-
-        // Verify pedido belongs to the proyectoId
         if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
             abort(404);
         }
@@ -687,9 +704,10 @@ class PedidoController extends Controller
         ]);
     }
 
-
     public function facturarCuota(Request $request, PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.manage');
+
         // 1. Validamos que los datos lleguen correctamente
         $request->validate([
             'importe' => 'required|numeric|min:0.01',
@@ -709,19 +727,22 @@ class PedidoController extends Controller
 
     public function destroyFacturacion(Request $request, $id)
     {
+        $this->authorize('pedidos.manage');
+
         // Buscamos la cuota por su ID y la eliminamos
         $facturacion = \App\Models\FacturacionManual::findOrFail($id);
         $facturacion->delete();
 
         return redirect()->back()->with('success', 'Cuota de facturación eliminada correctamente. Los totales se han recalculado.');
     }
-    
 
     /**
      * Show the form for editing the specified resource.
      */
     public function edit(string $id)
     {
+        $this->authorize('pedidos.manage');
+
         return view('pedidos.edit', [
             'id' => $id,
             'titulo' => 'Editar Pedido',
@@ -734,7 +755,7 @@ class PedidoController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $this->authorize('pedidos.manage');
     }
 
     /**
@@ -742,6 +763,8 @@ class PedidoController extends Controller
      */
     public function updateEstado(Request $request, PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.manage');
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         if ((int) $pedidoCliente->proyecto_id !== (int) $proyectoId) {
@@ -764,17 +787,14 @@ class PedidoController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $this->authorize('pedidos.delete');
     }
 
     public function destroyCliente(Request $request, PedidoCliente $pedidoCliente)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
+        $this->authorize('pedidos.delete');
 
-        $user = $request->user();
-        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
+        $proyectoId = $this->resolveActiveProyectoId($request);
 
         if ((int) $pedidoCliente->proyecto_id !== (int) $proyectoId) {
             abort(404);
@@ -893,6 +913,8 @@ class PedidoController extends Controller
 
     public function actualizarDescripcion(Request $request, PedidoCliente $pedidoCliente)
     {
+        $this->authorize('pedidos.manage');
+
         // 1. Validamos que nos llegue la descripción y el índice (la posición de la línea)
         $request->validate([
             'linea_index' => 'required|integer|min:0',

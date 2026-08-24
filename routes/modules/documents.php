@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\AyudaController;
 use Illuminate\Support\Facades\Route;
 
 // Perfil de usuario.
@@ -17,3 +18,6 @@ Route::post('documentos', [DocumentosController::class, 'store'])->name('documen
 Route::get('documentos/{documento}/descargar', [DocumentosController::class, 'download'])->name('documentos.download');
 Route::get('documentos/{documento}/preview', [DocumentosController::class, 'preview'])->name('documentos.preview');
 Route::delete('documentos/{documento}', [DocumentosController::class, 'destroy'])->name('documentos.destroy');
+
+// Módulo de Ayuda
+Route::get('herramientas/ayuda', [AyudaController::class, 'index'])->name('ayuda.index');

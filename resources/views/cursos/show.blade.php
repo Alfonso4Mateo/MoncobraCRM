@@ -67,9 +67,12 @@
                     <a href="{{ route('cursos.gestion') }}" class="cursos-btn cursos-btn--soft">
                         <i class="fas fa-arrow-left mr-2"></i> Volver a gestión
                     </a>
+
+                @can('cursos.edit')
                     <a href="{{ route('cursos.edit', $curso->id) }}" class="cursos-btn cursos-btn--primary">
                         <i class="fas fa-edit mr-2"></i> Editar curso
                     </a>
+                @endcan
                 </div>
             </div>
             
@@ -86,13 +89,18 @@
             <div class="card-header border-bottom-0">
                 <h3 class="card-title font-weight-bold" style="color: #173e67;">Listado de asistentes</h3>
                 <div class="card-tools">
+                @can('cursos.export')
                     <!-- Espacio reservado para el futuro botón de exportación -->
                     <a href="{{ route('cursos.export', $curso->id) }}" class="cursos-btn cursos-btn--csv">
                         <i class="fas fa-file-excel" style="margin-right: 6px;"></i> Exportar CSV
                     </a>
+                @endcan
+
+                @can('cursos.export')
                     <a href="{{ route('cursos.export', $curso->id) }}" class="cursos-btn cursos-btn--pdf">
                         <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Exportar PDF (próximamente)
                     </a>
+                @endcan
                 </div>
             </div>
             
@@ -175,8 +183,20 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="status-dot {{ $color }}"></span>
-                                    {{ $estado }}
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="status-dot {{ $color }}"></span>
+                                            {{ $estado }}
+                                        </div>
+                                        <!-- Botón de Historial -->
+                                        <button type="button" class="btn btn-sm btn-link js-open-history p-0 ml-2" 
+                                                data-personal-id="{{ $trabajador->id }}" 
+                                                data-curso-id="{{ $curso->id }}" 
+                                                data-trabajador-nombre="{{ $trabajador->name }} {{ $trabajador->apellido }}" 
+                                                title="Ver historial de renovaciones">
+                                            <i class="fas fa-history text-primary"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -193,4 +213,137 @@
             </div>
         </div>
     </section>
+
+    <!-- MODAL DE HISTORIAL DE RENOVACIONES -->
+    <style>
+        .curso-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1060; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
+        .curso-modal-overlay.is-open { display: flex; opacity: 1; }
+        .curso-modal-panel { background: #fff; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(20px); transition: transform 0.2s; overflow: hidden; padding: 24px; }
+        .curso-modal-overlay.is-open .curso-modal-panel { transform: translateY(0); }
+    </style>
+
+    <div class="curso-modal-overlay" id="history-modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="curso-modal-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 15px;">
+                <h3 style="font-size: 1.1rem; font-weight: 800; color: #173e67; margin: 0;">Historial de Renovaciones</h3>
+                <button type="button" data-close-history style="background:none; border:none; font-size:1.2rem; color:#94a3b8; cursor:pointer;"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+                Trabajador: <strong id="history-trabajador-name" style="color: #0f172a;">Cargando...</strong><br>
+                Curso: <strong style="color: #173e67;">{{ $curso->nombre }}</strong>
+            </p>
+
+            <div id="history-timeline" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Aquí se inyectan los datos -->
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnsOpen = document.querySelectorAll('.js-open-history');
+            const modalHistory = document.getElementById('history-modal');
+            
+            if (!modalHistory || btnsOpen.length === 0) return;
+
+            const btnClose = modalHistory.querySelectorAll('[data-close-history]');
+            const timelineContainer = document.getElementById('history-timeline');
+            const titleTrabajador = document.getElementById('history-trabajador-name');
+
+            const closeHistoryModal = () => {
+                modalHistory.classList.remove('is-open');
+                modalHistory.setAttribute('aria-hidden', 'true');
+            };
+
+            btnClose.forEach(btn => btn.addEventListener('click', closeHistoryModal));
+            modalHistory.addEventListener('click', (e) => { if(e.target === modalHistory) closeHistoryModal(); });
+            document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeHistoryModal(); });
+
+            btnsOpen.forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const personalId = this.getAttribute('data-personal-id');
+                    const cursoId = this.getAttribute('data-curso-id');
+                    const trabajadorNombre = this.getAttribute('data-trabajador-nombre');
+                    
+                    titleTrabajador.textContent = trabajadorNombre;
+                    timelineContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #64748b;"><i class="fas fa-spinner fa-spin"></i> Consultando registros...</div>';
+                    
+                    modalHistory.classList.add('is-open');
+                    modalHistory.setAttribute('aria-hidden', 'false');
+
+                    try {
+                        const response = await fetch(`/personal/${personalId}/cursos/${cursoId}/historial`);
+                        if (!response.ok) throw new Error('Error al obtener datos');
+                        
+                        const data = await response.json();
+                        timelineContainer.innerHTML = '';
+
+                        // Renderizamos el curso actual
+                        if (data.actual) {
+                            const isApto = data.actual.apto;
+                            const badgeColor = isApto ? '#166534' : '#b91c1c';
+                            const badgeBg = isApto ? '#dcfce7' : '#fee2e2';
+                            const badgeTexto = isApto ? 'APTO' : 'NO APTO';
+                            
+                            const diplomaBtn = data.actual.diploma_url 
+                                ? `<a href="${data.actual.diploma_url}" target="_blank" style="margin-right: 12px; font-size: 0.75rem; text-decoration: none; color: #166534; background: #dcfce7; padding: 4px 10px; border-radius: 6px; font-weight: 800; border: 1px solid #bbf7d0;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` 
+                                : '';
+
+                            timelineContainer.innerHTML += `
+                                <div style="padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 0.75rem; font-weight: 800; color: #166534; text-transform: uppercase;">Certificado Actual</div>
+                                        <div style="font-weight: 700; color: #14532d; font-size: 1.1rem;">${data.actual.fecha}</div>
+                                    </div>
+                                    <div style="display: flex; align-items: center;">
+                                        ${diplomaBtn}
+                                        <span style="font-size: 11px; font-weight: 800; padding: 5px 9px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor};">${badgeTexto}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        // Renderizamos los cursos pasados
+                        if (data.historico && data.historico.length > 0) {
+                            data.historico.forEach(item => {
+                                const isApto = item.apto;
+                                const badgeColor = isApto ? '#166534' : '#b91c1c';
+                                const badgeBg = isApto ? '#dcfce7' : '#fee2e2';
+                                const badgeTexto = isApto ? 'APTO' : 'NO APTO';
+                                
+                                const diplomaBtn = item.diploma_url 
+                                    ? `<a href="${item.diploma_url}" target="_blank" style="margin-right: 12px; font-size: 0.75rem; text-decoration: none; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-weight: 800; border: 1px solid #e2e8f0;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` 
+                                    : '';
+
+                                timelineContainer.innerHTML += `
+                                    <div style="padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; opacity: 0.85;">
+                                        <div>
+                                            <div style="font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Registro Archivado</div>
+                                            <div style="font-weight: 700; color: #475569; font-size: 1rem;">${item.fecha}</div>
+                                        </div>
+                                        <div style="display: flex; align-items: center;">
+                                            ${diplomaBtn}
+                                            <span style="font-size: 11px; font-weight: 800; padding: 5px 9px; border-radius: 999px; background: #e2e8f0; color: #64748b;">${badgeTexto}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            if (!data.actual) {
+                                timelineContainer.innerHTML = '<div style="text-align: center; color: #64748b;">No hay registros de fechas para este trabajador en este curso.</div>';
+                            } else {
+                                timelineContainer.innerHTML += '<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 10px;">No existen renovaciones anteriores.</div>';
+                            }
+                        }
+
+                    } catch (error) {
+                        timelineContainer.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">Error al cargar el historial.</div>';
+                    }
+                });
+            });
+        });
+    </script>
 @endsection

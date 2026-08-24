@@ -32,6 +32,9 @@ class AlbaranClienteController extends Controller
 
     public function index(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.view');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $buscar = trim((string) $request->query('buscar', ''));
@@ -188,6 +191,9 @@ class AlbaranClienteController extends Controller
 
     public function create(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $numeroAlbaranAuto = $this->resolveNextAlbaranClienteNumber($proyectoId)['numero'];
@@ -229,6 +235,9 @@ class AlbaranClienteController extends Controller
 
     public function store(Request $request)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
         $validated = $request->validate([
@@ -414,6 +423,9 @@ class AlbaranClienteController extends Controller
 
     public function show(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.view');
+
         $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
         if ($proyectoId === null) {
@@ -431,6 +443,9 @@ class AlbaranClienteController extends Controller
 
     public function pdfViewer(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.download');
+
         $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
         if ($proyectoId === null) {
@@ -451,11 +466,17 @@ class AlbaranClienteController extends Controller
 
     public function preview(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.download');
+
         return $this->pdfViewer($albaran);
     }
 
     public function streamPdf(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.download');
+
         $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
         if ($proyectoId === null) {
@@ -491,6 +512,9 @@ class AlbaranClienteController extends Controller
 
     public function downloadPdf(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.download');
+
         $proyectoId = $this->resolveVisibleAlbaranProyectoId($albaran);
 
         if ($proyectoId === null) {
@@ -524,11 +548,17 @@ class AlbaranClienteController extends Controller
 
     public function pantallaRoja(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         return $this->edit($albaran);
     }
 
     public function edit(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
@@ -549,10 +579,8 @@ class AlbaranClienteController extends Controller
 
     public function editCorrelativo(Request $request)
     {
-        $user = $request->user();
-        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
         $formatoActual = $this->getCorrelativoFormato($proyectoId, 'albaranes_formato_correlativo', function () {
@@ -583,10 +611,8 @@ class AlbaranClienteController extends Controller
 
     public function updateCorrelativo(Request $request)
     {
-        $user = $request->user();
-        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
 
@@ -611,11 +637,17 @@ class AlbaranClienteController extends Controller
 
     public function updatePantallaRoja(Request $request, AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         return $this->update($request, $albaran);
     }
 
     public function update(Request $request, AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
@@ -760,6 +792,9 @@ class AlbaranClienteController extends Controller
 
     public function updateEstado(Request $request, AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.manage');
+
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
@@ -784,13 +819,11 @@ class AlbaranClienteController extends Controller
 
     public function destroy(AlbaranCliente $albaran)
     {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('albaranes.delete');
+
         $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
-
-        $user = request()->user();
-        if (!$user || !in_array($user->role, ['admin', 'superadmin'], true)) {
-            abort(403);
-        }
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
@@ -999,17 +1032,17 @@ class AlbaranClienteController extends Controller
     }
 
     private function extractCorrelativoFromNumero(string $formato, string $numero): ?int
-{
-    $parts = explode('0000', $formato); 
-    
-    $pattern = '/^' . preg_quote($parts[0], '/') . '(\d{4})' . preg_quote($parts[1] ?? '', '/') . '$/';
+    {
+        $parts = explode('0000', $formato); 
+        
+        $pattern = '/^' . preg_quote($parts[0], '/') . '(\d{4})' . preg_quote($parts[1] ?? '', '/') . '$/';
 
-    if (preg_match($pattern, $numero, $match) !== 1) {
-        return null;
+        if (preg_match($pattern, $numero, $match) !== 1) {
+            return null;
+        }
+
+        return (int) $match[1];
     }
-
-    return (int) $match[1];
-}
 
     private function isDelivered(AlbaranCliente $albaran): bool
     {
@@ -1041,7 +1074,7 @@ class AlbaranClienteController extends Controller
             $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
 
             $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-            $medida = $medida !== '' ? $medida : null;
+            $medida = $medida !== '' ? $medida :'und';
 
             $articulo = trim((string) ($linea['articulo'] ?? ''));
             $articuloId = isset($linea['articulo_id']) ? (int) $linea['articulo_id'] : null;
@@ -1130,7 +1163,6 @@ class AlbaranClienteController extends Controller
 
         $pdfContent = null;
 
-        // Load related presupuesto when requested
         $presupuesto = null;
         if ($withPresupuesto) {
             $presupuesto = Presupuesto::query()
@@ -1179,10 +1211,6 @@ class AlbaranClienteController extends Controller
         return $directory . '/' . $filename . '-sin-presupuesto.pdf';
     }
 
-    /**
-     * Resolve proyecto_id with fallback to model's proyecto_id if session is not available.
-     * This allows accessing resources even without an active session proyecto.
-     */
     private function resolveProyectoIdWithFallback(?int $fallbackProyectoId = null): int
     {
         $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
@@ -1197,9 +1225,6 @@ class AlbaranClienteController extends Controller
         return $this->resolveActiveProyectoId(request());
     }
 
-    /**
-     * Validate user access to a specific proyecto.
-     */
     private function validateProyectoAccess(int $proyectoId): void
     {
         $user = request()->user();

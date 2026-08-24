@@ -113,7 +113,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_medida">Medida</label>
-                                <input type="text" id="item_medida" placeholder="u, kg, m...">
+                                <input type="text" id="item_medida" value="und" placeholder="u, kg, m...">
                             </div>
                             <div class="field-group">
                                 <label for="item_precio_unitario">Precio unitario</label>
@@ -274,7 +274,7 @@
             const resetItemForm = () => {
                 descripcionInput.value = '';
                 cantidadInput.value = '0';
-                medidaInput.value = '';
+                medidaInput.value = 'und';
                 precioInput.value = '0';
                 margenInput.value = '0';
                 editingIndex = null;
@@ -377,7 +377,7 @@
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, safeNumber(cantidadInput.value));
-                const medida = String(medidaInput.value || '').trim();
+                const medida = String(medidaInput.value || '').trim() || 'und';
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
                 const margen = Math.max(0, safeNumber(margenInput.value));
 

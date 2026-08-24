@@ -160,7 +160,7 @@
                         </div>
 
                         <div class="docs-detail-lines">
-                            <h4>Lineas del documento</h4>
+                            <h4>Líneas del documento</h4>
                             @if(!empty($documentoActivo['lineas']))
                                 <ul class="docs-line-list">
                                     @foreach($documentoActivo['lineas'] as $linea)
@@ -182,7 +182,7 @@
                                     @endforeach
                                 </ul>
                             @else
-                                <div class="docs-empty-lineas">No hay lineas para este documento.</div>
+                                <div class="docs-empty-lineas">No hay líneas para este documento.</div>
                             @endif
                         </div>
 
@@ -251,11 +251,13 @@
             </aside>
         </div>
 
-        <div class="docs-footer">
-            <a href="{{ route('documentos.create') }}" class="docs-btn docs-btn-primary">
-                <i class="fas fa-cloud-arrow-up"></i>
-                Cargar documentos
-            </a>
-        </div>
+        @can('documentos.create')
+            <div class="docs-footer">
+                <a href="{{ route('documentos.create') }}" class="docs-btn docs-btn-primary">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                    Cargar documentos
+                </a>
+            </div>
+        @endcan
     </section>
 @endsection

@@ -32,6 +32,7 @@ class Personal extends Model
         'gafas',
         'sin_tallas',
         'telefono',
+        'correo',
         'descripcion',
         'ultima_revision_medica',
         'proxima_revision_medica',
@@ -56,11 +57,16 @@ class Personal extends Model
         return $this->belongsToMany(Proyecto::class, 'personal_proyecto')->withTimestamps();
     }
 
-    public function cursos(): BelongsToMany
+    public function cursos()
     {
-        return $this->belongsToMany(Curso::class)
-            ->using(PersonalCurso::class)
-            ->withPivot(['fecha_realizacion', 'apto', 'descripcion_aptitud'])
-            ->withTimestamps();
+        return $this->belongsToMany(Curso::class, 'curso_personal')
+                    ->withPivot('fecha_realizacion', 'apto', 'descripcion_aptitud', 'archivo_diploma')
+                    ->withTimestamps();
+    }
+
+    public function puestos()
+    {
+        return $this->belongsToMany(Puesto::class, 'personal_puesto')
+                    ->withTimestamps();
     }
 }

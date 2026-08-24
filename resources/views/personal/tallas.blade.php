@@ -72,10 +72,8 @@
                     <p>Filtra por estado o nombre si lo deseas.</p>
                 </div>
                 <div class="personal-card__actions">
-                    <!-- 1. FORMULARIO ENRIQUECIDO CON EL FILTRO DE ESTADO -->
                     <form method="GET" action="{{ route('personal.tallas') }}" class="personal-search-form" style="display:flex; gap:10px; align-items:center;">
                         
-                        <!-- 1. Desplegable de Estados (El que ya teníamos) -->
                         <div class="personal-search-field">
                             <label for="estado" style="display:none">Estado</label>
                             <select name="estado" id="estado" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; font-family: inherit; color: #173e67;">
@@ -86,7 +84,6 @@
                             </select>
                         </div>
 
-                        <!-- 2. Desplegable dinámico de Departamentos -->
                         <div class="personal-search-field">
                             <label for="departamento" style="display:none">Departamento</label>
                             <select name="departamento" id="departamento" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; font-family: inherit; color: #173e67;">
@@ -99,23 +96,25 @@
                             </select>
                         </div>
 
-                        <!-- 3. Campo de texto  -->
                         <div class="personal-search-field">
                             <label for="q" style="display:none">Buscar</label>
                             <input type="search" id="q" name="q" placeholder="Buscar por nombre o apellidos..." value="{{ $query ?? '' }}" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; width: 250px;">
                         </div>
                         
-                        <!-- 4. Botones  -->
                         <div class="personal-search-actions" style="display:flex; gap: 8px;">
                             <button type="submit" class="personal-search-submit">
                                 Filtrar
                             </button>
-                            <button type="submit" name="export" value="csv" class="personal-search-submit personal-btn-csv" title="Descargar listado actual en Excel">
-                                <i class="fas fa-file-csv"></i> Exportación simple
-                            </button>
-                            <button type="submit" name="export" value="pdf" class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
-                                <i class="fas fa-file-pdf"></i> PDF (Próximamente)
-                            </button>
+                            
+                            <!-- CANDADO PARA EXPORTACIONES MASIVAS -->
+                            @can('personal.export')
+                                <button type="submit" name="export" value="csv" class="personal-search-submit personal-btn-csv" title="Descargar listado actual en Excel">
+                                    <i class="fas fa-file-csv"></i> Exportación simple
+                                </button>
+                                <button type="submit" name="export" value="pdf" class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
+                                    <i class="fas fa-file-pdf"></i> PDF (Próximamente)
+                                </button>
+                            @endcan
                         </div>
                     </form>
                 </div>
@@ -142,16 +141,14 @@
                         @else
                             <div style="display:flex; gap:12px; flex-wrap:wrap">
                                 @foreach($counts as $size => $c)
-                                    <!-- TARJETAS DE TALLAS INTERACTIVAS -->
-                                    <div class="js-filter-size" data-col="{{ $col }}" data-size="{{ $size }}" title="Haz clic para ver quién usa esta talla" style="background:#fff; border:1px solid #e6edf3; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    <div class="js-filter-size" data-col="{{ $col }}" data-size="{{ $size }}" title="Haz clic para ver quién usa esta talla" style="background:#fff; border:1px solid #e6edf3; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
                                         <div style="font-weight:800; font-size: 1.1rem; color: #173e67;">{{ $size }}</div>
                                         <div style="color:#6b7280; font-size: 0.85rem;">{{ $c }} trabajador{{ $c > 1 ? 'es' : '' }}</div>
                                     </div>
                                 @endforeach
 
-                                <!-- 2. TARJETAS ROJAS INTERACTIVAS (Tienen la clase js-filter-missing y guardan qué columna representan) -->
                                 @if($missing > 0)
-                                    <div class="js-filter-missing" data-col="{{ $col }}" title="Haz clic para ver quiénes faltan" style="background:#fff1f2; border:1px solid #f5c2c7; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    <div class="js-filter-missing" data-col="{{ $col }}" title="Haz clic para ver quiénes faltan" style="background:#fff1f2; border:1px solid #f5c2c7; padding:8px 12px; border-radius:10px; min-width:120px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
                                         <div style="font-weight:800; font-size: 1.1rem; color:#b91c1c;">Faltan</div>
                                         <div style="color:#b91c1c; font-size: 0.85rem;">{{ $missing }} por asignar</div>
                                     </div>
@@ -163,7 +160,6 @@
 
                 <hr style="margin:24px 0 18px; border-color: #e6edf3;">
 
-                <!-- Barra de aviso temporal de JS -->
                 <div id="js-active-filter-alert" style="display:none; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; align-items: center; justify-content: space-between; font-weight: 600;">
                     <span><i class="fas fa-filter" style="margin-right: 8px;"></i> Viendo únicamente personal al que le falta: <strong id="js-filter-name" style="text-transform: uppercase;"></strong></span>
                     <button id="js-clear-filter" type="button" style="background: #1d4ed8; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-weight: 700; cursor: pointer;">Quitar filtro</button>
@@ -188,7 +184,6 @@
                                     $deptos = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
                                     $deptosStr = !empty($deptos) ? strtoupper(implode(', ', $deptos)) : '—';
                                     
-                                    // Analizamos dinámicamente qué le falta a ESTE trabajador y creamos un array
                                     $faltas = [];
                                     if (!$p->sin_tallas) {
                                         foreach ($columns as $c) {
@@ -199,7 +194,6 @@
                                     }
                                 @endphp
                                 
-                                <!-- 3. FILAS PREPARADAS (Tienen la clase js-worker-row y el atributo data-faltas con todo lo que les falta) -->
                                 <tr class="js-worker-row" 
                                     data-faltas="{{ implode(' ', $faltas) }}" 
                                     @foreach($columns as $colName)
@@ -207,13 +201,18 @@
                                     @endforeach
                                     style="{{ $p->sin_tallas ? 'opacity: 0.6; background-color: #f9fafb;' : '' }}">
                                     
-                                    <!-- CELDA RESTAURADA: ID RRHH -->
                                     <td style="font-weight: 600; color: #6b7280;">{{ $p->id_rrhh ?: '—' }}</td>
                                     
                                     <td style="font-weight: 700;">
-                                        <a href="{{ route('personal.show', $p->id) }}" style="color: #173e67; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#1d4ed8'; this.style.textDecoration='underline'" onmouseout="this.style.color='#173e67'; this.style.textDecoration='none'">
-                                            {{ $p->name }} {{ $p->apellido }}
-                                        </a>
+                                        <!-- CANDADO PARA VER FICHA DEL TRABAJADOR -->
+                                        @can('personal.acciones')
+                                            <a href="{{ route('personal.show', $p->id) }}" style="color: #173e67; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#1d4ed8'; this.style.textDecoration='underline'" onmouseout="this.style.color='#173e67'; this.style.textDecoration='none'">
+                                                {{ $p->name }} {{ $p->apellido }}
+                                            </a>
+                                        @else
+                                            <span style="color: #173e67;">{{ $p->name }} {{ $p->apellido }}</span>
+                                        @endcan
+                                        
                                         @if($p->sin_tallas)
                                             <span style="font-size: 0.7rem; background: #e5e7eb; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Oficina</span>
                                         @endif
@@ -240,7 +239,6 @@
                         </tbody>
                     </table>
                 </div>
-
             </div>
         </article>
     </div>

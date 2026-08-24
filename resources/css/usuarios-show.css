@@ -308,6 +308,19 @@
     color:       #fff !important;
 }
 
+.usuarios-show-page .btn-warning {
+    background:  var(--color-warning) !important;
+    color:       #fff !important;
+    box-shadow:  0 2px 8px rgba(217, 119, 6, 0.25) !important;
+}
+
+.usuarios-show-page .btn-warning:hover {
+    background:  #b45309 !important; 
+    transform:   translateY(-1px) !important;
+    box-shadow:  0 4px 12px rgba(217, 119, 6, 0.3) !important;
+    color:       #fff !important;
+}
+
 .usuarios-show-page .float-right {
     margin-left: auto !important;
 }

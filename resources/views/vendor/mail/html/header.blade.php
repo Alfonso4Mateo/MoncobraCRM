@@ -3,7 +3,7 @@
         <a href="{{ $url }}" style="display: inline-block;">
             @if (trim($slot) === 'Laravel')
                 {{-- Puedes poner aquí la URL de tu logo corporativo --}}
-                <img src="{{ asset('images/moncobra-1l.png') }}" class="logo" alt="Moncobra Logo" style="max-height: 75px; width: auto;">
+                <img src="{{ $message->embed(public_path('images/moncobra-1l.png')) }}" class="logo" alt="Moncobra Logo" style="max-height: 75px; width: auto;"> class="logo" alt="Moncobra Logo" style="max-height: 75px; width: auto;">
             @else
                 {{ $slot }}
             @endif

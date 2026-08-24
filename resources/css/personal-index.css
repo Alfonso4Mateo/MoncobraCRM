@@ -757,3 +757,170 @@ body,
         flex-wrap: wrap;
     }
 }
+
+    /* ==========================================================================
+   BARRA DE ACCIONES MASIVAS (BULK ACTIONS)
+   ========================================================================== */
+.bulk-action-bar {
+    position: fixed;
+    bottom: -100px; /* Oculta por defecto debajo de la pantalla */
+    left: 50%;
+    transform: translateX(-50%);
+    background: #12263d; /* Azul muy oscuro/casi negro */
+    color: #fff;
+    padding: 12px 20px 12px 24px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    box-shadow: 0 20px 40px rgba(15, 39, 71, 0.3);
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1050;
+    pointer-events: none; /* Evita clics fantasma cuando está oculta */
+}
+
+.bulk-action-bar.is-visible {
+    bottom: 30px; /* Sube a la vista */
+    pointer-events: auto;
+}
+
+.bulk-action-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.bulk-action-count {
+    background: #2563eb; /* Azul brillante para destacar el número */
+    color: white;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 900;
+}
+
+.bulk-action-buttons {
+    display: flex;
+    gap: 10px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    padding-left: 20px;
+}
+
+.bulk-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Estilo para los checkboxes de la tabla */
+.personal-table input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--personal-primary); /* Color corporativo al marcar */
+}
+/* ==========================================================================
+   MODAL DE ACCIONES MASIVAS
+   ========================================================================== */
+.bulk-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 39, 71, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 2000;
+}
+
+.bulk-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.bulk-modal__panel {
+    width: min(520px, 92vw);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(15, 39, 71, 0.25);
+    padding: 24px;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bulk-modal.is-open .bulk-modal__panel {
+    transform: translateY(0);
+}
+
+.bulk-modal__title {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--personal-ink);
+}
+
+.bulk-modal__text {
+    margin: 0 0 20px;
+    color: var(--personal-muted);
+    font-size: 0.9rem;
+}
+
+.bulk-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--personal-line);
+}
+
+.bulk-modal__btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.bulk-modal__btn--cancel {
+    background: #f3f6fb;
+    color: var(--personal-muted);
+}
+
+.bulk-modal__btn--cancel:hover {
+    background: #e4ebf5;
+    color: var(--personal-ink);
+}
+
+.bulk-modal__btn--submit {
+    background: var(--personal-primary);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(20, 61, 102, 0.2);
+}
+
+.bulk-modal__btn--submit:hover {
+    background: var(--personal-primary-2);
+    transform: translateY(-1px);
+}

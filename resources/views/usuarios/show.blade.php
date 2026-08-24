@@ -81,15 +81,28 @@
                     </div>
                 </div>
 
-                <div class="card-footer">
+                <div class="card-footer d-flex justify-content-between align-items-center">
                     <a href="{{ route('users.index') }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Volver
                     </a>
-                    @can('edit-user', $user)
-                        <a href="{{ route('users.edit', $user->id) }}" class="btn btn-primary float-right">
-                            <i class="fas fa-edit"></i> Editar
-                        </a>
-                    @endcan
+                    
+                    <div class="d-flex" style="gap: 10px;">
+                        @if(auth()->user()->role === 'superadmin')
+                            <!-- Botón de Restablecer Contraseña -->
+                            <form action="{{ route('users.sendResetLink', $user->id) }}" method="POST" class="m-0 d-flex" onsubmit="return confirm('¿Enviar un correo a {{ $user->email }} con un enlace para restablecer su contraseña?');">
+                                @csrf
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-envelope"></i> Enviar Enlace de Acceso
+                                </button>
+                            </form>
+                        @endif
+
+                        @can('edit-user', $user)
+                            <a href="{{ route('users.edit', $user->id) }}" class="btn btn-primary">
+                                <i class="fas fa-edit"></i> Editar
+                            </a>
+                        @endcan
+                    </div>
                 </div>
             </div>
         </div>

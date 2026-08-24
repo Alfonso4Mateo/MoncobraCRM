@@ -44,6 +44,47 @@
     </div>
 @endsection
 
+@section('content_header')
+    <div class="pedidos-clientes-header">
+        <div class="pedidos-clientes-header__copy">
+            <h1>Albaranes del Pedido</h1>
+            <p>Gestión y seguimiento de albaranes asociados.</p>
+        </div>
+
+        <div class="pedidos-clientes-header__actions">
+            <a href="{{ route('pedidos-clientes.index') }}" class="pedidos-clientes-action-btn pedidos-clientes-action-btn--secondary">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                Volver
+            </a>
+            
+            @can('albaranes.manage')
+                @php
+                    $pedidoFacturado = (string) ($pedidoCliente->estado ?? '') === 'facturado';
+                    $crearAlbaranUrl = route('albaranes.create', ['pedido_id' => $pedidoCliente->id, 'pedido_cliente' => $pedidoCliente->numero_pedido, 'cliente_id' => $pedidoCliente->id_cliente, 'ot' => $pedidoCliente->ot]);
+                @endphp
+                @if ($pedidoFacturado)
+                    <span
+                        class="pedidos-clientes-create-btn pedidos-clientes-create-btn--disabled"
+                        aria-disabled="true"
+                        title="Este pedido ya está facturado"
+                    >
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        Agregar Albarán
+                    </span>
+                @else
+                    <a
+                        href="{{ $crearAlbaranUrl }}"
+                        class="pedidos-clientes-create-btn"
+                    >
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        Agregar Albarán
+                    </a>
+                @endif
+            @endcan
+        </div>
+    </div>
+@endsection
+
 @section('content')
     <section class="pedidos-clientes-shell">
         <!-- Datos Principales del Pedido -->
@@ -76,12 +117,13 @@
             <header class="albaran-info-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3>Resumen de Pagos</h3>
                 
-                <!-- Botón que activa el modal (Solo visible si es bolsa) -->
                 @if ($pedidoCliente->bolsa)
+                    @can('pedidos.manage')
                     <button type="button" class="pedidos-clientes-action-btn pedidos-clientes-action-btn--primary" data-toggle="modal" data-target="#modalFacturacionManual">
                         <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
                         Facturar Cuota
                     </button>
+                    @endcan
                 @endif
             </header>
             <div class="albaran-pagos-grid">
@@ -130,7 +172,6 @@
                     <h3>Gestión Asociada del Pedido</h3>
                     <p class="card-subtitle">Visualiza los albaranes de entrega o la facturación manual por hitos.</p>
                 </div>
-                <!-- Selector de pestañas -->
                 <ul class="nav nav-pills card-header-pills mt-2 mt-md-0" id="gestionTab" role="tablist">
                     <li class="nav-item">
                         <a class="nav-link active" id="albaranes-tab" data-toggle="pill" href="#albaranes-panel" role="tab" aria-controls="albaranes-panel" aria-selected="true">
@@ -172,7 +213,11 @@
                                         @endphp
                                         <tr>
                                             <td data-label="Número">
+                                                @can('albaranes.view')
                                                 <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-code-link">{{ $albaran->numero }}</a>
+                                                @else
+                                                <span class="pedido-muted">{{ $albaran->numero }}</span>
+                                                @endcan
                                             </td>
                                             <td data-label="Fecha">
                                                 <span class="pedido-date">{{ optional($albaran->fecha)->format('d M Y') ?: '—' }}</span>
@@ -184,9 +229,13 @@
                                                 <strong class="pedido-total">€{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }}</strong>
                                             </td>
                                             <td data-label="Acciones">
+                                                @can('albaranes.view')
                                                 <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-action-btn pedido-action-btn--soft">
                                                     <i class="fas fa-eye" aria-hidden="true"></i> Ver
                                                 </a>
+                                                @else
+                                                <span class="text-muted"><i class="fas fa-lock"></i></span>
+                                                @endcan
                                             </td>
                                         </tr>
                                     @empty
@@ -233,6 +282,7 @@
                                                     <strong class="pedido-total">€{{ number_format((float) $facturacion->importe, 2, ',', '.') }}</strong>
                                                 </td>
                                                 <td data-label="Acciones" class="text-center">
+                                                    @can('pedidos.manage')
                                                     <form action="{{ route('facturacion-manual.destroy', $facturacion->id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta cuota? El saldo pendiente se recalculará.');">
                                                         @csrf
                                                         @method('DELETE')
@@ -240,6 +290,7 @@
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </form>
+                                                    @endcan
                                                 </td>
                                             </tr>
                                         @empty
@@ -264,6 +315,7 @@
     </section>
 
     @if ($pedidoCliente->bolsa)
+    @can('pedidos.manage')
         <!-- Modal Facturar Cuota -->
         <div class="modal fade" id="modalFacturacionManual" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered" role="document">
@@ -295,5 +347,6 @@
                 </div>
             </div>
         </div>
+    @endcan
     @endif
 @endsection

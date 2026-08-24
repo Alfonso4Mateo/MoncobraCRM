@@ -180,9 +180,9 @@
                                 </div>
 
                                 <div class="profile-name-block">
-                                    <h2>{{ $personal->name }} {{ $personal->apellido }}</h2>
+                                    <h2>{{ $personal->name ?? 'Nuevo' }} {{ $personal->apellido ?? 'Trabajador' }}</h2>
                                     @php
-                                        $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
+                                        $deptosActuales = isset($personal) && is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) ($personal->departamento ?? []);
                                     @endphp
                                     <p>{{ !empty($deptosActuales) ? strtoupper(implode(', ', $deptosActuales)) : 'SIN DEPARTAMENTO' }}</p>
                                 </div>
@@ -209,17 +209,17 @@
                             <div style="flex: 1;">
                                 <div class="profile-edit-form-group">
                                     <label for="name">Nombre</label>
-                                    <input type="text" id="name" name="name" value="{{ old('name', $personal->name) }}" class="@error('name') is-invalid @enderror">
+                                    <input type="text" id="name" name="name" value="{{ old('name', $personal->name ?? '') }}" class="@error('name') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="apellido">Apellido</label>
-                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $personal->apellido) }}" class="@error('apellido') is-invalid @enderror">
+                                    <input type="text" id="apellido" name="apellido" value="{{ old('apellido', $personal->apellido ?? '') }}" class="@error('apellido') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
                                     <label for="dni_nie">DNI / NIE</label>
-                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie) }}" class="@error('dni_nie') is-invalid @enderror">
+                                    <input type="text" id="dni_nie" name="dni_nie" value="{{ old('dni_nie', $personal->dni_nie ?? '') }}" class="@error('dni_nie') is-invalid @enderror">
                                 </div>
 
                                 <div class="profile-edit-form-group">
@@ -228,9 +228,9 @@
                                 </div>
                 
                                 <div class="profile-edit-form-group">
-                                    <!-- Contenedor flex para alinear la etiqueta y los botones de añadir/quitar departamento -->
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <label for="departamento" style="margin-bottom: 0;">Departamento</label>
+                                        @can('personal.acciones')
                                         <div style="display: flex; gap: 8px;">
                                             <button type="button" id="btn-add-depto" title="Añadir departamento" style="border: 1px solid var(--profile-line); background: #f7f9fc; color: var(--profile-ink); border-radius: 4px; padding: 2px 8px; cursor: pointer;">
                                                 <i class="fas fa-plus"></i>
@@ -239,18 +239,13 @@
                                                 <i class="fas fa-minus"></i>
                                             </button>
                                         </div>
+                                        @endcan
                                     </div>
 
                                     <select id="departamento" name="departamento[]" multiple class="@error('departamento') is-invalid @enderror" style="height: 140px;">
                                         @php
-                                            // Normalizamos el dato guardado en el trabajador para asegurar que siempre sea un array
-                                            $deptosActuales = is_string($personal->departamento) ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) : (array) $personal->departamento;
-                                            
-                                            // old() recupera los seleccionados si la validación falla
                                             $deptosSeleccionados = old('departamento', $deptosActuales);
                                         @endphp
-
-                                        <!-- Ahora iteramos sobre la variable $departamentos que nos ha mandado el Controlador -->
                                         @foreach($departamentos as $depto)
                                             <option value="{{ $depto->nombre }}" @selected(in_array($depto->nombre, $deptosSeleccionados ?: []))>
                                                 {{ strtoupper($depto->nombre) }}
@@ -265,47 +260,62 @@
                                     <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000" class="@error('telefono') is-invalid @enderror">
                                 </div>
 
-                                <div class="profile-edit-two-cols">
+                                <div class="profile-edit-form-group">
+                                    <label for="correo">Correo electrónico</label>
+                                    <input type="email" id="correo" name="correo" value="{{ old('correo', $personal->correo ?? '') }}" placeholder="Ej. tecnico@moncobra.com" class="@error('correo') is-invalid @enderror">
+                                </div>
+
+                            @can('personal.medico')
+                                <div class="profile-edit-two-cols" style="padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; margin-top: 20px;">
+                                    <div class="profile-edit-form-group" style="grid-column: 1 / -1; margin-bottom: 0;">
+                                        <h4 style="font-size: 0.85rem; font-weight: 800; color: #166534; margin: 0;"><i class="fas fa-notes-medical"></i> DATOS MÉDICOS Y VIGILANCIA DE LA SALUD</h4>
+                                    </div>
                                     <div class="profile-edit-form-group">
                                         <label for="ultima_revision_medica">Última revisión médica</label>
                                         <div class="profile-edit-inline">
-                                            <input type="date" id="ultima_revision_medica" name="ultima_revision_medica" value="{{ old('ultima_revision_medica', optional($personal->ultima_revision_medica)->format('Y-m-d')) }}" class="@error('ultima_revision_medica') is-invalid @enderror">
+                                            <input type="date" id="ultima_revision_medica" name="ultima_revision_medica" value="{{ old('ultima_revision_medica', optional($personal->ultima_revision_medica ?? null)->format('Y-m-d')) }}" class="@error('ultima_revision_medica') is-invalid @enderror">
                                             <button type="button" id="set-ultima-hoy" class="profile-edit-today-btn">Hoy</button>
                                         </div>
                                     </div>
 
                                     <div class="profile-edit-form-group">
                                         <label for="proxima_revision_medica">Próxima revisión médica</label>
-                                        <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
+                                        <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica ?? null)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
                                     </div>
 
                                     <div class="profile-edit-form-group">
                                         <label for="ultima_graduacion">Última graduación</label>
                                         <div class="profile-edit-inline">
-                                            <input type="date" id="ultima_graduacion" name="ultima_graduacion" value="{{ old('ultima_graduacion', optional($personal->ultima_graduacion)->format('Y-m-d')) }}" class="@error('ultima_graduacion') is-invalid @enderror">
+                                            <input type="date" id="ultima_graduacion" name="ultima_graduacion" value="{{ old('ultima_graduacion', optional($personal->ultima_graduacion ?? null)->format('Y-m-d')) }}" class="@error('ultima_graduacion') is-invalid @enderror">
                                             <button type="button" id="set-graduacion-hoy" class="profile-edit-today-btn">Hoy</button>
                                         </div>
                                     </div>
 
-                                    <div class="profile-edit-form-group">
+                                    <div class="profile-edit-form-group js-graduacion-field">
                                         <label for="proxima_graduacion">Próxima graduación</label>
-                                        <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
+                                        <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion ?? null)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
                                     </div>
 
-                                    <div class="profile-edit-form-group">
+                                    <div class="profile-edit-form-group js-graduacion-field">
                                         <label for="reconocido_en">Reconocido en:</label>
-                                        <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?: '—') }}" class="@error('reconocido_en') is-invalid @enderror">
+                                        <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?? '') }}" class="@error('reconocido_en') is-invalid @enderror">
                                     </div>
 
-                                    <div class="profile-edit-form-group">
+                                    <div class="profile-edit-form-group js-graduacion-field">
                                         <label for="graduado_en">Graduado en:</label>
-                                        <input type="text" id="graduado_en" name="graduado_en" value="{{ old('graduado_en', $personal->graduado_en ?: '—' ) }}" class="@error('graduado_en') is-invalid @enderror">
+                                        <input type="text" id="graduado_en" name="graduado_en" value="{{ old('graduado_en', $personal->graduado_en ?? '') }}" class="@error('graduado_en') is-invalid @enderror">
                                     </div>
                                 </div>
+                            @else
+                                <div class="profile-alert" style="background: #f8fafc; border: 1px dashed #cbd5e1; color: #64748b; margin-top: 20px;">
+                                    <i class="fas fa-lock"></i> No tienes permisos para gestionar los datos médicos y de vigilancia de la salud.
+                                </div>
+                            @endcan
                             </div>
                         </div>
                     </article>
 
+                @can('personal.tallas')
                     <!-- Panel Tallas y Equipamiento -->
                     <article class="profile-card">
                         <div class="profile-card__header">
@@ -317,10 +327,8 @@
 
                         <div class="profile-card__body" style="padding: 20px">
                             <label for="sin_tallas" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                <!-- EL TRUCO: Campo oculto que asegura que siempre se envíe un 0 si el checkbox está desmarcado -->
                                 <input type="hidden" name="sin_tallas" value="0">
-                                <!-- Tu checkbox original -->
-                                <input type="checkbox" id="sin_tallas" name="sin_tallas" value="1" @checked(old('sin_tallas', $personal->sin_tallas))>
+                                <input type="checkbox" id="sin_tallas" name="sin_tallas" value="1" @checked(old('sin_tallas', $personal->sin_tallas ?? false))>
                                 <span>Sin tallas asignadas</span>
                             </label>
                         </div>
@@ -332,7 +340,7 @@
                                     <select id="camiseta" name="camiseta" class="@error('camiseta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('camiseta', $personal->camiseta ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -342,7 +350,7 @@
                                     <select id="chaqueta" name="chaqueta" class="@error('chaqueta') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('chaqueta', $personal->chaqueta ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -352,7 +360,7 @@
                                     <select id="sudadera" name="sudadera" class="@error('sudadera') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','2XS' => '2XS','XS' => 'XS', 'S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', '2XL' => '2XL', '3XL' => '3XL', '4XL' => '4XL', '5XL' => '5XL', '6XL' => '6XL'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('sudadera', $personal->sudadera ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -362,7 +370,7 @@
                                     <select id="pantalon" name="pantalon" class="@error('pantalon') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','30' => '30','32' => '32','34' => '34','36' => '36', '38' => '38', '40' => '40', '42' => '42', '44' => '44', '46' => '46', '48' => '48', '50' => '50','52' => '52','54' => '54','56' => '56','58' => '58','60' => '60','62' => '62','64' => '64','66' => '66','68' => '68','70' => '70'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('pantalon', $personal->pantalon ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -372,7 +380,7 @@
                                     <select id="calzado" name="calzado" class="@error('calzado') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','34' => '34','35' => '35','36' => '36', '37' => '37', '38' => '38', '39' => '39', '40' => '40', '41' => '41', '42' => '42', '43' => '43', '44' => '44', '45' => '45', '46' => '46', '47' => '47', '48' => '48', '49' => '49', '50' => '50'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('calzado', $personal->calzado) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('calzado', $personal->calzado ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -382,7 +390,7 @@
                                     <select id="guantes" name="guantes" class="@error('guantes') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','5' => '5','6' => '6', '7' => '7', '8' => '8', '9' => '9', '10' => '10', '11' => '11' ,'12' => '12'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('guantes', $personal->guantes) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('guantes', $personal->guantes ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -392,7 +400,7 @@
                                     <select id="casco" name="casco" class="@error('casco') is-invalid @enderror">
                                         <option value="">Selecciona talla</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','Estándar' => 'Estándar'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('casco', $personal->casco) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('casco', $personal->casco ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -401,13 +409,14 @@
                                     <select id="gafas" name="gafas" class="@error('gafas') is-invalid @enderror">
                                         <option value="">Selecciona tipo</option>
                                         @foreach(['Sin necesidad' => 'Sin necesidad','Graduadas' => 'Graduadas', 'Protección' => 'Protección'] as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('gafas', $personal->gafas) == $value)>{{ $label }}</option>
+                                            <option value="{{ $value }}" @selected(old('gafas', $personal->gafas ?? '') == $value)>{{ $label }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                             </div>
                         </div>
                     </article>
+                @endcan
 
                     <!-- Panel Observaciones -->
                     <article class="profile-card">
@@ -574,6 +583,30 @@
                     }
                 });
             }
+
+            // LÓGICA PARA MOSTRAR/OCULTAR CAMPOS DE GRADUACIÓN
+            (function() {
+                const selectGafas = document.getElementById('gafas');
+                const graduacionFields = document.querySelectorAll('.js-graduacion-field');
+
+                if (!selectGafas || graduacionFields.length === 0) return;
+
+                const toggleGraduacionFields = () => {
+                    // Comprobamos si el valor seleccionado es exactamente "Graduadas"
+                    const mostrar = selectGafas.value === 'Graduadas';
+                    
+                    graduacionFields.forEach(field => {
+                        // Usamos '' para restaurar el display original del CSS o 'none' para ocultarlo
+                        field.style.display = mostrar ? '' : 'none';
+                    });
+                };
+
+                // 1. Ejecutar al cargar la página (por si está editando y ya tiene Graduadas)
+                toggleGraduacionFields();
+
+                // 2. Ejecutar cada vez que el usuario cambie el desplegable
+                selectGafas.addEventListener('change', toggleGraduacionFields);
+            })();
         })();
     </script>
 @endsection
