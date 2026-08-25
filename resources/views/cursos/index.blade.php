@@ -260,6 +260,19 @@
             box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
             animation: pulse-soft 2s infinite;
         }
+
+        /* ETIQUETAS ANIMADAS */
+        .badge-nuevo {
+            background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; font-size: 0.6rem; padding: 3px 6px; border-radius: 6px; margin-left: 6px; font-weight: 800; text-transform: uppercase; vertical-align: middle; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); animation: pulse-blue 2s infinite;
+        }
+        .badge-reactivado {
+            background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-size: 0.6rem; padding: 3px 6px; border-radius: 6px; margin-left: 6px; font-weight: 800; text-transform: uppercase; vertical-align: middle; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); animation: pulse-orange 2s infinite;
+        }
+        .badge-pendiente {
+            background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-size: 0.6rem; padding: 3px 6px; border-radius: 6px; margin-left: 6px; font-weight: 800; text-transform: uppercase; vertical-align: middle;
+        }
+        @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        @keyframes pulse-orange { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
         @keyframes pulse-soft {
             0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
             70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
@@ -327,20 +340,13 @@
         </header>
         
         @php
-            // 1. Calculamos la fecha de hoy para poder comparar
-            $hoy = \Carbon\Carbon::now()->startOfDay();
-
-            // 2. ORDENACIÓN INTELIGENTE: Primero Nuevos, luego Alfabéticamente
-            $personals = $personals->sortBy(function($personal) use ($hoy) {
-                $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
-                
-                // Si es nuevo recibe un "0-", si es antiguo un "1-". 
-                // Al pegarle el nombre detrás (ej: "0-alfonso"), Laravel ordena 
-                // primero los 0 alfabéticamente, y luego los 1 alfabéticamente.
-                return ($esNuevo ? '0-' : '1-') . mb_strtolower(trim($personal->name . ' ' . $personal->apellido));
+            // ORDENACIÓN INTELIGENTE: Primero los pendientes de revisión, luego alfabéticamente.
+            $personals = $personals->sortBy(function($personal) {
+                // Si prl_revisado es false (0), le ponemos '0-' delante para que suba. Si es true (1), le ponemos '1-'.
+                $estadoPrl = $personal->prl_revisado ? '1-' : '0-';
+                return $estadoPrl . mb_strtolower(trim($personal->name . ' ' . $personal->apellido));
             });
 
-            // 3. Extracción de departamentos (lo que ya tenías)
             $listaDepartamentos = collect();
             foreach($personals as $p) {
                 $ds = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
@@ -381,10 +387,10 @@
                         </select>
 
                         <!-- NUEVO: FILTRO DE ESTADO FORMATIVO -->
-                        <select id="js-worker-status-filter" style="margin-top: 10px;">
-                            <option value="all">Cualquier estado formativo</option>
-                            <option value="nuevos">🌟 Nuevas altas (14 días)</option>
-                            <option value="sin_cursos">⚠️ Sin cursos asignados</option>
+                        <select id="js-worker-status-sidebar" style="width: 100%; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px; margin-bottom: 10px;">
+                            <option value="all">Cualquier estado</option>
+                            <option value="pendientes">⚠️ Pendientes de revisión</option>
+                            <option value="sin_cursos">❌ Sin cursos asignados</option>
                         </select>
                     </div>
 
@@ -399,6 +405,7 @@
                         $hasAviso = false;
                         $hoy = \Carbon\Carbon::now()->startOfDay();
                         $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
+                        $esReactivado = $personal->fecha_reactivacion && \Carbon\Carbon::parse($personal->fecha_reactivacion)->startOfDay()->diffInDays($hoy) <= 14;
 
                         foreach ($personal->cursos as $c) {
                             if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
@@ -428,22 +435,27 @@
                         data-activo="{{ $personal->activo ? '1' : '0' }}"
                         data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
                         data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                        data-cursos="{{ $cursosCount }}"
+                        data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}"
                         data-cursos="{{ $cursosCount }}">
                         
                        
                         <div class="personal-item__top">
                             <div class="personal-item__name">
                                 {{ $nombreCompleto }}
-                                    @if($esNuevo)
-                                        <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
-                                    @endif
+                                
+                                @if(!$personal->prl_revisado)
+                                    <span class="badge-pendiente" title="Pendiente de revisar">⚠️ PENDIENTE</span>
+                                @endif
+                                
+                                @if($esNuevo)
+                                    <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
+                                @elseif($esReactivado)
+                                    <span class="badge-reactivado" title="Reactivado (14 días)">Reactivado</span>
+                                @endif
                                 
                                 @if($hasCaducado)
                                     <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 4px;" title="Tiene cursos caducados"></i>
-                                @endif
-                                
-                                @if($hasAviso)
-                                    <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-left: 4px;" title="Tiene cursos próximos a caducar"></i>
                                 @endif
                             </div>
                             
@@ -474,21 +486,20 @@
                                 </div>
                             </div>
 
-                            <div class="cursos-filter-row" style="flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
-                                <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar por nombre..." style="flex: 1; min-width: 200px;" autocomplete="off">
+                           <div class="cursos-filter-row" style="flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
+                                <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar por nombre..." style="flex: 1; min-width: 200px; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px;" autocomplete="off">
 
-                                <select id="js-worker-depto" style="width: auto; min-width: 180px;">
+                                <select id="js-worker-depto" style="width: auto; min-width: 180px; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px;">
                                     <option value="all">Todos los departamentos</option>
                                     @foreach($listaDepartamentos as $depto)
                                         <option value="{{ mb_strtolower($depto) }}" @selected($currentDepto === mb_strtolower($depto))>{{ strtoupper($depto) }}</option>
                                     @endforeach
                                 </select>
 
-                                <!-- NUEVO: FILTRO DE ESTADO FORMATIVO -->
-                                <select id="js-worker-status-filter" style="width: auto; min-width: 220px;">
-                                    <option value="all">Cualquier estado formativo</option>
-                                    <option value="nuevos">🌟 Nuevas altas (14 días)</option>
-                                    <option value="sin_cursos">⚠️ Sin cursos asignados</option>
+                                <select id="js-worker-status-grid" style="width: auto; min-width: 220px; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px;">
+                                    <option value="all">Cualquier estado</option>
+                                    <option value="pendientes">⚠️ Pendientes de revisión</option>
+                                    <option value="sin_cursos">❌ Sin cursos asignados</option>
                                 </select>
 
                                 <label class="filter-toggle-inactive mb-0 ml-2">
@@ -508,6 +519,7 @@
                                         $hasAviso = false;
                                         $hoy = \Carbon\Carbon::now()->startOfDay();
                                         $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
+                                        $esReactivado = $personal->fecha_reactivacion && \Carbon\Carbon::parse($personal->fecha_reactivacion)->startOfDay()->diffInDays($hoy) <= 14;
 
                                         foreach ($personal->cursos as $c) {
                                             if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
@@ -536,14 +548,24 @@
                                         data-activo="{{ $personal->activo ? '1' : '0' }}"
                                         data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
                                         data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                                        data-cursos="{{ $cursosCount }}"
+                                        data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}"
                                         data-cursos="{{ $cursosCount }}">
 
                                         <div class="trabajador-card__header">
                                             <div>
-                                                <h4 class="trabajador-card__name">{{ $nombreCompleto }}</h4>
+                                                <h4 class="trabajador-card__name">
+                                                    {{ $nombreCompleto }}
+                                                    @if(!$personal->prl_revisado)
+                                                        <span class="badge-pendiente" title="Pendiente de revisar">⚠️ PENDIENTE</span>
+                                                    @endif
+                                                    
                                                     @if($esNuevo)
                                                         <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
+                                                    @elseif($esReactivado)
+                                                        <span class="badge-reactivado" title="Reactivado (14 días)">Reactivado</span>
                                                     @endif
+                                                </h4>
                                                 <div class="trabajador-card__depto">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
                                             </div>
                                             <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
@@ -586,6 +608,24 @@
                                 <i class="fas fa-arrow-left"></i> Volver al directorio
                             </a>
                         </div>
+
+                        <!-- BANNER DE REVISIÓN PENDIENTE -->
+                        @if(!$selectedPersonal->prl_revisado)
+                            <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                <div>
+                                    <h4 style="margin: 0; color: #b45309; font-size: 1.05rem; font-weight: 800;"><i class="fas fa-exclamation-circle mr-2"></i> Pendiente de revisión</h4>
+                                    <p style="margin: 4px 0 0; color: #92400e; font-size: 0.85rem;">Verifica los perfiles formativos de este trabajador. Al confirmar, desaparecerá de la parte superior del directorio.</p>
+                                </div>
+                                @can('cursos.edit')
+                                <form action="{{ route('personal.prl.revisado', $selectedPersonal->id) }}" method="POST" style="margin: 0;">
+                                    @csrf
+                                    <button type="submit" class="cursos-btn" style="background: #d97706; color: white;">
+                                        <i class="fas fa-check-double mr-2"></i> Confirmar Revisión
+                                    </button>
+                                </form>
+                                @endcan
+                            </div>
+                        @endif
 
                         <div>
                             <label class="filter-toggle-inactive mt-2">
@@ -704,6 +744,7 @@
                                     $catHasAviso = false;
                                     $catHasAssigned = false;
                                     $hoy = \Carbon\Carbon::now()->startOfDay();
+                                    
 
                                     foreach($cursosGrupo as $c) {
                                         $asignadoCheck = $selectedPersonal ? $selectedPersonal->cursos->firstWhere('id', $c->id) : null;
@@ -1222,8 +1263,9 @@
             const searchInput = document.getElementById('js-worker-search');
             const deptoSelect = document.getElementById('js-worker-depto');
             
-            // Nuevo selector de estado formativo
-            const statusFilter = document.getElementById('js-worker-status-filter');
+            // Hemos cambiado los IDs para que no choquen
+            const statusSidebar = document.getElementById('js-worker-status-sidebar');
+            const statusGrid = document.getElementById('js-worker-status-grid');
             
             const toggleInactiveSidebar = document.getElementById('js-toggle-inactive-sidebar');
             const toggleInactiveGrid = document.getElementById('js-toggle-inactive-grid');
@@ -1246,13 +1288,25 @@
                 filterWorkers(); 
             };
 
+            // Sincroniza ambos selectores de estado para que cambien a la vez
+            const syncStatusAndFilter = (e) => {
+                const newVal = e.target.value;
+                if (statusSidebar && e.target !== statusSidebar) statusSidebar.value = newVal;
+                if (statusGrid && e.target !== statusGrid) statusGrid.value = newVal;
+                filterWorkers();
+            };
+
             const filterWorkers = () => {
                 if (!workerItems.length) return;
 
                 const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
                 const category = categorySelect ? categorySelect.value.toLowerCase() : 'all';
                 const depto = deptoSelect ? deptoSelect.value.toLowerCase() : 'all';
-                const status = statusFilter ? statusFilter.value : 'all'; // Capturamos el filtro de estado
+                
+                // Lee el filtro de la vista en la que estemos trabajando
+                let status = 'all';
+                if (statusGrid && statusGrid.offsetParent !== null) status = statusGrid.value;
+                else if (statusSidebar) status = statusSidebar.value;
                 
                 let showInactive = true;
                 if (toggleInactiveSidebar) showInactive = toggleInactiveSidebar.checked;
@@ -1262,10 +1316,9 @@
                     const name = item.getAttribute('data-name') || '';
                     const cats = item.getAttribute('data-cats') || '';
                     const workerDepto = item.getAttribute('data-depto') || '';
-                    const isActivo = item.getAttribute('data-activo') === '1'; 
                     
-                    // Capturamos los datos nuevos
-                    const isNuevo = item.getAttribute('data-nuevo') === '1';
+                    const isActivo = item.getAttribute('data-activo') === '1'; 
+                    const isPendiente = item.getAttribute('data-pendiente') === '1';
                     const numCursos = parseInt(item.getAttribute('data-cursos') || '0', 10);
 
                     const matchesSearch = term === '' || name.includes(term);
@@ -1273,9 +1326,9 @@
                     const matchesDepto = depto === 'all' || workerDepto.includes(depto);
                     const matchesActivo = showInactive || isActivo;
 
-                    // Lógica del filtro de estado
+                    // Lógica del filtro de estado arreglada
                     let matchesStatus = true;
-                    if (status === 'nuevos' && !isNuevo) matchesStatus = false;
+                    if (status === 'pendientes' && !isPendiente) matchesStatus = false;
                     if (status === 'sin_cursos' && numCursos > 0) matchesStatus = false;
 
                     item.style.display = (matchesSearch && matchesCategory && matchesDepto && matchesActivo && matchesStatus) ? '' : 'none'; 
@@ -1285,7 +1338,9 @@
             if (categorySelect) categorySelect.addEventListener('change', filterWorkers);
             if (searchInput) searchInput.addEventListener('input', filterWorkers);
             if (deptoSelect) deptoSelect.addEventListener('change', filterWorkers);
-            if (statusFilter) statusFilter.addEventListener('change', filterWorkers); // Listener del nuevo filtro
+            
+            if (statusSidebar) statusSidebar.addEventListener('change', syncStatusAndFilter); 
+            if (statusGrid) statusGrid.addEventListener('change', syncStatusAndFilter); 
             
             if (toggleInactiveSidebar) toggleInactiveSidebar.addEventListener('change', saveStateAndFilter);
             if (toggleInactiveGrid) toggleInactiveGrid.addEventListener('change', saveStateAndFilter);
@@ -1349,7 +1404,6 @@
                         });
                         
                         if (response.ok) {
-                            // Extraemos el texto del chip ignorando el botón de borrar
                             const puestoNombre = chip.firstChild.textContent.trim();
                             const selectAdd = document.getElementById('js-select-add-puesto');
                             

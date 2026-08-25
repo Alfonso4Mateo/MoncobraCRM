@@ -42,6 +42,8 @@ class Personal extends Model
         'reconocido_en',
         'graduado_en',
         'activo',
+        'prl_revisado',
+        'fecha_reactivacion',
     ];
 
     protected $casts = [
@@ -52,6 +54,8 @@ class Personal extends Model
         'proxima_graduacion' => 'date',
         'departamento' => 'array',
         'puesto' => 'string',
+        'prl_revisado' => 'boolean',
+        'fecha_reactivacion' => 'date',
     ];
 
     public function proyectos(): BelongsToMany

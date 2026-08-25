@@ -217,7 +217,7 @@ class PuestoController extends Controller
             fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
 
             // Construir Cabecera Dinámica
-            $cabeceras = ['ID RRHH', 'Trabajador', 'Departamento'];
+            $cabeceras = ['ID RRHH', 'Trabajador', 'Departamento', 'Puesto'];
             foreach ($cursosExigidos as $c) {
                 $cabeceras[] = $c->nombre; // 1 Columna por curso
             }
@@ -234,7 +234,8 @@ class PuestoController extends Controller
                 $fila = [
                     $trabajador->id_rrhh ?: '—',
                     trim($trabajador->name . ' ' . $trabajador->apellido),
-                    !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO'
+                    !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO',
+                    $trabajador->puesto ?: '—'
                 ];
 
                 foreach ($cursosExigidos as $cursoNorma) {

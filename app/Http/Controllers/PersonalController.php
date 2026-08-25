@@ -440,7 +440,15 @@ class PersonalController extends Controller
     {
         $this->authorize('personal.edit'); // Requiere permiso de edición
         
-        $personal->activo = !$personal->activo; // Invierte el estado (de true a false, o viceversa)
+        $estabaInactivo = !$personal->activo;
+        $personal->activo = !$personal->activo; // Invierte el estado
+        
+        // LÓGICA DE REACTIVACIÓN: Si lo estamos dando de alta y antes estaba de baja
+        if ($personal->activo && $estabaInactivo) {
+            $personal->fecha_reactivacion = now();
+            $personal->prl_revisado = false; // Vuelve a requerir atención de PRL
+        }
+        
         $personal->save();
         
         $mensaje = $personal->activo ? 'Trabajador dado de ALTA correctamente.' : 'Trabajador dado de BAJA correctamente.';
@@ -769,5 +777,20 @@ class PersonalController extends Controller
             }
             $personal->cursos()->attach($syncData);
         }
+    }
+
+    /**
+     * Marcar el perfil formativo de un trabajador como revisado por PRL.
+     */
+    public function marcarRevisadoPrl(Personal $personal)
+    {
+        // Exigimos permiso de edición de cursos (PRL)
+        $this->authorize('cursos.edit');
+
+        $personal->update([
+            'prl_revisado' => true
+        ]);
+
+        return redirect()->back()->with('success', 'Revisión confirmada. El trabajador ya no aparecerá como pendiente.');
     }
 }

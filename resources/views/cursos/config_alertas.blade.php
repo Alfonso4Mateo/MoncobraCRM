@@ -9,10 +9,7 @@
     <style>
         .config-page { padding: 18px; font-family: 'Manrope', sans-serif; }
         
-        /* NUEVO: ESTRUCTURA A DOS COLUMNAS (Grid) */
         .config-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; max-width: 1200px; margin: 0 auto; align-items: start; }
-        
-        /* Para que en móviles o pantallas pequeñas se ponga uno debajo de otro automáticamente */
         @media (max-width: 900px) { .config-layout { grid-template-columns: 1fr; } }
 
         .config-card { background: #fff; border: 1px solid #e7ecf3; border-radius: 18px; box-shadow: 0 16px 30px rgba(15, 23, 42, .06); padding: 24px; }
@@ -20,7 +17,7 @@
         .config-header h2 { color: #173e67; font-weight: 800; font-size: 1.5rem; margin-bottom: 5px; }
         .config-header p { color: #667085; font-size: 0.9rem; margin: 0; line-height: 1.4; }
         .config-field label { display: block; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #8a98ab; margin-bottom: 8px; }
-        .config-field input, .config-field select { width: 100%; border: 1px solid #dbe3ef; border-radius: 12px; padding: 12px 14px; font-size: 0.95rem; font-weight: 600; color: #173e67; transition: all 0.2s; height: 46px; }
+        .config-field input:not([type="checkbox"]), .config-field select { width: 100%; border: 1px solid #dbe3ef; border-radius: 12px; padding: 12px 14px; font-size: 0.95rem; font-weight: 600; color: #173e67; transition: all 0.2s; height: 46px; }
         .config-field input:focus, .config-field select:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1); }
         
         .config-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
@@ -40,7 +37,6 @@
         .email-item-btn { color: #94a3b8; background: none; border: none; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; }
         .email-item-btn:hover { color: #ef4444; background: #fee2e2; }
         
-        /* NUEVO: Zona con scroll para que la tarjeta no crezca hacia el infinito */
         .email-scroll-area { max-height: 250px; overflow-y: auto; padding-right: 6px; }
         .email-scroll-area::-webkit-scrollbar { width: 6px; }
         .email-scroll-area::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
@@ -52,26 +48,33 @@
     <section class="config-page">
         
         <!-- Bloque superior para alertas y botón de regreso -->
-        <div style="max-width: 1200px; margin: 0 auto 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div style="max-width: 1200px; margin: 0 auto 20px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
             
-            <!-- NUEVO: Contenedor con Flex para alinear los dos botones -->
-            <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <a href="{{ route('cursos.index') }}" class="config-btn config-btn--soft" style="padding: 10px 16px;">
                     <i class="fas fa-arrow-left mr-2"></i> Volver al catálogo
                 </a>
                 
             @can('cursos.alertas')
-                <!-- Botón de Envío Manual -->
-                <form action="{{ route('cursos.config.alertas.manual') }}" method="POST" style="margin: 0;" onsubmit="return confirm('¿Forzar el escaneo y envío de correos ahora mismo?');">
+                <!-- Botón Manual 1: Caducidades -->
+                <form action="{{ route('cursos.config.alertas.manual') }}" method="POST" style="margin: 0;" onsubmit="return confirm('¿Forzar el escaneo y envío del reporte de CADUCIDADES ahora mismo?');">
                     @csrf
-                    <button type="submit" class="config-btn config-btn--primary" style="padding: 10px 16px;">
-                        <i class="fas fa-paper-plane mr-2"></i> Enviar informe ya
+                    <button type="submit" class="config-btn config-btn--primary" style="padding: 10px 16px;" title="Enviar listado de cursos caducados y próximos a caducar">
+                        <i class="fas fa-calendar-times mr-2"></i> Reporte Caducidades
+                    </button>
+                </form>
+
+                <!-- Botón Manual 2: Pendientes de Revisión -->
+                <form action="{{ route('cursos.config.alertas.manual_pendientes') }}" method="POST" style="margin: 0;" onsubmit="return confirm('¿Forzar el envío del aviso de trabajadores PENDIENTES DE REVISIÓN ahora mismo?');">
+                    @csrf
+                    <button type="submit" class="config-btn config-btn--blue" style="padding: 10px 16px;" title="Enviar listado de nuevas altas y reactivaciones sin revisar">
+                        <i class="fas fa-user-clock mr-2"></i> Aviso Pendientes
                     </button>
                 </form>
             @endcan
             </div>
 
-            <div style="flex: 1; max-width: 400px; margin-left: 20px;">
+            <div style="flex: 1; max-width: 400px; margin-left: auto;">
                 @if(session('success'))
                     <div class="alert alert-success mb-0" style="border-radius: 10px; font-weight: 600; padding: 10px 16px;">
                         <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
@@ -91,7 +94,7 @@
             <div class="config-card">
                 <div class="config-header">
                     <h2>Destinatarios (PRL)</h2>
-                    <p>Añade los correos del personal que debe recibir los informes de caducidad cada semana.</p>
+                    <p>Añade los correos del personal que debe recibir los informes automatizados.</p>
                 </div>
 
             @can('cursos.alertas')
@@ -100,12 +103,12 @@
                     <div class="config-field">
                         <label for="email">Añadir destinatario</label>
                         <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-light border-right-0" style="border-color: #dbe3ef; border-radius: 12px 0 0 12px;"><i class="fas fa-envelope text-muted"></i></span>
-                            </div>
-                            <input type="email" id="email" name="email" class="form-control border-left-0" style="border-radius: 0; height: 46px;" placeholder="Ej: tecnico@moncobra.com" required autocomplete="off">
-                            <div class="input-group-append">
-                                <button type="submit" class="config-btn config-btn--primary" style="border-radius: 0 12px 12px 0; padding: 0 20px; margin: 0;" title="Añadir correo">
+                            <div style="display: flex; align-items: stretch; width: 100%; height: 46px;">
+                                <div style="display: flex; align-items: center; justify-content: center; background: #f8fafc; border: 1px solid #dbe3ef; border-right: none; border-radius: 12px 0 0 12px; padding: 0 16px;">
+                                    <i class="fas fa-envelope text-muted"></i>
+                                </div>
+                                <input type="email" id="email" name="email" style="flex: 1; border: 1px solid #dbe3ef; border-left: none; border-right: none; border-radius: 0; margin: 0; padding: 0 14px; outline: none; font-weight: 600; color: #173e67; font-family: inherit;" placeholder="Ej: tecnico@moncobra.com" required autocomplete="off">
+                                <button type="submit" class="config-btn config-btn--primary" style="border-radius: 0 12px 12px 0; margin: 0; padding: 0 20px; box-shadow: none;" title="Añadir correo">
                                     <i class="fas fa-plus"></i>
                                 </button>
                             </div>
@@ -148,11 +151,11 @@
                 </div>
             </div>
 
-            <!-- COLUMNA DERECHA: HORARIO -->
+            <!-- COLUMNA DERECHA: HORARIO E INTERRUPTORES -->
             <div class="config-card">
                 <div class="config-header">
-                    <h2>Frecuencia de Envío</h2>
-                    <p>Configura el día exacto y la hora a la que el servidor enviará el reporte automatizado.</p>
+                    <h2>Frecuencia y Tipos de Aviso</h2>
+                    <p>Configura qué correos y cuándo se enviarán automáticamente a la lista de destinatarios.</p>
                 </div>
 
             @can('cursos.alertas')
@@ -176,10 +179,35 @@
                         <label for="hora_envio">Hora de ejecución</label>
                         <input type="time" id="hora_envio" name="hora_envio" value="{{ old('hora_envio', $hora) }}" required>
                     </div>
+
+                    <!-- NUEVO: Interruptores de tipos de correo -->
+                    <div class="config-field" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #eef2f7;">
+                        <label>Tipos de correo a enviar</label>
+                        
+                        <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 12px; text-transform: none; letter-spacing: normal;">
+                            <input type="hidden" name="enviar_caducidades" value="0">
+                            <!-- El backend pasará la variable $enviarCaducidades. Si no existe, por defecto es true -->
+                            <input type="checkbox" name="enviar_caducidades" value="1" @checked($enviarCaducidades ?? true) style="width: 20px; height: 20px; margin-top: 2px;">
+                            <div>
+                                <strong style="color: #173e67; font-size: 0.95rem; display: block;">Reporte de Caducidades</strong>
+                                <span style="color: #64748b; font-size: 0.85rem; font-weight: 500;">Listado de cursos caducados y próximos a caducar.</span>
+                            </div>
+                        </label>
+
+                        <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 0; text-transform: none; letter-spacing: normal;">
+                            <input type="hidden" name="enviar_pendientes" value="0">
+                            <!-- El backend pasará la variable $enviarPendientes. Si no existe, por defecto es true -->
+                            <input type="checkbox" name="enviar_pendientes" value="1" @checked($enviarPendientes ?? true) style="width: 20px; height: 20px; margin-top: 2px;">
+                            <div>
+                                <strong style="color: #173e67; font-size: 0.95rem; display: block;">Aviso de Pendientes de Revisión</strong>
+                                <span style="color: #64748b; font-size: 0.85rem; font-weight: 500;">Aviso de trabajadores nuevos/reactivados sin gestionar.</span>
+                            </div>
+                        </label>
+                    </div>
                     
                     <div class="config-actions">
                         <button type="submit" class="config-btn config-btn--blue w-100" style="padding: 14px;">
-                            <i class="fas fa-clock mr-2"></i> Guardar Frecuencia
+                            <i class="fas fa-save mr-2"></i> Guardar Configuración
                         </button>
                     </div>
                 </form>

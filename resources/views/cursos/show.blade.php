@@ -111,6 +111,7 @@
                             <th>ID RRHH</th>
                             <th>Trabajador</th>
                             <th>Departamento</th>
+                            <th>Puesto</th>
                             <th>DNI / NIE</th>
                             <th>Teléfono</th>
                             <th>Fecha Realización</th>
@@ -164,12 +165,13 @@
                             <tr>
                                 <td class="text-muted font-weight-bold">{{ $trabajador->id_rrhh ?: '—' }}</td>
                                 <td>
-                                    <strong>{{ $trabajador->name }} {{ $trabajador->apellido }}</strong>
+                                    <strong>{{ $trabajador->name ?: '—' }} {{ $trabajador->apellido ?: '—' }}</strong>
                                     @if(!$esApto)
                                         <span class="badge badge-danger ml-1" title="El trabajador no superó el curso">No apto</span>
                                     @endif
                                 </td>
-                                <td><span class="text-muted">{{ $departamentoStr }}</span></td>
+                                <td><span class="text-muted">{{ $departamentoStr ?: '—' }}</span></td>
+                                <td class="text-muted">{{ $trabajador->puesto ?: '—' }}</td>
                                 <td class="text-muted">{{ $trabajador->dni_nie ?: '—' }}</td>
                                 <td class="text-muted">{{ $trabajador->telefono ?: '—' }}</td>
                                 <td>{{ $fechaRealizacion ? $fechaRealizacion->format('d/m/Y') : '—' }}</td>

@@ -100,27 +100,37 @@
         <div class="matrix-container">
             <table class="matrix-table">
                 <thead>
-                    <tr>
-                        <th class="col-worker">TRABAJADOR / ID RRHH</th>
-                        @foreach($cursosExigidos as $curso)
-                            <th title="{{ $curso->nombre }}">
-                                <!-- Acortamos nombres muy largos en la cabecera -->
-                                {{ \Illuminate\Support\Str::limit($curso->nombre, 25) }}
-                            </th>
-                        @endforeach
-                    </tr>
-                </thead>
+                        <tr>
+                            <th class="col-worker">TRABAJADOR / ID / DNI</th>
+                            <th>DEPARTAMENTO</th>
+                            <th>PUESTO</th>
+                            @foreach($cursosExigidos as $curso)
+                                <th title="{{ $curso->nombre }}">
+                                    {{ \Illuminate\Support\Str::limit($curso->nombre, 25) }}
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
                 <tbody>
                     @forelse($trabajadores as $trabajador)
+                        @php
+                            // Procesamos el departamento igual que en las otras vistas
+                            $deptos = is_string($trabajador->departamento) 
+                                ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
+                                : (array) $trabajador->departamento;
+                            $departamentoStr = !empty($deptos) ? implode(', ', $deptos) : 'Sin departamento';
+                        @endphp
                         <tr>
                             <td class="col-worker">
-                                <div style="line-height: 1.2;">
-                                    {{ $trabajador->name }} {{ $trabajador->apellido }}
-                                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 2px;">
-                                        ID: {{ $trabajador->id_rrhh ?: '—' }}
+                                <div style="line-height: 1.3;">
+                                    <strong>{{ $trabajador->name }} {{ $trabajador->apellido }}</strong>
+                                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 2px;">
+                                        ID RRHH: {{ $trabajador->id_rrhh ?: '—' }} | DNI: {{ $trabajador->dni_nie ?: '—' }}
                                     </div>
                                 </div>
                             </td>
+                            <td><span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">{{ strtoupper($departamentoStr ?: '—') }}</span></td>
+                            <td><span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">{{ $trabajador->puesto ?: '—' }}</span></td>
                             
                             @foreach($cursosExigidos as $curso)
                                 @php

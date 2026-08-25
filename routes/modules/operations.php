@@ -66,6 +66,9 @@ Route::post('users/{user}/change-role', [UserController::class, 'changeRole'])
 Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive'])
     ->name('users.toggleActive')
     ->middleware('permission:users.manage');
+Route::post('/personal/{personal}/prl-revisado', [PersonalController::class, 'marcarRevisadoPrl'])
+    ->name('personal.prl.revisado')
+    ->middleware('permission:cursos.edit');
 Route::get('users/{user}/permissions', [UserController::class, 'permissionsEdit'])
     ->name('users.permissions.edit')
     ->middleware('permission:users.permissions'); 
@@ -146,4 +149,5 @@ Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController:
     ->middleware('permission:cursos.view'); 
 
 Route::post('/personal/{personal}/toggle-status', [App\Http\Controllers\PersonalController::class, 'toggleStatus'])
-    ->name('personal.toggleStatus'); 
+    ->name('personal.toggleStatus')
+    ->middleware('permission:personal.edit');

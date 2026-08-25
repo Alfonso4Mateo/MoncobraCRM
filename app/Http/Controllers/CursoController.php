@@ -340,7 +340,7 @@ class CursoController extends Controller
             fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
             // Escribimos la primera fila (Cabeceras actualizadas con Departamento)
-            fputcsv($file, ['ID RRHH', 'Trabajador', 'Departamento', 'Fecha Realización', 'Caducidad', 'Estado'], ';');
+            fputcsv($file, ['ID RRHH', 'Trabajador', 'Departamento', 'Puesto', 'DNI / NIE', 'Teléfono', 'Fecha Realización', 'Caducidad', 'Estado'], ';');
 
             $hoy = \Carbon\Carbon::now()->startOfDay();
 
@@ -392,9 +392,12 @@ class CursoController extends Controller
 
                 // Escribimos la fila en el CSV
                 fputcsv($file, [
-                    $idRrhh,
-                    $nombreCompleto,
-                    $departamentoStr,
+                    $idRrhh ?: '—',
+                    $nombreCompleto ?: '—',
+                    $departamentoStr ?: '—',
+                    $trabajador->puesto ?: '—',
+                    $trabajador->dni_nie ?: '—',
+                    $trabajador->telefono ?: '—',
                     $fechaRealizacionFormat,
                     $caducidadFormat,
                     $estado
@@ -523,7 +526,14 @@ class CursoController extends Controller
         $dia = Setting::where('key', 'alertas_prl_dia')->value('value') ?? '1';
         $hora = Setting::where('key', 'alertas_prl_hora')->value('value') ?? '08:00';
 
-        return view('cursos.config_alertas', compact('emails', 'dia', 'hora'));
+        // Leemos la configuración de los checkboxes (Si no existen, se asume 'true' por defecto)
+        $enviarCaducidades = Setting::where('key', 'alertas_prl_enviar_caducidades')->value('value');
+        $enviarCaducidades = $enviarCaducidades === null ? true : (bool) $enviarCaducidades;
+
+        $enviarPendientes = Setting::where('key', 'alertas_prl_enviar_pendientes')->value('value');
+        $enviarPendientes = $enviarPendientes === null ? true : (bool) $enviarPendientes;
+
+        return view('cursos.config_alertas', compact('emails', 'dia', 'hora', 'enviarCaducidades', 'enviarPendientes'));
     }
 
     // 2. GUARDA UN CORREO NUEVO EN LA LISTA
@@ -578,7 +588,7 @@ class CursoController extends Controller
         return redirect()->route('cursos.config.alertas')->with('success', 'Correo eliminado de la lista.');
     }
 
-    // 4. GUARDA LOS DÍAS Y HORAS DEL SERVIDOR
+    // 4. GUARDA LOS DÍAS, HORAS Y CHECKBOXES DEL SERVIDOR
     public function storeHorarioAlertas(Request $request)
     {
         // --- GUARDIA DE LA MURALLA ---
@@ -587,7 +597,9 @@ class CursoController extends Controller
         // 1. Validamos los datos de entrada
         $request->validate([
             'dia_envio' => 'required',
-            'hora_envio' => 'required'
+            'hora_envio' => 'required',
+            'enviar_caducidades' => 'nullable|boolean',
+            'enviar_pendientes' => 'nullable|boolean',
         ]);
 
         // 2. Guardado blindado para el DÍA (Evita bloqueos de Asignación Masiva)
@@ -600,11 +612,21 @@ class CursoController extends Controller
         $settingHora->value = $request->hora_envio;
         $settingHora->save();
 
+        // 4. Guardado de Checkbox: Caducidades
+        $settingCaducidades = Setting::firstOrNew(['key' => 'alertas_prl_enviar_caducidades']);
+        $settingCaducidades->value = $request->boolean('enviar_caducidades') ? '1' : '0';
+        $settingCaducidades->save();
+
+        // 5. Guardado de Checkbox: Pendientes
+        $settingPendientes = Setting::firstOrNew(['key' => 'alertas_prl_enviar_pendientes']);
+        $settingPendientes->value = $request->boolean('enviar_pendientes') ? '1' : '0';
+        $settingPendientes->save();
+
         return redirect()->route('cursos.config.alertas')
-                         ->with('success', 'Frecuencia de envío actualizada correctamente.');
+                         ->with('success', 'Configuración y frecuencia de envío actualizadas correctamente.');
     }
 
-    // 5. EJECUCIÓN MANUAL DEL COMANDO DE ALERTAS
+    // 5. EJECUCIÓN MANUAL DEL COMANDO DE CADUCIDADES
     public function enviarAlertaManual()
     {
         // --- GUARDIA DE LA MURALLA ---
@@ -615,6 +637,20 @@ class CursoController extends Controller
 
         return redirect()->route('cursos.config.alertas')
                          ->with('success', 'Orden de escaneo ejecutada. Si hay caducidades, el correo se ha enviado.');
+    }
+    
+    // 6. EJECUCIÓN MANUAL DEL COMANDO DE PENDIENTES (NUEVO)
+    public function enviarAlertaManualPendientes()
+    {
+        // --- GUARDIA DE LA MURALLA ---
+        $this->authorize('cursos.alertas');
+
+        // Asumimos que este comando Artisan será el encargado de gestionar los pendientes de revisión.
+        // Si tienes otro nombre para este comando en el futuro, cámbialo aquí.
+        Artisan::call('cursos:notificar-pendientes');
+
+        return redirect()->route('cursos.config.alertas')
+                         ->with('success', 'Aviso manual procesado. Si hay trabajadores pendientes de revisión, el correo se ha enviado.');
     }
     
 }
