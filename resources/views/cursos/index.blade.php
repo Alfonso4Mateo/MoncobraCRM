@@ -552,25 +552,33 @@
                                         data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}"
                                         data-cursos="{{ $cursosCount }}">
 
-                                        <div class="trabajador-card__header">
-                                            <div>
-                                                <h4 class="trabajador-card__name">
+                                        <div class="trabajador-card__header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                                            <!-- Columna Izquierda: Nombre y Etiquetas envueltos en un flex-wrap -->
+                                            <div style="flex: 1; min-width: 0;">
+                                                <h4 class="trabajador-card__name" style="margin-bottom: 6px; line-height: 1.3;">
                                                     {{ $nombreCompleto }}
+                                                </h4>
+                                                
+                                                <!-- Contenedor de etiquetas inferior con salto de línea natural si no caben -->
+                                                <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
                                                     @if(!$personal->prl_revisado)
-                                                        <span class="badge-pendiente" title="Pendiente de revisar">⚠️ PENDIENTE</span>
+                                                        <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
                                                     @endif
                                                     
                                                     @if($esNuevo)
-                                                        <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
+                                                        <span class="badge-nuevo" style="margin: 0;" title="Alta reciente (14 días)">Nuevo</span>
                                                     @elseif($esReactivado)
-                                                        <span class="badge-reactivado" title="Reactivado (14 días)">Reactivado</span>
+                                                        <span class="badge-reactivado" style="margin: 0;" title="Reactivado (14 días)">Reactivado</span>
                                                     @endif
-                                                </h4>
-                                                <div class="trabajador-card__depto">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
+                                                </div>
+
+                                                <div class="trabajador-card__depto" style="margin-top: 6px;">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
                                             </div>
-                                            <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
-                                                {{ $personal->activo ? 'Activo' : 'Inactivo' }}
-                                            </span>
+                                            <div style="flex-shrink: 0;">
+                                                <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
+                                                    {{ $personal->activo ? 'Activo' : 'Inactivo' }}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div class="trabajador-card__stats">
                                             <span style="font-size: 0.85rem; font-weight: 700; color: #667085;">{{ $cursosCount }} cursos asignados</span>
