@@ -183,70 +183,40 @@
 
             <article class="albaran-card">
                 <h2>ARTICULOS</h2>
-                @if ($pedidoMode && !$pedidoBolsa)
-                    <div class="albaran-selection-note">
-                        <i class="fas fa-circle-info" aria-hidden="true"></i>
-                        Marca los artículos que quieres incluir en este albarán. Los no marcados quedarán fuera del documento.
-                    </div>
-                @elseif ($pedidoBolsa)
+                
+                @if ($pedidoBolsa)
                     <div class="albaran-selection-note albaran-selection-note--warning">
                         <i class="fas fa-circle-info" aria-hidden="true"></i>
-                        Este pedido es bolsa: puedes añadir las líneas que necesites, pero no podrás superar <strong>{{ number_format((float) ($pedidoPendienteFacturar ?? 0), 2, ',', '.') }} €</strong> pendientes por facturar.
-                    </div>
-                    <div class="linea-input-row">
-                        <div class="field-group flex-2">
-                            <label for="linea_descripcion">Descripcion</label>
-                            <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_cantidad">Cantidad</label>
-                            <input type="number" id="linea_cantidad" value="1" min="0" max="10000000" step="0.01">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_medida">Medida</label>
-                            <input type="text" id="linea_medida" value="und" placeholder="u, kg, m...">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_precio">P. unitario</label>
-                            <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_margen">Margen (%)</label>
-                            <input type="number" id="linea_margen" value="0" min="0" max="1000" step="0.01">
-                        </div>
-                        <button type="button" class="btn-add-linea" id="btnAddLinea">
-                            <i class="fas fa-plus"></i>
-                            Agregar
-                        </button>
-                    </div>
-                @else
-                    <div class="linea-input-row">
-                        <div class="field-group flex-2">
-                            <label for="linea_descripcion">Descripcion</label>
-                            <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_cantidad">Cantidad</label>
-                            <input type="number" id="linea_cantidad" value="1" min="0" max="10000000" step="0.01">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_medida">Medida</label>
-                            <input type="text" id="linea_medida" value="und" placeholder="u, kg, m...">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_precio">P. unitario</label>
-                            <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
-                        </div>
-                        <div class="field-group flex-1">
-                            <label for="linea_margen">Margen (%)</label>
-                            <input type="number" id="linea_margen" value="0" min="0" max="1000" step="0.01">
-                        </div>
-                        <button type="button" class="btn-add-linea" id="btnAddLinea">
-                            <i class="fas fa-plus"></i>
-                            Agregar
-                        </button>
+                        Este pedido es bolsa: puedes añadir o modificar las líneas que necesites libremente.
                     </div>
                 @endif
+
+                <div class="linea-input-row">
+                    <div class="field-group flex-2">
+                        <label for="linea_descripcion">Descripcion</label>
+                        <textarea id="linea_descripcion" placeholder="Escriba el nombre del articulo..."></textarea>
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_cantidad">Cantidad</label>
+                        <input type="number" id="linea_cantidad" value="1" min="0" max="10000000" step="0.01">
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_medida">Medida</label>
+                        <input type="text" id="linea_medida" value="und" placeholder="u, kg, m...">
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_precio">P. unitario</label>
+                        <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
+                    </div>
+                    <div class="field-group flex-1">
+                        <label for="linea_margen">Margen (%)</label>
+                        <input type="number" id="linea_margen" value="0" min="0" max="1000" step="0.01">
+                    </div>
+                    <button type="button" class="btn-add-linea" id="btnAddLinea">
+                        <i class="fas fa-plus"></i>
+                        Agregar
+                    </button>
+                </div>
             </article>
 
             <article class="albaran-card albaran-lineas-card">
@@ -254,25 +224,14 @@
                     <table class="table lineas-table">
                         <thead>
                             <tr>
-                                @if ($pedidoMode && !$pedidoBolsa)
-                                    <th>Línea</th>
-                                    <th>Descripcion</th>
-                                    <th>Cantidad</th>
-                                    <th>Medida</th>
-                                    <th>P. unitario</th>
-                                    <th>Margen</th>
-                                    <th>Total</th>
-                                    <th style="width: 7rem">Incluir</th>
-                                @else
-                                    <th>Línea</th>
-                                    <th>Descripcion</th>
-                                    <th>Cantidad</th>
-                                    <th>Medida</th>
-                                    <th>P. unitario</th>
-                                    <th>Margen</th>
-                                    <th>Total</th>
-                                    <th>Accion</th>
-                                @endif
+                                <th>Línea</th>
+                                <th>Descripcion</th>
+                                <th>Cantidad</th>
+                                <th>Medida</th>
+                                <th>P. unitario</th>
+                                <th>Margen</th>
+                                <th>Total</th>
+                                <th>Accion</th>
                             </tr>
                         </thead>
                         <tbody id="lineasBody">
