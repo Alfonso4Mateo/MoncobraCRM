@@ -274,6 +274,7 @@ class AlbaranClienteController extends Controller
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 2);
 
+        /*
         if ($pedidoBolsa && $pedidoContext) {
             $pendienteFacturar = $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId);
 
@@ -282,7 +283,7 @@ class AlbaranClienteController extends Controller
                     'lineas_json' => 'El albarán supera el importe pendiente por facturar del pedido bolsa (' . number_format($pendienteFacturar, 2, ',', '.') . ' €).',
                 ]);
             }
-        }
+        }*/
 
         $validated['proyecto_id'] = $proyectoId;
         $validated['documento'] = 'Albarán';
@@ -679,6 +680,7 @@ class AlbaranClienteController extends Controller
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $total = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
 
+        /*
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId) ?? $pedidoAnterior;
         if ($pedidoContext && (bool) ($pedidoContext->bolsa ?? false)) {
             $pendienteFacturar = $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId, (int) $albaran->id);
@@ -688,7 +690,7 @@ class AlbaranClienteController extends Controller
                     'lineas_json' => 'El albarán supera el importe pendiente por facturar del pedido bolsa (' . number_format($pendienteFacturar, 2, ',', '.') . ' €).',
                 ]);
             }
-        }
+        }*/
 
         $albaran->update([
             'documento' => $validated['documento'],
