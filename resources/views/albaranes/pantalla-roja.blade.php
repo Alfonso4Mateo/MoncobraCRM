@@ -86,7 +86,7 @@
                             </div>
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}">
+                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}" placeholder="Ej: PENDIENTE POR CONFIRMAR o Nº de pedido">
                             </div>
 
                             <div class="field span-2">

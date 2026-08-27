@@ -88,9 +88,10 @@
                                 <label for="ot">OT</label>
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
                             </div>
+
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}">
+                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}" placeholder="Ej: PENDIENTE POR CONFIRMAR o Nº de pedido">
                             </div>
 
                             <div class="field span-2">
@@ -102,12 +103,10 @@
 
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
-                        @if ($pedidoMode && !$pedidoBolsa)
                             <div class="albaran-selection-note">
                                 <i class="fas fa-circle-info" aria-hidden="true"></i>
                                 Este albarán pertenece a un pedido no bolsa, por lo que no se pueden agregar nuevas líneas.
                             </div>
-                        @else
                             <div class="line-row linea-input-row">
                                 <div class="field flex-6">
                                     <label for="linea_descripcion">Descripción</label>
@@ -134,7 +133,6 @@
                                 
                                 <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
                             </div>
-                        @endif
                     </section>
 
                     <section class="card-block empty-table">

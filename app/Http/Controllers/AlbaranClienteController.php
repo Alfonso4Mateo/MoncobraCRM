@@ -208,8 +208,8 @@ class AlbaranClienteController extends Controller
             ->get(['id', 'numero_pedido', 'id_cliente', 'ot']);
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
         $pedidoBolsa = (bool) ($pedidoContext?->bolsa ?? false);
-        $pedidoModoRestringido = $pedidoContext !== null && !$pedidoBolsa;
-        $lineasIniciales = $pedidoModoRestringido ? $this->buildLineasInicialesFromPedido($pedidoContext, $proyectoId) : [];
+        $pedidoModoRestringido = false; // <-- Desactivamos el bloqueo por completo
+        $lineasIniciales = []; // Ya no cargamos líneas bloqueadas por defecto si quieres total libertad
         $pedidoPendienteFacturar = $pedidoBolsa && $pedidoContext
             ? $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId)
             : null;
@@ -1244,9 +1244,9 @@ class AlbaranClienteController extends Controller
     {
         $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
 
-        if ($pedidoNumero === '') {
-            $albaran->pedidosClientes()->detach();
-            return;
+        if ($pedidoNumero === '' || mb_strtolower($pedidoNumero) === 'pendiente por confirmar') {
+        $albaran->pedidosClientes()->detach();
+        return;
         }
 
         $pedidoId = PedidoCliente::query()
@@ -1354,10 +1354,6 @@ class AlbaranClienteController extends Controller
 
         $pedidoLineas = is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [];
 
-        if ($pedidoLineas === [] && $direction < 0) {
-            return;
-        }
-
         $indexMap = [];
         foreach ($pedidoLineas as $idx => $lineaPedido) {
             if (!is_array($lineaPedido)) {
@@ -1381,31 +1377,29 @@ class AlbaranClienteController extends Controller
             }
 
             $signature = $this->normalizePedidoLineaSignature($lineaAlbaran);
-            if ($signature === '') {
-                continue;
-            }
-
-            if ($direction > 0) {
-                if (!empty($indexMap[$signature])) {
-                    $idx = $indexMap[$signature][0];
-                    $pedidoLineas[$idx]['cantidad'] = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0) + $cantidad, 2);
-                    $pedidoLineas[$idx]['total'] = round(
-                        (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
-                        * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
-                        * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)),
-                        2
-                    );
-                } else {
+            
+            // Si el artículo libre no existe en el pedido original, 
+            // evitamos que rompa y simplemente lo ignoramos o lo añadimos de forma segura
+            if ($signature === '' || !isset($indexMap[$signature])) {
+                if ($direction > 0) {
+                    // Si estamos sumando y es completamente nuevo, podemos opcionalmente agregarlo al pedido
                     $restored = $this->normalizePedidoLineas([$lineaAlbaran]);
                     if (!empty($restored[0])) {
                         $pedidoLineas[] = $restored[0];
                     }
                 }
-
                 continue;
             }
 
-            if (empty($indexMap[$signature])) {
+            if ($direction > 0) {
+                $idx = $indexMap[$signature][0];
+                $pedidoLineas[$idx]['cantidad'] = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0) + $cantidad, 2);
+                $pedidoLineas[$idx]['total'] = round(
+                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
+                    * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
+                    * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)),
+                    2
+                );
                 continue;
             }
 
