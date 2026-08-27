@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let pedidoMode = root.dataset.pedidoMode === "1";
     let pedidoBolsaMode = root.dataset.pedidoBolsa === "1";
     const isExistingEditForm = root.dataset.formMode === "edit";
-    const isPedidoRestrictoMode = () => pedidoMode && !pedidoBolsaMode;
+    const isPedidoRestrictoMode = () => false;
 
     const descripcionInput = document.getElementById("linea_descripcion");
     const cantidadInput = document.getElementById("linea_cantidad");
