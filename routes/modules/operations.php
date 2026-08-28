@@ -6,11 +6,14 @@ use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\PersonalController;
+use App\Http\Controllers\PuestoTrabajoController; // <-- AÑADIDO: Importación obligatoria
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DepartamentoController;
 
-// Inventario: acciones, stock y movimientos.
+// ==========================================
+// 1. INVENTARIO: ACCIONES, STOCK Y MOVIMIENTOS
+// ==========================================
 Route::get('inventario/acciones', [InventarioAccionController::class, 'index'])
     ->name('inventario.acciones.index')
     ->middleware('permission:inventario.manage');
@@ -49,7 +52,10 @@ Route::get('inventario/historial', [HistoricoController::class, 'index'])
     ->middleware('permission:inventario.manage');
 Route::resource('historico', HistoricoController::class)->only(['index']);
 
-// Almacenes y clasificaciones.
+
+// ==========================================
+// 2. ALMACENES Y CLASIFICACIONES
+// ==========================================
 Route::get('almacenes/nuevo', [AlmacenController::class, 'create'])
     ->name('almacenes.create')
     ->middleware('permission:inventario.manage');
@@ -58,7 +64,10 @@ Route::post('almacenes', [AlmacenController::class, 'store'])
     ->middleware('permission:inventario.manage');
 Route::resource('clases', ClaseController::class);
 
-// Administración: usuarios y personal.
+
+// ==========================================
+// 3. ADMINISTRACIÓN: USUARIOS Y PERMISOS
+// ==========================================
 Route::resource('users', UserController::class);
 Route::post('users/{user}/change-role', [UserController::class, 'changeRole'])
     ->name('users.changeRole')
@@ -66,9 +75,6 @@ Route::post('users/{user}/change-role', [UserController::class, 'changeRole'])
 Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive'])
     ->name('users.toggleActive')
     ->middleware('permission:users.manage');
-Route::post('/personal/{personal}/prl-revisado', [PersonalController::class, 'marcarRevisadoPrl'])
-    ->name('personal.prl.revisado')
-    ->middleware('permission:cursos.edit');
 Route::get('users/{user}/permissions', [UserController::class, 'permissionsEdit'])
     ->name('users.permissions.edit')
     ->middleware('permission:users.permissions'); 
@@ -78,11 +84,31 @@ Route::put('users/{user}/permissions', [UserController::class, 'permissionsUpdat
 Route::post('/users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])
     ->name('users.sendResetLink');
 
-// Personal como entidad independiente de usuarios.
-Route::get('personal/tallas', [PersonalController::class, 'tallas'])
-    ->name('personal.tallas')
-    ->middleware('permission:personal.tallas');
 
+// ==========================================
+// 4. GESTIÓN DE PUESTOS DE PERSONAL (PerfilController)
+// (Colocado arriba para evitar que Laravel lo confunda con IDs)
+// ==========================================
+Route::get('personal/puestos-trabajo', [PuestoTrabajoController::class, 'index'])
+    ->name('personal.puestos-trabajo.index')
+    ->middleware('permission:personal.edit');
+
+Route::post('personal/puestos-trabajo', [PuestoTrabajoController::class, 'store'])
+    ->name('personal.puestos-trabajo.store')
+    ->middleware('permission:personal.edit');
+
+Route::put('personal/puestos-trabajo/{puestoTrabajo}', [PuestoTrabajoController::class, 'update'])
+    ->name('personal.puestos-trabajo.update')
+    ->middleware('permission:personal.edit');
+
+Route::delete('personal/puestos-trabajo/{puestoTrabajo}', [PuestoTrabajoController::class, 'destroy'])
+    ->name('personal.puestos-trabajo.destroy')
+    ->middleware('permission:personal.edit');
+
+
+// ==========================================
+// 5. MÓDULO DE PERSONAL (Rutas estáticas primero)
+// ==========================================
 Route::get('personal', [PersonalController::class, 'index'])
     ->name('personal.index')
     ->middleware('permission:personal.view');
@@ -95,6 +121,38 @@ Route::post('personal', [PersonalController::class, 'store'])
     ->name('personal.store')
     ->middleware('permission:personal.create');
 
+Route::get('personal/tallas', [PersonalController::class, 'tallas'])
+    ->name('personal.tallas')
+    ->middleware('permission:personal.tallas');
+
+Route::get('personal/puestos', [PersonalController::class, 'puestos'])
+    ->name('personal.puestos.info')
+    ->middleware('permission:personal.view');
+
+Route::post('/personal/cursos/bulk', [PersonalController::class, 'assignBulkCourses'])
+    ->name('personal.cursos.bulk')
+    ->middleware('permission:cursos.edit'); 
+
+Route::post('/personal/export/bulk', [PersonalController::class, 'exportBulk'])
+    ->name('personal.export.bulk')
+    ->middleware('permission:personal.export'); 
+
+Route::post('/personal/departamento/bulk', [PersonalController::class, 'updateBulkDepartamento'])
+    ->name('personal.departamento.bulk')
+    ->middleware('permission:personal.edit');
+
+Route::post('/personal/{personal}/prl-revisado', [PersonalController::class, 'marcarRevisadoPrl'])
+    ->name('personal.prl.revisado')
+    ->middleware('permission:cursos.edit');
+
+Route::post('/personal/{personal}/toggle-status', [PersonalController::class, 'toggleStatus'])
+    ->name('personal.toggleStatus')
+    ->middleware('permission:personal.edit');
+
+
+// ==========================================
+// 6. MÓDULO DE PERSONAL (Rutas con parámetros al final)
+// ==========================================
 Route::get('personal/{personal}', [PersonalController::class, 'show'])
     ->name('personal.show')
     ->middleware('permission:personal.view');
@@ -109,8 +167,12 @@ Route::put('personal/{personal}', [PersonalController::class, 'update'])
 
 Route::delete('personal/{personal}', [PersonalController::class, 'destroy'])
     ->name('personal.destroy')
-    ->middleware('permission:personal.destroy'); 
+    ->middleware('permission:personal.destroy');
 
+
+// ==========================================
+// 7. DEPARTAMENTOS Y ACCESORIOS DE CURSOS/PRL
+// ==========================================
 Route::post('/departamentos', [DepartamentoController::class, 'store'])
     ->name('departamentos.store')
     ->middleware('permission:personal.edit');
@@ -119,19 +181,6 @@ Route::delete('/departamentos/{nombre}', [DepartamentoController::class, 'destro
     ->name('departamentos.destroy')
     ->middleware('permission:personal.edit');
 
-Route::post('/personal/cursos/bulk', [App\Http\Controllers\PersonalController::class, 'assignBulkCourses'])
-    ->name('personal.cursos.bulk')
-    ->middleware('permission:cursos.edit'); 
-
-Route::post('/personal/export/bulk', [App\Http\Controllers\PersonalController::class, 'exportBulk'])
-    ->name('personal.export.bulk')
-    ->middleware('permission:personal.export'); 
-
-Route::post('/personal/departamento/bulk', [App\Http\Controllers\PersonalController::class, 'updateBulkDepartamento'])
-    ->name('personal.departamento.bulk')
-    ->middleware('permission:personal.edit');
-
-// PROTEGIDAS RUTAS QUE ESTABAN EXPUESTAS (Sin middleware)
 Route::post('personal/{personal}/puestos', [App\Http\Controllers\CursoController::class, 'syncPuestos'])
     ->name('personal.puestos.sync')
     ->middleware('permission:cursos.edit'); 
@@ -146,8 +195,4 @@ Route::delete('personal/{personal}/puestos/{puesto}', [App\Http\Controllers\Curs
 
 Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController::class, 'auditoria'])
     ->name('puestos.auditoria')
-    ->middleware('permission:cursos.view'); 
-
-Route::post('/personal/{personal}/toggle-status', [App\Http\Controllers\PersonalController::class, 'toggleStatus'])
-    ->name('personal.toggleStatus')
-    ->middleware('permission:personal.edit');
+    ->middleware('permission:cursos.view');

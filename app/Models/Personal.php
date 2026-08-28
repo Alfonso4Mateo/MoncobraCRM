@@ -21,6 +21,7 @@ class Personal extends Model
         'dni_nie',
         'departamento',
         'puesto',
+        'puesto_trabajo_id',
         'id_rrhh',
         'tipo_personal',
         'camiseta',
@@ -37,6 +38,7 @@ class Personal extends Model
         'descripcion',
         'ultima_revision_medica',
         'proxima_revision_medica',
+        'revision_medica_manual',
         'ultima_graduacion',
         'proxima_graduacion',
         'reconocido_en',
@@ -50,6 +52,7 @@ class Personal extends Model
         'activo' => 'boolean',
         'ultima_revision_medica' => 'date',
         'proxima_revision_medica' => 'date',
+        'revision_medica_manual' => 'boolean',
         'ultima_graduacion' => 'date',
         'proxima_graduacion' => 'date',
         'departamento' => 'array',
@@ -72,7 +75,11 @@ class Personal extends Model
 
     public function puestos()
     {
-        return $this->belongsToMany(Puesto::class, 'personal_puesto')
-                    ->withTimestamps();
+        return $this->belongsTo(Puesto::class, 'puesto_id');
+    }
+
+    public function puestoTrabajo()
+    {
+        return $this->belongsTo(PuestoTrabajo::class, 'puesto_trabajo_id');
     }
 }

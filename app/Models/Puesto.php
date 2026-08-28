@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Puesto extends Model
 {
-    protected $fillable = ['nombre', 'activo'];
+    // AÑADIMOS 'meses_revision_medica'
+    protected $fillable = ['nombre', 'activo', 'meses_revision_medica'];
 
-    // Un puesto tiene unas normas (cursos)
     public function cursos()
     {
         return $this->belongsToMany(Curso::class, 'curso_puesto')
@@ -16,7 +16,6 @@ class Puesto extends Model
                     ->withTimestamps();
     }
 
-    // Un puesto está ocupado por trabajadores
     public function personal()
     {
         return $this->belongsToMany(Personal::class, 'personal_puesto')

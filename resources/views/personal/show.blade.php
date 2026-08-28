@@ -185,7 +185,7 @@
 
                                         <div>
                                             <span>PUESTO</span>
-                                            <strong>{{ $personal->puesto ?: '—' }}</strong>
+                                            <strong>{{ optional($personal->puestoTrabajo)->nombre ?: '—' }}</strong>
                                         </div>
 
                                         <div>

@@ -41,8 +41,29 @@
         }
         .personal-item.is-active { border-color: #173e67; box-shadow: 0 0 0 3px rgba(23, 62, 103, .08); }
         .personal-item__top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-        .personal-item__name { font-weight: 800; color: #173e67; }
-        .personal-item__meta { font-size: .82rem; color: #667085; margin-top: 2px; }
+        
+        .personal-item__name { 
+            font-weight: 800; 
+            color: #173e67; 
+            word-break: break-word; 
+            overflow-wrap: break-word;
+        }
+
+        .personal-item__meta { 
+            font-size: .82rem; 
+            color: #667085; 
+            margin-top: 2px; 
+            word-break: break-word;
+        }
+
+        .worker-strip__value { 
+            font-size: .92rem; 
+            font-weight: 700; 
+            color: #173e67; 
+            white-space: normal !important; 
+            word-break: break-word;        
+            overflow-wrap: break-word;
+        }
         .worker-strip {
             display: grid;
             grid-template-columns: minmax(150px, 1.2fr) minmax(90px, .7fr) minmax(130px, 1fr) minmax(100px, .8fr) minmax(160px, 1.2fr) minmax(80px, .5fr) minmax(70px, .4fr);
@@ -347,12 +368,7 @@
                 return $estadoPrl . mb_strtolower(trim($personal->name . ' ' . $personal->apellido));
             });
 
-            $listaDepartamentos = collect();
-            foreach($personals as $p) {
-                $ds = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
-                $listaDepartamentos = $listaDepartamentos->merge($ds);
-            }
-            $listaDepartamentos = $listaDepartamentos->map(fn($d) => trim($d))->filter()->unique()->sort();
+            $listaDepartamentos = \App\Models\Departamento::orderBy('nombre')->pluck('nombre');
             
             $currentDepto = request('departamento', 'all');
         @endphp
@@ -440,26 +456,31 @@
                         data-cursos="{{ $cursosCount }}">
                         
                        
-                        <div class="personal-item__top">
-                            <div class="personal-item__name">
-                                {{ $nombreCompleto }}
+                        <div class="personal-item__top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="personal-item__name" style="line-height: 1.3; margin-bottom: 4px;">
+                                    {{ $nombreCompleto }}
+                                </div>
                                 
-                                @if(!$personal->prl_revisado)
-                                    <span class="badge-pendiente" title="Pendiente de revisar">⚠️ PENDIENTE</span>
-                                @endif
-                                
-                                @if($esNuevo)
-                                    <span class="badge-nuevo" title="Alta reciente (14 días)">Nuevo</span>
-                                @elseif($esReactivado)
-                                    <span class="badge-reactivado" title="Reactivado (14 días)">Reactivado</span>
-                                @endif
-                                
-                                @if($hasCaducado)
-                                    <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 4px;" title="Tiene cursos caducados"></i>
-                                @endif
+                                <!-- Contenedor de etiquetas flex-wrap para nombres largos -->
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px;">
+                                    @if(!$personal->prl_revisado)
+                                        <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
+                                    @endif
+                                    
+                                    @if($esNuevo)
+                                        <span class="badge-nuevo" style="margin: 0;" title="Alta reciente (14 días)">Nuevo</span>
+                                    @elseif($esReactivado)
+                                        <span class="badge-reactivado" style="margin: 0;" title="Reactivado (14 días)">Reactivado</span>
+                                    @endif
+                                    
+                                    @if($hasCaducado)
+                                        <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 2px;" title="Tiene cursos caducados"></i>
+                                    @endif
+                                </div>
                             </div>
                             
-                            <span class="course-card__badge {{ $cursosCount === $cursosAptos ? '' : 'course-card__badge--warn' }}">
+                            <span class="course-card__badge {{ $cursosCount === $cursosAptos ? '' : 'course-card__badge--warn' }}" style="flex-shrink: 0;">
                                 {{ $cursosAptos }}/{{ $cursosCount ?: 0 }}
                             </span>
                         </div>
@@ -553,13 +574,13 @@
                                         data-cursos="{{ $cursosCount }}">
 
                                         <div class="trabajador-card__header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                                            <!-- Columna Izquierda: Nombre y Etiquetas envueltos en un flex-wrap -->
+                                            <!-- Columna Izquierda: Nombre y Etiquetas con salto natural -->
                                             <div style="flex: 1; min-width: 0;">
                                                 <h4 class="trabajador-card__name" style="margin-bottom: 6px; line-height: 1.3;">
                                                     {{ $nombreCompleto }}
                                                 </h4>
                                                 
-                                                <!-- Contenedor de etiquetas inferior con salto de línea natural si no caben -->
+                                                <!-- Contenedor de etiquetas fluido -->
                                                 <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
                                                     @if(!$personal->prl_revisado)
                                                         <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
@@ -574,12 +595,15 @@
 
                                                 <div class="trabajador-card__depto" style="margin-top: 6px;">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
                                             </div>
+                                            
+                                            <!-- Columna Derecha: Estado Fijo -->
                                             <div style="flex-shrink: 0;">
                                                 <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
                                                     {{ $personal->activo ? 'Activo' : 'Inactivo' }}
                                                 </span>
                                             </div>
                                         </div>
+
                                         <div class="trabajador-card__stats">
                                             <span style="font-size: 0.85rem; font-weight: 700; color: #667085;">{{ $cursosCount }} cursos asignados</span>
                                             <div class="trabajador-card__alerts">
@@ -661,7 +685,7 @@
 
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">Puesto</div>
-                                    <div class="worker-strip__value {{ $selectedPersonal->puesto ? '' : 'worker-strip__value--muted' }}">{{ $selectedPersonal->puesto ?: '—' }}</div>
+                                    <div class="worker-strip__value {{ optional($selectedPersonal->puestoTrabajo)->nombre ? '' : 'worker-strip__value--muted' }}">{{ optional($selectedPersonal->puestoTrabajo)->nombre ?: '—' }}</div>
                                 </div>
 
                                 <div class="worker-strip__item">
@@ -694,7 +718,7 @@
                                 </div>
                                 
                                 <div class="erp-tags-container" id="puestos-chip-container">
-                                    @foreach($selectedPersonal->puestos as $puesto)
+                                    @foreach($selectedPersonal->puestos()->get() as $puesto)
                                         <div class="erp-chip" id="chip-puesto-{{ $puesto->id }}">
                                             {{ $puesto->nombre }}
                                             @can('cursos.edit')
@@ -713,8 +737,12 @@
                                             
                                             <select id="js-select-add-puesto" class="erp-select-input">
                                                 <option value="">Buscar y seleccionar...</option>
+                                                @php
+                                                    // Obtenemos los IDs llamando forzosamente a la relación ()
+                                                    $puestosAsignados = $selectedPersonal->puestos()->pluck('puestos.id')->toArray();
+                                                @endphp
                                                 @foreach($todosLosPuestos as $p)
-                                                    @if(!$selectedPersonal->puestos->contains($p->id))
+                                                    @if(!in_array($p->id, $puestosAsignados))
                                                         <option value="{{ $p->id }}">{{ $p->nombre }}</option>
                                                     @endif
                                                 @endforeach

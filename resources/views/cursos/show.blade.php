@@ -171,7 +171,7 @@
                                     @endif
                                 </td>
                                 <td><span class="text-muted">{{ $departamentoStr ?: '—' }}</span></td>
-                                <td class="text-muted">{{ $trabajador->puesto ?: '—' }}</td>
+                                <td class="text-muted">{{ optional($trabajador->puestoTrabajo)->nombre ?: '—' }}</td>
                                 <td class="text-muted">{{ $trabajador->dni_nie ?: '—' }}</td>
                                 <td class="text-muted">{{ $trabajador->telefono ?: '—' }}</td>
                                 <td>{{ $fechaRealizacion ? $fechaRealizacion->format('d/m/Y') : '—' }}</td>

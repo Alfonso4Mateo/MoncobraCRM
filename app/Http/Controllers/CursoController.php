@@ -395,7 +395,7 @@ class CursoController extends Controller
                     $idRrhh ?: '—',
                     $nombreCompleto ?: '—',
                     $departamentoStr ?: '—',
-                    $trabajador->puesto ?: '—',
+                    optional($trabajador->puestoTrabajo)->nombre ?: '—',
                     $trabajador->dni_nie ?: '—',
                     $trabajador->telefono ?: '—',
                     $fechaRealizacionFormat,

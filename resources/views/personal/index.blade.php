@@ -48,6 +48,13 @@
                 </a>
             @endcan
 
+            @can('personal.edit')
+                <a href="{{ route('personal.puestos-trabajo.index') }}" class="personal-action-btn personal-action-btn--soft" style="margin-right:12px;">
+                    <i class="fas fa-briefcase" aria-hidden="true"></i>
+                    Gestionar Puestos
+                </a>
+            @endcan
+
             @can('personal.tallas')
                 <a href="{{ route('personal.tallas') }}" class="personal-action-btn personal-action-btn--soft" style="margin-right:12px;">
                     <i class="fas fa-tshirt" aria-hidden="true"></i>

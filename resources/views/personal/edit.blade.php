@@ -6,11 +6,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     @vite(['resources/css/personal-show.css'])
+    
     <style>
-        .profile-edit-form-group {
-            margin-bottom: 16px;
-        }
+        /* =========================================================
+           1. ESTILOS GENERALES DEL FORMULARIO
+           ========================================================= */
+        .profile-edit-form-group { margin-bottom: 16px; }
 
         .profile-edit-form-group label {
             display: block;
@@ -22,7 +25,8 @@
             margin-bottom: 8px;
         }
 
-        .profile-edit-form-group input,
+        /* La regla general que EXCLUYE a Select2 */
+        .profile-edit-form-group input:not(.select2-search__field),
         .profile-edit-form-group select,
         .profile-edit-form-group textarea {
             width: 100%;
@@ -36,7 +40,7 @@
             transition: border-color .18s ease;
         }
 
-        .profile-edit-form-group input:focus,
+        .profile-edit-form-group input:not(.select2-search__field):focus,
         .profile-edit-form-group select:focus,
         .profile-edit-form-group textarea:focus {
             outline: none;
@@ -46,68 +50,11 @@
 
         .profile-edit-form-group textarea {
             resize: vertical;
-            min-height: 100px;
+            min-height: 10px;
         }
 
-        .profile-edit-form-group .is-invalid {
-            border-color: #e11d48;
-            background: #fff1f2;
-        }
-
-        .profile-edit-form-group .is-invalid:focus {
-            border-color: #be123c;
-            box-shadow: 0 0 0 3px rgba(225, 29, 72, .18);
-        }
-
-        .profile-edit-inline {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .profile-edit-inline input {
-            flex: 1;
-        }
-
-        .profile-edit-today-btn {
-            border: 1px solid var(--profile-line);
-            background: #f7f9fc;
-            color: var(--profile-ink);
-            font-weight: 700;
-            font-size: .8rem;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all .18s ease;
-            white-space: nowrap;
-        }
-
-        .profile-edit-today-btn:hover {
-            border-color: var(--profile-primary);
-            color: var(--profile-primary);
-            box-shadow: 0 4px 10px rgba(23, 62, 103, .12);
-        }
-
-        .profile-alert {
-            padding: 12px 16px;
-            border-radius: 12px;
-            font-size: .9rem;
-            font-weight: 600;
-            border: 1px solid transparent;
-            margin-bottom: 16px;
-        }
-
-        .profile-alert-error {
-            background: #fff1f2;
-            color: #b91c1c;
-            border-color: #f5c2c7;
-        }
-
-        .profile-alert-error ul {
-            margin: 8px 0 0;
-            padding-left: 18px;
-            font-weight: 600;
-        }
+        .profile-edit-form-group .is-invalid { border-color: #e11d48; background: #fff1f2; }
+        .profile-edit-form-group .is-invalid:focus { border-color: #be123c; box-shadow: 0 0 0 3px rgba(225, 29, 72, .18); }
 
         .profile-edit-two-cols {
             display: grid;
@@ -115,10 +62,128 @@
             gap: 16px;
         }
 
+        /* =========================================================
+           2. MAQUILLAJE SELECT2 (Limpio, sin conflictos)
+           ========================================================= */
+        /* Contenedor principal: Fuerza el 100% del grid */
+        .select2-container {
+            width: 100% !important;
+        }
+
+        /* La caja visual (Caja blanca) */
+        .select2-container--default .select2-selection--multiple {
+            background-color: #fff;
+            border: 1px solid var(--profile-line);
+            border-radius: 8px;
+            padding: 4px 8px;
+            min-height: 44px;
+            cursor: text;
+        }
+
+        /* Foco al hacer clic en la caja blanca */
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: var(--profile-primary);
+            box-shadow: 0 0 0 3px rgba(23, 62, 103, 0.08);
+        }
+
+        /* Contenedor Flexbox interno (donde viven las píldoras y el cursor) */
+        .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        /* Diseño de las píldoras azules */
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e3a8a;
+            border-radius: 6px;
+            padding: 4px 10px;
+            margin: 0;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            flex-direction: row-reverse;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* La cruz "X" de las píldoras */
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+            color: #60a5fa;
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            font-weight: bold;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+            color: #ef4444;
+        }
+
+        /* =========================================================
+           3. LA CIRUGÍA DEL CURSOR (Esto arregla los saltos)
+           ========================================================= */
+        /* Quitamos el float nativo de Select2 para que use Flexbox */
+        .select2-container--default .select2-selection--multiple .select2-search--inline {
+            float: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        /* EL INPUT: Limpiamos los estilos para que JS controle la anchura al teclear */
+        .select2-container--default .select2-search--inline .select2-search__field {
+            margin: 0;
+            padding: 0;
+            height: 26px;
+            line-height: 26px;
+            border: none;
+            box-shadow: none;
+            background: transparent;
+            font-family: inherit;
+            color: var(--profile-ink);
+            outline: none;
+            /* PROHIBIDO PONER WIDTH AQUI. SELECT2 LO CALCULA SOLO. */
+        }
+
+        /* =========================================================
+           4. MODALES Y DESPLEGABLE
+           ========================================================= */
+        .select2-dropdown {
+            border: 1px solid #cbd5e1;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        /* Lista del Modal de Gestión */
+        .depto-list-item {
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px 14px; border-bottom: 1px solid var(--profile-line); transition: background 0.2s;
+        }
+        .depto-list-item:hover { background: #f1f5f9; }
+        .depto-list-item:last-child { border-bottom: none; }
+        .depto-btn-delete { 
+            color: #ef4444; background: #fee2e2; border: none; cursor: pointer; 
+            width: 28px; height: 28px; border-radius: 6px; 
+            display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; 
+        }
+        .depto-btn-delete:hover { background: #ef4444; color: #fff; transform: scale(1.05); }
+
         @media (max-width: 768px) {
-            .profile-edit-two-cols {
-                grid-template-columns: 1fr;
-            }
+            .profile-edit-two-cols { grid-template-columns: 1fr; }
         }
     </style>
 @endsection
@@ -231,18 +296,13 @@
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <label for="departamento" style="margin-bottom: 0;">Departamento</label>
                                         @can('personal.acciones')
-                                        <div style="display: flex; gap: 8px;">
-                                            <button type="button" id="btn-add-depto" title="Añadir departamento" style="border: 1px solid var(--profile-line); background: #f7f9fc; color: var(--profile-ink); border-radius: 4px; padding: 2px 8px; cursor: pointer;">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                            <button type="button" id="btn-del-depto" title="Eliminar seleccionado" style="border: 1px solid #f5c2c7; background: #fff1f2; color: #b91c1c; border-radius: 4px; padding: 2px 8px; cursor: pointer;">
-                                                <i class="fas fa-minus"></i>
-                                            </button>
-                                        </div>
+                                        <button type="button" id="btn-manage-deptos" style="border: 1px solid var(--profile-line); background: #f7f9fc; color: var(--profile-primary); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 800; transition: all 0.2s;">
+                                            <i class="fas fa-cog"></i> Gestionar
+                                        </button>
                                         @endcan
                                     </div>
 
-                                    <select id="departamento" name="departamento[]" multiple class="@error('departamento') is-invalid @enderror" style="height: 140px;">
+                                    <select id="departamento" name="departamento[]" multiple class="@error('departamento') is-invalid @enderror" style="width: 100%; display: none;">
                                         @php
                                             $deptosSeleccionados = old('departamento', $deptosActuales);
                                         @endphp
@@ -252,63 +312,91 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    <small style="font-size: 0.75rem; color: #8a98ab; margin-top: 4px; display: block;">Mantén pulsado Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</small>
                                 </div>
 
+                                <!-- 1. PUESTO LABORAL (Línea completa independiente) -->
                                 <div class="profile-edit-form-group">
-                                    <label for="puesto">Puesto</label>
-                                    <input type="text" id="puesto" name="puesto" value="{{ old('puesto', $personal->puesto ?? '') }}" class="@error('puesto') is-invalid @enderror">
+                                    <label for="puesto_trabajo_id">Puesto Laboral (PRL)</label>
+                                    <select id="puesto_trabajo_id" name="puesto_trabajo_id" class="@error('puesto_trabajo_id') is-invalid @enderror">
+                                        <option value="" data-meses="12">Selecciona un puesto...</option>
+                                        @foreach($puestosTrabajoCatalogo as $pt)
+                                            <option value="{{ $pt->id }}" 
+                                                    data-meses="{{ $pt->periodicidad_meses ?? 12 }}"
+                                                    @selected(old('puesto_trabajo_id', $personal->puesto_trabajo_id) == $pt->id)>
+                                                {{ $pt->nombre }}
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </div>
 
-                                <div class="profile-edit-form-group">
-                                    <label for="telefono">Teléfono</label>
-                                    <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000" class="@error('telefono') is-invalid @enderror">
-                                </div>
+                                <!-- 2. TELÉFONO Y CORREO (Estrictamente 2 columnas) -->
+                                <div class="profile-edit-two-cols">
+                                    <div class="profile-edit-form-group">
+                                        <label for="telefono">Teléfono</label>
+                                        <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $personal->telefono ?? '') }}" placeholder="Ej. 600 000 000" class="@error('telefono') is-invalid @enderror">
+                                    </div>
 
-                                <div class="profile-edit-form-group">
-                                    <label for="correo">Correo electrónico</label>
-                                    <input type="email" id="correo" name="correo" value="{{ old('correo', $personal->correo ?? '') }}" placeholder="Ej. tecnico@moncobra.com" class="@error('correo') is-invalid @enderror">
+                                    <div class="profile-edit-form-group">
+                                        <label for="correo">Correo electrónico</label>
+                                        <input type="email" id="correo" name="correo" value="{{ old('correo', $personal->correo ?? '') }}" placeholder="Ej. tecnico@moncobra.com" class="@error('correo') is-invalid @enderror">
+                                    </div>
                                 </div>
 
                             @can('personal.medico')
-                                <div class="profile-edit-two-cols" style="padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; margin-top: 20px;">
-                                    <div class="profile-edit-form-group" style="grid-column: 1 / -1; margin-bottom: 0;">
-                                        <h4 style="font-size: 0.85rem; font-weight: 800; color: #166534; margin: 0;"><i class="fas fa-notes-medical"></i> DATOS MÉDICOS Y VIGILANCIA DE LA SALUD</h4>
+                                <!-- 3. CAJA MÉDICA (Contenedor externo limpio al 100% de ancho) -->
+                                <div style="width: 100%; box-sizing: border-box; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; margin-top: 24px; grid-column: 1 / -1;">
+                                    
+                                    <div style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px dashed #bbf7d0;">
+                                        <h4 style="font-size: 0.85rem; font-weight: 800; color: #166534; margin: 0; letter-spacing: 0.05em;">
+                                            <i class="fas fa-notes-medical"></i> DATOS MÉDICOS Y VIGILANCIA DE LA SALUD
+                                        </h4>
                                     </div>
-                                    <div class="profile-edit-form-group">
-                                        <label for="ultima_revision_medica">Última revisión médica</label>
-                                        <div class="profile-edit-inline">
-                                            <input type="date" id="ultima_revision_medica" name="ultima_revision_medica" value="{{ old('ultima_revision_medica', optional($personal->ultima_revision_medica ?? null)->format('Y-m-d')) }}" class="@error('ultima_revision_medica') is-invalid @enderror">
-                                            <button type="button" id="set-ultima-hoy" class="profile-edit-today-btn">Hoy</button>
+                                    
+                                    <div class="profile-edit-two-cols">
+                                        <!-- Última Revisión -->
+                                        <div class="profile-edit-form-group">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                <label for="ultima_revision_medica" style="margin-bottom: 0;">Última Revisión</label>
+                                                <button type="button" id="btn-hoy-ultima" class="profile-edit-today-btn">Poner hoy</button>
+                                            </div>
+                                            <input type="date" id="ultima_revision_medica" name="ultima_revision_medica" value="{{ old('ultima_revision_medica', optional($personal->ultima_revision_medica)->format('Y-m-d')) }}" class="@error('ultima_revision_medica') is-invalid @enderror">
                                         </div>
-                                    </div>
 
-                                    <div class="profile-edit-form-group">
-                                        <label for="proxima_revision_medica">Próxima revisión médica</label>
-                                        <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica ?? null)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
-                                    </div>
+                                        <!-- Próxima Revisión -->
+                                        <div class="profile-edit-form-group">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                <label for="proxima_revision_medica" style="margin-bottom: 0;">Próxima Revisión</label>
+                                                <button type="button" id="btn-hoy-proxima" class="profile-edit-today-btn">Poner hoy</button>
+                                            </div>
+                                            <input type="date" id="proxima_revision_medica" name="proxima_revision_medica" value="{{ old('proxima_revision_medica', optional($personal->proxima_revision_medica)->format('Y-m-d')) }}" class="@error('proxima_revision_medica') is-invalid @enderror">
+                                        </div>
 
-                                    <div class="profile-edit-form-group">
-                                        <label for="ultima_graduacion">Última graduación</label>
-                                        <div class="profile-edit-inline">
+                                        <!-- Última Graduación -->
+                                        <div class="profile-edit-form-group">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                <label for="ultima_graduacion" style="margin-bottom: 0;">Última graduación</label>
+                                                <button type="button" id="set-graduacion-hoy" class="profile-edit-today-btn">Poner hoy</button>
+                                            </div>
                                             <input type="date" id="ultima_graduacion" name="ultima_graduacion" value="{{ old('ultima_graduacion', optional($personal->ultima_graduacion ?? null)->format('Y-m-d')) }}" class="@error('ultima_graduacion') is-invalid @enderror">
-                                            <button type="button" id="set-graduacion-hoy" class="profile-edit-today-btn">Hoy</button>
                                         </div>
-                                    </div>
 
-                                    <div class="profile-edit-form-group js-graduacion-field">
-                                        <label for="proxima_graduacion">Próxima graduación</label>
-                                        <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion ?? null)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
-                                    </div>
+                                        <!-- Próxima Graduación -->
+                                        <div class="profile-edit-form-group js-graduacion-field">
+                                            <label for="proxima_graduacion" style="margin-bottom: 8px;">Próxima graduación</label>
+                                            <input type="date" id="proxima_graduacion" name="proxima_graduacion" value="{{ old('proxima_graduacion', optional($personal->proxima_graduacion ?? null)->format('Y-m-d')) }}" class="@error('proxima_graduacion') is-invalid @enderror">
+                                        </div>
 
-                                    <div class="profile-edit-form-group js-graduacion-field">
-                                        <label for="reconocido_en">Reconocido en:</label>
-                                        <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?? '') }}" class="@error('reconocido_en') is-invalid @enderror">
-                                    </div>
+                                        <!-- Reconocido en -->
+                                        <div class="profile-edit-form-group js-graduacion-field">
+                                            <label for="reconocido_en" style="margin-bottom: 8px;">Reconocido en:</label>
+                                            <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?? '') }}" class="@error('reconocido_en') is-invalid @enderror">
+                                        </div>
 
-                                    <div class="profile-edit-form-group js-graduacion-field">
-                                        <label for="graduado_en">Graduado en:</label>
-                                        <input type="text" id="graduado_en" name="graduado_en" value="{{ old('graduado_en', $personal->graduado_en ?? '') }}" class="@error('graduado_en') is-invalid @enderror">
+                                        <!-- Graduado en -->
+                                        <div class="profile-edit-form-group js-graduacion-field">
+                                            <label for="graduado_en" style="margin-bottom: 8px;">Graduado en:</label>
+                                            <input type="text" id="graduado_en" name="graduado_en" value="{{ old('graduado_en', $personal->graduado_en ?? '') }}" class="@error('graduado_en') is-invalid @enderror">
+                                        </div>
                                     </div>
                                 </div>
                             @else
@@ -442,18 +530,69 @@
                 </section>
             </div>
         </form>
+
+            <!-- MODAL GESTIÓN DE DEPARTAMENTOS -->
+        <div class="profile-modal" id="manage-deptos-modal" aria-hidden="true" role="dialog">
+            <div class="profile-modal__panel" style="max-width: 480px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--profile-line); padding-bottom: 12px;">
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--profile-ink);"><i class="fas fa-sitemap" style="color: var(--profile-primary); margin-right: 8px;"></i> Gestionar Departamentos</h3>
+                    <button type="button" data-close-manage-deptos style="background: none; border: none; font-size: 1.2rem; color: #94a3b8; cursor: pointer;"><i class="fas fa-times"></i></button>
+                </div>
+
+                <!-- Formulario añadir -->
+                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <input type="text" id="new-depto-name" placeholder="Añadir nuevo departamento..." style="flex: 1; padding: 10px 14px; border: 1px solid var(--profile-line); border-radius: 8px; outline: none; font-family: inherit; font-size: 0.9rem;">
+                    <button type="button" id="btn-add-depto-ajax" style="background: var(--profile-primary); color: #fff; border: none; border-radius: 8px; padding: 0 16px; font-weight: 800; cursor: pointer; transition: all 0.2s;">Añadir</button>
+                </div>
+
+                <!-- Lista existente -->
+                <div style="max-height: 280px; overflow-y: auto; border: 1px solid var(--profile-line); border-radius: 8px; background: #fff;">
+                    <ul id="manage-deptos-list" style="list-style: none; padding: 0; margin: 0;">
+                        <!-- Se llena con JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
     </section>
 @endsection
 
 @section('js')
+<!-- SCRIPT OFICIAL SELECT2 -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        // INICIALIZAR SELECT2 (Anti-Fantasmas Definitivo)
+        $(document).ready(function() {
+            $('#departamento').select2({
+                placeholder: "Busca o selecciona departamentos...",
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() {
+                        return "No se ha encontrado el departamento";
+                    }
+                },
+                // LA MAGIA: Si la opción ya está seleccionada, no la renderiza en el menú
+                templateResult: function(option) {
+                    if (option.element && option.element.selected) {
+                        return null; 
+                    }
+                    return option.text;
+                }
+            });
+        });
+    </script>
+    
     <script>
         // Lógica de fechas
         (function() {
             // Elementos de Revisión Médica
-            const btnHoyMedica = document.getElementById('set-ultima-hoy');
+            const btnHoyUltima = document.getElementById('btn-hoy-ultima'); // ID CORREGIDO
             const ultimaMedicaInput = document.getElementById('ultima_revision_medica');
             const proximaMedicaInput = document.getElementById('proxima_revision_medica');
             
+            const btnHoyProxima = document.getElementById('btn-hoy-proxima');
+
             // Elementos de Graduación (gafas)
             const btnHoyGrad = document.getElementById('set-graduacion-hoy');
             const ultimaGradInput = document.getElementById('ultima_graduacion');
@@ -473,34 +612,68 @@
                 return new Date(parts[0], parts[1] - 1, parts[2]);
             };
 
-            const setNextFrom = (date, targetInput) => {
+            const setNextFrom = (date, targetInput, meses = 12) => {
                 if (!date || !targetInput) {
                     if (targetInput) targetInput.value = '';
                     return;
                 }
                 const next = new Date(date);
-                next.setMonth(next.getMonth() + 12); // Añade 1 año por defecto
+                next.setMonth(next.getMonth() + meses); 
                 targetInput.value = formatDate(next);
             };
 
-            // Eventos para Revisión Médica
-            if (btnHoyMedica && ultimaMedicaInput) {
-                btnHoyMedica.addEventListener('click', function() {
+            const getMesesPuesto = () => {
+                const selectPuesto = document.getElementById('puesto_trabajo_id');
+                let minMeses = 12; // Valor seguro por defecto
+
+                if (selectPuesto && selectPuesto.selectedIndex >= 0) {
+                    const option = selectPuesto.options[selectPuesto.selectedIndex];
+                    const meses = parseInt(option.getAttribute('data-meses'));
+                    if (!isNaN(meses)) {
+                        minMeses = meses;
+                    }
+                }
+                return minMeses;
+            };
+
+            // 1. Botón "Poner hoy" para ÚLTIMA Revisión Médica
+            if (btnHoyUltima && ultimaMedicaInput) {
+                btnHoyUltima.addEventListener('click', function() {
                     const today = new Date();
                     ultimaMedicaInput.value = formatDate(today);
-                    setNextFrom(today, proximaMedicaInput);
+                    // Calcula la próxima revisión automáticamente según el puesto
+                    setNextFrom(today, proximaMedicaInput, getMesesPuesto());
                 });
 
                 ultimaMedicaInput.addEventListener('input', function() {
-                    setNextFrom(parseDate(ultimaMedicaInput.value), proximaMedicaInput);
+                    setNextFrom(parseDate(ultimaMedicaInput.value), proximaMedicaInput, getMesesPuesto());
                 });
             }
 
-            // Eventos para Graduación
+            // Si cambia el puesto laboral, recalcular próxima revisión médica automáticamente
+            const selectPuesto = document.getElementById('puesto_trabajo_id');
+            if (selectPuesto && ultimaMedicaInput && proximaMedicaInput) {
+                selectPuesto.addEventListener('change', function() {
+                    if (ultimaMedicaInput.value) {
+                        setNextFrom(parseDate(ultimaMedicaInput.value), proximaMedicaInput, getMesesPuesto());
+                    }
+                });
+            }
+
+            // 2. Botón "Poner hoy" para PRÓXIMA Revisión Médica
+            if (btnHoyProxima && proximaMedicaInput) {
+                btnHoyProxima.addEventListener('click', function() {
+                    const today = new Date();
+                    proximaMedicaInput.value = formatDate(today);
+                });
+            }
+
+            // 3. Botón "Poner hoy" para ÚLTIMA Graduación
             if (btnHoyGrad && ultimaGradInput) {
                 btnHoyGrad.addEventListener('click', function() {
                     const today = new Date();
                     ultimaGradInput.value = formatDate(today);
+                    // Calcula la próxima graduación (+12 meses por defecto)
                     setNextFrom(today, proximaGradInput);
                 });
 
@@ -510,108 +683,127 @@
             }
         })();
 
-        // LÓGICA PARA LOS BOTONES DE DEPARTAMENTO (AJAX)
+        // LÓGICA DEL MODAL DE GESTIÓN DE DEPARTAMENTOS
         (function() {
-            const btnAddDepto = document.getElementById('btn-add-depto');
-            const btnDelDepto = document.getElementById('btn-del-depto');
+            const btnManage = document.getElementById('btn-manage-deptos');
+            const modalManage = document.getElementById('manage-deptos-modal');
+            if (!btnManage || !modalManage) return;
+
+            const btnCloseList = modalManage.querySelectorAll('[data-close-manage-deptos]');
+            const deptoList = document.getElementById('manage-deptos-list');
+            const inputNewDepto = document.getElementById('new-depto-name');
+            const btnAddDeptoAjax = document.getElementById('btn-add-depto-ajax');
             const selectDepto = document.getElementById('departamento');
 
-            // Acción del botón "+"
-            if (btnAddDepto) {
-                btnAddDepto.addEventListener('click', async function() {
-                    const nombre = prompt('Escribe el nombre del nuevo departamento:');
-                    if (!nombre || nombre.trim() === '') return;
+            // Pinta la lista leyendo el <select> invisible
+            const renderList = () => {
+                deptoList.innerHTML = '';
+                const options = Array.from(selectDepto.options).filter(opt => opt.value !== '');
+                
+                if(options.length === 0) {
+                    deptoList.innerHTML = '<li style="padding: 16px; text-align: center; color: #94a3b8; font-size: 0.9rem;">No hay departamentos. Crea uno arriba.</li>';
+                    return;
+                }
 
-                    try {
-                        const response = await fetch('{{ route("departamentos.store") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}' // Medida de seguridad obligatoria en Laravel
-                            },
-                            body: JSON.stringify({ nombre: nombre.trim() })
-                        });
-
-                        const data = await response.json();
-                        
-                        if (response.ok && data.success) {
-                            // Si Laravel dice OK, creamos la opción y la añadimos al HTML visualmente
-                            const option = document.createElement('option');
-                            option.value = data.departamento.nombre;
-                            option.text = data.departamento.nombre.toUpperCase();
-                            selectDepto.appendChild(option);
-                            
-                            // Seleccionamos automáticamente el que acabamos de crear
-                            option.selected = true;
-                        } else {
-                            alert('Error: Es posible que el departamento ya exista o haya un problema de validación.');
-                        }
-                    } catch (error) {
-                        alert('Error de conexión al crear el departamento.');
-                        console.error(error);
-                    }
+                options.forEach(opt => {
+                    const li = document.createElement('li');
+                    li.className = 'depto-list-item';
+                    li.innerHTML = `
+                        <span style="font-size: 0.9rem; font-weight: 700; color: var(--profile-ink);">${opt.text}</span>
+                        <button type="button" class="depto-btn-delete" data-val="${opt.value}" title="Eliminar definitivamente"><i class="fas fa-trash"></i></button>
+                    `;
+                    deptoList.appendChild(li);
                 });
-            }
+            };
 
-            // Acción del botón "-"
-            if (btnDelDepto) {
-                btnDelDepto.addEventListener('click', async function() {
-                    const selectedOptions = Array.from(selectDepto.selectedOptions);
-                    
-                    if (selectedOptions.length === 0) {
-                        alert('Selecciona en la lista el departamento que quieres eliminar.');
-                        return;
-                    }
+            const openModal = () => {
+                renderList();
+                modalManage.classList.add('is-open');
+                modalManage.setAttribute('aria-hidden', 'false');
+            };
 
-                    const confirmacion = confirm('¿Eliminar los departamentos seleccionados de la base de datos?\n\n(Nota: No se borrarán de los trabajadores que ya lo tengan asignado).');
-                    if (!confirmacion) return;
+            const closeModal = () => {
+                modalManage.classList.remove('is-open');
+                modalManage.setAttribute('aria-hidden', 'true');
+                inputNewDepto.value = ''; // Limpiar el input al salir
+            };
 
-                    // Recorremos todos los que haya marcado y los borramos uno a uno
-                    for (const option of selectedOptions) {
-                        try {
-                            const response = await fetch(`/departamentos/${option.value}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                                }
-                            });
+            btnManage.addEventListener('click', openModal);
+            btnCloseList.forEach(btn => btn.addEventListener('click', closeModal));
 
-                            if (response.ok) {
-                                option.remove(); // Lo borramos del HTML visualmente
-                            } else {
-                                alert(`Error al intentar borrar el departamento: ${option.value}`);
-                            }
-                        } catch (error) {
-                            console.error('Error al borrar', error);
-                            alert('Hubo un error de conexión al intentar borrar el departamento.');
-                        }
-                    }
-                });
-            }
+            // AÑADIR AJAX
+            btnAddDeptoAjax.addEventListener('click', async () => {
+                const nombre = inputNewDepto.value.trim();
+                if(!nombre) return;
+                
+                btnAddDeptoAjax.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btnAddDeptoAjax.disabled = true;
 
-            // LÓGICA PARA MOSTRAR/OCULTAR CAMPOS DE GRADUACIÓN
-            (function() {
-                const selectGafas = document.getElementById('gafas');
-                const graduacionFields = document.querySelectorAll('.js-graduacion-field');
-
-                if (!selectGafas || graduacionFields.length === 0) return;
-
-                const toggleGraduacionFields = () => {
-                    // Comprobamos si el valor seleccionado es exactamente "Graduadas"
-                    const mostrar = selectGafas.value === 'Graduadas';
-                    
-                    graduacionFields.forEach(field => {
-                        // Usamos '' para restaurar el display original del CSS o 'none' para ocultarlo
-                        field.style.display = mostrar ? '' : 'none';
+                try {
+                    const response = await fetch('{{ route("departamentos.store") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ nombre })
                     });
-                };
+                    const data = await response.json();
+                    
+                    if(response.ok && data.success) {
+                        // Inyectar en el select y avisar a Select2
+                        const option = document.createElement('option');
+                        option.value = data.departamento.nombre;
+                        option.text = data.departamento.nombre.toUpperCase();
+                        selectDepto.appendChild(option);
+                        $('#departamento').trigger('change');
+                        
+                        inputNewDepto.value = '';
+                        renderList(); // Repintar la lista en vivo
+                    } else {
+                        alert('El departamento ya existe o el nombre no es válido.');
+                    }
+                } catch(e) {
+                    alert('Error de conexión al crear.');
+                } finally {
+                    btnAddDeptoAjax.innerHTML = 'Añadir';
+                    btnAddDeptoAjax.disabled = false;
+                }
+            });
 
-                // 1. Ejecutar al cargar la página (por si está editando y ya tiene Graduadas)
-                toggleGraduacionFields();
+            // BORRAR AJAX (Delegación de eventos)
+            deptoList.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.depto-btn-delete');
+                if(!btn) return;
 
-                // 2. Ejecutar cada vez que el usuario cambie el desplegable
-                selectGafas.addEventListener('change', toggleGraduacionFields);
-            })();
+                const val = btn.getAttribute('data-val');
+                if(!confirm(`¿Seguro que deseas eliminar definitivamente "${val}" de la base de datos?`)) return;
+
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                try {
+                    const response = await fetch(`/departamentos/${val}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                    });
+                    
+                    if(response.ok) {
+                        // Buscarlo en el select y aniquilarlo
+                        const opt = Array.from(selectDepto.options).find(o => o.value === val);
+                        if(opt) {
+                            opt.selected = false; // Desmarcarlo si estaba puesto
+                            opt.remove();
+                        }
+                        $('#departamento').trigger('change'); // Refrescar UI Select2
+                        renderList(); // Repintar modal
+                    } else {
+                        alert('Error del servidor al intentar borrar.');
+                        renderList();
+                    }
+                } catch(err) {
+                    alert('Error de conexión al borrar.');
+                    renderList();
+                }
+            });
         })();
     </script>
 @endsection

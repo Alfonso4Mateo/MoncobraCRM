@@ -22,9 +22,16 @@
         <tbody>
             @forelse ($personals as $personal)
                 @php
-                    $alertaRevision = $personal->alerta_revision_medica ?? false;
-                @endphp
-                @php
+                    // Evaluamos el estado para asignar la clase de fondo correcta a la fila
+                    $claseFila = '';
+                    if (isset($personal->estado_medico)) {
+                        if ($personal->estado_medico === 'caducada') {
+                            $claseFila = 'personal-row--danger'; // Fondo rojizo
+                        } elseif ($personal->estado_medico === 'aviso') {
+                            $claseFila = 'personal-row--alert';  // Fondo amarillento
+                        }
+                    }
+                    
                     $initials = collect(explode(' ', trim($personal->name)))
                         ->filter()
                         ->map(fn ($part) => strtoupper(mb_substr($part, 0, 1)))
@@ -32,7 +39,8 @@
                         ->implode('');
                     $userCode = str_pad((string) $personal->id_rrhh, 4, '0', STR_PAD_LEFT);
                 @endphp
-                <tr class="{{ $alertaRevision ? 'personal-row--alert' : '' }}" data-id="{{ $personal->id }}">
+
+                <tr class="{{ $claseFila }}" data-id="{{ $personal->id }}">
                     <td style="text-align: center;">
                         <input type="checkbox" class="checkbox-row" value="{{ $personal->id }}">
                     </td>
@@ -45,8 +53,12 @@
                             <div class="personal-person-copy">
                                 <div class="personal-person-name">
                                     <strong>{{ $personal->name }} {{ $personal->apellido }}</strong>
-                                    @if($alertaRevision)
-                                        <span class="personal-alert-icon" title="Revisión médica próxima">
+                                    @if(isset($personal->estado_medico) && $personal->estado_medico === 'caducada')
+                                        <span class="personal-alert-icon" title="Revisión médica CADUCADA" style="color: #b91c1c;">
+                                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                        </span>
+                                    @elseif(isset($personal->estado_medico) && $personal->estado_medico === 'aviso')
+                                        <span class="personal-alert-icon" title="Revisión médica próxima" style="color: #f59e0b;">
                                             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
                                         </span>
                                     @endif

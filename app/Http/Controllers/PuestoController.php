@@ -30,8 +30,7 @@ class PuestoController extends Controller
             'nombre' => 'required|string|max:255|unique:puestos,nombre',
         ]);
 
-        // Lo guardamos en mayúsculas para mantener consistencia en la base de datos
-        Puesto::create([
+        $puesto = Puesto::create([
             'nombre' => mb_strtoupper($request->nombre),
             'activo' => true,
         ]);
@@ -63,7 +62,7 @@ class PuestoController extends Controller
             'nombre' => mb_strtoupper($request->nombre),
         ]);
 
-        return redirect()->route('puestos.index')->with('success', 'Nombre del puesto actualizado.');
+        return redirect()->route('puestos.index')->with('success', 'Puesto actualizado.');
     }
 
     public function syncCursos(Request $request, Puesto $puesto)
@@ -235,7 +234,7 @@ class PuestoController extends Controller
                     $trabajador->id_rrhh ?: '—',
                     trim($trabajador->name . ' ' . $trabajador->apellido),
                     !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO',
-                    $trabajador->puesto ?: '—'
+                    optional($trabajador->puestoTrabajo)->nombre ?: '—'
                 ];
 
                 foreach ($cursosExigidos as $cursoNorma) {

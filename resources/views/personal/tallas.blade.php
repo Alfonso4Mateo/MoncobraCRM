@@ -100,6 +100,13 @@
                             <label for="q" style="display:none">Buscar</label>
                             <input type="search" id="q" name="q" placeholder="Buscar por nombre o apellidos..." value="{{ $query ?? '' }}" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e6edf3; width: 250px;">
                         </div>
+
+                        <div class="personal-search-field" style="display: flex; align-items: center; padding-left: 8px;">
+                            <input type="checkbox" id="incluir_inactivos" name="incluir_inactivos" value="1" @checked($incluirInactivos) onchange="this.form.submit()" style="cursor: pointer; width: 16px; height: 16px; margin-right: 6px; accent-color: #173e67;">
+                            <label for="incluir_inactivos" style="margin: 0; font-size: 0.85rem; font-weight: 700; color: #173e67; cursor: pointer; white-space: nowrap;">
+                                Incluir bajas
+                            </label>
+                        </div>
                         
                         <div class="personal-search-actions" style="display:flex; gap: 8px;">
                             <button type="submit" class="personal-search-submit">
@@ -215,6 +222,10 @@
                                         
                                         @if($p->sin_tallas)
                                             <span style="font-size: 0.7rem; background: #e5e7eb; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Oficina</span>
+                                        @endif
+
+                                        @if(!$p->activo)
+                                            <span style="font-size: 0.7rem; background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 800; border: 1px solid #f87171;" title="Trabajador dado de baja">De Baja</span>
                                         @endif
                                     </td>
                                     <td>{{ $deptosStr }}</td>

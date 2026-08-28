@@ -398,6 +398,14 @@ body,
     background: #fff1c2;
 }
 
+.personal-row--danger {
+    background: #fff1f2;
+}
+
+.personal-row--danger:hover {
+    background: #ffe4e6;
+}
+
 .personal-table tbody tr:hover {
     background: #fafcff;
 }
@@ -718,6 +726,10 @@ body,
 
     .personal-table tbody tr.personal-row--alert {
         background: #fff7e0;
+    }
+
+    .personal-table tbody tr.personal-row--danger {
+        background: #fff1f2;
     }
 
     .personal-table tbody td {
