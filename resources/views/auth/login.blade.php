@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Iniciar Sesión — MoncobraCRM</title>
+    <title>Iniciar Sesión — Factumon</title>
  
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="{{ asset('node_modules/@fortawesome/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS via Vite -->
     @vite(['resources/css/login.css'])
 </head>
@@ -16,13 +16,9 @@
 <div class="login-card">
  
     <!-- Logo -->
-    <div class="login-logo">
-        <div class="logo-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-        </div>
-        <span class="logo-text">Moncobra<span>CRM</span></span>
+    <div class="login-logo-container">
+        <img src="{{ asset('images/moncobra-1l.png') }}" alt="Logotipo Moncobra" class="company-logo">
+        <span class="app-name">Factumon</span>
     </div>
  
     <!-- Cabecera -->
@@ -72,7 +68,8 @@
                         required
                         autocomplete="current-password"
                     >
-                    <span class="field-icon fas fa-lock"></span>
+                    <!-- Cambiamos fa-lock por fa-eye y añadimos un ID y estilo de cursor -->
+                    <span class="field-icon fas fa-eye" id="togglePassword" style="cursor: pointer;" title="Mostrar/Ocultar contraseña"></span>
                 </div>
                 @error('password')
                     <span class="invalid-feedback" role="alert">{{ $message }}</span>
@@ -99,5 +96,24 @@
     </form>
 </div>
  
+<!-- Script para visibilidad de contraseña -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePassword = document.querySelector('#togglePassword');
+            const passwordInput = document.querySelector('#password');
+
+            if(togglePassword && passwordInput) {
+                togglePassword.addEventListener('click', function (e) {
+                    // Alternar el atributo type
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    
+                    // Alternar el icono (ojo abierto / ojo cerrado)
+                    this.classList.toggle('fa-eye');
+                    this.classList.toggle('fa-eye-slash');
+                });
+            }
+        });
+    </script>
 </body>
 </html>

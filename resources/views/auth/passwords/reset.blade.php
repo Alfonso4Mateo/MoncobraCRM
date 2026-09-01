@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Configurar Acceso — Moncobra</title>
+    <title>Configurar Acceso — Factumon</title>
  
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="{{ asset('node_modules/@fortawesome/fontawesome-free/css/all.min.css') }}">
+    <!-- Font Awesome vía CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS via Vite -->
     @vite(['resources/css/reset-password.css'])
 </head>
@@ -15,16 +15,12 @@
  
 <div class="login-card">
  
-    <!-- Logo -->
-    <div class="login-logo">
-        <div class="logo-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-        </div>
-        <span class="logo-text">Moncobra<span>ERP</span></span>
+    <!-- Logo Estructurado -->
+    <div class="login-logo-container">
+        <img src="{{ asset('images/moncobra-1l.png') }}" alt="Logotipo Moncobra" class="company-logo">
+        <span class="app-name">Factumon</span>
     </div>
- 
+
     <!-- Cabecera -->
     <div class="form-header">
         <h1 class="form-title">¡Bienvenido al equipo!</h1>
@@ -77,7 +73,8 @@
                         autofocus
                         autocomplete="new-password"
                     >
-                    <span class="field-icon fas fa-lock"></span>
+                    <!-- Usamos clase y data-target apuntando al ID del input -->
+                    <span class="field-icon fas fa-eye toggle-password" data-target="password" title="Mostrar/Ocultar contraseña"></span>
                 </div>
                 @error('password')
                     <span class="invalid-feedback" role="alert">{{ $message }}</span>
@@ -97,7 +94,8 @@
                         required
                         autocomplete="new-password"
                     >
-                    <span class="field-icon fas fa-lock"></span>
+                    <!-- Usamos clase y data-target apuntando al ID de confirmación -->
+                    <span class="field-icon fas fa-eye toggle-password" data-target="password_confirmation" title="Mostrar/Ocultar contraseña"></span>
                 </div>
                 @error('password_confirmation')
                     <span class="invalid-feedback" role="alert">{{ $message }}</span>
@@ -115,6 +113,29 @@
     </form>
  
 </div>
- 
+ <!-- Script dinámico para múltiples contraseñas -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleButtons = document.querySelectorAll('.toggle-password');
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                // Recuperamos el ID del input desde el data-target
+                const targetId = this.getAttribute('data-target');
+                const targetInput = document.getElementById(targetId);
+
+                if (targetInput) {
+                    // Alternar el atributo type
+                    const type = targetInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    targetInput.setAttribute('type', type);
+                    
+                    // Alternar el icono
+                    this.classList.toggle('fa-eye');
+                    this.classList.toggle('fa-eye-slash');
+                }
+            });
+        });
+    });
+</script>
 </body>
 </html>

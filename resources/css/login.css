@@ -30,7 +30,7 @@ body::before {
     inset: 0;
     background-image: radial-gradient(rgba(0,0,0,0.04) 1px, transparent 1px);
     background-size: 22px 22px;
-    pointer-events: none;
+    pointer-events: none; 
     z-index: 0;
 }
  
@@ -355,6 +355,89 @@ body::before {
 .register-link:hover {
     color: #1D4ED8;
     text-decoration: underline;
+}
+
+/* ============================================================
+   MODIFICACIONES PARA INTERACTIVIDAD Y LOGO CORPORATIVO
+   ============================================================ */
+
+/* 1. Control del nuevo logotipo de la empresa */
+.company-logo {
+    max-height: 40px; /* Ajusta esto según las proporciones del logo */
+    width: auto;
+    object-fit: contain;
+}
+
+/* 2. Reactivar los clics solo para el botón de mostrar contraseña */
+#togglePassword {
+    pointer-events: auto; /* Sobrescribe la regla de .field-icon */
+    padding: 0.5rem; /* Amplía el área táctil para facilitar el clic */
+    margin-left: -0.5rem; /* Compensa el padding para mantener el alineamiento visual */
+}
+
+/* 3. Feedback visual al interactuar con el ojo */
+#togglePassword:hover {
+    color: #2563EB; /* Usa tu color primario al pasar el ratón */
+}
+
+/* ============================================================
+   NUEVA ESTRUCTURA DE LOGO Y APP (Jerarquía vertical)
+   ============================================================ */
+.login-logo-container {
+    display: flex;
+    flex-direction: column; /* Apila los elementos verticalmente */
+    align-items: center;    /* Los centra horizontalmente */
+    justify-content: center;
+    gap: 0.5rem;            /* Espacio entre el logo y el texto */
+    margin-bottom: 2.25rem;
+}
+
+.app-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4B5E78; /* Un tono gris azulado sutil para no opacar el logo principal */
+    letter-spacing: 0.5px;
+    text-transform: uppercase; /* Le da un toque más técnico/ERP */
+}
+
+/* ============================================================
+   NUEVA ESTRUCTURA DE LOGO Y APP (Jerarquía vertical)
+   ============================================================ */
+.login-logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2.25rem;
+}
+
+.company-logo {
+    max-height: 40px;
+    width: auto;
+    object-fit: contain;
+}
+
+.app-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4B5E78;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   INTERACTIVIDAD DE CONTRASEÑAS
+   ============================================================ */
+.toggle-password {
+    pointer-events: auto; /* Permite el clic, sobrescribiendo .field-icon */
+    padding: 0.5rem;
+    margin-left: -0.5rem;
+    cursor: pointer;
+}
+
+.toggle-password:hover {
+    color: #2563EB;
 }
  
 /* ============================================================
