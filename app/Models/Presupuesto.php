@@ -25,6 +25,7 @@ class Presupuesto extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'parent_id',
         'documento',
         'numero',
         'numero_correlativo',
@@ -85,5 +86,18 @@ class Presupuesto extends Model
     public function pedidosClientes(): HasOne
     {
         return $this->pedidoCliente();
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Presupuesto::class, 'parent_id');
+    }
+
+    /**
+     * Obtiene todas las revisiones (hijos) creadas a partir de este presupuesto.
+     */
+    public function revisiones(): HasMany
+    {
+        return $this->hasMany(Presupuesto::class, 'parent_id');
     }
 }

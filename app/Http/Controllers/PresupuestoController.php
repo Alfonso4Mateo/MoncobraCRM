@@ -129,15 +129,16 @@ class PresupuestoController extends Controller
         $archivoPdfRule = $modo === 'carga' ? 'required' : 'nullable';
 
         $validated = $request->validate([
+            'parent_id' => 'nullable|exists:presupuestos,id',
             'documento' => 'required|string|max:50',
             'numero' => [
-            'nullable',
-            'string',
-            'max:50',
-            Rule::unique('presupuestos', 'numero')
-                ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
-                ->whereNull('deleted_at'),
-        ],
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('presupuestos', 'numero')
+                    ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+                    ->whereNull('deleted_at'),
+            ],
             'fecha' => 'required|date',
             'cliente_id' => [
                 'required',
@@ -153,19 +154,28 @@ class PresupuestoController extends Controller
             'lista_articulos' => 'nullable|json',
         ]);
 
+        // --- LÓGICA DE REVISIÓN ---
+        $esRevision = !empty($validated['parent_id']);
+
         $numeroManual = trim((string) ($validated['numero'] ?? ''));
         $correlativoActual = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
         $formatoActual = $correlativoActual['formato'];
         $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
+        
         $correlativoFinal = $correlativoActual['correlativo'];
+        $manualCorrelativo = null;
 
-        $manualCorrelativo = $this->extractCorrelativoFromNumero($formatoActual, $numeroFinal);
-        if ($manualCorrelativo !== null) {
-            $correlativoFinal = $manualCorrelativo;
+        // Si NO es revisión extraemos el correlativo; si lo es, lo ponemos a 0 para no gastarlo
+        if (!$esRevision) {
+            $manualCorrelativo = $this->extractCorrelativoFromNumero($formatoActual, $numeroFinal);
+            if ($manualCorrelativo !== null) {
+                $correlativoFinal = $manualCorrelativo;
+            }
+        } else {
+            $correlativoFinal = 0; 
         }
 
         $validated['numero'] = $numeroFinal;
-
         $validated['proyecto_id'] = $proyectoId;
         $validated['numero_correlativo'] = $correlativoFinal;
 
@@ -176,9 +186,9 @@ class PresupuestoController extends Controller
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
         $lineasFiltradas = array_map(function (array $linea) {
-        $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
-        $linea['medida'] = $medida === '' ? 'und' : $medida;
-        return $linea;
+            $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
+            $linea['medida'] = $medida === '' ? 'und' : $medida;
+            return $linea;
         }, $lineasFiltradas);
 
         $this->validateLineasPayload($lineasFiltradas);
@@ -197,8 +207,11 @@ class PresupuestoController extends Controller
         $presupuesto = Presupuesto::create($validated);
         $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
 
-        $siguienteCorrelativo = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
-        $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
+        // --- AVANZAR EL CONTADOR GLOBAL SÓLO SI ES UN PRESUPUESTO NUEVO (NO REVISIÓN) ---
+        if (!$esRevision) {
+            $siguienteCorrelativo = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+            $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
+        }
 
         // Attempt to generate and store a PDF copy of the presupuesto if a PDF library is available
         try {
@@ -244,8 +257,18 @@ class PresupuestoController extends Controller
             'pedidosClientes.cliente',
             'pedidosClientes.albaran',
         ]);
+        // Buscamos cuál es el presupuesto raíz original
+        $raizId = $presupuesto->parent_id ?? $presupuesto->id;
+        
+        // Extraemos todos los presupuestos que compartan esta misma raíz de forma segura
+        $historialRevisiones = Presupuesto::where(function ($query) use ($raizId) {
+            $query->where('id', $raizId)
+                  ->orWhere('parent_id', $raizId);
+        })
+        ->orderBy('id', 'asc')
+        ->get();
 
-        return view('presupuestos.show', compact('presupuesto'));
+        return view('presupuestos.show', compact('presupuesto', 'historialRevisiones'));
     }
 
     public function viewPdf(Presupuesto $presupuesto)
@@ -861,5 +884,68 @@ class PresupuestoController extends Controller
                 ]
             );
         }
+    }
+
+    public function revision(Request $request, Presupuesto $presupuesto)
+    {
+        $this->authorize('presupuestos.manage');
+
+        $proyectoId = $this->resolveProyectoForCorrelativo($request);
+        $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
+
+        // 1. Encontrar al Padre Original de esta familia
+        $raizId = $presupuesto->parent_id ?? $presupuesto->id;
+        $padreOriginal = Presupuesto::find($raizId);
+
+        // 2. Extraer la raíz del número (ej: Aibus28-0002)
+        // CAMBIO EXPERTO: Usamos preg_split para que corte la raíz tanto si el padre 
+        // tiene el formato antiguo (-Revision-) como el nuevo ( Rev-)
+        $numeroBase = preg_split('/(-Revision-| Rev-)/', $padreOriginal->numero)[0];
+
+        // 3. Traer TODOS los números de esta familia (Padre + Hijos)
+        $numerosFamilia = Presupuesto::where(function ($query) use ($raizId) {
+            $query->where('id', $raizId)
+                  ->orWhere('parent_id', $raizId);
+        })->pluck('numero');
+
+        // 4. Analizar los números para encontrar la revisión más alta actual
+        $maxRevision = 0;
+        // CAMBIO EXPERTO: El patrón regex ahora busca ambos formatos "(?:-Revision-| Rev-)"
+        // Así nos aseguramos de que el contador no se reinicie si clonas un presupuesto viejo.
+        $regex = '/' . preg_quote($numeroBase, '/') . '(?:-Revision-| Rev-)(\d+)/';
+
+        foreach ($numerosFamilia as $num) {
+            if ($num && preg_match($regex, $num, $matches)) {
+                $revNum = (int)$matches[1];
+                if ($revNum > $maxRevision) {
+                    $maxRevision = $revNum;
+                }
+            }
+        }
+
+        // 5. Asignar el siguiente número
+        $siguienteRevision = $maxRevision + 1;
+        // CAMBIO ESTÉTICO: Aquí generamos el formato que querías
+        $nuevoNumero = $numeroBase . ' Rev-' . $siguienteRevision;
+
+        // 6. Clonar y limpiar el título
+        $nuevaRevision = $presupuesto->replicate();
+        
+        $tituloBase = str_replace(' - Revisión', '', $presupuesto->titulo ?? '');
+        $nuevaRevision->titulo = $tituloBase ? $tituloBase . ' - Revisión' : 'Revisión';
+        
+        $nuevaRevision->parent_id = $raizId;
+        $nuevaRevision->fecha = now()->toDateString();
+        $nuevaRevision->estado = 'pendiente'; 
+        $nuevaRevision->numero = $nuevoNumero;
+
+        return view('presupuestos.create', [
+            'presupuesto' => $nuevaRevision,
+            'clientes' => $clientes,
+            'clienteSeleccionadoId' => $nuevaRevision->cliente_id,
+            'volverACliente' => false,
+            'modo' => 'revision',
+            'siguienteNumero' => $nuevoNumero
+        ]);
     }
 }

@@ -34,6 +34,10 @@
                 <input type="hidden" name="modo" value="{{ $modo }}">
                 <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
 
+                @if(isset($presupuesto) && $presupuesto->parent_id)
+                    <input type="hidden" name="parent_id" value="{{ $presupuesto->parent_id }}">
+                @endif
+
                 @if ($volverACliente && $clienteSeleccionadoId)
                     <input type="hidden" name="redirect_cliente_id" value="{{ $clienteSeleccionadoId }}">
                 @endif
@@ -64,17 +68,17 @@
 
                     <div class="field-group">
                         <label for="titulo">Titulo del presupuesto</label>
-                        <input type="text" id="titulo" name="titulo" value="{{ old('titulo') }}" placeholder="Ej: Renovacion flota logistica trimestral" class="@error('titulo') is-invalid @enderror" maxlength="255">
+                        <input type="text" id="titulo" name="titulo" value="{{ old('titulo', $presupuesto->titulo ?? '') }}" placeholder="Ej: Renovacion flota logistica trimestral" class="@error('titulo') is-invalid @enderror" maxlength="255">
                     </div>
 
                     <div class="field-group">
                         <label for="ot">OT (Orden de trabajo)</label>
-                        <input type="text" id="ot" name="ot" value="{{ old('ot') }}" placeholder="Referencia OT" class="@error('ot') is-invalid @enderror" maxlength="255">
+                        <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot ?? '') }}" placeholder="Referencia OT" class="@error('ot') is-invalid @enderror" maxlength="255">
                     </div>
 
                     <div class="field-group">
                         <label for="validez_oferta">Validez oferta</label>
-                        <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
+                        <input type="text" id="validez_oferta" name="validez_oferta" value="{{ old('validez_oferta', $presupuesto->validez_oferta ?? '30 días') }}" placeholder="Ej: 30 días" class="@error('validez_oferta') is-invalid @enderror" maxlength="255">
                     </div>
 
                     <div class="field-group">
@@ -89,7 +93,7 @@
 
                     <div class="field-group field-full">
                         <label for="exclusiones">Exclusiones</label>
-                        <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', 'Cualquier concepto no descrito en la oferta') }}</textarea>
+                        <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta') }}</textarea>
                     </div>
                 </div>
 
@@ -125,7 +129,7 @@
                             </div>
                         </div>
 
-                        <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', '[]') }}'>
+                        <input type="hidden" id="lista_articulos" name="lista_articulos" value='{{ old('lista_articulos', isset($presupuesto) && is_array($presupuesto->lista_articulos) ? json_encode($presupuesto->lista_articulos) : '[]') }}'>
 
                         <div class="items-table-wrap">
                             <table class="items-table" aria-label="Listado de items del presupuesto">

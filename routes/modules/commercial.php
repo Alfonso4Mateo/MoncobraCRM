@@ -42,6 +42,7 @@ Route::resource('presupuestos', PresupuestoController::class);
 Route::get('presupuestos/correlativo/editar', [PresupuestoController::class, 'editCorrelativo'])->name('presupuestos.correlativo.edit');
 Route::post('presupuestos/correlativo', [PresupuestoController::class, 'updateCorrelativo'])->name('presupuestos.correlativo.update');
 Route::patch('presupuestos/{presupuesto}/estado', [PresupuestoController::class, 'updateEstado'])->name('presupuestos.estado.update');
+Route::get('presupuestos/{presupuesto}/revision', [PresupuestoController::class, 'revision'])->name('presupuestos.revision');
 
 // Proveedores, bolsa y pedidos base.
 Route::resource('bolsa', BolsaController::class);
