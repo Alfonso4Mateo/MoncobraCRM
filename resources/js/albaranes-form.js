@@ -93,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const editBaseLineas = isExistingEditForm ? lineas.map((linea) => ({ ...linea })) : [];
     let activePedidoKey = null;
     let selectedIndex = -1;
+    let isInitialEditLoad = isExistingEditForm;
 
     const autosizeDescripcion = () => {
         if (!descripcionInput || descripcionInput.tagName !== "TEXTAREA") {
@@ -542,11 +543,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const normalizedPedidoLineas = sumPedidoLineasBySignature(rawLineas);
 
             if (hasLineas) {
-                if (rawLineas.length > 0) {
-                    // MODIFICADO: Si estamos creando, restamos lo consumido usando la nueva función
-                    lineas = isExistingEditForm
-                        ? mergeEditLines(normalizedPedidoLineas)
-                        : mergeCreateLinesWithRemaining(normalizedPedidoLineas);
+                if (isInitialEditLoad) {
+                    // CORRECCIÓN: Al abrir la edición por primera vez, respetamos EXACTAMENTE 
+                    // las líneas guardadas en el albarán, sin pisarlas con las del pedido.
+                    lineas = editBaseLineas.map(linea => ({ ...linea }));
+                    isInitialEditLoad = false;
+                } else if (rawLineas.length > 0) {
+                    // Si el usuario cambia el pedido manualmente en el desplegable, cargamos las nuevas
+                    lineas = mergeCreateLinesWithRemaining(normalizedPedidoLineas);
                 } else if (!isExistingEditForm) {
                     lineas = [];
                 }
