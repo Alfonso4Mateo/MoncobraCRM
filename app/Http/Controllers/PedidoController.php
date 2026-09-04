@@ -74,6 +74,10 @@ class PedidoController extends Controller
                 $query->where('numero_pedido', 'like', $like)
                     ->orWhereHas('cliente', function ($clienteQuery) use ($like) {
                         $clienteQuery->where('empresa_nombre', 'like', $like);
+                    })
+                    // AÑADIR ESTE BLOQUE PARA BUSCAR POR PRESUPUESTO
+                    ->orWhereHas('presupuesto', function ($presupuestoQuery) use ($like) {
+                        $presupuestoQuery->where('numero', 'like', $like);
                     });
             });
         }
@@ -203,7 +207,7 @@ class PedidoController extends Controller
             $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
 
             $pedido->ui_total_facturaciones = round((float) ($pedido->facturaciones_sum ?? 0), 2);
-            $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_albaranes - $pedido->ui_total_facturaciones, 2));
+            $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_facturaciones, 2));
 
             return $pedido;
         });
@@ -689,7 +693,7 @@ class PedidoController extends Controller
         $totalFacturadoDirecto = round((float) $facturaciones->sum('importe'), 2);
 
         // 2. Calcular el pendiente final unificado (Pedido - Albaranes - Facturación Directa)
-        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranes - $totalFacturadoDirecto), 2);
+        $pendienteFacturar = round(max(0, $totalPedido - $totalFacturadoDirecto), 2);
 
         // 3. Único retorno con todas las variables empaquetadas correctamente
         return view('pedidos-clientes.albaranes', [

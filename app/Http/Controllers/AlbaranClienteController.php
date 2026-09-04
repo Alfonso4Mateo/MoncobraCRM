@@ -263,79 +263,83 @@ class AlbaranClienteController extends Controller
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
         $pedidoBolsa = (bool) ($pedidoContext?->bolsa ?? false);
 
-        $correlativoActual = $this->resolveNextAlbaranClienteNumber($proyectoId);
-        $numeroManual = trim((string) ($validated['numero'] ?? ''));
-        $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
-        $manualCorrelativo = $this->extractCorrelativoFromNumero($correlativoActual['formato'], $numeroFinal);
-        $validated['numero'] = $numeroFinal;
-
+        // Parseamos las líneas en memoria antes de entrar a la base de datos
         $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 2);
 
-        /*
-        if ($pedidoBolsa && $pedidoContext) {
-            $pendienteFacturar = $this->calculatePedidoPendienteFacturar($pedidoContext, $proyectoId);
-
-            if ($totalAlbaran > $pendienteFacturar + 0.00001) {
-                throw ValidationException::withMessages([
-                    'lineas_json' => 'El albarán supera el importe pendiente por facturar del pedido bolsa (' . number_format($pendienteFacturar, 2, ',', '.') . ' €).',
-                ]);
-            }
-        }*/
-
-        $validated['proyecto_id'] = $proyectoId;
-        $validated['documento'] = 'Albarán';
-        $validated['estado'] = $validated['estado'] ?? 'pendiente';
-        $validated['lista_articulos'] = $lineas === [] ? null : $lineas;
-        $validated['total'] = $totalAlbaran;
-        unset($validated['lineas_json']);
-
+        // EXTRAEMOS EL PDF FUERA DE LA TRANSACCIÓN
         if ($request->hasFile('archivo_pdf')) {
             $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('albaranes', 'public');
         }
 
-        $albaran = AlbaranCliente::create($validated);
-        $nextValue = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
-        $this->setContadorValue($proyectoId, 'albaranes_next_correlativo', $nextValue);
-        $this->setCorrelativoFormato($proyectoId, $correlativoActual['formato'], 'albaranes_formato_correlativo');
-        $this->syncPedidoClienteLink($albaran, $proyectoId);
-        $this->syncPedidoEstadoFromAlbaran($albaran, $proyectoId, $lineas);
+        // ABRIMOS LA TRANSACCIÓN
+        DB::transaction(function () use (&$validated, $proyectoId, $lineas, $totalAlbaran) {
+            
+            // 1. Obtener número (ahora protegido por el lockForUpdate dentro de la transacción)
+            $correlativoActual = $this->resolveNextAlbaranClienteNumber($proyectoId);
+            $numeroManual = trim((string) ($validated['numero'] ?? ''));
+            $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
+            $manualCorrelativo = $this->extractCorrelativoFromNumero($correlativoActual['formato'], $numeroFinal);
+            
+            $validated['numero'] = $numeroFinal;
+            $validated['proyecto_id'] = $proyectoId;
+            $validated['documento'] = 'Albarán';
+            $validated['estado'] = $validated['estado'] ?? 'pendiente';
+            $validated['lista_articulos'] = $lineas === [] ? null : $lineas;
+            $validated['total'] = $totalAlbaran;
+            unset($validated['lineas_json']);
 
-        $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
-        if ($pedido && ! (bool) ($pedido->bolsa ?? false)) {
-            $this->adjustPedidoLineasFromAlbaran($pedido, $lineas, -1);
-        }
+            // 2. Crear albarán
+            $albaran = AlbaranCliente::create($validated);
 
-        $consumos = collect($lineas)
-            ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
-            ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
-            ->map(fn ($items) => round($items->sum(fn ($linea) => (float) ($linea['cantidad'] ?? 0)), 2));
+            // 3. Actualizar contadores
+            $nextValue = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+            $this->setContadorValue($proyectoId, 'albaranes_next_correlativo', $nextValue);
+            $this->setCorrelativoFormato($proyectoId, $correlativoActual['formato'], 'albaranes_formato_correlativo');
+            
+            // 4. Sincronizar estados y relaciones
+            $this->syncPedidoClienteLink($albaran, $proyectoId);
+            $this->syncPedidoEstadoFromAlbaran($albaran, $proyectoId, $lineas);
 
-        if ($consumos->isNotEmpty()) {
-            $articulos = Articulo::query()
-                ->where('proyecto_id', $proyectoId)
-                ->whereIn('id', $consumos->keys())
-                ->get();
-
-            foreach ($articulos as $articulo) {
-                $consumo = (float) ($consumos[$articulo->id] ?? 0);
-                if ($consumo <= 0) {
-                    continue;
-                }
-
-                $cantidadActual = (float) ($articulo->cantidad ?? 0);
-                $restante = round(max(0, $cantidadActual - $consumo), 2);
-                $precioUnitario = (float) ($articulo->precio_unitario ?? 0);
-                $margen = (float) ($articulo->margen ?? 0);
-
-                $articulo->cantidad = $restante;
-                $articulo->facturado = $restante <= 0;
-                $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
-                $articulo->save();
+            $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+            if ($pedido && ! (bool) ($pedido->bolsa ?? false)) {
+                $this->adjustPedidoLineasFromAlbaran($pedido, $lineas, -1);
             }
-        }
+
+            // 5. Restar stock de artículos (Consumos)
+            $consumos = collect($lineas)
+                ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
+                ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
+                ->map(fn ($items) => round($items->sum(fn ($linea) => (float) ($linea['cantidad'] ?? 0)), 2));
+
+            if ($consumos->isNotEmpty()) {
+                $articulos = Articulo::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->whereIn('id', $consumos->keys())
+                    // MUY IMPORTANTE: Bloqueamos también los artículos que estamos modificando
+                    ->lockForUpdate() 
+                    ->get();
+
+                foreach ($articulos as $articulo) {
+                    $consumo = (float) ($consumos[$articulo->id] ?? 0);
+                    if ($consumo <= 0) {
+                        continue;
+                    }
+
+                    $cantidadActual = (float) ($articulo->cantidad ?? 0);
+                    $restante = round(max(0, $cantidadActual - $consumo), 2);
+                    $precioUnitario = (float) ($articulo->precio_unitario ?? 0);
+                    $margen = (float) ($articulo->margen ?? 0);
+
+                    $articulo->cantidad = $restante;
+                    $articulo->facturado = $restante <= 0;
+                    $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+                    $articulo->save();
+                }
+            }
+        });
 
         return redirect()->route('albaranes.index')->with('success', 'Albarán creado');
     }
@@ -723,7 +727,49 @@ class AlbaranClienteController extends Controller
         $this->recalculatePedidosEstadoFromAlbaran($proyectoId, array_filter([
             $pedidoAnterior,
             $pedidoActual,
-        ]), $albaran);
+        ]), $albaran);// ABRIMOS LA TRANSACCIÓN PARA EL UPDATE
+        DB::transaction(function () use (&$albaran, $validated, $lineas, $total, $proyectoId, $pedidoAnterior, $lineasAnteriores) {
+            
+            // 1. Restaurar stock de los artículos de la versión vieja del albarán (+1)
+            $this->adjustArticulosStock($lineasAnteriores, $proyectoId, 1);
+            
+            // 2. Actualizar el registro base
+            $albaran->update([
+                'documento' => $validated['documento'],
+                'numero' => $validated['numero'],
+                'fecha' => $validated['fecha'],
+                'cliente_id' => $validated['cliente_id'],
+                'ot' => $validated['ot'] ?? null,
+                'pedido_cliente' => $validated['pedido_cliente'] ?? null,
+                'titulo' => $validated['titulo'] ?? null,
+                'estado' => $validated['estado'],
+                'lista_articulos' => $lineas === [] ? null : $lineas,
+                'total' => round($total, 2),
+            ]);
+
+            // 3. Consumir el stock de la versión nueva del albarán (-1)
+            $this->adjustArticulosStock($lineas, $proyectoId, -1);
+
+            $this->syncPedidoClienteLink($albaran, $proyectoId);
+            $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+
+            if ($pedidoAnterior && ! (bool) ($pedidoAnterior->bolsa ?? false)) {
+                $this->adjustPedidoLineasFromAlbaran($pedidoAnterior, $lineasAnteriores, 1);
+            }
+
+            if ($pedidoActual && $pedidoAnterior && $pedidoActual->id === $pedidoAnterior->id) {
+                $pedidoActual->refresh();
+            }
+
+            if ($pedidoActual && ! (bool) ($pedidoActual->bolsa ?? false)) {
+                $this->adjustPedidoLineasFromAlbaran($pedidoActual, $lineas, -1);
+            }
+
+            $this->recalculatePedidosEstadoFromAlbaran($proyectoId, array_filter([
+                $pedidoAnterior,
+                $pedidoActual,
+            ]), $albaran);
+        });
 
         try {
             $albaran->refresh();
@@ -860,8 +906,11 @@ class AlbaranClienteController extends Controller
             } else {
                 $albaran->pedidosClientes()->detach();
             }
+            
+            // --- NUEVA LÍNEA: Restauramos el stock del almacén al borrar ---
+            $this->adjustArticulosStock($lineasAlbaran, $proyectoId, 1);
 
-            // 2. Borramos el albarán
+            // Borramos el albarán
             $albaran->delete();
         });
 
@@ -959,6 +1008,7 @@ class AlbaranClienteController extends Controller
         return (int) DB::table('contadores')
             ->where('proyecto_id', $proyectoId)
             ->where('clave', $clave)
+            ->lockForUpdate() // <-- Bloquea la fila para otros hilos de ejecución
             ->value('valor');
     }
 
@@ -1325,9 +1375,9 @@ class AlbaranClienteController extends Controller
             $albaranes = $albaranes->filter(fn (AlbaranCliente $albaran) => $this->albaranAportaPedido($albaran, $lineasPedido));
         }
 
-        $totalFacturado = round((float) $albaranes->sum(function (AlbaranCliente $albaran) {
-            return (float) ($albaran->total ?? 0);
-        }), 2);
+        // 1. OBTENEMOS EL IMPORTE DE FACTURACIÓN REAL, NO EL DEL ALBARÁN.
+        // Asumiendo que has definido la relación 'facturacionesManuales' en el modelo PedidoCliente
+        $totalFacturado = round((float) $pedido->facturacionesManuales()->sum('importe'), 2);
 
         $nuevoEstado = 'pendiente';
         if ($pedidoTotal > 0 && $totalFacturado > 0) {
@@ -1503,5 +1553,47 @@ class AlbaranClienteController extends Controller
             ->where('proyecto_id', $proyectoId)
             ->where('numero_pedido', $pedidoNumero)
             ->first();
+    }
+
+    private function adjustArticulosStock(array $lineas, int $proyectoId, int $direction): void
+    {
+        // 1. Agrupamos las cantidades solo de aquellas líneas que tienen articulo_id numérico válido
+        $consumos = collect($lineas)
+            ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
+            ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
+            ->map(fn ($items) => round($items->sum(fn ($linea) => (float) ($linea['cantidad'] ?? 0)), 2));
+
+        if ($consumos->isEmpty()) {
+            return; // Compatibilidad con datos antiguos: Si no hay IDs, no hacemos nada y no rompe.
+        }
+
+        // 2. Buscamos los artículos aplicando bloqueo pesimista
+        $articulos = Articulo::query()
+            ->where('proyecto_id', $proyectoId)
+            ->whereIn('id', $consumos->keys())
+            ->lockForUpdate() 
+            ->get();
+
+        foreach ($articulos as $articulo) {
+            $consumo = (float) ($consumos[$articulo->id] ?? 0);
+            if ($consumo <= 0) {
+                continue;
+            }
+
+            $cantidadActual = (float) ($articulo->cantidad ?? 0);
+            
+            // $direction: -1 (restar del stock), 1 (sumar/restaurar stock)
+            $restante = $direction < 0 
+                ? round(max(0, $cantidadActual - $consumo), 2) // Max 0 evita stock negativo residual
+                : round($cantidadActual + $consumo, 2);
+
+            $precioUnitario = (float) ($articulo->precio_unitario ?? 0);
+            $margen = (float) ($articulo->margen ?? 0);
+
+            $articulo->cantidad = $restante;
+            $articulo->facturado = $restante <= 0;
+            $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+            $articulo->save();
+        }
     }
 }

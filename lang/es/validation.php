@@ -1,6 +1,7 @@
 <?php
 
 return [
+    
     'accepted' => 'El campo :attribute debe ser aceptado.',
     'array' => 'El campo :attribute debe ser un arreglo.',
     'boolean' => 'El campo :attribute debe ser verdadero o falso.',
@@ -16,12 +17,14 @@ return [
         'string' => 'El campo :attribute no debe tener más de :max caracteres.',
         'array' => 'El campo :attribute no debe tener más de :max elementos.',
     ],
+
     'min' => [
         'numeric' => 'El campo :attribute debe ser al menos :min.',
         'file' => 'El archivo :attribute debe pesar al menos :min kilobytes.',
         'string' => 'El campo :attribute debe tener al menos :min caracteres.',
         'array' => 'El campo :attribute debe tener al menos :min elementos.',
     ],
+
     'numeric' => 'El campo :attribute debe ser un número.',
     'required' => 'El campo :attribute es obligatorio.',
     'string' => 'El campo :attribute debe ser una cadena de texto.',
@@ -60,5 +63,33 @@ return [
         'proxima_revision_medica' => 'próxima revisión médica',
         'proyecto_ids' => 'proyectos',
         'proyecto_ids.*' => 'proyecto',
+    ],
+
+    'gt' => [
+        'numeric' => 'El campo :attribute debe ser mayor que :value.',
+        'file' => 'El archivo :attribute debe pesar más de :value kilobytes.',
+        'string' => 'El campo :attribute debe tener más de :value caracteres.',
+        'array' => 'El campo :attribute debe tener más de :value elementos.',
+    ],
+
+    'gte' => [
+        'numeric' => 'El campo :attribute debe ser como mínimo :value.',
+        'file' => 'El archivo :attribute debe pesar como mínimo :value kilobytes.',
+        'string' => 'El campo :attribute debe tener como mínimo :value caracteres.',
+        'array' => 'El campo :attribute debe tener como mínimo :value elementos.',
+    ],
+
+    'lt' => [
+        'numeric' => 'El campo :attribute debe ser menor que :value.',
+        'file' => 'El archivo :attribute debe pesar menos de :value kilobytes.',
+        'string' => 'El campo :attribute debe tener menos de :value caracteres.',
+        'array' => 'El campo :attribute debe tener menos de :value elementos.',
+    ],
+
+    'lte' => [
+        'numeric' => 'El campo :attribute debe ser como máximo :value.',
+        'file' => 'El archivo :attribute debe pesar como máximo :value kilobytes.',
+        'string' => 'El campo :attribute debe tener como máximo :value caracteres.',
+        'array' => 'El campo :attribute no debe tener más de :value elementos.',
     ],
 ];

@@ -117,14 +117,12 @@
             <header class="albaran-info-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3>Resumen de Pagos</h3>
                 
-                @if ($pedidoCliente->bolsa)
                     @can('pedidos.manage')
                     <button type="button" class="pedidos-clientes-action-btn pedidos-clientes-action-btn--primary" data-toggle="modal" data-target="#modalFacturacionManual">
                         <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
                         Facturar Cuota
                     </button>
                     @endcan
-                @endif
             </header>
             <div class="albaran-pagos-grid">
                 <div class="albaran-pago-item">
@@ -178,13 +176,13 @@
                             <i class="fas fa-file-invoice mr-1" aria-hidden="true"></i> Albaranes ({{ $albaranes->total() }})
                         </a>
                     </li>
-                    @if ($pedidoCliente->bolsa)
+                    
                         <li class="nav-item ml-2">
                             <a class="nav-link" id="facturacion-tab" data-toggle="pill" href="#facturacion-panel" role="tab" aria-controls="facturacion-panel" aria-selected="false">
                                 <i class="fas fa-file-invoice-dollar mr-1" aria-hidden="true"></i> Facturación Asociada ({{ count($facturaciones ?? []) }})
                             </a>
                         </li>
-                    @endif
+                    
                 </ul>
             </header>
 
@@ -261,7 +259,7 @@
                     </div>
 
                     <!-- PESTAÑA 2: FACTURACIÓN MANUAL (Solo si es bolsa) -->
-                    @if ($pedidoCliente->bolsa)
+                    
                         <div class="tab-pane fade" id="facturacion-panel" role="tabpanel" aria-labelledby="facturacion-tab">
                             <div class="table-responsive pedidos-clientes-table-wrap m-0">
                                 <table class="table pedidos-clientes-table mb-0">
@@ -308,13 +306,11 @@
                                 </table>
                             </div>
                         </div>
-                    @endif
                 </div>
             </div>
         </article>
     </section>
 
-    @if ($pedidoCliente->bolsa)
     @can('pedidos.manage')
         <!-- Modal Facturar Cuota -->
         <div class="modal fade" id="modalFacturacionManual" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
@@ -348,5 +344,4 @@
             </div>
         </div>
     @endcan
-    @endif
 @endsection

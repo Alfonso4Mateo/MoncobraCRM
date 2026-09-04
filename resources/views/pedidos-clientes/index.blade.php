@@ -125,7 +125,7 @@
                 <form method="GET" action="{{ route('pedidos-clientes.index') }}" class="pedido-clientes-filters">
                     <div class="pedido-filter-field pedido-filter-field--search">
                         <label for="search">Buscar</label>
-                        <input type="search" id="search" name="search" value="{{ $searchActual }}" placeholder="Nº pedido o cliente">
+                        <input type="search" id="search" name="search" value="{{ $searchActual }}" placeholder="Nº pedido, cliente o presupuesto">
                     </div>
 
                     <div class="pedido-filter-field">
@@ -234,38 +234,27 @@
                                         $facturacionesCount = (int) ($pedido->facturaciones_manuales_count ?? 0);
                                     @endphp
 
-                                    @if($pedido->bolsa)
-                                        <div style="display: flex; gap: 5px; flex-direction: column;">
-                                            @if($albaranesCount > 0)
-                                                @can('albaranes.view')
-                                                <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#albaranes-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
-                                                    <i class="fas fa-file-invoice" aria-hidden="true"></i>
-                                                    Albaranes ({{ $albaranesCount }})
-                                                </a>
-                                                @else
-                                                <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;"><i class="fas fa-lock"></i> Albaranes</span>
-                                                @endcan
-                                            @endif
-
-                                            @if($facturacionesCount > 0 || $albaranesCount === 0)
-                                                @can('pedidos.manage')
-                                                <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#facturacion-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver facturación manual" style="background-color: #f8f9fa;">
-                                                    <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
-                                                    Facturación ({{ $facturacionesCount }})
-                                                </a>
-                                                @endcan
-                                            @endif
-                                        </div>
-                                    @else
+                                    <div style="display: flex; gap: 5px; flex-direction: column;">
+                                        <!-- Botón de Albaranes -->
                                         @can('albaranes.view')
-                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
+                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#albaranes-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
                                             <i class="fas fa-file-invoice" aria-hidden="true"></i>
-                                            Ver albarán/es ({{ $albaranesCount }})
+                                            Albaranes ({{ $albaranesCount }})
                                         </a>
                                         @else
-                                        <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;"><i class="fas fa-lock"></i> Albaranes</span>
+                                        <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;">
+                                            <i class="fas fa-lock"></i> Albaranes
+                                        </span>
                                         @endcan
-                                    @endif
+
+                                        <!-- Botón de Facturación (Siempre visible para poder registrar la 1ª factura) -->
+                                        @can('pedidos.manage')
+                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#facturacion-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver facturación manual" style="background-color: #f8f9fa; border: 1px solid #e2e8f0; color: #475569;">
+                                            <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
+                                            Facturación ({{ $facturacionesCount }})
+                                        </a>
+                                        @endcan
+                                    </div>
                                 </td>
                                 <td data-label="Facturación">
                                     <div class="pedido-facturacion-cell">
