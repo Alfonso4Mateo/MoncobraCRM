@@ -6,10 +6,11 @@ use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\PersonalController;
-use App\Http\Controllers\PuestoTrabajoController; // <-- AÑADIDO: Importación obligatoria
+use App\Http\Controllers\PuestoTrabajoController; 
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DepartamentoController;
+use App\Http\Controllers\QrController;
 
 // ==========================================
 // 1. INVENTARIO: ACCIONES, STOCK Y MOVIMIENTOS
@@ -196,3 +197,23 @@ Route::delete('personal/{personal}/puestos/{puesto}', [App\Http\Controllers\Curs
 Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController::class, 'auditoria'])
     ->name('puestos.auditoria')
     ->middleware('permission:cursos.view');
+
+// ==========================================
+// 8. GESTOR DE CÓDIGOS QR 
+// ==========================================
+ Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
+    ->name('qrs.index');
+    //->middleware('permission:qrs.manage');
+Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])
+    ->name('qrs.store');
+    //->middleware('permission:qrs.manage');
+Route::post('/admin/qrs/carpetas', [App\Http\Controllers\QrController::class, 'storeCarpeta'])
+    ->name('qrs.carpeta.store');
+Route::get('/admin/qrs/{id}/download', [App\Http\Controllers\QrController::class, 'download'])                  
+    ->name('qrs.download');
+Route::delete('/admin/qrs/{id}', [App\Http\Controllers\QrController::class, 'destroy'])
+    ->name('qrs.destroy');
+Route::put('/admin/qrs/{id}/mover', [App\Http\Controllers\QrController::class, 'moverCarpeta'])
+    ->name('qrs.mover');
+Route::delete('/admin/qrs/carpetas/{id}', [App\Http\Controllers\QrController::class, 'destroyCarpeta'])
+    ->name('qrs.carpeta.destroy');

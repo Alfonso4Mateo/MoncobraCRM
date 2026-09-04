@@ -64,7 +64,7 @@ return [
     */
 
     'logo' => 'Factu<b>Mon</b>',
-    'logo_img' => 'images/logo_moncobra.png',
+    'logo_img' => 'images/cobra.png',
     'logo_img_class' => 'brand-image img-circle',
     'logo_img_xl' => null,
     'logo_img_xl_class' => 'brand-image-xs',
@@ -392,6 +392,39 @@ return [
             'icon' => 'fas fa-fw fa-graduation-cap',
             'active' => ['cursos*'],
             'can' => 'cursos.view', // <-- Este ya lo tenías bien
+        ],
+
+        // Herramientas (vista dedicada)
+        [
+            'text' => 'Herramientas',
+            'icon' => 'fas fa-fw fa-tools',
+            // El menú padre se mostrará si el usuario tiene acceso a AL MENOS UNO de los submódulos
+            'can'  => ['herramientas.view'],
+            'submenu' => [
+                [
+                    'text' => 'Equipos',
+                    'url' => 'equipos',
+                    'icon' => 'fas fa-fw fa-cogs',
+                    'active' => ['equipos*'],
+                    'can' => 'clientes.view', // Candado específico
+                ],
+                [
+                    'text' => 'Herramientas',
+                    'url' => 'herramientas',
+                    'icon' => 'fas fa-fw fa-tools',
+                    'active' => ['herramientas*'],
+                    'can' => 'herramientas.view', // <-- Este ya lo tenías bien
+                ],
+            ],
+        ],
+
+        //Generador de QRs
+        [
+            'text' => 'Generador de QRs',
+            'url' => 'admin/qrs', 
+            'icon' => 'fas fa-fw fa-qrcode',
+            'active' => ['admin/qrs*'],
+            // 'can' => 'generador-qr.view',
         ],
 
         // Sección inferior fija de utilidades
