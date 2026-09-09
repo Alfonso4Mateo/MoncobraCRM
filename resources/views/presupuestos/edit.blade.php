@@ -123,9 +123,11 @@
                                     autocomplete="off"
                                 >
                                 <datalist id="cc_frecuentes">
-                                    @foreach($centrosCoste as $cc)
-                                        <option value="{{ $cc->etiqueta_completa }}">
-                                    @endforeach
+                                    @if(isset($centrosCoste))
+                                        @foreach($centrosCoste as $cc)
+                                            <option value="{{ $cc->etiqueta_completa }}">
+                                        @endforeach
+                                    @endif
                                 </datalist>
                             </div>
                             <div class="field-group">

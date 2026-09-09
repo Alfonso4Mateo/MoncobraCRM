@@ -361,14 +361,17 @@ class PresupuestoController extends Controller
 
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
         $siguienteNumero = $this->nextNumeroPresupuestoCorrelativo($proyectoId)['numero'];
+        
+        // 1. Añadimos la consulta para obtener los Centros de Coste
+        $centrosCoste = CentroCoste::orderBy('codigo')->get();
 
         if ($presupuesto->cliente && !$clientes->contains('id', $presupuesto->cliente_id)) {
             $clientes->prepend($presupuesto->cliente);
         }
 
-        return view('presupuestos.edit', compact('presupuesto', 'clientes', 'siguienteNumero'));
+        // 2. Añadimos 'centrosCoste' a la función compact() para enviarlo a la vista
+        return view('presupuestos.edit', compact('presupuesto', 'clientes', 'siguienteNumero', 'centrosCoste'));
     }
-
     public function editCorrelativo(Request $request)
     {
         // --- GUARDIA DE LA MURALLA ---
