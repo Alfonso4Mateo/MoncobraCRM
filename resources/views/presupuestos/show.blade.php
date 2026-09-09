@@ -135,8 +135,8 @@
                         <strong class="clean-value">{{ $presupuesto->titulo ?: 'Sin título' }}</strong>
                     </div>
                     <div class="clean-field">
-                        <span class="clean-label">OT</span>
-                        <strong class="clean-value">{{ $presupuesto->ot ?: 'Sin OT' }}</strong>
+                        <span class="clean-label">CC (Centro de Coste)</span>
+                        <strong class="clean-value">{{ $presupuesto->ot ?: 'Sin CC' }}</strong>
                     </div>
 
                     <!-- Fila 4 (1 + 2 = 3) -->

@@ -340,6 +340,12 @@
     border-color: #c8e6c9;
 }
 
+.estado-facturado {
+    background-color: #ebf9f1;
+    color: #247a48;
+    border: 1px solid #b7e6cb;
+}
+
 .acciones-col {
     display: inline-flex;
     align-items: center;

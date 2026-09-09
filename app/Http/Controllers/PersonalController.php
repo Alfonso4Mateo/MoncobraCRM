@@ -270,7 +270,7 @@ class PersonalController extends Controller
             unset($validated['ultima_revision_medica'], $validated['proxima_revision_medica'], $validated['ultima_graduacion'], $validated['proxima_graduacion'], $validated['reconocido_en'], $validated['graduado_en']);
         }
         if (!auth()->user()->can('personal.tallas')) {
-            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['sin_tallas']);
+            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']); // <-- AÑADIR A ESTE ARRAY
         }
 
         $proyectoIds = $validated['proyecto_ids'] ?? [];
@@ -413,6 +413,7 @@ class PersonalController extends Controller
             ['label' => 'Casco', 'value' => $personal->casco ?: '—', 'icon' => 'fa-hard-hat'],
             ['label' => 'Guantes', 'value' => $personal->guantes ?: '—', 'icon' => 'fa-hand-paper'],
             ['label' => 'Gafas', 'value' => $personal->gafas ?: '—', 'icon' => 'fa-glasses'],
+            ['label' => 'Bolsa F.O.D.', 'value' => $personal->bolsa_fod ?: '—', 'icon' => 'fa-bag-shopping'],
         ];
 
         return view('personal.show', compact('personal', 'historicoSalidas', 'tallas', 'cursosCatalogo'));
@@ -468,7 +469,7 @@ class PersonalController extends Controller
             unset($validated['ultima_revision_medica'], $validated['proxima_revision_medica'], $validated['ultima_graduacion'], $validated['proxima_graduacion'], $validated['reconocido_en'], $validated['graduado_en']);
         }
         if (!auth()->user()->can('personal.tallas')) {
-            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['sin_tallas']);
+            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']); // <-- AÑADIR A ESTE ARRAY
         }
 
         $proyectoIds = $validated['proyecto_ids'] ?? null;
@@ -548,7 +549,7 @@ class PersonalController extends Controller
         // 1. Capturamos el valor del checkbox (falso por defecto)
         $incluirInactivos = $request->boolean('incluir_inactivos', false);
 
-        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
+        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas' , 'bolsa_fod'];
         $departamentosCatalogo = Departamento::orderBy('nombre')->get();
         
         $user = auth()->user();
@@ -676,6 +677,7 @@ class PersonalController extends Controller
             'casco' => 'nullable|string|max:20',
             'gafas' => 'nullable|string|max:20',
             'guantes' => 'nullable|string|max:20',
+            'bolsa_fod' => 'nullable|string|max:20',
             'telefono' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
             'descripcion' => 'nullable|string|max:500',

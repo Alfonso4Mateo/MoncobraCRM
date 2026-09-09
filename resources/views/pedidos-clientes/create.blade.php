@@ -145,7 +145,7 @@
                     </div>
 
                     <div class="pedido-field">
-                        <label for="ot">OT</label>
+                        <label for="ot">CC (Centro de Coste)</label>
                         <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo">
                     </div>
 

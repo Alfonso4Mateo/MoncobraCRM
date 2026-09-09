@@ -13,7 +13,7 @@
                 <h1>{{ $pedidoCliente->numero_pedido }}</h1>
                 <p>
                     Fecha: {{ optional($pedidoCliente->fecha_pedido)->format('d/m/Y') ?: '-' }}
-                    | OT: {{ $pedidoCliente->ot ?: 'Sin OT' }}
+                    | CC (Centro de Coste): {{ $pedidoCliente->ot ?: 'Sin CC' }}
                 </p>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">

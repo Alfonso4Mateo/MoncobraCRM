@@ -32,6 +32,7 @@ class Personal extends Model
         'casco',
         'guantes',
         'gafas',
+        'bolsa_fod',
         'sin_tallas',
         'telefono',
         'correo',

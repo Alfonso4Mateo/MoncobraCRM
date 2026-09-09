@@ -81,7 +81,7 @@
                         type="text"
                         name="buscar"
                         value="{{ $buscar }}"
-                        placeholder="Buscar por Nº albarán, documento, OT, fecha, cliente, título, pedido, total o estado..."
+                        placeholder="Buscar por Nº albarán, documento, CC (Centro de Coste), fecha, cliente, título, pedido, total o estado..."
                         aria-label="Buscar albaranes"
                     >
                 </div>
@@ -106,7 +106,7 @@
                         <tr>
                             <th>Nº Albarán</th>
                             <th>Nº Presupuesto</th>
-                            <th>OT Asociada</th>
+                            <th>CC Asociada</th>
                             <th>Fecha Entrega</th>
                             <th>Cliente</th>
                             <th>Título</th>
@@ -119,8 +119,9 @@
                     <tbody>
                         @forelse($albaranes as $albaran)
                             @php
-                                $estado = in_array((string) $albaran->estado, ['pendiente', 'recibido', 'entregado'], true)
-                                    ? (string) $albaran->estado
+                                $estadoValido = strtolower((string) $albaran->estado);
+                                $estado = in_array($estadoValido, ['pendiente', 'recibido', 'facturado'], true)
+                                    ? $estadoValido
                                     : 'pendiente';
                                 $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
                                 $total = (float) ($albaran->ui_total ?? 0);
@@ -149,7 +150,7 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="ot-pill">{{ $albaran->ot ?: 'Sin OT' }}</span>
+                                    <span class="ot-pill">{{ $albaran->ot ?: 'Sin CC' }}</span>
                                 </td>
                                 <td>{{ optional($albaran->fecha)->format('d/m/Y') ?: '-' }}</td>
                                 <td>{{ $albaran->cliente?->empresa_nombre ?: 'Sin cliente' }}</td>
@@ -191,9 +192,21 @@
                                         @endcan
 
                                         @can('albaranes.manage')
-                                            <a href="{{ route('albaranes.edit', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
-                                                <i class="fas fa-pen"></i>
-                                            </a>
+                                            @if($estado !== 'facturado')
+                                                <!-- BOTÓN DIRECTO: Pasar a Facturado -->
+                                                <form action="{{ route('albaranes.estado.update', $albaran) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Marcar este albarán como FACTURADO? Se bloqueará y el pedido restará este importe automáticamente.');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="estado" value="facturado">
+                                                    <button type="submit" class="presupuesto-action-btn" style="color: #28a745; border-color: #28a745; background-color: transparent;" aria-label="Pasar a Facturado" title="Pasar a Facturado">
+                                                        <i class="fas fa-check-double"></i>
+                                                    </button>
+                                                </form>
+
+                                                <a href="{{ route('albaranes.edit', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar albarán" title="Editar albarán">
+                                                    <i class="fas fa-pen"></i>
+                                                </a>
+                                            @endif
                                         @endcan
 
                                         @can('albaranes.delete')
@@ -237,7 +250,7 @@
                                                         @method('PATCH')
                                                         <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
                                                         <button class="dropdown-item" type="submit" name="estado" value="recibido">Recibido</button>
-                                                        <button class="dropdown-item" type="submit" name="estado" value="entregado">Entregado</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado</button>
                                                     </form>
                                                 </div>
                                             </div>

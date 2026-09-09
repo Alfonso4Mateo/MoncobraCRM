@@ -162,9 +162,9 @@
             <section class="personal-footer-grid">
                 @php
                     $tallasFaltantes = 0;
-                    $personalNecesitaEpi = \App\Models\Personal::where('sin_tallas', false)->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas']);
-                    
-                    $columnas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas'];
+                    $personalNecesitaEpi = \App\Models\Personal::where('sin_tallas', false)->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod']);
+                                        
+                    $columnas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod'];
                     
                     foreach ($personalNecesitaEpi as $p) {
                         foreach ($columnas as $col) {

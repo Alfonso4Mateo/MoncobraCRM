@@ -25,32 +25,11 @@
                 <i class="fas fa-plus"></i>
                 Nuevo Presupuesto
             </a>
-        </div>
-    </div>
-@endsection
 
-@section('content_header')
-    <div class="presupuestos-header">
-        <div class="presupuestos-header__copy">
-            <h1>Seguimiento de Presupuestos</h1>
-            <p>Visualiza, filtra y gestiona las ofertas comerciales del proyecto activo.</p>
-        </div>
-
-        <div class="presupuestos-actions">
-            @can('presupuestos.manage')
-                <!-- Correlativo está vinculado a la gestión -->
-                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
-                    <a href="{{ route('presupuestos.correlativo.edit') }}" class="presupuestos-create-btn">
-                        <i class="fas fa-cog"></i>
-                        Ajustar correlativo
-                    </a>
-                @endif
-
-                <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
-                    <i class="fas fa-plus"></i>
-                    Nuevo Presupuesto
+            <a href="{{ route('centros-costes.index') }}" class="presupuestos-create-btn">
+                    <i class="fas fa-list"></i> 
+                    Gestionar CC
                 </a>
-            @endcan
         </div>
     </div>
 @endsection
@@ -71,7 +50,7 @@
             <form method="GET" action="{{ route('presupuestos.index') }}" class="presupuestos-search-form">
                 <div class="presupuestos-search-copy">
                     <span class="presupuestos-search-label">Buscador</span>
-                    <h2>Encuentra presupuestos por numero, cliente, OT, fecha o estado</h2>
+                    <h2>Encuentra presupuestos por numero, cliente, CC, fecha o estado</h2>
                     <p>Usa texto libre y combina rango de fechas con estado para acotar resultados.</p>
                 </div>
 
@@ -82,7 +61,7 @@
                             type="search"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por numero, cliente, OT"
+                            placeholder="Buscar por numero, cliente, CC"
                             autocomplete="off"
                         >
                     </div>
@@ -143,7 +122,7 @@
                             <th>Número</th>
                             <th>Fecha</th>
                             <th>Cliente</th>
-                            <th>OT</th>
+                            <th>CC</th>
                             <th>Total</th>
                             <th>Estado</th>
                             <th class="text-right">Acciones</th>
@@ -168,9 +147,9 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td data-label="OT">
+                                <td data-label="CC (Centro de Coste)">
                                     <span class="presupuesto-ot">
-                                        {{ $presupuesto->ot ?: 'Sin OT' }}
+                                        {{ $presupuesto->ot ?: 'Sin CC' }}
                                     </span>
                                 </td>
                                 <td data-label="Total">

@@ -81,7 +81,7 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="ot">OT</label>
+                                <label for="ot">CC (Centro de Coste)</label>
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
                             </div>
                             <div class="field">

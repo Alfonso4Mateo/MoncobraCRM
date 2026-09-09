@@ -140,7 +140,7 @@
 
                     <section style="margin-bottom:18px;">
                         <h4 style="margin:6px 0 8px; text-transform:capitalize; border-bottom: 1px solid #e6edf3; padding-bottom: 8px;">
-                            {{ ucfirst($col) }}
+                            {{ $col === 'bolsa_fod' ? 'Bolsa F.O.D.' : ucfirst($col) }}
                         </h4>
 
                         @if($counts->isEmpty() && $missing == 0)
@@ -181,7 +181,7 @@
                                 <th>Nombre</th>
                                 <th>Departamento</th>
                                 @foreach($columns as $c)
-                                    <th style="text-transform:capitalize;">{{ $c }}</th>
+                                    <th style="text-transform:capitalize;">{{ $c === 'bolsa_fod' ? 'Bolsa F.O.D.' : $c }}</th>
                                 @endforeach
                             </tr>
                         </thead>
@@ -282,7 +282,9 @@
                     row.style.display = missingList.includes(colToFind) ? '' : 'none';
                 });
 
-                filterNameSpan.innerHTML = `FALTA: <strong>${colToFind.toUpperCase()}</strong>`;
+                // Añadimos el formateo bonito para el recuadro de filtro activo
+                const formattedColName = colToFind === 'bolsa_fod' ? 'BOLSA F.O.D.' : colToFind.toUpperCase();
+                filterNameSpan.innerHTML = `FALTA: <strong>${formattedColName}</strong>`;
                 alertBox.style.display = 'flex';
                 
                 dimAllCards();
@@ -304,7 +306,9 @@
                     row.style.display = (workerSize === sizeToFind) ? '' : 'none';
                 });
 
-                filterNameSpan.innerHTML = `TALLA <strong>${this.getAttribute('data-size').toUpperCase()}</strong> DE <strong>${colToFind.toUpperCase()}</strong>`;
+                // Añadimos el formateo bonito para el recuadro de filtro activo
+                const formattedColName = colToFind === 'bolsa_fod' ? 'BOLSA F.O.D.' : colToFind.toUpperCase();
+                filterNameSpan.innerHTML = `TALLA <strong>${this.getAttribute('data-size').toUpperCase()}</strong> DE <strong>${formattedColName}</strong>`;
                 alertBox.style.display = 'flex';
                 
                 dimAllCards();

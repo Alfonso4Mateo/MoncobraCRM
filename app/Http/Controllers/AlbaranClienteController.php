@@ -256,7 +256,7 @@ class AlbaranClienteController extends Controller
             'pedido_cliente' => 'nullable|string|max:255',
             'titulo' => 'nullable|string|max:255',
             'lineas_json' => 'nullable|json',
-            'estado' => ['nullable', Rule::in(['pendiente', 'recibido', 'entregado'])],
+            'estado' => ['nullable', Rule::in(['pendiente', 'recibido', 'facturado'])],
             'archivo_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
@@ -295,7 +295,15 @@ class AlbaranClienteController extends Controller
             $albaran = AlbaranCliente::create($validated);
 
             // 3. Actualizar contadores
-            $nextValue = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+            // CAMBIO APLICADO: Condicionamos el avance del correlativo al igual que en Presupuestos
+            if ($manualCorrelativo !== null) {
+                // Si introdujo un número con formato válido, avanzamos el contador tomando el máximo
+                $nextValue = max($correlativoActual['correlativo'], $manualCorrelativo + 1);
+            } else {
+                // Si introdujo un texto libre, congelamos el contador reteniendo el número propuesto
+                $nextValue = $correlativoActual['correlativo'];
+            }
+            
             $this->setContadorValue($proyectoId, 'albaranes_next_correlativo', $nextValue);
             $this->setCorrelativoFormato($proyectoId, $correlativoActual['formato'], 'albaranes_formato_correlativo');
             
@@ -674,7 +682,7 @@ class AlbaranClienteController extends Controller
             'ot' => 'nullable|string|max:255',
             'pedido_cliente' => 'nullable|string|max:255',
             'titulo' => 'nullable|string|max:255',
-            'estado' => ['required', Rule::in(['pendiente', 'recibido', 'entregado'])],
+            'estado' => ['nullable', Rule::in(['pendiente', 'recibido', 'facturado'])],
             'lineas_json' => 'nullable|json',
             'return_to' => 'nullable|string|max:2048',
         ]);
@@ -850,17 +858,19 @@ class AlbaranClienteController extends Controller
             abort(404);
         }
 
-        if ($this->isDelivered($albaran)) {
-            return redirect()->back()->with('error', 'El albarán ya está entregado y no admite cambios.');
-        }
-
         $validated = $request->validate([
-            'estado' => ['required', Rule::in(['pendiente', 'recibido', 'entregado'])],
+            'estado' => ['required', Rule::in(['pendiente', 'recibido', 'facturado'])],
         ]);
 
         $albaran->update([
             'estado' => $validated['estado'],
         ]);
+
+        //AVISAR AL PEDIDO:
+        $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        if ($pedidoActual) {
+            $this->recalculatePedidoEstado($pedidoActual, $proyectoId);
+        }
 
         return redirect()->back()->with('success', 'Estado del albarán actualizado.');
     }
@@ -1096,11 +1106,6 @@ class AlbaranClienteController extends Controller
         return (int) $match[1];
     }
 
-    private function isDelivered(AlbaranCliente $albaran): bool
-    {
-        return strtolower((string) ($albaran->estado ?? '')) === 'entregado';
-    }
-
     private function normalizeLineas(?string $lineasJson, ?array $decodedLineas = null): array
     {
         $decoded = $decodedLineas ?? json_decode((string) ($lineasJson ?? '[]'), true);
@@ -1322,30 +1327,11 @@ class AlbaranClienteController extends Controller
     private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array $lineasDelAlbaran = []): void
     {
         $pedido = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
-        if ($pedido && (bool) ($pedido->bolsa ?? false)) {
+        
+        // Si el albarán pertenece a un pedido, recalculamos su estado sin importar si los textos cambiaron
+        if ($pedido) {
             $this->recalculatePedidoEstado($pedido, $proyectoId);
-            return;
         }
-
-        $lineasPedido = $pedido
-            ? collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
-                ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-                ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
-                ->filter()
-                ->values()
-            : collect();
-
-        $lineasAlbaran = collect($lineasDelAlbaran !== [] ? $lineasDelAlbaran : (is_array($albaran->lista_articulos) ? $albaran->lista_articulos : []))
-            ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-            ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
-            ->filter()
-            ->values();
-
-        if (!$pedido || $lineasPedido->isEmpty() || $lineasAlbaran->isEmpty() || $lineasAlbaran->intersect($lineasPedido)->isEmpty()) {
-            return;
-        }
-
-        $this->recalculatePedidoEstado($pedido, $proyectoId);
     }
 
     private function recalculatePedidoEstado(PedidoCliente $pedido, int $proyectoId): void
@@ -1356,34 +1342,26 @@ class AlbaranClienteController extends Controller
             ->find($pedido->id) ?? $pedido;
 
         $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
-        $pedidoEsBolsa = (bool) ($pedido->bolsa ?? false);
-        $lineasPedido = $pedidoEsBolsa
-            ? collect()
-            : collect(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : [])
-                ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
-                ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
-                ->filter()
-                ->values();
 
+        // Agrupamos todos los albaranes vinculados a este pedido
         $albaranes = collect($pedido->albaranesPivot ?? [])
             ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
             ->merge($pedido->albaranes ?? collect())
             ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
             ->unique('id');
 
-        if (!$pedidoEsBolsa) {
-            $albaranes = $albaranes->filter(fn (AlbaranCliente $albaran) => $this->albaranAportaPedido($albaran, $lineasPedido));
-        }
-
-        // 1. OBTENEMOS EL IMPORTE DE FACTURACIÓN REAL, NO EL DEL ALBARÁN.
-        // Asumiendo que has definido la relación 'facturacionesManuales' en el modelo PedidoCliente
-        $totalFacturado = round((float) $pedido->facturacionesManuales()->sum('importe'), 2);
-
+        // Sumamos únicamente el total de los albaranes que ya están facturados
+        $totalFacturado = round((float) $albaranes->where('estado', 'facturado')->sum('total'), 2);
+        
         $nuevoEstado = 'pendiente';
+        
+        // Evaluamos el estado basado en logística financiera
         if ($pedidoTotal > 0 && $totalFacturado > 0) {
-            $nuevoEstado = $totalFacturado >= $pedidoTotal ? 'facturado' : 'facturado_parcial';
+            // Aplicamos un margen de tolerancia de 1 céntimo para evitar fallos de redondeo (floating point)
+            $nuevoEstado = $totalFacturado >= ($pedidoTotal - 0.01) ? 'facturado' : 'facturado_parcial';
         }
 
+        // Guardamos el nuevo estado en la base de datos
         $pedido->forceFill([
             'estado' => $nuevoEstado,
         ])->save();

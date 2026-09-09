@@ -506,6 +506,15 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <div class="profile-edit-form-group">
+                                    <label for="bolsa_fod">Bolsa F.O.D.</label>
+                                    <select id="bolsa_fod" name="bolsa_fod" class="@error('bolsa_fod') is-invalid @enderror">
+                                        <option value="">Selecciona opción</option>
+                                        @foreach(['Sin necesidad' => 'Sin necesidad', 'Estándar' => 'Estándar'] as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('bolsa_fod', $personal->bolsa_fod ?? '') == $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </article>

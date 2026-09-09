@@ -102,7 +102,7 @@
                     <strong class="albaran-info-value">{{ $pedidoCliente->cliente?->empresa_nombre ?? 'Sin cliente' }}</strong>
                 </div>
                 <div class="albaran-info-item">
-                    <span class="albaran-info-label">OT</span>
+                    <span class="albaran-info-label">CC (Centro de Coste)</span>
                     <strong class="albaran-info-value">{{ $pedidoCliente->ot ?: '—' }}</strong>
                 </div>
                 <div class="albaran-info-item">
@@ -116,13 +116,6 @@
         <article class="pedidos-clientes-card albaran-resumen-pagos">
             <header class="albaran-info-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3>Resumen de Pagos</h3>
-                
-                    @can('pedidos.manage')
-                    <button type="button" class="pedidos-clientes-action-btn pedidos-clientes-action-btn--primary" data-toggle="modal" data-target="#modalFacturacionManual">
-                        <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
-                        Facturar Cuota
-                    </button>
-                    @endcan
             </header>
             <div class="albaran-pagos-grid">
                 <div class="albaran-pago-item">
@@ -164,184 +157,100 @@
         </article>
 
         <!-- Selector unificado de Albaranes y Facturación (Pestañas) -->
+        <!-- Listado de Albaranes -->
         <article class="pedidos-clientes-card">
-            <header class="pedidos-clientes-card__header d-flex justify-content-between align-items-center flex-wrap">
+            <header class="pedidos-clientes-card__header">
                 <div>
-                    <h3>Gestión Asociada del Pedido</h3>
-                    <p class="card-subtitle">Visualiza los albaranes de entrega o la facturación manual por hitos.</p>
+                    <h3>Albaranes Asociados</h3>
+                    <p class="card-subtitle">Listado de entregas logísticas vinculadas a este pedido.</p>
                 </div>
-                <ul class="nav nav-pills card-header-pills mt-2 mt-md-0" id="gestionTab" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="albaranes-tab" data-toggle="pill" href="#albaranes-panel" role="tab" aria-controls="albaranes-panel" aria-selected="true">
-                            <i class="fas fa-file-invoice mr-1" aria-hidden="true"></i> Albaranes ({{ $albaranes->total() }})
-                        </a>
-                    </li>
-                    
-                        <li class="nav-item ml-2">
-                            <a class="nav-link" id="facturacion-tab" data-toggle="pill" href="#facturacion-panel" role="tab" aria-controls="facturacion-panel" aria-selected="false">
-                                <i class="fas fa-file-invoice-dollar mr-1" aria-hidden="true"></i> Facturación Asociada ({{ count($facturaciones ?? []) }})
-                            </a>
-                        </li>
-                    
-                </ul>
             </header>
 
             <div class="card-body p-0">
-                <div class="tab-content" id="gestionTabContent">
-                    <!-- PESTAÑA 1: ALBARANES -->
-                    <div class="tab-pane fade show active" id="albaranes-panel" role="tabpanel" aria-labelledby="albaranes-tab">
-                        <div class="table-responsive pedidos-clientes-table-wrap m-0">
-                            <table class="table pedidos-clientes-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Número</th>
-                                        <th>Fecha</th>
-                                        <th>Estado</th>
-                                        <th class="text-right">Importe</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($albaranes as $albaran)
-                                        @php
-                                            $estadoAlbaran = (string) ($albaran->estado ?: 'pendiente');
-                                            $estadoClass = $estadoAlbaran === 'entregado'
-                                                ? 'pedido-chip pedido-chip--paid'
-                                                : ($estadoAlbaran === 'recibido' ? 'pedido-chip pedido-chip--partial' : 'pedido-chip pedido-chip--pending');
-                                        @endphp
-                                        <tr>
-                                            <td data-label="Número">
-                                                @can('albaranes.view')
-                                                <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-code-link">{{ $albaran->numero }}</a>
-                                                @else
-                                                <span class="pedido-muted">{{ $albaran->numero }}</span>
-                                                @endcan
-                                            </td>
-                                            <td data-label="Fecha">
-                                                <span class="pedido-date">{{ optional($albaran->fecha)->format('d M Y') ?: '—' }}</span>
-                                            </td>
-                                            <td data-label="Estado">
-                                                <span class="{{ $estadoClass }}">{{ ucfirst($estadoAlbaran) }}</span>
-                                            </td>
-                                            <td data-label="Importe" class="text-right">
-                                                <strong class="pedido-total">€{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }}</strong>
-                                            </td>
-                                            <td data-label="Acciones">
-                                                @can('albaranes.view')
-                                                <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-action-btn pedido-action-btn--soft">
-                                                    <i class="fas fa-eye" aria-hidden="true"></i> Ver
-                                                </a>
-                                                @else
-                                                <span class="text-muted"><i class="fas fa-lock"></i></span>
-                                                @endcan
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5">
-                                                <div class="pedido-empty-state">
-                                                    <i class="fas fa-file-invoice"></i>
-                                                    <h4>No hay albaranes asociados</h4>
-                                                    <p>Puedes crear uno nuevo con el botón "Agregar Albarán".</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                <div class="table-responsive pedidos-clientes-table-wrap m-0">
+                    <table class="table pedidos-clientes-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th class="text-right">Importe</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($albaranes as $albaran)
+                                @php
+                                    $estadoAlbaran = (string) ($albaran->estado ?: 'pendiente');
+                                    // Nuevos colores para los 3 estados
+                                    $estadoClass = match($estadoAlbaran) {
+                                        'facturado' => 'pedido-chip pedido-chip--paid',
+                                        'recibido' => 'pedido-chip pedido-chip--partial',
+                                        default => 'pedido-chip pedido-chip--pending',
+                                    };
+                                @endphp
+                                <tr>
+                                    <td data-label="Número">
+                                        @can('albaranes.view')
+                                        <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-code-link">{{ $albaran->numero }}</a>
+                                        @else
+                                        <span class="pedido-muted">{{ $albaran->numero }}</span>
+                                        @endcan
+                                    </td>
+                                    <td data-label="Fecha">
+                                        <span class="pedido-date">{{ optional($albaran->fecha)->format('d M Y') ?: '—' }}</span>
+                                    </td>
+                                    <td data-label="Estado">
+                                        <span class="{{ $estadoClass }}">{{ ucfirst($estadoAlbaran) }}</span>
+                                    </td>
+                                    <td data-label="Importe" class="text-right">
+                                        <strong class="pedido-total">€{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }}</strong>
+                                    </td>
+                                    <td data-label="Acciones" class="text-center">
+                                        <div style="display: flex; gap: 8px; justify-content: center;">
+                                            @can('albaranes.view')
+                                            <a href="{{ route('albaranes.show', $albaran) }}" class="pedido-action-btn pedido-action-btn--soft" title="Ver PDF">
+                                                <i class="fas fa-eye" aria-hidden="true"></i>
+                                            </a>
+                                            @endcan
 
-                        @if ($albaranes->hasPages())
-                            <div class="pedidos-clientes-pagination p-3">
-                                {{ $albaranes->links() }}
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- PESTAÑA 2: FACTURACIÓN MANUAL (Solo si es bolsa) -->
-                    
-                        <div class="tab-pane fade" id="facturacion-panel" role="tabpanel" aria-labelledby="facturacion-tab">
-                            <div class="table-responsive pedidos-clientes-table-wrap m-0">
-                                <table class="table pedidos-clientes-table mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Fecha</th>
-                                            <th>Concepto</th>
-                                            <th class="text-right">Importe</th>
-                                            <th class="text-center" style="width: 80px;">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($facturaciones ?? [] as $facturacion)
-                                            <tr>
-                                                <td data-label="Fecha">{{ $facturacion->created_at->format('d M Y') }}</td>
-                                                <td data-label="Concepto">{{ $facturacion->concepto }}</td>
-                                                <td data-label="Importe" class="text-right">
-                                                    <strong class="pedido-total">€{{ number_format((float) $facturacion->importe, 2, ',', '.') }}</strong>
-                                                </td>
-                                                <td data-label="Acciones" class="text-center">
-                                                    @can('pedidos.manage')
-                                                    <form action="{{ route('facturacion-manual.destroy', $facturacion->id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta cuota? El saldo pendiente se recalculará.');">
+                                            @can('albaranes.manage')
+                                                @if($estadoAlbaran !== 'facturado')
+                                                    <!-- BOTÓN DIRECTO PARA PASAR A FACTURADO -->
+                                                    <form action="{{ route('albaranes.estado.update', $albaran) }}" method="POST" onsubmit="return confirm('¿Marcar este albarán como FACTURADO? Se bloqueará y el importe se sumará a la facturación del pedido.');">
                                                         @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Borrar cuota" style="border: none; background: none; color: #dc3545; cursor: pointer;">
-                                                            <i class="fas fa-trash"></i>
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="estado" value="facturado">
+                                                        <button type="submit" class="pedido-action-btn" style="color: #28a745; border: 1px solid #28a745; background: transparent; padding: 4px 8px; border-radius: 4px;" title="Marcar como Facturado">
+                                                            <i class="fas fa-check-double"></i>
                                                         </button>
                                                     </form>
-                                                    @endcan
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="4">
-                                                    <div class="pedido-empty-state">
-                                                        <i class="fas fa-receipt" style="font-size: 2rem; color: #a0aec0; margin-bottom: 10px; display: block;"></i>
-                                                        <h4>No hay facturación manual registrada</h4>
-                                                        <p>Utiliza el botón "Facturar Cuota" para registrar la primera certificación.</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                                @endif
+                                            @endcan
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="pedido-empty-state">
+                                            <i class="fas fa-file-invoice"></i>
+                                            <h4>No hay albaranes asociados</h4>
+                                            <p>Puedes crear uno nuevo con el botón "Agregar Albarán".</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
+
+                @if ($albaranes->hasPages())
+                    <div class="pedidos-clientes-pagination p-3">
+                        {{ $albaranes->links() }}
+                    </div>
+                @endif
             </div>
         </article>
     </section>
-
-    @can('pedidos.manage')
-        <!-- Modal Facturar Cuota -->
-        <div class="modal fade" id="modalFacturacionManual" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <form action="{{ route('pedidos-clientes.facturar-cuota', $pedidoCliente) }}" method="POST">
-                        @csrf
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="modalLabel">Añadir Facturación Manual</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="form-group">
-                                <label for="importe">Importe a facturar (€) <span class="text-danger">*</span></label>
-                                <input type="number" step="0.01" min="0.01" max="{{ max(0, $pendienteFacturar ?? 0) }}" class="form-control" id="importe" name="importe" required placeholder="Ej: 1000">
-                                <small class="form-text text-muted">El importe no debería superar el pendiente ({{ number_format((float) ($pendienteFacturar ?? 0), 2, ',', '.') }} €).</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="concepto">Concepto / Descripción <span class="text-danger">*</span></label>
-                                <textarea class="form-control" id="concepto" name="concepto" rows="3" required placeholder="Ej: Facturación Hito 1 - Julio 2026"></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary" style="background-color: #2a6fb0; border-color: #2a6fb0;">Guardar Facturación</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endcan
 @endsection

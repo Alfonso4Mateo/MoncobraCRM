@@ -16,6 +16,7 @@
                 <th>CALZADO</th>
                 <th>GUANTES</th>
                 <th>GAFAS</th>
+                <th>BOLSA F.O.D.</th>
                 <th>ACCIONES</th>
             </tr>
         </thead>
@@ -81,7 +82,7 @@
                         @endif
                     </td>
                     @php
-                        $columnasEpi = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'gafas'];
+                        $columnasEpi = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'gafas' , 'bolsa_fod'];
                     @endphp
                     
                     @foreach($columnasEpi as $prenda)
@@ -115,7 +116,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="12">
+                    <td colspan="14">
                         <div class="personal-empty-state">
                             <i class="fas fa-users-slash"></i>
                             <strong>No hay personal para mostrar</strong>

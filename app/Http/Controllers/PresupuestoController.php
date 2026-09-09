@@ -6,12 +6,14 @@ use App\Models\Articulo;
 use Carbon\Carbon;
 use App\Models\Presupuesto;
 use App\Models\Cliente;
+use App\Models\CentroCoste;
 use App\Services\DocumentLineNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+
 
 class PresupuestoController extends Controller
 {
@@ -114,7 +116,18 @@ class PresupuestoController extends Controller
 
         $modo = (string) $request->query('modo', 'nuevo');
 
-        return view('presupuestos.create', compact('clientes', 'clienteSeleccionadoId', 'volverACliente', 'modo', 'siguienteNumero'));
+        // Recuperamos los Centros de Coste
+        $centrosCoste = CentroCoste::orderBy('codigo')->get();
+
+        // Un solo return fusionando tus variables con las nuevas
+        return view('presupuestos.create', compact(
+            'clientes', 
+            'clienteSeleccionadoId', 
+            'volverACliente', 
+            'modo', 
+            'siguienteNumero', 
+            'centrosCoste'
+        ));
     }
 
     public function store(Request $request)
@@ -208,8 +221,18 @@ class PresupuestoController extends Controller
         $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
 
         // --- AVANZAR EL CONTADOR GLOBAL SÓLO SI ES UN PRESUPUESTO NUEVO (NO REVISIÓN) ---
+        // CAMBIO APLICADO AQUÍ PARA PREVENIR EL SALTO DE NÚMEROS
         if (!$esRevision) {
-            $siguienteCorrelativo = max($correlativoActual['correlativo'] + 1, ($manualCorrelativo !== null ? $manualCorrelativo + 1 : 0));
+            if ($manualCorrelativo !== null) {
+                // Si usó el número por defecto o introdujo manualmente otro con formato válido (ej. 134)
+                // El siguiente será ese número + 1. Usamos max() para no retroceder el contador si escribe un número viejo.
+                $siguienteCorrelativo = max($correlativoActual['correlativo'], $manualCorrelativo + 1);
+            } else {
+                // Si introdujo un texto libre o inventado (ej. "PRESUPUESTO-ALTERNO")
+                // No gastamos el correlativo actual, lo mantenemos intacto para el próximo intento.
+                $siguienteCorrelativo = $correlativoActual['correlativo'];
+            }
+            
             $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
         }
 

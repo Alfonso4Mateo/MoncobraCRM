@@ -165,7 +165,7 @@
                             <th>Nº-Ref-Interna</th>
                             <th>Presupuesto origen</th>
                             <th>Cliente</th>
-                            <th>OT</th>
+                            <th>CC</th>
                             <th>Fecha</th>
                             <th>Estado</th>
                             <th>Albarán asociado</th>
@@ -219,8 +219,8 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td data-label="OT">
-                                    <span class="pedido-ot-pill">{{ $pedido->ot ?: 'Sin OT' }}</span>
+                                <td data-label="CC (Centro de Coste)">
+                                    <span class="pedido-ot-pill">{{ $pedido->ot ?: 'Sin CC' }}</span>
                                 </td>
                                 <td data-label="Fecha">
                                     <span class="pedido-date">{{ $fechaPedido ? $fechaPedido->format('d M Y') : '—' }}</span>
@@ -231,30 +231,22 @@
                                 <td data-label="Documentos">
                                     @php
                                         $albaranesCount = (int) ($pedido->ui_albaranes_count ?? 0);
-                                        $facturacionesCount = (int) ($pedido->facturaciones_manuales_count ?? 0);
                                     @endphp
 
-                                    <div style="display: flex; gap: 5px; flex-direction: column;">
-                                        <!-- Botón de Albaranes -->
+                                    @if($albaranesCount > 0)
                                         @can('albaranes.view')
-                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#albaranes-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver albarán/es">
+                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}" class="pedido-albaran-btn pedido-albaran-btn--view" title="Gestionar albaranes">
                                             <i class="fas fa-file-invoice" aria-hidden="true"></i>
                                             Albaranes ({{ $albaranesCount }})
                                         </a>
                                         @else
                                         <span class="pedido-albaran-btn" style="background: #f1f5f9; color: #94a3b8; cursor: not-allowed;">
-                                            <i class="fas fa-lock"></i> Albaranes
+                                            <i class="fas fa-lock"></i> Albaranes ({{ $albaranesCount }})
                                         </span>
                                         @endcan
-
-                                        <!-- Botón de Facturación (Siempre visible para poder registrar la 1ª factura) -->
-                                        @can('pedidos.manage')
-                                        <a href="{{ route('pedidos-clientes.albaranes', $pedido) }}#facturacion-panel" class="pedido-albaran-btn pedido-albaran-btn--view" title="Ver facturación manual" style="background-color: #f8f9fa; border: 1px solid #e2e8f0; color: #475569;">
-                                            <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
-                                            Facturación ({{ $facturacionesCount }})
-                                        </a>
-                                        @endcan
-                                    </div>
+                                    @else
+                                        <span class="pedido-muted">—</span>
+                                    @endif
                                 </td>
                                 <td data-label="Facturación">
                                     <div class="pedido-facturacion-cell">
@@ -283,16 +275,34 @@
                                         @endcan
 
                                         @can('pedidos.manage')
-                                        @if($pedido->estado !== 'facturado')
-                                            <form action="{{ route('pedidos-clientes.estado.update', $pedido) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Estás seguro de pasar este pedido a Facturado de forma manual?');">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="hidden" name="estado" value="facturado">
-                                                <button type="submit" class="presupuesto-action-btn" style="color: #28a745; border-color: #28a745;" aria-label="Marcar como facturado" title="Marcar como facturado manualmente">
-                                                    <i class="fas fa-check-double"></i>
+                                            @php
+                                                $dropdownId = 'pedido-estado-dropdown-' . $pedido->id;
+                                            @endphp
+                                            <div class="dropdown presupuesto-dropdown">
+                                                <button
+                                                    type="button"
+                                                    class="presupuesto-action-btn--state dropdown-toggle"
+                                                    style="color: #64748b; border: 1px solid #e2e8f0; background: white; width: 32px; height: 32px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;"
+                                                    id="{{ $dropdownId }}"
+                                                    data-toggle="dropdown"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="false"
+                                                    aria-label="Cambiar estado"
+                                                    title="Cambiar estado"
+                                                >
+                                                    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
                                                 </button>
-                                            </form>
-                                        @endif
+                                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
+                                                    <h6 class="dropdown-header">CAMBIAR ESTADO</h6>
+                                                    <form method="POST" action="{{ route('pedidos-clientes.estado.update', $pedido) }}" class="...">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado_parcial">Facturado parcial</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado</button>
+                                                    </form>
+                                                </div>
+                                            </div>
                                         @endcan
 
                                         @can('pedidos.delete')
@@ -452,6 +462,32 @@
                     deleteForm.submit();
                 });
             }
-        });
+
+            // MUDANZA REALIZADA: Este código ahora vive dentro del DOMContentLoaded
+            // Lógica para el modal de Cambio de Estado
+            const estadoModalElement = document.getElementById('pedidoEstadoModal');
+            const estadoForm = document.getElementById('pedido-estado-form');
+            const estadoSelect = document.getElementById('estadoSelect');
+
+            document.querySelectorAll('[data-change-estado]').forEach((button) => {
+                button.addEventListener('click', function () {
+                    // Obtenemos los datos inyectados en los atributos "data-" del botón
+                    const updateUrl = this.getAttribute('data-update-url') || '';
+                    const estadoActual = this.getAttribute('data-estado-actual') || 'pendiente';
+
+                    // Inyectamos la URL correcta en el form y seleccionamos el estado actual
+                    if (estadoForm) {
+                        estadoForm.setAttribute('action', updateUrl);
+                    }
+                    if (estadoSelect) {
+                        estadoSelect.value = estadoActual;
+                    }
+
+                    // Ahora sí puede ver y ejecutar tu función showModal()
+                    showModal(estadoModalElement);
+                });
+            });
+
+        }); 
     </script>
 @endsection

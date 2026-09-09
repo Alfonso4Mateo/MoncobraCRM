@@ -206,7 +206,8 @@ class PedidoController extends Controller
                 : null;
             $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
 
-            $pedido->ui_total_facturaciones = round((float) ($pedido->facturaciones_sum ?? 0), 2);
+            $albaranesFacturados = $albaranesPedido->where('estado', 'facturado');
+            $pedido->ui_total_facturaciones = round((float) $albaranesFacturados->sum('total'), 2);
             $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_facturaciones, 2));
 
             return $pedido;
@@ -214,6 +215,7 @@ class PedidoController extends Controller
 
         return view('pedidos-clientes.index', [
             'pedidos' => $pedidos,
+            'estadosFiltro' => self::PEDIDO_CLIENTE_ESTADOS,
             'searchActual' => $search,
             'estadoActual' => $estado,
             'desdeActual' => $desde,
@@ -688,14 +690,18 @@ class PedidoController extends Controller
             ['path' => request()->url(), 'query' => request()->query()]
         );
 
-        // 1. Obtener facturaciones manuales (cuotas)
-        $facturaciones = $pedidoCliente->facturacionesManuales()->orderBy('created_at', 'desc')->get();
-        $totalFacturadoDirecto = round((float) $facturaciones->sum('importe'), 2);
+        // 1. Calculamos el total de los albaranes que ya están FACTURADOS
+        $totalAlbaranesFacturados = round((float) $albaranes->where('estado', 'facturado')->sum('total'), 2);
 
-        // 2. Calcular el pendiente final unificado (Pedido - Albaranes - Facturación Directa)
-        $pendienteFacturar = round(max(0, $totalPedido - $totalFacturadoDirecto), 2);
+        // 2. El pendiente final es el total del pedido menos el total de los albaranes facturados
+        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranesFacturados), 2);
 
-        // 3. Único retorno con todas las variables empaquetadas correctamente
+        // 3. Inicializamos las facturaciones manuales como una colección vacía.
+        // Esto evita que la vista falle (rompa el código) si en la plantilla Blade 
+        // aún existe un @foreach recorriendo la variable $facturaciones.
+        $facturaciones = collect();
+
+        // 4. Único retorno con todas las variables empaquetadas
         return view('pedidos-clientes.albaranes', [
             'pedidoCliente' => $pedidoCliente,
             'albaranes' => $albaranes,

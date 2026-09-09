@@ -72,8 +72,23 @@
                     </div>
 
                     <div class="field-group">
-                        <label for="ot">OT (Orden de trabajo)</label>
-                        <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot ?? '') }}" placeholder="Referencia OT" class="@error('ot') is-invalid @enderror" maxlength="255">
+                        <label for="ot">CC (Centro de Coste)</label>
+                        <input 
+                            type="text" 
+                            id="ot" 
+                            name="ot" 
+                            list="cc_frecuentes"
+                            value="{{ old('ot', $presupuesto->ot ?? '') }}" 
+                            placeholder="Referencia CC" 
+                            class="@error('ot') is-invalid @enderror" 
+                            maxlength="255"
+                            autocomplete="off"
+                        >
+                        <datalist id="cc_frecuentes">
+                            @foreach($centrosCoste as $cc)
+                                <option value="{{ $cc->etiqueta_completa }}">
+                            @endforeach
+                        </datalist>
                     </div>
 
                     <div class="field-group">

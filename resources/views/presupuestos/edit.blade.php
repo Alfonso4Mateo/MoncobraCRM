@@ -113,8 +113,20 @@
                                 <input type="text" id="titulo" name="titulo" value="{{ old('titulo', $presupuesto->titulo) }}">
                             </div>
                             <div class="field-group">
-                                <label for="ot">OT</label>
-                                <input type="text" id="ot" name="ot" value="{{ old('ot', $presupuesto->ot) }}">
+                                <label for="ot">CC (Centro de Coste)</label>
+                                <input 
+                                    type="text" 
+                                    id="ot" 
+                                    name="ot" 
+                                    list="cc_frecuentes"
+                                    value="{{ old('ot', $presupuesto->ot) }}"
+                                    autocomplete="off"
+                                >
+                                <datalist id="cc_frecuentes">
+                                    @foreach($centrosCoste as $cc)
+                                        <option value="{{ $cc->etiqueta_completa }}">
+                                    @endforeach
+                                </datalist>
                             </div>
                             <div class="field-group">
                                 <label for="solicitante">Solicitante</label>
