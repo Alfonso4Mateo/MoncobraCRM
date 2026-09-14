@@ -346,6 +346,12 @@
                     </a>
                 @endcan
 
+                @can('epis.gestion')
+                    <a href="{{ route('epis.index') }}" class="cursos-primary" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
+                        <i class="fas fa-hard-hat"></i> Gestionar EPI
+                    </a>
+                @endcan
+
                 @can('cursos.normas')
                     <a href="{{ route('puestos.index') }}" class="cursos-primary" style="background: linear-gradient(135deg, #6366f1, #4338ca);">
                         <i class="fas fa-sitemap"></i> Panel de Normas

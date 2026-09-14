@@ -339,6 +339,17 @@
     color: #2e7d32;
     border-color: #c8e6c9;
 }
+.estado-cancelado { 
+    background: #fee2e2; 
+    color: #991b1b; 
+    border-color: #fca5a5;
+}
+
+.estado-facturado_parcial { 
+    background: #e0e7ff; 
+    color: #3730a3; 
+    border-color: #c7d2fe;
+}
 
 .estado-facturado {
     background-color: #ebf9f1;

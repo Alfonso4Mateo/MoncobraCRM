@@ -87,6 +87,35 @@
 
 @section('content')
     <section class="pedidos-clientes-shell">
+        
+        <!-- WIDGET GLOBAL DEL CLIENTE (Solo se renderiza si hay OTRAS bolsas activas) -->
+        @if(isset($resumenBolsasCliente) && !empty($resumenBolsasCliente['bolsas']))
+            <article class="pedidos-clientes-card" style="background: #fef3c7; border: 1px solid #f59e0b; border-left: 4px solid #d97706; padding: 16px; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 14px;">
+                    <div style="font-size: 2.2rem; color: #d97706;"><i class="fas fa-boxes"></i></div>
+                    <div>
+                        <h3 style="margin: 0; color: #92400e; font-size: 1.1rem; font-weight: 800;">Otras bolsas activas de {{ $pedidoCliente->cliente?->empresa_nombre ?? 'este cliente' }}</h3>
+                        <p style="margin: 4px 0 0 0; color: #b45309; font-size: 0.95rem;">
+                            El sistema detecta <strong>{{ $resumenBolsasCliente['cantidad'] }} bolsa(s) más</strong> activa(s) para este cliente. Cada bolsa es independiente: comprueba cuál corresponde antes de vincular un albarán.
+                        </p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    @foreach ($resumenBolsasCliente['bolsas'] as $bolsa)
+                        <div style="background: #fffbeb; padding: 10px 14px; border-radius: 8px; border: 1px solid #fcd34d;">
+                            <span style="display: block; font-size: 0.72rem; color: #b45309; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">
+                                {{ $bolsa['numero_pedido'] ?: 'Sin número' }}{{ $bolsa['ot'] ? ' · OT ' . $bolsa['ot'] : '' }}
+                            </span>
+                            <strong style="display: block; font-size: 1.25rem; color: #92400e; line-height: 1.3;">
+                                {{ number_format($bolsa['saldo_disponible'], 2, ',', '.') }} € libres
+                            </strong>
+                            <span style="font-size: 0.78rem; color: #92400e;">de {{ number_format($bolsa['total'], 2, ',', '.') }} € totales</span>
+                        </div>
+                    @endforeach
+                </div>
+            </article>
+        @endif
+
         <!-- Datos Principales del Pedido -->
         <article class="pedidos-clientes-card albaran-pedido-info">
             <header class="albaran-info-header">
@@ -204,7 +233,27 @@
                                         <span class="{{ $estadoClass }}">{{ ucfirst($estadoAlbaran) }}</span>
                                     </td>
                                     <td data-label="Importe" class="text-right">
-                                        <strong class="pedido-total">€{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }}</strong>
+                                        @php
+                                            $totalRealAlbaran = (float) ($albaran->total ?? 0);
+                                            
+                                            // Si es bolsa, confiamos ciegamente en el pivote (incluso si es 0).
+                                            if ($pedidoCliente->bolsa) {
+                                                $importeImputado = isset($albaran->pivot) ? (float) $albaran->pivot->importe_imputado : $totalRealAlbaran;
+                                            } else {
+                                                $importeImputado = (isset($albaran->pivot) && $albaran->pivot->importe_imputado > 0) 
+                                                    ? (float) $albaran->pivot->importe_imputado 
+                                                    : $totalRealAlbaran;
+                                            }
+                                        @endphp
+                                        
+                                        <strong class="pedido-total">€{{ number_format($importeImputado, 2, ',', '.') }}</strong>
+                                        
+                                        @if($importeImputado < $totalRealAlbaran)
+                                            <br>
+                                            <small style="color: #64748b; font-size: 0.8em;" title="Total real del albarán: €{{ number_format($totalRealAlbaran, 2, ',', '.') }}">
+                                                (de €{{ number_format($totalRealAlbaran, 2, ',', '.') }})
+                                            </small>
+                                        @endif
                                     </td>
                                     <td data-label="Acciones" class="text-center">
                                         <div style="display: flex; gap: 8px; justify-content: center;">
@@ -226,6 +275,17 @@
                                                         </button>
                                                     </form>
                                                 @endif
+
+                                                <!-- BOTÓN DE DESVINCULAR -->
+                                                <form action="{{ route('albaranes.desvincular', $albaran) }}" method="POST" onsubmit="return confirm('¿Seguro que quieres desvincular este albarán DE ESTE PEDIDO? El saldo imputado se liberará.');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="pedido_id" value="{{ $pedidoCliente->id }}">
+                                                    
+                                                    <button type="submit" class="pedido-action-btn" style="color: #dc3545; border: 1px solid #dc3545; background: transparent; padding: 4px 8px; border-radius: 4px;" title="Desvincular del pedido">
+                                                        <i class="fas fa-unlink"></i>
+                                                    </button>
+                                                </form>
                                             @endcan
                                         </div>
                                     </td>

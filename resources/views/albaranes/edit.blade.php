@@ -89,9 +89,26 @@
                                 <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
                             </div>
 
+                            @php
+                                // Recuperamos las bolsas que ya tiene guardadas el albarán
+                                $pedidosVinculados = old('pedidos_cliente', $albaran->pedidosClientes->pluck('numero_pedido')->toArray());
+                                // Fallback para albaranes antiguos
+                                if (empty($pedidosVinculados) && !empty($albaran->pedido_cliente)) {
+                                    $pedidosVinculados = [$albaran->pedido_cliente];
+                                }
+                            @endphp
                             <div class="field">
                                 <label for="pedido_cliente">Pedido cliente</label>
-                                <input type="text" id="pedido_cliente" name="pedido_cliente" value="{{ old('pedido_cliente', $albaran->pedido_cliente ?? '') }}" placeholder="Ej: PENDIENTE POR CONFIRMAR o Nº de pedido">
+                                <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas...">
+                                    @foreach ($pedidosClientes as $pedido)
+                                        @php
+                                            $pedidoLabel = trim(($pedido->bolsa ? '📦 [BOLSA] ' : '') . ($pedido->numero_pedido ?: 'Sin número') . ' | ' . ($pedido->cliente?->empresa_nombre ?: 'Sin cliente'));
+                                        @endphp
+                                        <option value="{{ $pedido->numero_pedido }}" @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))>
+                                            {{ $pedidoLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             <div class="field span-2">
@@ -207,9 +224,38 @@
 @endsection
 
 @section('css')
+    <!-- Cargamos los estilos de Select2 -->
+    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+    
     @vite(['resources/css/albaranes-edit.css'])
+    
+    <style>
+        /* Ajuste visual para que la caja múltiple encaje con tu diseño */
+        .select2-container--bootstrap4 .select2-selection--multiple {
+            border: 1px solid #d8e1ec !important;
+            border-radius: 0.5rem !important;
+            background: #f8fbff !important;
+            min-height: 2.15rem !important;
+        }
+    </style>
 @endsection
 
 @section('js')
+    <!-- Cargamos el motor JavaScript de Select2 -->
+    <script src="{{ asset('vendor/select2/js/select2.full.min.js') }}"></script>
     @vite(['resources/js/albaranes-form.js'])
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
+                window.jQuery('#pedido_cliente').select2({
+                    theme: 'bootstrap4',
+                    placeholder: "Selecciona una o varias bolsas...",
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    </script>
 @endsection

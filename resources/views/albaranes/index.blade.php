@@ -74,32 +74,64 @@
         </div>
 
         <article class="albaranes-card">
-            <form method="GET" action="{{ route('albaranes.index') }}" class="filters-row">
-                <div class="ot-filter-box">
+            <form method="GET" action="{{ route('albaranes.index') }}" class="filters-row" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <!-- 1. Buscador -->
+                <div class="ot-filter-box" style="flex-grow: 1; min-width: 250px; margin: 0;">
                     <i class="fas fa-filter" aria-hidden="true"></i>
                     <input
                         type="text"
                         name="buscar"
                         value="{{ $buscar }}"
-                        placeholder="Buscar por Nº albarán, documento, CC (Centro de Coste), fecha, cliente, título, pedido, total o estado..."
+                        placeholder="Buscar por Nº albarán, documento, CC, fecha, cliente..."
                         aria-label="Buscar albaranes"
+                        style="width: 100%;"
                     >
                 </div>
 
-                <label class="date-label" for="desde">Desde:</label>
-                <input type="date" id="desde" name="desde" value="{{ $desde }}" class="date-input">
+                <!-- 2. Fechas -->
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label class="date-label" for="desde" style="margin: 0;">Desde:</label>
+                    <input type="date" id="desde" name="desde" value="{{ $desde }}" class="date-input">
+                </div>
 
-                <label class="date-label" for="hasta">Hasta:</label>
-                <input type="date" id="hasta" name="hasta" value="{{ $hasta }}" class="date-input">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label class="date-label" for="hasta" style="margin: 0;">Hasta:</label>
+                    <input type="date" id="hasta" name="hasta" value="{{ $hasta }}" class="date-input">
+                </div>
 
-                <button type="submit" class="filter-btn">
-                    <i class="fas fa-search"></i>
-                    Filtrar
-                </button>
+                <!-- 3. NUEVO: Selector de Estado Nativo -->
+                <div style="display: flex; align-items: center;">
+                    <select name="estado" class="date-input" style="min-width: 150px; cursor: pointer;">
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente" @selected(request('estado') === 'pendiente')>Pendiente</option>
+                        <option value="recibido" @selected(request('estado') === 'recibido')>Recibido</option>
+                        <option value="facturado" @selected(request('estado') === 'facturado')>Facturado</option>
+                        <option value="facturado_parcial" @selected(request('estado') === 'facturado_parcial')>Facturado Parcial</option>
+                        <option value="cancelado" @selected(request('estado') === 'cancelado')>Cancelado</option>
+                    </select>
+                </div>
 
-                <a href="{{ route('albaranes.index') }}" class="clear-btn">Limpiar</a>
+                <!-- 4. Botones de Acción -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="submit" class="filter-btn">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+
+                    <!-- Botón Solo Bolsa -->
+                    <a href="{{ route('albaranes.index', array_merge(request()->query(), ['bolsa' => isset($bolsaActual) && $bolsaActual ? 0 : 1])) }}" 
+                       class="filter-btn" 
+                       style="{{ isset($bolsaActual) && $bolsaActual ? 'background-color: #1e40af; color: white; border-color: #1e40af;' : 'background-color: #f1f5f9; color: #475569; border-color: #cbd5e1;' }} width: auto; white-space: nowrap;" 
+                       title="Ver únicamente albaranes vinculados a pedidos bolsa">
+                        <i class="fas fa-box{{ isset($bolsaActual) && $bolsaActual ? '-open' : '' }}"></i>
+                        {{ isset($bolsaActual) && $bolsaActual ? 'Viendo Solo Bolsa' : 'Solo Bolsa' }}
+                    </a>
+
+                    <a href="{{ route('albaranes.index') }}" class="clear-btn" style="width: auto; white-space: nowrap;">
+                        Limpiar
+                    </a>
+                </div>
             </form>
-
+    
             <div class="table-responsive table-wrapper">
                 <table class="table albaranes-table">
                     <thead>
@@ -120,13 +152,18 @@
                         @forelse($albaranes as $albaran)
                             @php
                                 $estadoValido = strtolower((string) $albaran->estado);
-                                $estado = in_array($estadoValido, ['pendiente', 'recibido', 'facturado'], true)
+                                $estado = in_array($estadoValido, ['pendiente', 'recibido', 'facturado', 'facturado_parcial', 'cancelado'], true)
                                     ? $estadoValido
                                     : 'pendiente';
                                 $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
                                 $total = (float) ($albaran->ui_total ?? 0);
+                                
+                                // Detectamos si el albarán está vinculado a alguna bolsa
+                                $esBolsa = isset($albaran->pedidosClientes) && $albaran->pedidosClientes->where('bolsa', true)->isNotEmpty();
                             @endphp
-                            <tr>
+                            
+                            <!-- Aplicamos el fondo azulado condicionalmente -->
+                            <tr @if($esBolsa) style="background-color: #f0f6ff;" @endif>
                                 <td>
                                     @can('albaranes.download')
                                         <a href="{{ route('albaranes.pdf', $albaran) }}" class="code-link">
@@ -156,19 +193,30 @@
                                 <td>{{ $albaran->cliente?->empresa_nombre ?: 'Sin cliente' }}</td>
                                 <td>{{ $albaran->titulo ?: '-' }}</td>
                                 <td>
-                                    @if ($albaran->ui_pedido_id)
-                                        @can('pedidos.view')
-                                            <a href="{{ route('pedidos-clientes.show', $albaran->ui_pedido_id) }}" class="code-link">
-                                                {{ $pedidoNumero }}
-                                            </a>
-                                        @else
-                                            <span class="muted">{{ $pedidoNumero }}</span>
-                                        @endcan
+                                    @if(isset($albaran->ui_pedidos_vinculados) && $albaran->ui_pedidos_vinculados->isNotEmpty())
+                                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                                            @foreach($albaran->ui_pedidos_vinculados as $pedidoVinculado)
+                                                <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; background: #f8fafc; display: inline-block; font-size: 0.85em; white-space: nowrap;">
+                                                    @can('pedidos.view')
+                                                        <a href="{{ route('pedidos-clientes.show', $pedidoVinculado['id']) }}" style="font-weight: bold; color: #1f74dd; text-decoration: none;">
+                                                            {{ $pedidoVinculado['numero'] }}
+                                                        </a>
+                                                    @else
+                                                        <span style="font-weight: bold; color: #64748b;">{{ $pedidoVinculado['numero'] }}</span>
+                                                    @endcan
+                                                    
+                                                    @if($pedidoVinculado['imputado'] > 0)
+                                                        <span style="color: #64748b; margin-left: 4px;">
+                                                            ({{ number_format($pedidoVinculado['imputado'], 2, ',', '.') }}€)
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     @elseif ($pedidoNumero !== '')
+                                        <!-- Fallback para registros antiguos o escritos manualmente que no tienen tabla pivote -->
                                         @can('pedidos.view')
-                                            <a href="{{ route('pedidos.show', $pedidoNumero) }}" class="code-link">
-                                                {{ $pedidoNumero }}
-                                            </a>
+                                           <span style="font-weight: bold; color: #64748b;">{{ $pedidoNumero }}</span>
                                         @else
                                             <span class="muted">{{ $pedidoNumero }}</span>
                                         @endcan
@@ -176,9 +224,18 @@
                                         <span class="muted">-</span>
                                     @endif
                                 </td>
-                                <td>{{ number_format($total, 2, ',', '.') }}€</td>
                                 <td>
-                                    <span class="estado-chip estado-{{ $estado }}">{{ strtoupper($estado) }}</span>
+                                    <div style="font-weight: 500;">{{ number_format($total, 2, ',', '.') }}€</div>
+                                    @if(isset($albaran->ui_excedente) && $albaran->ui_excedente > 0)
+                                        <div style="margin-top: 4px;">
+                                            <span style="font-size: 0.82em; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: bold;" title="Saldo flotante disponible para absorber en futuras bolsas">
+                                                <i class="fas fa-coins" aria-hidden="true"></i> {{ number_format($albaran->ui_excedente, 2, ',', '.') }}€ libres
+                                            </span>
+                                        </div>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="estado-chip estado-{{ $estado }}">{{ strtoupper(str_replace('_', ' ', $estado)) }}</span>
                                 </td>
                                 <td>
                                     <div class="presupuesto-action-group">
@@ -236,6 +293,7 @@
                                                     class="presupuesto-action-btn--state dropdown-toggle"
                                                     id="{{ $dropdownId }}"
                                                     data-toggle="dropdown"
+                                                    data-boundary="window" 
                                                     aria-haspopup="true"
                                                     aria-expanded="false"
                                                     aria-label="Cambiar estado"
@@ -245,12 +303,45 @@
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="{{ $dropdownId }}">
                                                     <h6 class="dropdown-header">Cambiar estado</h6>
-                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" class="estado-menu-form">
+                                                    
+                                                    <!-- Opción Pendiente -->
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" style="margin: 0;">
                                                         @csrf
                                                         @method('PATCH')
-                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
-                                                        <button class="dropdown-item" type="submit" name="estado" value="recibido">Recibido</button>
-                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado</button>
+                                                        <input type="hidden" name="estado" value="pendiente">
+                                                        <button class="dropdown-item" type="submit">Pendiente</button>
+                                                    </form>
+
+                                                    <!-- Opción Recibido -->
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" style="margin: 0;">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="estado" value="recibido">
+                                                        <button class="dropdown-item" type="submit">Recibido</button>
+                                                    </form>
+
+                                                    <!-- Opción Facturado Parcial -->
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" style="margin: 0;">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="estado" value="facturado_parcial">
+                                                        <button class="dropdown-item" type="submit">Facturado Parcial</button>
+                                                    </form>
+
+                                                    <!-- Opción Facturado -->
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" style="margin: 0;">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="estado" value="facturado">
+                                                        <button class="dropdown-item" type="submit" onclick="return confirm('¿Seguro que quieres pasar el albarán a FACTURADO?');">Facturado</button>
+                                                    </form>
+
+                                                    <!-- Opción Cancelado -->
+                                                    <form method="POST" action="{{ route('albaranes.estado.update', $albaran) }}" style="margin: 0;">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="estado" value="cancelado">
+                                                        <button class="dropdown-item" type="submit" onclick="return confirm('¿Seguro que quieres CANCELAR este albarán?');">Cancelado</button>
                                                     </form>
                                                 </div>
                                             </div>

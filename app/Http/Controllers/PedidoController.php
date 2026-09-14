@@ -69,16 +69,25 @@ class PedidoController extends Controller
 
         if ($search !== '') {
             $like = '%' . $search . '%';
+            
+            // CONTEXTO: Convertimos la coma española a punto decimal para que la Base de Datos lo entienda
+            $searchNumeric = str_replace(',', '.', $search);
 
-            $pedidosQuery->where(function ($query) use ($like) {
+            $pedidosQuery->where(function ($query) use ($like, $searchNumeric) {
                 $query->where('numero_pedido', 'like', $like)
+                    ->orWhere('ot', 'like', $like) // Búsqueda directa por OT/CC
                     ->orWhereHas('cliente', function ($clienteQuery) use ($like) {
                         $clienteQuery->where('empresa_nombre', 'like', $like);
                     })
-                    // AÑADIR ESTE BLOQUE PARA BUSCAR POR PRESUPUESTO
                     ->orWhereHas('presupuesto', function ($presupuestoQuery) use ($like) {
                         $presupuestoQuery->where('numero', 'like', $like);
                     });
+
+                // Si lo que ha escrito el usuario es un número válido, buscamos también en el total
+                if (is_numeric($searchNumeric)) {
+                    $query->orWhere('total', 'like', '%' . $searchNumeric . '%')
+                          ->orWhere('total', '=', (float) $searchNumeric);
+                }
             });
         }
 
@@ -207,10 +216,24 @@ class PedidoController extends Controller
             $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
 
             $albaranesFacturados = $albaranesPedido->where('estado', 'facturado');
-            $pedido->ui_total_facturaciones = round((float) $albaranesFacturados->sum('total'), 2);
+            $albaranesAContar = $pedido->bolsa ? $albaranesPedido : $albaranesFacturados;
+            
+            $sumaFacturada = 0.0;
+            foreach ($albaranesAContar as $alb) {
+                if ($pedido->bolsa) {
+                    // Si tiene pivote respeta el 0, si es antigua lee el total
+                    $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+                } else {
+                    $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+                }
+                $sumaFacturada += $importe;
+            }   
+            
+            // LIMPIO DE CUOTAS
+            $pedido->ui_total_facturaciones = round($sumaFacturada, 2);
             $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_facturaciones, 2));
 
-            return $pedido;
+            return $pedido; 
         });
 
         return view('pedidos-clientes.index', [
@@ -240,7 +263,7 @@ class PedidoController extends Controller
         $this->authorize('pedidos.manage');
 
         $proyectoId = $this->resolveActiveProyectoId($request);
-        $presupuestoEstadosPermitidos = ['pendiente'];
+        $presupuestoEstadosPermitidos = ['pendiente' , 'aceptado' , 'parcial'];
 
         $clientes = Cliente::query()
             ->where('proyecto_id', $proyectoId)
@@ -467,7 +490,8 @@ class PedidoController extends Controller
                 }
             }
 
-            PedidoCliente::create([
+            // CREACIÓN ÚNICA ASIGNADA A LA VARIABLE
+            $nuevoPedido = PedidoCliente::create([
                 'id_cliente' => $validated['id_cliente'],
                 'proyecto_id' => $proyectoId,
                 'numero_pedido' => $validated['numero_pedido'],
@@ -545,11 +569,9 @@ class PedidoController extends Controller
             abort(404);
         }
 
-        return view('pedidos.show-cliente', [
-            'pedidoCliente' => $pedidoCliente,
-            'titulo' => 'Detalle del Pedido de Cliente',
-            'breadcrumb' => 'Pedido de Cliente',
-        ]);
+        // En lugar de cargar la vista inútil, redirigimos al instante 
+        // al panel de control real del pedido (el del progreso y totales)
+        return redirect()->route('pedidos-clientes.albaranes', $pedidoCliente);
     }
 
     public function viewPdf(PedidoCliente $pedidoCliente)
@@ -676,74 +698,107 @@ class PedidoController extends Controller
             ->sortByDesc(fn (AlbaranCliente $albaran) => sprintf('%s-%06d', optional($albaran->fecha)->format('Y-m-d') ?? '0000-00-00', (int) $albaran->id))
             ->values();
 
-        $totalAlbaranes = round((float) $albaranes->sum('total'), 2);
+        // 1. Sumar el total general de los albaranes (TODOS)
+        $totalAlbaranes = 0.0;
+        foreach ($albaranes as $alb) {
+            if ($pedidoCliente->bolsa) {
+                // Si tiene pivote respeta el 0, si es antigua lee el total del albarán
+                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+            } else {
+                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+            }
+            $totalAlbaranes += $importe;
+        }
+        $totalAlbaranes = round($totalAlbaranes, 2);
+
         $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
 
         $perPage = 10;
         $currentPage = max(1, (int) request()->query('page', 1));
         $pagedItems = $albaranes->forPage($currentPage, $perPage)->values();
-        $albaranes = new \Illuminate\Pagination\LengthAwarePaginator(
-            $pagedItems,
-            $albaranes->count(),
-            $perPage,
-            $currentPage,
-            ['path' => request()->url(), 'query' => request()->query()]
+        $albaranesPaginados = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedItems, $albaranes->count(), $perPage, $currentPage, ['path' => request()->url(), 'query' => request()->query()]
         );
 
-        // 1. Calculamos el total de los albaranes que ya están FACTURADOS
-        $totalAlbaranesFacturados = round((float) $albaranes->where('estado', 'facturado')->sum('total'), 2);
+        // 2. Sumar lo facturado
+        $totalAlbaranesFacturados = 0.0;
+        $albaranesAContar = $pedidoCliente->bolsa ? $albaranes : $albaranes->where('estado', 'facturado');
+        
+        foreach ($albaranesAContar as $alb) {
+            if ($pedidoCliente->bolsa) {
+                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+            } else {
+                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+            }
+            $totalAlbaranesFacturados += $importe;
+        }
+        $totalAlbaranesFacturados = round($totalAlbaranesFacturados, 2);
 
-        // 2. El pendiente final es el total del pedido menos el total de los albaranes facturados
+        // 3. El pendiente final es el total del pedido menos el total de los albaranes facturados
         $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranesFacturados), 2);
 
-        // 3. Inicializamos las facturaciones manuales como una colección vacía.
-        // Esto evita que la vista falle (rompa el código) si en la plantilla Blade 
-        // aún existe un @foreach recorriendo la variable $facturaciones.
-        $facturaciones = collect();
+        // --- 4. WIDGET GLOBAL DEL CLIENTE: lista de OTRAS bolsas activas, SIN sumarlas ---
+        // No se agregan en un único saldo porque cada bolsa puede tener una función
+        // distinta (mecánico, eléctrico, reparaciones...) y no son intercambiables.
+        $resumenBolsasCliente = null;
+        if ($pedidoCliente->bolsa) {
+            $bolsasActivas = PedidoCliente::with(['albaranesPivot', 'albaran', 'albaranes'])
+                ->where('proyecto_id', $proyectoId)
+                ->where('id_cliente', $pedidoCliente->id_cliente)
+                ->where('bolsa', true)
+                ->where('id', '<>', $pedidoCliente->id) // Excluimos la bolsa que ya se está viendo
+                ->where(function ($query) {
+                    $query->whereNull('estado')
+                          ->orWhereIn('estado', ['pendiente', 'facturado_parcial']);
+                })
+                ->orderByDesc('id')
+                ->get();
 
-        // 4. Único retorno con todas las variables empaquetadas
+            $bolsasResumen = $bolsasActivas->map(function (PedidoCliente $bolsaActiva) use ($proyectoId) {
+                $totalBolsa = round((float) ($bolsaActiva->total ?? 0), 2);
+
+                $albs = collect($bolsaActiva->albaranesPivot)
+                    ->merge($bolsaActiva->albaran?->id ? collect([$bolsaActiva->albaran]) : collect())
+                    ->merge($bolsaActiva->albaranes ?? collect())
+                    ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $proyectoId) === $proyectoId)
+                    ->unique('id');
+
+                $facturado = 0.0;
+                foreach ($albs as $alb) {
+                    $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+                    $facturado += $importe;
+                }
+                $facturado = round($facturado, 2);
+
+                return [
+                    'id' => $bolsaActiva->id,
+                    'numero_pedido' => $bolsaActiva->numero_pedido,
+                    'ot' => $bolsaActiva->ot,
+                    'total' => $totalBolsa,
+                    'facturado' => $facturado,
+                    'saldo_disponible' => max(0, round($totalBolsa - $facturado, 2)),
+                ];
+            })->values();
+
+            if ($bolsasResumen->isNotEmpty()) {
+                $resumenBolsasCliente = [
+                    'cantidad' => $bolsasResumen->count(),
+                    'bolsas' => $bolsasResumen,
+                ];
+            }
+        }
+
         return view('pedidos-clientes.albaranes', [
             'pedidoCliente' => $pedidoCliente,
-            'albaranes' => $albaranes,
-            'facturaciones' => $facturaciones,
+            'albaranes' => $albaranesPaginados,
+            'facturaciones' => collect(), // Se mantiene por seguridad si la vista aún lo pide
             'totalPedido' => $totalPedido,
             'totalAlbaranes' => $totalAlbaranes,
             'pendienteFacturar' => $pendienteFacturar,
+            'resumenBolsasCliente' => $resumenBolsasCliente, // Variable lista para pintar el panel
             'titulo' => 'Albaranes del pedido',
             'breadcrumb' => 'Albaranes del pedido',
         ]);
-    }
-
-    public function facturarCuota(Request $request, PedidoCliente $pedidoCliente)
-    {
-        $this->authorize('pedidos.manage');
-
-        // 1. Validamos que los datos lleguen correctamente
-        $request->validate([
-            'importe' => 'required|numeric|min:0.01',
-            'concepto' => 'required|string|max:2000',
-        ]);
-
-        // 2. Guardamos en la tabla relacionada
-        $pedidoCliente->facturacionesManuales()->create([
-            'importe' => $request->importe,
-            'concepto' => $request->concepto,
-        ]);
-
-        // 3. Redirigimos de vuelta a la misma pantalla con un mensaje de éxito
-        return redirect()->route('pedidos-clientes.albaranes', $pedidoCliente)
-                        ->with('success', 'Facturación añadida correctamente.');
-    }
-
-    public function destroyFacturacion(Request $request, $id)
-    {
-        $this->authorize('pedidos.manage');
-
-        // Buscamos la cuota por su ID y la eliminamos
-        $facturacion = \App\Models\FacturacionManual::findOrFail($id);
-        $facturacion->delete();
-
-        return redirect()->back()->with('success', 'Cuota de facturación eliminada correctamente. Los totales se han recalculado.');
     }
 
     /**
@@ -820,8 +875,16 @@ class PedidoController extends Controller
             ->unique('id')
             ->values();
 
+        // LÓGICA DE BLOQUEO O LIBERACIÓN
         if ($albaranesVinculados->isNotEmpty()) {
-            return back()->with('error', 'Este pedido tiene ' . $albaranesVinculados->count() . ' albarán/es asignado/s y no puede ser borrado.');
+            if ($pedidoCliente->bolsa) {
+                // Si es un pedido bolsa, simplemente liberamos los albaranes del pivote
+                // Dejando el dinero flotante nuevamente para otro pedido.
+                $pedidoCliente->albaranesPivot()->detach();
+            } else {
+                // Si es un pedido normal, mantenemos el bloqueo estricto
+                return back()->with('error', 'Este pedido tiene ' . $albaranesVinculados->count() . ' albarán/es asignado/s y no puede ser borrado.');
+            }
         }
 
         DB::transaction(function () use ($pedidoCliente) {
@@ -843,7 +906,7 @@ class PedidoController extends Controller
             $pedidoCliente->delete();
         });
 
-        return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido eliminado correctamente. El presupuesto volvió a estado pendiente.');
+        return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido eliminado correctamente.');
     }
 
     private function renderPdfResponse(PedidoCliente $pedido, bool $download)

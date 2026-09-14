@@ -125,7 +125,7 @@
                 <form method="GET" action="{{ route('pedidos-clientes.index') }}" class="pedido-clientes-filters">
                     <div class="pedido-filter-field pedido-filter-field--search">
                         <label for="search">Buscar</label>
-                        <input type="search" id="search" name="search" value="{{ $searchActual }}" placeholder="Nº pedido, cliente o presupuesto">
+                        <input type="search" id="search" name="search" value="{{ $searchActual }}" placeholder="Buscar por Nº pedido, CC, cliente, presupuesto o importe...">
                     </div>
 
                     <div class="pedido-filter-field">
@@ -262,12 +262,6 @@
                                 </td>
                                 <td data-label="Acciones">
                                     <div class="presupuesto-action-group">
-                                        @can('pedidos.view')
-                                        <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver pedido" title="Ver pedido">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        @endcan
-
                                         @can('pedidos.download')
                                         <a href="{{ route('pedidos-clientes.preview', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar PDF del pedido" title="Previsualizar PDF del pedido">
                                             <i class="fas fa-file-pdf"></i>

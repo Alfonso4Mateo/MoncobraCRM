@@ -21,4 +21,9 @@ class Puesto extends Model
         return $this->belongsToMany(Personal::class, 'personal_puesto')
                     ->withTimestamps();
     }
+
+    public function epis() 
+    {
+        return $this->belongsToMany(Epi::class, 'epi_puesto');
+    }
 }

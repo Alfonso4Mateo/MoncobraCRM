@@ -36,7 +36,7 @@ Route::put('albaranes/{albaran}', [AlbaranClienteController::class, 'update'])->
 Route::get('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'pantallaRoja'])->name('albaranes.pantalla-roja');
 Route::put('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'updatePantallaRoja'])->name('albaranes.pantalla-roja.update');
 Route::patch('albaranes/{albaran}/estado', [AlbaranClienteController::class, 'updateEstado'])->name('albaranes.estado.update');
-
+Route::patch('albaranes/{albaran}/desvincular', [AlbaranClienteController::class, 'desvincular'])->name('albaranes.desvincular');
 // 3º Resource
 Route::resource('albaranes', AlbaranClienteController::class)
     ->parameters(['albaranes' => 'albaran'])

@@ -151,11 +151,12 @@
 
                     <div class="field-group">
                         <label for="pedido_cliente">Pedido cliente</label>
-                        <select id="pedido_cliente" name="pedido_cliente" data-placeholder="Busca por número, cliente u OT...">
+                        <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas...">
                             <option value="">Selecciona pedido...</option>
                             @foreach ($pedidosClientes as $pedido)
                                 @php
                                     $pedidoLabel = trim(
+                                        ($pedido->bolsa ? '📦 [BOLSA] ' : '') .
                                         ($pedido->numero_pedido ?: 'Pedido sin número') . ' | ' .
                                         ($pedido->cliente?->empresa_nombre ?: 'Sin cliente') .
                                         ($pedido->ot ? ' | OT ' . $pedido->ot : '')

@@ -80,3 +80,7 @@ Route::post('puestos/{puesto}/cursos', [App\Http\Controllers\PuestoController::c
 Route::get('puestos/{puesto}/exportar-auditoria', [App\Http\Controllers\PuestoController::class, 'exportAuditoria'])
     ->name('puestos.auditoria.export')
     ->middleware('permission:cursos.export');
+
+// Módulo de EPI (Equipos de Protección Individual)
+Route::resource('epis', App\Http\Controllers\EpiController::class)
+    ->middleware('permission:epis.gestion');

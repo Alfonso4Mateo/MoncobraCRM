@@ -76,6 +76,6 @@ class AlbaranCliente extends Model
             'pedido_cliente_albaran_cliente',
             'albaran_cliente_id',
             'pedido_cliente_id'
-        )->withTimestamps();
+        )->withPivot('importe_imputado')->withTimestamps();
     }
 }
