@@ -154,21 +154,29 @@ class AlbaranClienteController extends Controller
             $albaran->ui_pedido_numero = $pedidoNumero;
             $albaran->ui_pedido_albaranes_count = (int) ($pedidoRelacionado?->albaranes_count ?? 0);
             $albaran->estado = $albaran->estado ?: 'pendiente';
-            $albaran->ui_pedidos_vinculados = $albaran->pedidosClientes->map(function ($pedido) {
+            $albaran->ui_pedidos_vinculados = $albaran->pedidosClientes->map(function ($pedido) use ($totalAlbaran) {
+                $imputado = isset($pedido->pivot) ? (float) $pedido->pivot->importe_imputado : 0.0;
+                // ESCUDO LEGACY: Si es antiguo y marca 0, asume el total
+                if ($imputado <= 0.001) {
+                    $imputado = $totalAlbaran;
+                }
                 return [
                     'id' => $pedido->id,
                     'numero' => $pedido->numero_pedido,
-                    'imputado' => isset($pedido->pivot) ? (float) $pedido->pivot->importe_imputado : 0
-                    ];
+                    'imputado' => $imputado
+                ];
             });
 
             // NUEVO: Calcular cuánto dinero le queda "flotando" a este albarán
             $sumaImputada = 0.0;
             if ($albaran->pedidosClientes->isNotEmpty()) {
-                // Si tiene historial nuevo, sumamos exactamente lo repartido
-                $sumaImputada = $albaran->pedidosClientes->sum('pivot.importe_imputado');
+                $sumaImputada = (float) $albaran->pedidosClientes->sum('pivot.importe_imputado');
+                // ESCUDO LEGACY
+                if ($sumaImputada <= 0.001) {
+                    $sumaImputada = $totalAlbaran;
+                }
             } elseif (trim((string) $pedidoNumero) !== '') {
-                // Si es un albarán antiguo asignado a un pedido, damos por hecho que se consumió entero
+                // Si es un albarán súper antiguo sin pivote
                 $sumaImputada = $totalAlbaran;
             }
             $albaran->ui_excedente = max(0, round($totalAlbaran - $sumaImputada, 2));
@@ -466,11 +474,10 @@ class AlbaranClienteController extends Controller
 
         $totalFacturado = 0.0;
         foreach ($albaranes as $alb) {
-            if ($pedido->bolsa) {
-                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            } else {
-                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            }
+            $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+            // ESCUDO LEGACY: Si el pivote es 0, usamos el total del albarán
+            $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
+            
             $totalFacturado += $importe;
         }
 
@@ -1483,11 +1490,10 @@ class AlbaranClienteController extends Controller
         $albaranesAContar = $pedido->bolsa ? $albaranes : $albaranes->where('estado', 'facturado');
         
         foreach ($albaranesAContar as $alb) {
-           if ($pedido->bolsa) {
-                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            } else {
-                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            }
+            $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+            // ESCUDO LEGACY
+            $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
+            
             $totalFacturado += $importe;
         }
         

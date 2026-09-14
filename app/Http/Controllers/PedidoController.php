@@ -220,14 +220,12 @@ class PedidoController extends Controller
             
             $sumaFacturada = 0.0;
             foreach ($albaranesAContar as $alb) {
-                if ($pedido->bolsa) {
-                    // Si tiene pivote respeta el 0, si es antigua lee el total
-                    $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-                } else {
-                    $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-                }
+                $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+                // ESCUDO LEGACY
+                $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
+                
                 $sumaFacturada += $importe;
-            }   
+            }
             
             // LIMPIO DE CUOTAS
             $pedido->ui_total_facturaciones = round($sumaFacturada, 2);
@@ -701,12 +699,8 @@ class PedidoController extends Controller
         // 1. Sumar el total general de los albaranes (TODOS)
         $totalAlbaranes = 0.0;
         foreach ($albaranes as $alb) {
-            if ($pedidoCliente->bolsa) {
-                // Si tiene pivote respeta el 0, si es antigua lee el total del albarán
-                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            } else {
-                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            }
+            $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+            $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
             $totalAlbaranes += $importe;
         }
         $totalAlbaranes = round($totalAlbaranes, 2);
@@ -725,11 +719,8 @@ class PedidoController extends Controller
         $albaranesAContar = $pedidoCliente->bolsa ? $albaranes : $albaranes->where('estado', 'facturado');
         
         foreach ($albaranesAContar as $alb) {
-            if ($pedidoCliente->bolsa) {
-                $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            } else {
-                $importe = (isset($alb->pivot) && $alb->pivot->importe_imputado > 0) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
-            }
+            $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+            $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
             $totalAlbaranesFacturados += $importe;
         }
         $totalAlbaranesFacturados = round($totalAlbaranesFacturados, 2);
@@ -765,7 +756,9 @@ class PedidoController extends Controller
 
                 $facturado = 0.0;
                 foreach ($albs as $alb) {
-                    $importe = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : (float) ($alb->total ?? 0);
+                    $importePivot = isset($alb->pivot) ? (float) $alb->pivot->importe_imputado : 0.0;
+                    // ESCUDO LEGACY
+                    $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
                     $facturado += $importe;
                 }
                 $facturado = round($facturado, 2);
@@ -778,7 +771,12 @@ class PedidoController extends Controller
                     'facturado' => $facturado,
                     'saldo_disponible' => max(0, round($totalBolsa - $facturado, 2)),
                 ];
-            })->values();
+            })
+            // ---> EL FILTRO MÁGICO: Ocultamos las bolsas antiguas o agotadas
+            ->filter(function ($bolsa) {
+                return $bolsa['saldo_disponible'] > 0.001;
+            })
+            ->values();
 
             if ($bolsasResumen->isNotEmpty()) {
                 $resumenBolsasCliente = [
