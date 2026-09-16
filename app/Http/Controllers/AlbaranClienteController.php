@@ -18,8 +18,8 @@ use Illuminate\Validation\ValidationException;
 class AlbaranClienteController extends Controller
 {
     private const MAX_LINEAS = 5000;
-    private const MAX_DESCRIPCION = 5000;
-    private const MAX_ARTICULO = 1000;
+    private const MAX_DESCRIPCION = 500000;
+    private const MAX_ARTICULO = 2000;
     private const MAX_MEDIDA = 200;
     private const MAX_CANTIDAD = 1000000;
     private const MAX_PRECIO = 10000000;
