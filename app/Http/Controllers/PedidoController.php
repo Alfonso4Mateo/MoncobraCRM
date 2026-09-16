@@ -16,10 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class PedidoController extends Controller
 {
-    private const MAX_LINEAS = 500;
-    private const MAX_DESCRIPCION = 500;
-    private const MAX_ARTICULO = 100;
-    private const MAX_MEDIDA = 20;
+    private const MAX_LINEAS = 5000;
+    private const MAX_DESCRIPCION = 5000;
+    private const MAX_ARTICULO = 1000;
+    private const MAX_MEDIDA = 200;
     private const MAX_CANTIDAD = 1000000;
     private const MAX_PRECIO = 10000000;
     private const MAX_MARGEN = 1000;
