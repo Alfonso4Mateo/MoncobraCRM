@@ -606,6 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
             placeholder: pedidoClienteSelect.dataset.placeholder || "Selecciona pedido...",
             allowClear: true,
             minimumResultsForSearch: 0,
+            tags: true // <-- Habilita la creación dinámica de opciones (texto libre)
         });
 
         $pc.on('select2:select select2:unselect select2:clear', syncPedidoClienteFields);
