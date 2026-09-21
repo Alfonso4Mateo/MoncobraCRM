@@ -41,14 +41,14 @@
         $presupuestosParaPedidoJs = $presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
-        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 2, '.', ''));
+        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 4, '.', ''));
     @endphp
 
     <form id="pedido-cliente-form" action="{{ route('pedidos-clientes.store') }}" method="POST" class="pedido-create-layout" novalidate>
         @csrf
         <input type="hidden" name="bolsa" value="0">
         <input type="hidden" name="estado" id="pedido_estado" value="{{ $estadoActual }}">
-        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 2, '.', '') }}">
+        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 4, '.', '') }}">
         <input type="hidden" name="lista_articulos" id="pedido_lista_articulos" value="{{ $lineasJson }}">
 
         <section class="pedido-create-main">

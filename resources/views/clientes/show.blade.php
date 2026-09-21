@@ -139,7 +139,7 @@
                                     </td>
                                     <td class="total-cell">
                                         @if ($presupuesto->ui_total !== null)
-                                            {{ number_format($presupuesto->ui_total, 2, ',', '.') }} €
+                                            {{ number_format($presupuesto->ui_total, 4, ',', '.') }} €
                                         @else
                                             N/D
                                         @endif
@@ -237,7 +237,7 @@
                                     </td>
                                     <td>{{ $pedido->ui_albaranes_count > 0 ? $pedido->ui_albaranes_count : '0' }}</td>
                                     <td class="total-cell">
-                                        {{ number_format((float) ($pedido->ui_total ?? 0), 2, ',', '.') }} €
+                                        {{ number_format((float) ($pedido->ui_total ?? 0), 4, ',', '.') }} €
                                     </td>
                                     <td class="text-center">
                                         <div class="cliente-show-action-group">
@@ -335,7 +335,7 @@
                                     </td>
                                     <td class="total-cell">
                                         @if ($albaran->ui_total !== null)
-                                            {{ number_format((float) $albaran->ui_total, 2, ',', '.') }} €
+                                            {{ number_format((float) $albaran->ui_total, 4, ',', '.') }} €
                                         @else
                                             N/D
                                         @endif

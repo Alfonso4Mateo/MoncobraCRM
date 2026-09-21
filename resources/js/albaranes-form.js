@@ -1,4 +1,9 @@
-const euroFormatter = new Intl.NumberFormat("es-ES", {
+const moneyFormatter = new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+});
+
+const numberFormatter = new Intl.NumberFormat("es-ES", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });
@@ -13,6 +18,10 @@ const clampNumber = (value) => {
 
 const round2 = (value) => {
     return Math.round(clampNumber(value) * 100) / 100;
+};
+
+const round4 = (value) => {
+    return Math.round(clampNumber(value) * 10000) / 10000;
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -62,9 +71,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 .map((linea) => {
                     const cantidad = round2(linea.cantidad);
                     const cantidadMax = Math.max(cantidad, round2(linea.cantidad_max ?? linea.cantidad));
-                    const precioUnitario = round2(linea.precio_unitario ?? linea.precio);
+                    const precioUnitario = round4(linea.precio_unitario ?? linea.precio);
                     const margen = round2(linea.margen);
-                    const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+                    const total = round4(cantidad * precioUnitario * (1 + margen / 100));
 
                     return {
                         articulo_id: linea.articulo_id ?? null,
@@ -125,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateTotal = () => {
         const total = lineas.reduce((acc, linea) => acc + (isPedidoRestrictoMode() && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
-        totalElement.textContent = `${euroFormatter.format(round2(total))} €`;
+        totalElement.textContent = `${moneyFormatter.format(round4(total))} €`;
     };
 
     const lineSignature = (linea) => {
@@ -154,13 +163,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 descripcion,
                 cantidad: 0,
                 medida: String(linea.medida ?? linea.unidad ?? '').trim(),
-                precio_unitario: round2(linea.precio_unitario ?? linea.precio ?? 0),
+                precio_unitario: round4(linea.precio_unitario ?? linea.precio ?? 0),
                 margen: round2(linea.margen ?? 0),
                 total: 0,
             };
 
             current.cantidad = round2(current.cantidad + round2(linea.cantidad ?? 0));
-            current.total = round2(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
+            current.total = round4(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
             grouped.set(signature, current);
         });
 
@@ -265,7 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         linea.cantidad = cantidad;
-        linea.total = round2(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
+        linea.total = round4(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
     };
 
     const setPedidoMode = (enabled) => {
@@ -361,9 +370,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <input type="number" class="albaran-line-qty" data-action="edit-cantidad" data-index="${index}" min="0" step="0.01" max="${maxCantidad}" value="${qtyValue}" ${(checked && !locked) ? '' : 'disabled'}>
                             </td>
                             <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
-                            <td>${euroFormatter.format(linea.precio_unitario)} €</td>
-                            <td>${euroFormatter.format(linea.margen)} %</td>
-                            <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
+                            <td>${moneyFormatter.format(linea.precio_unitario)} €</td>
+                            <td>${numberFormatter.format(linea.margen)} %</td>
+                            <td class="linea-total">${moneyFormatter.format(totalLinea)} €</td>
                             <td>
                                 <label class="albaran-line-check">
                                     <input type="checkbox" class="albaran-line-check__input" data-action="toggle-selected" data-index="${index}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}>
@@ -377,11 +386,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     <tr data-index="${index}"${isSelected ? ' class="is-selected"' : ""}>
                         <td>${String(index + 1).padStart(2, '0')}</td>
                         <td>${linea.descripcion}</td>
-                        <td>${euroFormatter.format(linea.cantidad)}</td>
+                        <td>${numberFormatter.format(linea.cantidad)}</td>
                         <td>${medida ? medida : '<span class="text-muted">-</span>'}</td>
-                        <td>${euroFormatter.format(linea.precio_unitario)} €</td>
-                        <td>${euroFormatter.format(linea.margen)} %</td>
-                        <td class="linea-total">${euroFormatter.format(totalLinea)} €</td>
+                        <td>${moneyFormatter.format(linea.precio_unitario)} €</td>
+                        <td>${numberFormatter.format(linea.margen)} %</td>
+                        <td class="linea-total">${moneyFormatter.format(totalLinea)} €</td>
                         <td>
                             <button type="button" class="linea-btn linea-edit" data-action="edit" data-index="${index}" title="Editar línea">
                                 <i class="far fa-edit"></i>
@@ -410,7 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const descripcion = descripcionInput.value.trim();
         const cantidad = round2(cantidadInput.value);
         const medida = medidaInput.value.trim() || 'und';
-        const precioUnitario = round2(precioInput.value);
+        const precioUnitario = round4(precioInput.value);
         const margen = round2(margenInput.value);
 
         if (!descripcion || cantidad <= 0) {
@@ -418,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+        const total = round4(cantidad * precioUnitario * (1 + margen / 100));
 
         const payload = {
             articulo_id: selectedIndex >= 0 && selectedIndex < lineas.length ? (lineas[selectedIndex].articulo_id ?? null) : null,
