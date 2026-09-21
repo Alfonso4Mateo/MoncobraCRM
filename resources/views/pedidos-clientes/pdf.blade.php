@@ -242,8 +242,8 @@
                         <td style="white-space: pre-wrap;">{!! nl2br(e($textoLimpio)) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                        <td align="right" class="evitar-salto">{{ number_format($precio, 2, ',', '.') }} €</td>
-                        <td align="right" class="evitar-salto">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
+                        <td align="right" class="evitar-salto">{{ number_format($precio, 4, ',', '.') }} €</td>
+                        <td align="right" class="evitar-salto">{{ number_format($totalLinea, 4, ',', '.') }} €</td>
                     </tr>
                 @endforeach
             @elseif ($bolsaTexto !== '')
@@ -271,7 +271,7 @@
                 <td align="right">
                     <div class="total-box">
                         <span class="total-box__label">Total:</span>
-                        <span class="total-box__value">{{ number_format((float) $pedido->total ?? 0, 2, ',', '.') }} €</span>
+                        <span class="total-box__value">{{ number_format((float) $pedido->total ?? 0, 4, ',', '.') }} €</span>
                     </div>
                 </td>
             </tr>

@@ -226,8 +226,8 @@
             const deleteButton = document.getElementById('btn_eliminar_item');
 
             const eur = new Intl.NumberFormat('es-ES', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: 4,
+                maximumFractionDigits: 4,
             });
 
             const MAX_CANTIDAD = 1000000;
@@ -277,9 +277,9 @@
                     descripcion: String(item?.descripcion ?? '').trim(),
                     cantidad: Number(cantidad.toFixed(2)),
                     medida: String(item?.medida ?? item?.unidad ?? '').trim(),
-                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    precio_unitario: Number(precioUnitario.toFixed(4)),
                     margen: Number(margen.toFixed(2)),
-                    total: Number(total.toFixed(2)),
+                    total: Number(total.toFixed(4)),
                 };
             };
 
@@ -416,9 +416,9 @@
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
-                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    precio_unitario: Number(precioUnitario.toFixed(4)),
                     margen: Number(margen.toFixed(2)),
-                    total: Number(total.toFixed(2)),
+                    total: Number(total.toFixed(4)),
                 };
 
                 if (editingIndex !== null && editingIndex >= 0 && editingIndex < items.length) {

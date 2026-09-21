@@ -154,7 +154,7 @@
                                 </td>
                                 <td data-label="Total">
                                     <span class="presupuesto-total">
-                                        {{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR
+                                        {{ number_format((float) ($presupuesto->total ?? 0), 4, ',', '.') }} EUR
                                     </span>
                                 </td>
                                 <td data-label="Estado">

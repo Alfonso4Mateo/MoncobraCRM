@@ -238,11 +238,11 @@
                         <div class="presupuesto-totals-box" aria-live="polite">
                             <div class="total-row">
                                 <span>Subtotal</span>
-                                <strong id="items_subtotal">0,00 EUR</strong>
+                                <strong id="items_subtotal">0,0000 EUR</strong>
                             </div>
                             <div class="total-row total-final">
                                 <span>Total presupuesto</span>
-                                <strong id="items_total">0,00 EUR</strong>
+                                <strong id="items_total">0,0000 EUR</strong>
                             </div>
                         </div>
                     </footer>
@@ -270,8 +270,8 @@
             const deleteButton = document.getElementById('btn_eliminar_item');
 
             const eur = new Intl.NumberFormat('es-ES', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: 4,
+                maximumFractionDigits: 4,
             });
 
             const MAX_CANTIDAD = 1000000;
@@ -426,17 +426,17 @@
                 }
 
                 const precioConMargen = precioUnitario * (1 + (margen / 100));
-                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(4));
                 const total = cantidad * precioConMargenRounded;
 
                 const payload = {
                     descripcion,
                     cantidad: Number(cantidad),
                     unidad: unidad,
-                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    precio_unitario: Number(precioUnitario.toFixed(4)),
                     margen: Number(margen.toFixed(2)),
                     precio_con_margen: precioConMargenRounded,
-                    total: Number(total.toFixed(2)),
+                    total: Number(total.toFixed(4)),
                 };
 
                 if (editingIndex !== null && editingIndex >= 0 && editingIndex < items.length) {

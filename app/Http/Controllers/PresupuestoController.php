@@ -513,7 +513,7 @@ class PresupuestoController extends Controller
         // Preparamos el array de datos básicos
         $updateData = [
             'lista_articulos' => $articulosNormalizados ?: null,
-            'total' => round($totalComputed, 2),
+            'total' => round($totalComputed, 4),
             'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
             'solicitante' => $validated['solicitante'] ?? null, 
@@ -692,13 +692,13 @@ class PresupuestoController extends Controller
                 $margen = max(0, (float) ($item['margen'] ?? 0));
 
                 $cantidadNormalizada = $cantidadEntera ? (int) max(0, round($cantidad, 0)) : round($cantidad, 2);
-                $precioUnitarioRounded = round($precioUnitario, 2);
+                $precioUnitarioRounded = round($precioUnitario, 4);
                 $margenRounded = round($margen, 2);
 
                 // Apply margin to unit price on server-side (only once).
                 $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
-                $precioConMargenRounded = round($precioConMargen, 2);
-                $totalComputed = round($precioConMargenRounded * $cantidadNormalizada, 2);
+                $precioConMargenRounded = round($precioConMargen, 4);
+                $totalComputed = round($precioConMargenRounded * $cantidadNormalizada, 4);
 
                 $medida = trim((string) ($item['medida'] ?? ($item['unidad'] ?? '')));
                 $medida = $medida !== '' ? $medida : null;
@@ -903,9 +903,9 @@ class PresupuestoController extends Controller
                     'descripcion' => $descripcion,
                     'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
                     'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
-                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 4),
                     'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
-                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 4),
                     'facturado' => false,
                 ]
             );

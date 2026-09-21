@@ -139,7 +139,7 @@ class AlbaranClienteController extends Controller
 
             $presupuestoRelacionado = $presupuestoNumero !== '' ? $presupuestos->get($presupuestoNumero) : null;
             $pedidoRelacionado = $pedidoNumero !== '' ? $pedidos->get($pedidoNumero) : null;
-            $totalAlbaran = round((float) ($albaran->total ?? 0), 2);
+            $totalAlbaran = round((float) ($albaran->total ?? 0), 4);
 
             $pedidoPresupuesto = $pedidoRelacionado?->presupuesto;
 
@@ -179,7 +179,7 @@ class AlbaranClienteController extends Controller
                 // Si es un albarán súper antiguo sin pivote
                 $sumaImputada = $totalAlbaran;
             }
-            $albaran->ui_excedente = max(0, round($totalAlbaran - $sumaImputada, 2));
+            $albaran->ui_excedente = max(0, round($totalAlbaran - $sumaImputada, 4));
 
             return $albaran;
         });
@@ -312,7 +312,7 @@ class AlbaranClienteController extends Controller
         $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
-        $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 2);
+        $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 4);
 
         // EXTRAEMOS EL PDF FUERA DE LA TRANSACCIÓN
         if ($request->hasFile('archivo_pdf')) {
@@ -394,7 +394,7 @@ class AlbaranClienteController extends Controller
 
                     $articulo->cantidad = $restante;
                     $articulo->facturado = $restante <= 0;
-                    $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+                    $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 4);
                     $articulo->save();
                 }
             }
@@ -449,7 +449,7 @@ class AlbaranClienteController extends Controller
             $linea['cantidad_max'] = max($cantidad, (float) ($linea['cantidad_max'] ?? $cantidad));
             $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
             $margen = (float) ($linea['margen'] ?? 0);
-            $linea['total'] = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+            $linea['total'] = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 4);
 
             return $linea;
         })->values()->all();
@@ -481,9 +481,9 @@ class AlbaranClienteController extends Controller
             $totalFacturado += $importe;
         }
 
-        $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
+        $pedidoTotal = round((float) ($pedido->total ?? 0), 4);
 
-        return round(max(0, $pedidoTotal - $totalFacturado), 2);
+        return round(max(0, $pedidoTotal - $totalFacturado), 4);
     }
 
     private function resolveVisibleAlbaranProyectoId(AlbaranCliente $albaran): ?int
@@ -806,7 +806,7 @@ class AlbaranClienteController extends Controller
                 'titulo' => $validated['titulo'] ?? null,
                 'estado' => $validated['estado'],
                 'lista_articulos' => $lineas === [] ? null : $lineas,
-                'total' => round($total, 2),
+                'total' => round($total, 4),
             ]);
 
             // Consumir stock
@@ -1229,9 +1229,9 @@ class AlbaranClienteController extends Controller
             }
 
             $cantidad = round(max(0, (float) ($linea['cantidad'] ?? 0)), 2);
-            $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2);
+            $precioUnitario = round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 4);
             $margen = round(max(0, (float) ($linea['margen'] ?? 0)), 2);
-            $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+            $total = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 4);
 
             $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
             $medida = $medida !== '' ? $medida :'und';
@@ -1420,7 +1420,7 @@ class AlbaranClienteController extends Controller
         }
 
         if (empty($pedidosNumeros)) {
-            return round($importeRestante, 2);
+            return round($importeRestante, 4);
         }
 
         // 4. Cargamos ÚNICAMENTE las bolsas que el usuario ha seleccionado
@@ -1436,7 +1436,7 @@ class AlbaranClienteController extends Controller
             if ($importeRestante <= 0.001) break;
 
             if (! (bool) ($pedido->bolsa ?? false)) {
-                $albaran->pedidosClientes()->attach($pedido->id, ['importe_imputado' => round($importeRestante, 2)]);
+                $albaran->pedidosClientes()->attach($pedido->id, ['importe_imputado' => round($importeRestante, 4)]);
                 if (empty($pedido->albaran_id)) {
                     $pedido->forceFill(['albaran_id' => $albaran->id])->save();
                 }
@@ -1448,7 +1448,7 @@ class AlbaranClienteController extends Controller
             $asignar = max(0, min($importeRestante, $pendiente));
             
             if ($asignar > 0.001) {
-                $albaran->pedidosClientes()->attach($pedido->id, ['importe_imputado' => round($asignar, 2)]);
+                $albaran->pedidosClientes()->attach($pedido->id, ['importe_imputado' => round($asignar, 4)]);
                 $importeRestante -= $asignar;
 
                 if (empty($pedido->albaran_id)) {
@@ -1457,7 +1457,7 @@ class AlbaranClienteController extends Controller
             }
         }
 
-        return max(0, round($importeRestante, 2));
+        return max(0, round($importeRestante, 4));
     }
 
     private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array $lineasDelAlbaran = []): void
@@ -1478,7 +1478,7 @@ class AlbaranClienteController extends Controller
             ->with(['albaranesPivot', 'albaran', 'albaranes'])
             ->find($pedido->id) ?? $pedido;
 
-        $pedidoTotal = round((float) ($pedido->total ?? 0), 2);
+        $pedidoTotal = round((float) ($pedido->total ?? 0), 4);
 
         $albaranes = collect($pedido->albaranesPivot ?? [])
             ->merge($pedido->albaran?->id ? collect([$pedido->albaran]) : collect())
@@ -1617,9 +1617,9 @@ class AlbaranClienteController extends Controller
                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                     'cantidad' => round($cantidad, 2),
                     'medida' => $medida,
-                    'precio_unitario' => round($precioUnitario, 2),
+                    'precio_unitario' => round($precioUnitario, 4),
                     'margen' => round($margen, 2),
-                    'total' => round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2),
+                    'total' => round($cantidad * $precioUnitario * (1 + ($margen / 100)), 4),
                 ];
             })
             ->values()
@@ -1711,7 +1711,7 @@ class AlbaranClienteController extends Controller
 
             $articulo->cantidad = $restante;
             $articulo->facturado = $restante <= 0;
-            $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+                    $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 4);
             $articulo->save();
         }
     }
