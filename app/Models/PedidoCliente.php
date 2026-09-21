@@ -51,7 +51,7 @@ class PedidoCliente extends Model
     protected $casts = [
         'fecha_pedido' => 'date',
         'bolsa' => 'boolean',
-        'total' => 'decimal:2',
+        'total' => 'decimal:4',
         'lista_articulos' => 'array',
     ];
 
