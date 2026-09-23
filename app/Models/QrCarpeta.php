@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\Models\Activity;
 
 class QrCarpeta extends Model
 {
+    use Auditable;
     use SoftDeletes;
 
     protected $table = 'qr_carpetas';
@@ -34,5 +38,32 @@ class QrCarpeta extends Model
     public function qrs()
     {
         return $this->hasMany(EtiquetaQr::class, 'carpeta_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $nombre = trim((string) $this->getAttribute('nombre'));
+        $referencia = $nombre !== '' ? 'Carpeta QR: ' . $nombre : '';
+
+        if ($this->relationLoaded('padre') && $this->padre) {
+            $padre = trim((string) $this->padre->getAttribute('nombre'));
+            if ($padre !== '') {
+                $referencia .= ($referencia !== '' ? ' - ' : '') . 'Padre: ' . $padre;
+            }
+        }
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

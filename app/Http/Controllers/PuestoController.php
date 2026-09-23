@@ -46,10 +46,40 @@ class PuestoController extends Controller
             return $curso->categoria ?: 'Sin categoría';
         });
 
+        $episDisponibles = \App\Models\Epi::where('activo', true)->orderBy('nombre')->get();
+
+        $episAsignados = $puesto->epis->mapWithKeys(function ($epi) {
+            return [$epi->id => ['cantidad' => $epi->pivot->cantidad]];
+        })->toArray();
+
         // Extraemos solo los IDs de los cursos que este puesto ya tiene marcados como obligatorios
         $cursosAsignados = $puesto->cursos->pluck('id')->toArray();
 
-        return view('puestos.edit', compact('puesto', 'cursosPorCategoria', 'cursosAsignados'));
+        return view('puestos.edit', compact('puesto', 'cursosPorCategoria', 'cursosAsignados', 'episDisponibles', 'episAsignados'));
+    }
+
+    public function syncEpis(Request $request, Puesto $puesto)
+    {
+        $request->validate([
+            'epis' => 'nullable|array',
+            'epis.*' => 'exists:epis,id',
+            'cantidades' => 'nullable|array',
+            'cantidades.*' => 'integer|min:1'
+        ]);
+
+        $syncData = [];
+        if ($request->has('epis')) {
+            foreach ($request->epis as $epiId) {
+                // Recuperamos la cantidad introducida; si no viene por seguridad, ponemos 1
+                $cantidad = $request->input("cantidades.{$epiId}", 1);
+                $syncData[$epiId] = ['cantidad' => $cantidad];
+            }
+        }
+
+        // Aplicamos la inteligencia del sync() de Laravel con el atributo de la tabla pivot
+        $puesto->epis()->sync($syncData);
+
+        return redirect()->route('puestos.edit', $puesto->id)->with('success', 'Dotación de EPIs del puesto actualizada correctamente.');
     }
 
     public function update(Request $request, Puesto $puesto)
@@ -269,5 +299,19 @@ class PuestoController extends Controller
         };
 
         return response()->streamDownload($callback, $fileName, $headers);
+    }
+
+    /**
+     * Genera el documento PDF con la dotación de EPIs de un puesto.
+     * (Versión provisional en HTML hasta tener la plantilla definitiva)
+     */
+    public function exportEpisPdf(Puesto $puesto)
+    {
+        // Cargamos los EPIs asignados al puesto y su cantidad desde la tabla pivote
+        $puesto->load('epis');
+
+        // RETORNO PROVISIONAL: Te devolverá una vista HTML simple.
+        // Cuando tu compañero traiga el PDF, aquí usaremos la librería correspondiente (ej: Barryvdh\DomPDF).
+        return view('puestos.pdf-epis-placeholder', compact('puesto'));
     }
 }

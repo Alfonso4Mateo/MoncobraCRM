@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Activity;
 
 class Inventario extends Model
 {
+    use Auditable;
     use HasFactory;
 
     /**
@@ -72,5 +76,34 @@ class Inventario extends Model
     public function variante(): BelongsTo
     {
         return $this->belongsTo(InventarioVariante::class, 'inventario_variante_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $nombre = trim((string) $this->getAttribute('nombre'));
+        $codigo = trim((string) $this->getAttribute('codigo'));
+        $referenciaProveedor = trim((string) $this->getAttribute('referencia_proveedor'));
+        $almacen = trim((string) $this->getAttribute('almacen'));
+        $partes = array_values(array_filter([
+            $nombre !== '' ? $nombre : null,
+            $codigo !== '' ? 'Código: ' . $codigo : null,
+            $referenciaProveedor !== '' ? 'Ref. proveedor: ' . $referenciaProveedor : null,
+            $almacen !== '' ? 'Almacén: ' . $almacen : null,
+        ]));
+        $referencia = $partes !== [] ? 'Inventario: ' . implode(' - ', $partes) : '';
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

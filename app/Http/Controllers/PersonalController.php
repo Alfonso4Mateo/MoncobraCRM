@@ -6,11 +6,12 @@ use App\Models\Curso;
 use App\Models\Personal;
 use App\Models\SalidaStock;
 use App\Models\Proyecto;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use App\Models\Departamento;
 use App\Models\Puesto;
 use App\Models\PuestoTrabajo;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class PersonalController extends Controller
 {
@@ -90,7 +91,6 @@ class PersonalController extends Controller
         };
 
         if ($export === 'csv') {
-            // Requerimos permiso de bulk para exportar
             $this->authorize('personal.export');
             
             $rows = $buildQuery()->get();
@@ -122,7 +122,6 @@ class PersonalController extends Controller
         $personals->getCollection()->transform(function (Personal $personal) use ($alertaLimite) {
             $hoy = \Carbon\Carbon::now()->startOfDay();
             
-            // Calculamos el estado exacto de la revisión médica
             if ($personal->proxima_revision_medica) {
                 $prox = \Carbon\Carbon::parse($personal->proxima_revision_medica)->startOfDay();
                 if ($hoy->gt($prox)) {
@@ -136,8 +135,6 @@ class PersonalController extends Controller
                 $personal->estado_medico = 'ok';
             }
             
-            // Mantenemos la variable original para no romper el CSS de la fila, 
-            // pero ahora basándonos en los nuevos estados.
             $personal->alerta_revision_medica = in_array($personal->estado_medico, ['caducada', 'aviso']);
 
             $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
@@ -221,13 +218,10 @@ class PersonalController extends Controller
 
     public function create()
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.create');
 
         $personal = new Personal(['activo' => true]);
         $departamentos = Departamento::orderBy('nombre')->get();
-        
-        // CORREGIDO: Cargamos los nuevos Puestos de Trabajo
         $puestosTrabajoCatalogo = PuestoTrabajo::where('activo', true)->orderBy('nombre')->get();
 
         return view('personal.edit', [
@@ -235,28 +229,24 @@ class PersonalController extends Controller
             'isCreate' => true,
             'proyectos' => Proyecto::orderBy('nombre')->get(),
             'departamentos' => $departamentos, 
-            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo // Pasamos la variable correcta
+            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo
         ]);
     }
 
     public function store(Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.create');
 
         $validated = $this->validatePersonal($request);
 
-       // --- DETECCIÓN Y AUTO-CÁLCULO DE REVISIÓN MÉDICA ---
         if (!empty($validated['ultima_revision_medica']) && !empty($validated['puesto_trabajo_id'])) {
             $puestoTrabajo = \App\Models\PuestoTrabajo::find($validated['puesto_trabajo_id']);
             $meses = $puestoTrabajo ? ($puestoTrabajo->periodicidad_meses ?? 12) : 12;
             
-            // Fecha teórica según la periodicidad del puesto
             $fechaCalculada = \Carbon\Carbon::parse($validated['ultima_revision_medica'])
                 ->addMonths($meses)
                 ->format('Y-m-d');
 
-            // Si el usuario especificó una fecha distinta a la calculada, se marca como manual
             if (!empty($validated['proxima_revision_medica']) && $validated['proxima_revision_medica'] !== $fechaCalculada) {
                 $validated['revision_medica_manual'] = true;
             } else {
@@ -265,35 +255,30 @@ class PersonalController extends Controller
             }
         }
 
-        // --- FILTRO SANITIZADOR DE DATOS SENSIBLES ---
         if (!auth()->user()->can('personal.medico')) {
             unset($validated['ultima_revision_medica'], $validated['proxima_revision_medica'], $validated['ultima_graduacion'], $validated['proxima_graduacion'], $validated['reconocido_en'], $validated['graduado_en']);
         }
         if (!auth()->user()->can('personal.tallas')) {
-            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']); // <-- AÑADIR A ESTE ARRAY
+            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']);
         }
 
         $proyectoIds = $validated['proyecto_ids'] ?? [];
 
-        // --- AUTO-ASIGNACIÓN DE SEDE ---
         $user = auth()->user();
         if ($user && $user->role !== 'superadmin') {
             $proyectoIds = $user->proyectos->pluck('id')->toArray();
         }
 
-        // Comprobamos si la petición trae al menos un departamento seleccionado
         if ($request->has('departamento')) {
             $validated['departamento'] = is_array($request->input('departamento')) 
                 ? implode(',', $request->input('departamento')) 
                 : $request->input('departamento');
         } else {
-            // Si no trae nada, significa que el usuario ha deseleccionado todo, forzamos el nulo
             $validated['departamento'] = null;
         }
 
         $validated['activo'] = $request->boolean('activo', true);
         
-        // Asignar sin_tallas respetando el filtro
         if (isset($validated['sin_tallas'])) {
             $validated['sin_tallas'] = $request->boolean('sin_tallas', false);
         }
@@ -311,7 +296,6 @@ class PersonalController extends Controller
 
     public function show(Personal $personal, Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.acciones');
         
         $personal->load([
@@ -322,6 +306,7 @@ class PersonalController extends Controller
         $cursosCatalogo = Curso::orderBy('nombre')->get();
         $nombreCompleto = trim(preg_replace('/\s+/', ' ', trim((string) $personal->name . ' ' . (string) $personal->apellido)));
         $nombreNormalizado = mb_strtolower($nombreCompleto);
+        $personal->load(['proyectos', 'historialPrl']);
 
         $salidasQuery = SalidaStock::query()
             ->orderByDesc('fecha')
@@ -421,12 +406,9 @@ class PersonalController extends Controller
 
     public function edit(Personal $personal)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.edit');
 
         $departamentos = Departamento::orderBy('nombre')->get();
-        
-        // CORREGIDO: Cargamos los nuevos Puestos de Trabajo
         $puestosTrabajoCatalogo = PuestoTrabajo::where('activo', true)->orderBy('nombre')->get();
 
         return view('personal.edit', [
@@ -434,28 +416,24 @@ class PersonalController extends Controller
             'isCreate' => false,
             'proyectos' => Proyecto::orderBy('nombre')->get(),
             'departamentos' => $departamentos,
-            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo, // Pasamos la variable correcta
+            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo,
         ]);
     }
 
     public function update(Request $request, Personal $personal)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.edit');
 
         $validated = $this->validatePersonal($request, $personal->id);
 
-        // --- DETECCIÓN Y AUTO-CÁLCULO DE REVISIÓN MÉDICA ---
         if (!empty($validated['ultima_revision_medica']) && !empty($validated['puesto_trabajo_id'])) {
             $puestoTrabajo = \App\Models\PuestoTrabajo::find($validated['puesto_trabajo_id']);
             $meses = $puestoTrabajo ? ($puestoTrabajo->periodicidad_meses ?? 12) : 12;
             
-            // Fecha teórica según la periodicidad del puesto
             $fechaCalculada = \Carbon\Carbon::parse($validated['ultima_revision_medica'])
                 ->addMonths($meses)
                 ->format('Y-m-d');
 
-            // Si el usuario especificó una fecha distinta a la calculada, se marca como manual
             if (!empty($validated['proxima_revision_medica']) && $validated['proxima_revision_medica'] !== $fechaCalculada) {
                 $validated['revision_medica_manual'] = true;
             } else {
@@ -464,24 +442,21 @@ class PersonalController extends Controller
             }
         }
 
-        // --- FILTRO SANITIZADOR DE DATOS SENSIBLES ---
         if (!auth()->user()->can('personal.medico')) {
             unset($validated['ultima_revision_medica'], $validated['proxima_revision_medica'], $validated['ultima_graduacion'], $validated['proxima_graduacion'], $validated['reconocido_en'], $validated['graduado_en']);
         }
         if (!auth()->user()->can('personal.tallas')) {
-            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']); // <-- AÑADIR A ESTE ARRAY
+            unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']);
         }
 
         $proyectoIds = $validated['proyecto_ids'] ?? null;
         unset($validated['proyecto_ids']);
 
-        // Comprobamos si la petición trae al menos un departamento seleccionado
         if ($request->has('departamento')) {
             $validated['departamento'] = is_array($request->input('departamento')) 
                 ? implode(',', $request->input('departamento')) 
                 : $request->input('departamento');
         } else {
-            // Si no trae nada, significa que el usuario ha deseleccionado todo, forzamos el nulo
             $validated['departamento'] = null;
         }
 
@@ -491,7 +466,6 @@ class PersonalController extends Controller
             unset($validated['activo']); 
         }
         
-        // Asignar sin_tallas respetando el filtro
         if (isset($validated['sin_tallas'])) {
             $validated['sin_tallas'] = $request->boolean('sin_tallas', false);
         }
@@ -509,7 +483,6 @@ class PersonalController extends Controller
 
     public function destroy(Personal $personal)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.delete');
 
         $personal->delete();
@@ -519,15 +492,14 @@ class PersonalController extends Controller
 
     public function toggleStatus(Personal $personal)
     {
-        $this->authorize('personal.edit'); // Requiere permiso de edición
+        $this->authorize('personal.edit');
         
         $estabaInactivo = !$personal->activo;
-        $personal->activo = !$personal->activo; // Invierte el estado
+        $personal->activo = !$personal->activo; 
         
-        // LÓGICA DE REACTIVACIÓN: Si lo estamos dando de alta y antes estaba de baja
         if ($personal->activo && $estabaInactivo) {
             $personal->fecha_reactivacion = now();
-            $personal->prl_revisado = false; // Vuelve a requerir atención de PRL
+            $personal->prl_revisado = false; 
         }
         
         $personal->save();
@@ -536,9 +508,84 @@ class PersonalController extends Controller
         return redirect()->back()->with('success', $mensaje);
     }
     
+    // --- NUEVAS FUNCIONES PARA DOCUMENTACIÓN PRL (RIESGOS Y EPIs) ---
+
+    public function uploadDocumentosPrl(Request $request, Personal $personal)
+    {
+        $this->authorize('personal.edit');
+
+        $request->validate([
+            'tipo_documento' => 'required|in:riesgos,epi',
+            'archivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ]);
+
+        $tipo = $request->input('tipo_documento');
+        $columnaBaseDatos = $tipo === 'riesgos' ? 'documento_riesgos' : 'documento_epi';
+
+        // Guardamos el nuevo archivo en la carpeta 'prl'
+        $path = $request->file('archivo')->store('prl', 'public');
+
+        // 1. Actualizamos el "Estado Actual" en la tabla personal
+        $personal->update([
+            $columnaBaseDatos => $path
+        ]);
+
+        // 2. Registramos la "Trazabilidad" en el historial
+        $personal->historialPrl()->create([
+            'tipo' => $tipo,
+            'archivo_path' => $path
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function destroyDocumentosPrl(Personal $personal, $tipo)
+    {
+        $this->authorize('personal.edit');
+
+        if (!in_array($tipo, ['riesgos', 'epi'])) {
+            return redirect()->back()->with('error', 'Tipo de documento no válido.');
+        }
+
+        $columnaBaseDatos = $tipo === 'riesgos' ? 'documento_riesgos' : 'documento_epi';
+
+        // Borramos el documento físico independientemente de cuál sea
+        if ($personal->{$columnaBaseDatos}) {
+            Storage::disk('public')->delete($personal->{$columnaBaseDatos});
+        }
+        
+        // Ponemos a nulo en base de datos solo el documento seleccionado
+        $personal->update([$columnaBaseDatos => null]);
+
+        $nombreDoc = $tipo === 'riesgos' ? 'Riesgos' : 'EPIs';
+        return redirect()->back()->with('success', "Documento de {$nombreDoc} eliminado correctamente.");
+    }
+
+    public function destroyHistorialPrl(Personal $personal, \App\Models\HistorialPrl $historial)
+    {
+        $this->authorize('personal.edit');
+
+        // Validamos de forma estricta que el historial pertenezca a este trabajador
+        if ($historial->personal_id !== $personal->id) {
+            abort(403, 'Acción no permitida.');
+        }
+
+        // SEGURIDAD: Comprobamos si el archivo de este historial es el documento VIGENTE actual
+        $esDocumentoActivo = ($personal->documento_riesgos === $historial->archivo_path || $personal->documento_epi === $historial->archivo_path);
+
+        // Si NO es el documento activo, podemos borrar el archivo físico del disco para liberar espacio
+        if (!$esDocumentoActivo && !empty($historial->archivo_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($historial->archivo_path);
+        }
+
+        // Finalmente, borramos el registro de la base de datos
+        $historial->delete();
+
+        return redirect()->back()->with('success', 'Registro histórico eliminado de forma segura.');
+    }
+
     public function tallas(Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.tallas');
 
         $query = (string) $request->input('q', '');
@@ -546,7 +593,6 @@ class PersonalController extends Controller
         $departamentoFiltro = (string) $request->input('departamento', 'todos'); 
         $export = $request->input('export'); 
         
-        // 1. Capturamos el valor del checkbox (falso por defecto)
         $incluirInactivos = $request->boolean('incluir_inactivos', false);
 
         $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas' , 'bolsa_fod'];
@@ -555,7 +601,6 @@ class PersonalController extends Controller
         $user = auth()->user();
 
         $personals = Personal::query()
-            // 2. Filtramos para mostrar SOLO a los activos, a menos que el checkbox esté marcado
             ->when(!$incluirInactivos, function ($q) {
                 $q->where('activo', true);
         })
@@ -597,7 +642,6 @@ class PersonalController extends Controller
             ->get();
 
         if ($export === 'csv') {
-            // Protección adicional para exportación
             $this->authorize('personal.export');
 
             return response()->streamDownload(function () use ($personals, $columns) {
@@ -662,10 +706,8 @@ class PersonalController extends Controller
             'departamento'   => 'nullable|array',
             'departamento.*' => 'string|max:255',
             
-            // El puesto antiguo (puedes dejarlo si aún lo usas para otra cosa)
             'puesto' => 'nullable|string|max:255', 
             
-            // 👇 AÑADE ESTA LÍNEA AQUÍ PARA EL NUEVO PUESTO 👇
             'puesto_trabajo_id' => 'nullable|exists:puestos_trabajo,id',
 
             'tipo_personal' => 'nullable|in:indefinido,temporal',
@@ -702,13 +744,8 @@ class PersonalController extends Controller
         return $request->validate($rules);
     }
 
-    /**
-     * Asignar un curso masivamente a varios trabajadores
-     */
     public function assignBulkCourses(\Illuminate\Http\Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
-        // Exigimos permiso de edición de cursos para inyectar formación
         $this->authorize('cursos.edit');
 
         $validated = $request->validate([
@@ -747,12 +784,8 @@ class PersonalController extends Controller
         }
     }
 
-    /**
-     * Exportar a CSV los trabajadores seleccionados
-     */
     public function exportBulk(\Illuminate\Http\Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.export');
 
         $validated = $request->validate([
@@ -794,12 +827,8 @@ class PersonalController extends Controller
         ]);
     }
 
-    /**
-     * Actualizar departamento masivamente
-     */
     public function updateBulkDepartamento(\Illuminate\Http\Request $request)
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.bulk');
 
         $validated = $request->validate([
@@ -829,10 +858,6 @@ class PersonalController extends Controller
         }
     }
 
-    /**
-     * Motor de automatización: Inyecta los cursos requeridos según el departamento (Puesto) del trabajador.
-     * Engancha la tabla `departamentos` (o el nombre) con la matriz de formación `puestos`.
-     */
     private function aplicarMacroDeCursos(Personal $personal)
     {
         $deptosActuales = is_string($personal->departamento) 
@@ -875,12 +900,8 @@ class PersonalController extends Controller
         }
     }
 
-    /**
-     * Marcar el perfil formativo de un trabajador como revisado por PRL.
-     */
     public function marcarRevisadoPrl(Personal $personal)
     {
-        // Exigimos permiso de edición de cursos (PRL)
         $this->authorize('cursos.edit');
 
         $personal->update([
@@ -892,10 +913,8 @@ class PersonalController extends Controller
 
     public function puestos()
     {
-        // --- GUARDIA DE LA MURALLA ---
         $this->authorize('personal.edit'); 
 
-        // Listamos los puestos específicos para el módulo de personal/médico
         $puestos = \App\Models\Puesto::orderBy('nombre')->get();
 
         return view('personal.puestos', compact('puestos'));

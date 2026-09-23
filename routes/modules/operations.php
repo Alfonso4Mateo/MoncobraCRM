@@ -11,6 +11,70 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DepartamentoController;
 use App\Http\Controllers\QrController;
+use App\Http\Controllers\CalibrablesController;
+use App\Http\Controllers\EquiposController;
+use App\Http\Controllers\HerramientasPlantaController;
+use App\Http\Controllers\AlertasMantenimientoController;
+
+// ==========================================
+// 0. ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
+// ==========================================
+
+// EQUIPOS INFORMÁTICOS
+Route::get('equipos', [EquiposController::class, 'index'])->name('equipos.index');
+Route::get('equipos/nuevo', [EquiposController::class, 'create'])->name('equipos.create');
+Route::post('equipos', [EquiposController::class, 'store'])->name('equipos.store');
+Route::get('equipos/{equipo}', [EquiposController::class, 'show'])->name('equipos.show');
+Route::get('equipos/{equipo}/editar', [EquiposController::class, 'edit'])->name('equipos.edit');
+Route::put('equipos/{equipo}', [EquiposController::class, 'update'])->name('equipos.update');
+Route::delete('equipos/{equipo}', [EquiposController::class, 'destroy'])->name('equipos.destroy');
+Route::post('equipos/{equipo}/eventos', [EquiposController::class, 'storeEvento'])->name('equipos.eventos.store');
+Route::patch('equipos/{equipo}/estado', [EquiposController::class, 'updateEstado'])->name('equipos.estado');
+Route::patch('equipos/{equipo}/asignar', [EquiposController::class, 'updateAsignacion'])->name('equipos.asignar');
+
+// HERRAMIENTAS DE PLANTA
+Route::get('herramientas', [HerramientasPlantaController::class, 'index'])->name('herramientas.index');
+Route::get('herramientas/nuevo', [HerramientasPlantaController::class, 'create'])->name('herramientas.create');
+Route::post('herramientas', [HerramientasPlantaController::class, 'store'])->name('herramientas.store');
+Route::get('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'show'])->name('herramientas.planta.show');
+Route::get('herramientas/{herramientaPlanta}/editar', [HerramientasPlantaController::class, 'edit'])->name('herramientas.planta.edit');
+Route::put('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'update'])->name('herramientas.planta.update');
+Route::delete('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'destroy'])->name('herramientas.planta.destroy');
+Route::post('herramientas/{herramientaPlanta}/eventos', [HerramientasPlantaController::class, 'storeEvento'])->name('herramientas.planta.eventos.store');
+Route::patch('herramientas/{herramientaPlanta}/estado', [HerramientasPlantaController::class, 'updateEstado'])->name('herramientas.planta.estado');
+Route::patch('herramientas/{herramientaPlanta}/asignar', [HerramientasPlantaController::class, 'updateAsignacion'])->name('herramientas.planta.asignar');
+// Rutas exclusivas de maquinaria
+Route::post('herramientas/{herramientaPlanta}/manual', [HerramientasPlantaController::class, 'uploadManual'])->name('herramientas.planta.manual');
+Route::post('herramientas/familias', [HerramientasPlantaController::class, 'storeFamilia'])->name('herramientas.familias.store');
+
+// APARATOS CALIBRABLES (Prefijo unificado a 'calibrables')
+Route::get('calibrables', [CalibrablesController::class, 'index'])->name('calibrables.index');
+Route::get('calibrables/nuevo', [CalibrablesController::class, 'create'])->name('calibrables.create');
+Route::post('calibrables', [CalibrablesController::class, 'store'])->name('calibrables.store');
+Route::get('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'show'])->name('calibrables.show');
+Route::get('calibrables/{aparatoCalibrable}/editar', [CalibrablesController::class, 'edit'])->name('calibrables.edit');
+Route::put('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'update'])->name('calibrables.update');
+Route::delete('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'destroy'])->name('calibrables.destroy');
+Route::post('calibrables/{aparatoCalibrable}/eventos', [CalibrablesController::class, 'storeEvento'])->name('calibrables.eventos.store');
+Route::patch('calibrables/{aparatoCalibrable}/estado', [CalibrablesController::class, 'updateEstado'])->name('calibrables.estado');
+Route::patch('calibrables/{aparatoCalibrable}/asignar', [CalibrablesController::class, 'updateAsignacion'])->name('calibrables.asignar');
+
+// CENTRO DE CONTROL Y ALERTAS
+Route::get('alertas-mantenimiento', [AlertasMantenimientoController::class, 'index'])->name('alertas.index');
+Route::get('alertas-mantenimiento/enviar', [AlertasMantenimientoController::class, 'enviarReporte'])->name('alertas.enviar');
+Route::get('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'configuracion'])->name('alertas.configuracion');
+Route::post('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'storeConfiguracion'])->name('alertas.configuracion.store');
+
+// ENLACES CORTOS / QR (Redirecciones dinámicas)
+Route::get('activos/{id}/editar', function (int $id) {
+    if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.edit', $id);
+    return redirect()->route('herramientas.planta.edit', $id);
+})->name('herramientas.edit');
+
+Route::get('activos/{id}', function (int $id) {
+    if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.show', $id);
+    return redirect()->route('herramientas.planta.show', $id);
+})->name('herramientas.show');
 
 // ==========================================
 // 1. INVENTARIO: ACCIONES, STOCK Y MOVIMIENTOS
@@ -87,8 +151,7 @@ Route::post('/users/{user}/send-reset-link', [UserController::class, 'sendPasswo
 
 
 // ==========================================
-// 4. GESTIÓN DE PUESTOS DE PERSONAL (PerfilController)
-// (Colocado arriba para evitar que Laravel lo confunda con IDs)
+// 4. GESTIÓN DE PUESTOS DE PERSONAL
 // ==========================================
 Route::get('personal/puestos-trabajo', [PuestoTrabajoController::class, 'index'])
     ->name('personal.puestos-trabajo.index')
@@ -170,6 +233,18 @@ Route::delete('personal/{personal}', [PersonalController::class, 'destroy'])
     ->name('personal.destroy')
     ->middleware('permission:personal.destroy');
 
+Route::post('/personal/{personal}/entregas-epi', [PersonalController::class, 'uploadDocumentosPrl'])
+    ->name('personal.entregas_epi.store')
+    ->middleware('permission:personal.edit');
+
+Route::delete('/personal/{personal}/entregas-epi/{tipo}', [PersonalController::class, 'destroyDocumentosPrl'])
+    ->name('personal.entregas_epi.destroy')
+    ->middleware('permission:personal.edit');
+
+Route::delete('/personal/{personal}/historial-prl/{historial}', [PersonalController::class, 'destroyHistorialPrl'])
+    ->name('personal.historial_prl.destroy')
+    ->middleware('permission:personal.edit');
+
 
 // ==========================================
 // 7. DEPARTAMENTOS Y ACCESORIOS DE CURSOS/PRL
@@ -203,10 +278,8 @@ Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController:
 // ==========================================
  Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
     ->name('qrs.index');
-    //->middleware('permission:qrs.manage');
 Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])
     ->name('qrs.store');
-    //->middleware('permission:qrs.manage');
 Route::post('/admin/qrs/carpetas', [App\Http\Controllers\QrController::class, 'storeCarpeta'])
     ->name('qrs.carpeta.store');
 Route::get('/admin/qrs/{id}/download', [App\Http\Controllers\QrController::class, 'download'])                  

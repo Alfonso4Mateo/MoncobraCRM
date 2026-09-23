@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Activity;
 
 class InventarioVariante extends Model
 {
+    use Auditable;
     use HasFactory;
 
     /**
@@ -98,5 +102,34 @@ class InventarioVariante extends Model
         return $this->items()
             ->whereColumn('stock_actual', '<=', 'stock_minimo')
             ->exists();
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $nombre = trim((string) $this->getAttribute('nombre'));
+        $codigo = trim((string) $this->getAttribute('codigo'));
+        $referenciaProveedor = trim((string) $this->getAttribute('referencia_proveedor'));
+        $proyecto = $this->relationLoaded('proyecto') ? trim((string) $this->proyecto?->nombre) : '';
+        $partes = array_values(array_filter([
+            $nombre !== '' ? $nombre : null,
+            $codigo !== '' ? 'Código: ' . $codigo : null,
+            $referenciaProveedor !== '' ? 'Ref. proveedor: ' . $referenciaProveedor : null,
+            $proyecto !== '' ? 'Proyecto: ' . $proyecto : null,
+        ]));
+        $referencia = $partes !== [] ? 'Variante: ' . implode(' - ', $partes) : '';
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

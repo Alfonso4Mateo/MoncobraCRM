@@ -894,7 +894,7 @@ class PresupuestoController extends Controller
                 continue;
             }
 
-            Articulo::updateOrCreate(
+            Articulo::firstOrCreate(
                 [
                     'proyecto_id' => $proyectoId,
                     'numero_referencia' => $numeroReferencia,

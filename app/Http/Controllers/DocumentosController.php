@@ -104,7 +104,8 @@ class DocumentosController extends Controller
             'numero_documento' => 'nullable|string|max:120',
             'ot_documento' => 'nullable|string|max:120',
             'cliente_documento' => 'nullable|string|max:191',
-            'tipo' => 'nullable|string|in:albaranes,presupuestos,pedidos,epi,factura,salidas,certificados,otros',
+            // Modificamos esta línea para permitir los nuevos tipos:
+            'tipo' => 'nullable|string|in:albaranes,presupuestos,pedidos,epi,factura,salidas,certificados,otros,riesgos,plantillas_epi',
             'nombre_trabajador' => 'nullable|string',
             'id_rrhh' => 'nullable|string',
         ]);
@@ -123,7 +124,7 @@ class DocumentosController extends Controller
                 
                 $clienteStr = $request->input('cliente_documento');
 
-                if ($tipo === 'certificados') {
+                if (in_array($tipo, ['certificados', 'riesgos', 'plantillas_epi'])) {
                     $baseMeta['nombre_trabajador'] = $request->input('nombre_trabajador');
                     $baseMeta['id_rrhh'] = $request->input('id_rrhh');
                     $clienteStr = $request->input('nombre_trabajador') . ' (ID: ' . $request->input('id_rrhh') . ')';
@@ -171,7 +172,7 @@ class DocumentosController extends Controller
             ? 'Documento cargado correctamente.'
             : $created . ' documentos cargados correctamente.';
 
-        $redirectTipo = $tipo === 'certificados' ? 'certificados' : 'cargados';
+        $redirectTipo = in_array($tipo, ['certificados', 'riesgos', 'plantillas_epi']) ? $tipo : 'cargados';
         
         return redirect()->route('documentos.index', ['tipo' => $redirectTipo])->with('status', $message);
     }
@@ -237,6 +238,13 @@ class DocumentosController extends Controller
             $tipos['certificados'] = ['label' => 'Certificados', 'icon' => 'fa-certificate'];
         }
         
+        // --- NUEVAS CATEGORÍAS PRL ---
+        if ($user->can('personal.view')) {
+            $tipos['riesgos'] = ['label' => 'Informes de Riesgo', 'icon' => 'fa-triangle-exclamation'];
+            $tipos['plantillas_epi'] = ['label' => 'Plantillas EPI', 'icon' => 'fa-hard-hat'];
+        }
+        // -----------------------------
+        
         // El cajón de sastre general, disponible si tiene acceso al módulo.
         $tipos['cargados'] = ['label' => 'Cargados', 'icon' => 'fa-cloud-arrow-up'];
 
@@ -267,6 +275,13 @@ class DocumentosController extends Controller
             $tipos['certificados'] = ['label' => 'Certificados'];
         }
 
+        // --- NUEVAS CATEGORÍAS PRL ---
+        if ($user->can('personal.edit')) {
+            $tipos['riesgos'] = ['label' => 'Informe de Riesgos'];
+            $tipos['plantillas_epi'] = ['label' => 'Plantilla de EPI'];
+        }
+        // -----------------------------
+
         $tipos['factura'] = ['label' => 'Factura'];
         $tipos['otros'] = ['label' => 'Otros'];
 
@@ -278,10 +293,8 @@ class DocumentosController extends Controller
         $user = auth()->user();
         $counts = [];
         
-        // Recuperamos el muro invisible (Sede) para aislar los certificados
         $proyectoId = $this->resolveActiveProyectoId(request());
 
-        // Hacemos las queries solo si el usuario tiene permiso, ahorrando memoria SQL
         if ($user->can('albaranes.view')) $counts['albaranes'] = AlbaranCliente::count();
         if ($user->can('presupuestos.view')) $counts['presupuestos'] = Presupuesto::count();
         if ($user->can('pedidos.view')) $counts['pedidos'] = PedidoCliente::count();
@@ -291,15 +304,16 @@ class DocumentosController extends Controller
             $counts['traslados'] = TrasladoStock::count();
         }
         if ($user->can('cursos.view')) {
-            // Contador filtrado por la sede actual y tipo certificado
-            $counts['certificados'] = Documento::where('proyecto_id', $proyectoId)
-                                               ->where('tipo', 'certificados')
-                                               ->count();
+            $counts['certificados'] = Documento::where('proyecto_id', $proyectoId)->where('tipo', 'certificados')->count();
+        }
+        if ($user->can('personal.view')) {
+            $counts['riesgos'] = Documento::where('proyecto_id', $proyectoId)->where('tipo', 'riesgos')->count();
+            $counts['plantillas_epi'] = Documento::where('proyecto_id', $proyectoId)->where('tipo', 'plantillas_epi')->count();
         }
         
-        // Contador de "cargados" que excluye los certificados para que no se sumen doble, también filtrado por sede
+        // Excluir todos los específicos de RRHH de la bandeja general
         $counts['cargados'] = Documento::where('proyecto_id', $proyectoId)
-                                       ->where('tipo', '!=', 'certificados')
+                                       ->whereNotIn('tipo', ['certificados', 'riesgos', 'plantillas_epi'])
                                        ->count();
 
         return $counts;
@@ -316,6 +330,8 @@ class DocumentosController extends Controller
             'traslados' => $this->fromTraslados(),
             'cargados' => $this->fromCargados(),
             'certificados' => $this->fromCertificados(),
+            'riesgos' => $this->fromDocumentosPrl('riesgos'),
+            'plantillas_epi' => $this->fromDocumentosPrl('plantillas_epi'),
             default => collect(),
         };
     }
@@ -326,7 +342,7 @@ class DocumentosController extends Controller
 
         return Documento::query()
             ->where('proyecto_id', $proyectoId)
-            ->where('tipo', '!=', 'certificados') // EXCLUIMOS LOS CERTIFICADOS AQUÍ
+            ->whereNotIn('tipo', ['certificados', 'riesgos', 'plantillas_epi'])
             ->orderByDesc('fecha_documento')
             ->orderByDesc('id')
             ->limit(30)
@@ -737,6 +753,55 @@ class DocumentosController extends Controller
                     'tipo' => 'certificados',
                     'titulo' => $documento->original_name,
                     'meta' => [
+                        ['label' => 'Trabajador', 'value' => $metaDatos['nombre_trabajador'] ?? '—'],
+                        ['label' => 'ID RRHH', 'value' => $metaDatos['id_rrhh'] ?? '—'],
+                        ['label' => 'Subido el', 'value' => $metaDatos['uploaded_at'] ?? '—'],
+                    ],
+                    'lineas' => [],
+                    'acciones' => $acciones,
+                ];
+            });
+    }
+
+    private function fromDocumentosPrl(string $tipo): Collection
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        return Documento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('tipo', $tipo)
+            ->orderByDesc('fecha_documento')
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get()
+            ->map(function (Documento $documento) use ($tipo) {
+                $acciones = [];
+                if (auth()->user()->can('documentos.download')) {
+                    $acciones[] = ['label' => 'Previsualizar', 'icon' => 'fa-eye', 'url' => route('documentos.preview', $documento), 'preview' => true];
+                    $acciones[] = ['label' => 'Descargar', 'icon' => 'fa-cloud-arrow-down', 'url' => route('documentos.download', $documento)];
+                }
+                if (auth()->user()->can('documentos.delete')) {
+                    $acciones[] = ['label' => 'Borrar', 'icon' => 'fa-trash', 'url' => route('documentos.destroy', $documento), 'method' => 'DELETE', 'confirm' => '¿Seguro que quieres borrar este documento?'];
+                }
+
+                $metaDatos = is_array($documento->meta) ? $documento->meta : json_decode($documento->meta, true) ?? [];
+                
+                $tituloEstandar = $tipo === 'riesgos' ? 'Informe de Riesgos' : 'Plantilla EPI';
+                $prefijo = $tipo === 'riesgos' ? 'RSG-' : 'EPI-';
+
+                return [
+                    'id' => (string) $documento->id,
+                    'codigo' => $documento->numero_documento ?: ($prefijo . str_pad((string) $documento->id, 4, '0', STR_PAD_LEFT)),
+                    'fecha' => optional($documento->fecha_documento)->format('d/m/Y') ?: optional($documento->created_at)->format('d/m/Y') ?: '—',
+                    'persona' => $documento->cliente ?: 'Trabajador sin asignar',
+                    'estado' => 'ACTIVO',
+                    'estado_clase' => 'status-success',
+                    'total' => $documento->size ? number_format($documento->size / 1024, 2, ',', '.') . ' KB' : '—',
+                    'totales' => ['base' => '—', 'iva' => '—', 'total' => '—'],
+                    'tipo' => $tipo,
+                    'titulo' => $documento->original_name,
+                    'meta' => [
+                        ['label' => 'Tipo Documento', 'value' => $tituloEstandar],
                         ['label' => 'Trabajador', 'value' => $metaDatos['nombre_trabajador'] ?? '—'],
                         ['label' => 'ID RRHH', 'value' => $metaDatos['id_rrhh'] ?? '—'],
                         ['label' => 'Subido el', 'value' => $metaDatos['uploaded_at'] ?? '—'],

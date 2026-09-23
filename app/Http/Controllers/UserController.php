@@ -424,10 +424,68 @@ class UserController extends Controller
             'permissions.*' => 'string|exists:permissions,name',
         ]);
 
+        $oldRoles = $user->roles->pluck('name')->toArray();
+        $oldPermissions = $user->permissions->pluck('name')->toArray();
+
         if ($user->role === 'superadmin') {
             $user->syncPermissions(\Spatie\Permission\Models\Permission::all());
         } else {
             $user->syncPermissions($validated['permissions'] ?? []);
+        }
+
+        $user->refresh();
+        $newRoles = $user->roles->pluck('name')->toArray();
+        $newPermissions = $user->permissions->pluck('name')->toArray();
+
+        $oldRolesComparable = $oldRoles;
+        $newRolesComparable = $newRoles;
+        $oldPermissionsComparable = $oldPermissions;
+        $newPermissionsComparable = $newPermissions;
+        sort($oldRolesComparable);
+        sort($newRolesComparable);
+        sort($oldPermissionsComparable);
+        sort($newPermissionsComparable);
+
+        if ($oldRolesComparable !== $newRolesComparable || $oldPermissionsComparable !== $newPermissionsComparable) {
+            
+            // 1. Construimos los arrays de cambios dinámicamente
+            $oldProps = [];
+            $newProps = [];
+
+            // Solo metemos los roles al log si realmente sufrieron alteraciones
+            if ($oldRolesComparable !== $newRolesComparable) {
+                $oldProps['roles'] = $oldRoles;
+                $newProps['roles'] = $newRoles;
+            }
+
+            // Solo metemos los permisos al log si realmente sufrieron alteraciones
+            if ($oldPermissionsComparable !== $newPermissionsComparable) {
+                $oldProps['permissions'] = $oldPermissions;
+                $newProps['permissions'] = $newPermissions;
+            }
+
+            // 2. Preparamos la referencia
+            $referencia = trim(implode(' ', array_filter([
+                $user->name,
+                $user->apellido ?? null,
+            ])));
+            $referencia = $referencia !== ''
+                ? $referencia
+                : 'Sin referencia (ID: ' . $user->getKey() . ')';
+
+            // 3. Ejecutamos el log inyectando solo lo que cambió ($oldProps y $newProps)
+            activity()
+                ->performedOn($user)
+                ->causedBy(auth()->user())
+                ->event('updated')
+                ->withProperties([
+                    'old' => $oldProps,
+                    'attributes' => $newProps,
+                    'reference_name' => $referencia,
+                    'ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ])
+                ->log('Permisos de acceso modificados');
         }
 
         return redirect()->route('users.index')->with('success', 'Permisos de acceso actualizados correctamente.');

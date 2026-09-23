@@ -964,7 +964,10 @@ class PedidoController extends Controller
                 continue;
             }
 
-            Articulo::updateOrCreate(
+            // Usamos firstOrCreate en lugar de updateOrCreate.
+            // Esto añadirá el artículo al catálogo general SOLO si no existe. 
+            // Si ya existe (ej. ID 1 o ID 2), lo dejará intacto y no aplastará tus datos globales.
+            Articulo::firstOrCreate(
                 [
                     'proyecto_id' => $proyectoId,
                     'numero_referencia' => $numeroReferencia,

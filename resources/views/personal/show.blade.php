@@ -33,7 +33,7 @@
             font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            margin: 0; /* Evita márgenes indeseados de AdminLTE */
+            margin: 0;
         }
 
         .custom-file-btn:hover {
@@ -42,7 +42,6 @@
             color: #475569;
         }
 
-        /* Cambia el estilo cuando el usuario selecciona un archivo */
         .custom-file-upload.has-file .custom-file-btn {
             background-color: #eff6ff;
             border-color: #bfdbfe;
@@ -57,8 +56,23 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 200px; /* Ajusta según el espacio que tengas */
+            max-width: 200px; 
         }
+
+        /* Interruptor moderno (Toggle Switch) para PRL */
+        .prl-toggle-wrapper { display: inline-flex; align-items: center; cursor: pointer; background: #f8fafc; padding: 6px 14px; border-radius: 99px; border: 1px solid #e2e8f0; user-select: none; transition: all 0.2s; }
+        .prl-toggle-wrapper:hover { background: #f1f5f9; border-color: #cbd5e1; }
+        .prl-toggle-input { display: none; }
+        .prl-toggle-track { position: relative; width: 36px; height: 20px; background-color: #cbd5e1; border-radius: 99px; transition: background-color 0.3s ease; }
+        .prl-toggle-dot { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background-color: white; border-radius: 50%; transition: transform 0.3s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .prl-toggle-input:checked + .prl-toggle-track { background-color: #10b981; }
+        .prl-toggle-input:checked + .prl-toggle-track .prl-toggle-dot { transform: translateX(16px); }
+        .prl-toggle-text { margin-left: 10px; font-size: 0.85rem; font-weight: 700; color: #475569; transition: color 0.3s; }
+        .prl-toggle-input:checked ~ .prl-toggle-text { color: #166534; }
+        
+        /* Botón limpio para descargar PDF */
+        .prl-btn-pdf { display: inline-flex; align-items: center; gap: 6px; background: #eff6ff; color: #3b82f6; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; text-decoration: none !important; white-space: nowrap; transition: all 0.2s; border: 1px solid #bfdbfe; }
+        .prl-btn-pdf:hover { background: #dbeafe; color: #2563eb; border-color: #93c5fd; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1); }
     </style>
 @endsection
 
@@ -111,7 +125,7 @@
                     <!-- COLUMNA IZQUIERDA FIJA (Perfil Básico) -->
                     <div class="profile-main-left">
                         <article class="profile-card profile-card--main-sidebar" style="position: sticky; top: 20px;">
-                            <<div class="profile-status {{ $personal->activo ? '' : 'profile-status--inactive' }}">
+                            <div class="profile-status {{ $personal->activo ? '' : 'profile-status--inactive' }}">
                                 {{ $personal->activo ? 'ACTIVO' : 'INACTIVO' }}
                             </div>
 
@@ -313,6 +327,8 @@
 
                         <!-- PANEL 2: EQUIPAMIENTO (EPIS) -->
                         <div id="tab-epis" class="profile-tab-panel">
+                            
+                            <!-- BLOQUE 1: TALLAS -->
                             <article class="profile-card">
                                 <div class="profile-card__header">
                                     <div>
@@ -345,6 +361,182 @@
                                 </div>
                             @endcan
                             </article>
+
+                            @can('personal.edit') 
+                            <!-- BLOQUE 2: EVALUACIÓN DE RIESGOS -->
+                            <article class="profile-card" style="margin-top: 24px;">
+                                <div class="profile-card__header">
+                                    <div>
+                                        <h3><i class="fas fa-file-contract"></i> Documento de Información de Riesgos</h3>
+                                        <p>Sube el documento maestro firmado por el trabajador.</p>
+                                    </div>
+                                </div>
+                                <div class="profile-card__body" style="padding: 20px;">
+                                    @if(!empty($personal->documento_riesgos))
+                                        <div style="margin-bottom: 20px; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong style="color: #166534;"><i class="fas fa-check-circle mr-2"></i> Riesgos firmados</strong>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <a href="{{ Storage::url($personal->documento_riesgos) }}" target="_blank" class="profile-action profile-action--soft">
+                                                    <i class="fas fa-eye"></i> Ver PDF
+                                                </a>
+                                                <form action="{{ route('personal.entregas_epi.destroy', [$personal->id, 'riesgos']) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar la Info de Riesgos? ESTO ELIMINARÁ TAMBIÉN LOS EPIs ASOCIADOS.');" style="margin: 0;">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="profile-action profile-action--danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <form class="prl-upload-form" data-tipo="riesgos" data-personal-id="{{ $personal->id }}">
+                                        <div class="custom-file-upload upload-wrapper-riesgos">
+                                            <label for="archivo_riesgos" class="custom-file-btn">
+                                                <i class="fas fa-upload"></i> <span class="btn-text">Seleccionar archivo</span>
+                                            </label>
+                                            <input type="file" id="archivo_riesgos" name="archivo" accept=".pdf,.jpg,.jpeg,.png" required class="prl-file-input">
+                                            <span class="custom-file-name file-name-display">Ningún archivo seleccionado</span>
+                                        </div>
+                                        <button type="submit" class="profile-action profile-action--primary mt-3 btn-submit-prl">
+                                            <i class="fas fa-save"></i> Guardar Riesgos
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+
+                            <!-- BLOQUE 3: DOCUMENTO DE EPIs -->
+                            <article class="profile-card" style="margin-top: 24px;">
+                                <div class="profile-card__header">
+                                    <div>
+                                        <h3><i class="fas fa-hard-hat"></i> Documento de EPIs del Puesto</h3>
+                                        <p>Acuse de recibo de los equipos de protección individual.</p>
+                                    </div>
+                                </div>
+                                <div class="profile-card__body" style="padding: 20px;">
+                                    @if(!empty($personal->documento_epi))
+                                        <div style="margin-bottom: 20px; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong style="color: #166534;"><i class="fas fa-check-circle mr-2"></i> EPIs firmados</strong>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <a href="{{ Storage::url($personal->documento_epi) }}" target="_blank" class="profile-action profile-action--soft">
+                                                    <i class="fas fa-eye"></i> Ver PDF
+                                                </a>
+                                                <form action="{{ route('personal.entregas_epi.destroy', [$personal->id, 'epi']) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar el documento de EPIs?');" style="margin: 0;">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="profile-action profile-action--danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <form class="prl-upload-form" data-tipo="epi" data-personal-id="{{ $personal->id }}">
+                                        <div class="custom-file-upload upload-wrapper-epi">
+                                            <label for="archivo_epi" class="custom-file-btn">
+                                                <i class="fas fa-upload"></i> <span class="btn-text">Seleccionar archivo</span>
+                                            </label>
+                                            <input type="file" id="archivo_epi" name="archivo" accept=".pdf,.jpg,.jpeg,.png" required class="prl-file-input">
+                                            <span class="custom-file-name file-name-display">Ningún archivo seleccionado</span>
+                                        </div>
+                                        <button type="submit" class="profile-action profile-action--primary mt-3 btn-submit-prl">
+                                            <i class="fas fa-save"></i> Guardar EPIs
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+
+                            <!-- BLOQUE 4: HISTORIAL DE SUBIDAS -->
+                            <article class="profile-card" style="margin-top: 24px;">
+                                <div class="profile-card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    <div>
+                                        <h3 style="margin-bottom: 4px;"><i class="fas fa-history"></i> Registro Histórico de Documentos</h3>
+                                        <p style="margin: 0; color: #64748b; font-size: 0.85rem;">Auditoría de todas las subidas realizadas en el perfil de este trabajador.</p>
+                                    </div>
+                                    
+                                    <!-- Interruptor de Filtro Moderno -->
+                                    <label class="prl-toggle-wrapper">
+                                        <input type="checkbox" id="toggle-history-filter" class="prl-toggle-input" checked>
+                                        <div class="prl-toggle-track">
+                                            <div class="prl-toggle-dot"></div>
+                                        </div>
+                                        <span class="prl-toggle-text">Mostrar solo vigentes</span>
+                                    </label>
+                                </div>
+                                
+                                <div class="profile-card__body" style="padding: 0;">
+                                    <div class="table-responsive">
+                                        <table class="table profile-table" style="margin: 0;">
+                                            <thead style="background: #f8fafc;">
+                                                <tr>
+                                                    <th style="padding: 12px 20px;">FECHA DE SUBIDA</th>
+                                                    <th>TIPO DE DOCUMENTO</th>
+                                                    <th>DOCUMENTO</th>
+                                                    <th style="text-align: right; padding-right: 20px;">ACCIONES</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="historial-prl-body">
+                                                @php
+                                                    $vistoRiesgos = false;
+                                                    $vistoEpi = false;
+                                                @endphp
+
+                                                @forelse($personal->historialPrl ?? [] as $registro)
+                                                    @php
+                                                        $esVigente = false;
+                                                        if ($registro->tipo === 'riesgos' && !$vistoRiesgos) {
+                                                            $esVigente = true;
+                                                            $vistoRiesgos = true;
+                                                        } elseif ($registro->tipo === 'epi' && !$vistoEpi) {
+                                                            $esVigente = true;
+                                                            $vistoEpi = true;
+                                                        }
+                                                    @endphp
+
+                                                    <tr class="historial-row" data-is-latest="{{ $esVigente ? 'true' : 'false' }}" style="{{ !$esVigente ? 'display: none; background-color: #f8fafc; opacity: 0.7;' : '' }}">
+                                                        <td style="padding: 12px 20px;"><strong>{{ $registro->created_at->format('d M Y - H:i') }}</strong></td>
+                                                        <td>
+                                                            @if($registro->tipo === 'riesgos')
+                                                                <span class="profile-chip profile-chip--pending"><i class="fas fa-file-contract mr-1"></i> INFO. RIESGOS</span>
+                                                            @else
+                                                                <span class="profile-chip profile-chip--ok"><i class="fas fa-hard-hat mr-1"></i> EPIS PUESTO</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <!-- Botón PDF Mejorado -->
+                                                            <a href="{{ Storage::url($registro->archivo_path) }}" target="_blank" class="prl-btn-pdf">
+                                                                <i class="fas fa-file-pdf"></i> Abrir PDF
+                                                            </a>
+                                                        </td>
+                                                        <td style="text-align: right; padding-right: 20px;">
+                                                            <form action="{{ route('personal.historial_prl.destroy', [$personal->id, $registro->id]) }}" method="POST" onsubmit="return confirm('¿Eliminar este registro histórico?');" style="margin: 0; display: inline-block;">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" style="border: none; background: #fee2e2; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; color: #ef4444; transition: all 0.2s;" title="Eliminar registro" onmouseover="this.style.background='#fecaca'; this.style.color='#dc2626'" onmouseout="this.style.background='#fee2e2'; this.style.color='#ef4444'">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="4" style="text-align: center; color: #94a3b8; padding: 30px;">
+                                                            <i class="fas fa-folder-open mb-2" style="font-size: 2rem; color: #cbd5e1; display: block;"></i>
+                                                            Aún no hay documentos registrados en el historial.
+                                                        </td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </article>
+                            @endcan
                         </div>
 
                         <!-- PANEL 3: FORMACIÓN -->
@@ -642,36 +834,29 @@
             const tabButtons = document.querySelectorAll('.profile-tab-btn');
             const tabPanels = document.querySelectorAll('.profile-tab-panel');
 
-            // Función para activar una pestaña concreta
             const activateTab = (targetId) => {
-                // 1. Quitar clase activa a todos los botones y paneles
                 tabButtons.forEach(btn => btn.classList.remove('is-active'));
                 tabPanels.forEach(panel => panel.classList.remove('is-active'));
 
-                // 2. Encontrar el botón y el panel correctos
                 const activeBtn = document.querySelector(`.profile-tab-btn[data-target="${targetId}"]`);
                 const activePanel = document.getElementById(targetId);
 
-                // 3. Activarlos
                 if (activeBtn && activePanel) {
                     activeBtn.classList.add('is-active');
                     activePanel.classList.add('is-active');
                 }
 
-                // 4. Guardar en la URL silenciosamente (para que al recargar siga ahí)
                 const url = new URL(window.location);
                 url.searchParams.set('tab', targetId);
                 window.history.replaceState({}, '', url);
             };
 
-            // Escuchador de clics en los botones
             tabButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     activateTab(btn.getAttribute('data-target'));
                 });
             });
 
-            // Leer la URL al cargar la página por si veníamos de una pestaña específica
             const urlParams = new URLSearchParams(window.location.search);
             const tabFromUrl = urlParams.get('tab');
             if (tabFromUrl) {
@@ -689,9 +874,8 @@
                     
                     const btn = document.getElementById('assign-course-btn');
                     const originalText = btn.innerHTML;
-                    const originalBg = btn.style.backgroundColor; // Guardamos su color por si falla
+                    const originalBg = btn.style.backgroundColor; 
                     
-                    // Efecto de carga inicial
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo archivo y asignando...';
                     btn.disabled = true;
 
@@ -710,13 +894,11 @@
                         });
 
                         if (response.ok) {
-                            // CHECK VISUAL DE ÉXITO
                             btn.innerHTML = '<i class="fas fa-check-circle"></i> ¡Curso y archivo guardados con éxito!';
-                            btn.style.backgroundColor = '#10b981'; // Verde brillante
+                            btn.style.backgroundColor = '#10b981'; 
                             btn.style.borderColor = '#10b981';
                             btn.style.color = '#fff';
                             
-                            // Esperamos 1.2 segundos para que el usuario lea el mensaje de éxito antes de recargar
                             setTimeout(() => {
                                 const url = new URL(window.location);
                                 url.searchParams.set('tab', 'tab-formacion');
@@ -762,27 +944,22 @@
                     const cursoId = this.getAttribute('data-curso-id');
                     const cursoNombre = this.getAttribute('data-curso-nombre');
                     
-                    // Preparamos el modal
                     titleCurso.textContent = cursoNombre;
                     timelineContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #64748b;"><i class="fas fa-spinner fa-spin"></i> Consultando registros...</div>';
                     modalHistory.classList.add('is-open');
                     modalHistory.setAttribute('aria-hidden', 'false');
 
                     try {
-                        // Llamada AJAX al servidor
                         const response = await fetch(`/personal/${personalId}/cursos/${cursoId}/historial`);
                         if (!response.ok) throw new Error('Error al obtener datos');
                         
                         const data = await response.json();
-                        timelineContainer.innerHTML = ''; // Limpiamos el loading
+                        timelineContainer.innerHTML = ''; 
 
-                        // Renderizamos el curso actual
-                        // Renderizamos el curso actual
                         if (data.actual) {
                             const badgeClase = data.actual.apto ? 'profile-chip--ok' : 'profile-chip--danger';
                             const badgeTexto = data.actual.apto ? 'Apto' : 'No Apto';
                             
-                            // Botón de diploma si existe
                             const diplomaBtn = data.actual.diploma_url 
                                 ? `<a href="${data.actual.diploma_url}" target="_blank" style="margin-right: 12px; font-size: 0.75rem; text-decoration: none; color: #166534; background: #dcfce7; padding: 4px 10px; border-radius: 6px; font-weight: 800; border: 1px solid #bbf7d0; transition: all 0.2s;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` 
                                 : '';
@@ -801,13 +978,11 @@
                             `;
                         }
 
-                        // Renderizamos los cursos pasados
                         if (data.historico && data.historico.length > 0) {
                             data.historico.forEach(item => {
                                 const chipClase = item.apto ? 'profile-chip--ok' : 'profile-chip--danger';
                                 const chipTexto = item.apto ? 'Apto' : 'No Apto';
                                 
-                                // Botón de diploma histórico si existe
                                 const diplomaBtn = item.diploma_url 
                                     ? `<a href="${item.diploma_url}" target="_blank" style="margin-right: 12px; font-size: 0.75rem; text-decoration: none; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-weight: 800; border: 1px solid #e2e8f0; transition: all 0.2s;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` 
                                     : '';
@@ -840,7 +1015,7 @@
             });
         })();
 
-        // --- LÓGICA PARA EL DISEÑO DEL INPUT FILE ---
+        // --- LÓGICA PARA EL DISEÑO DEL INPUT FILE (Cursos) ---
         (function() {
             const fileInput = document.getElementById('archivo_diploma');
             const fileNameDisplay = document.getElementById('upload-file-name');
@@ -849,11 +1024,9 @@
 
             if (fileInput && fileNameDisplay && wrapper && btnText) {
                 fileInput.addEventListener('change', function() {
-                    // Si el usuario selecciona un archivo
                     if (this.files && this.files.length > 0) {
                         const file = this.files[0];
                         
-                        // Validación de tamaño (10MB)
                         if (file.size > 10 * 1024 * 1024) {
                             alert('El archivo es demasiado grande. Máximo 10MB.');
                             this.value = ''; 
@@ -863,18 +1036,125 @@
                             return;
                         }
 
-                        // CHECK VISUAL: Ponemos un icono verde y oscurecemos el texto para dar confianza
                         fileNameDisplay.innerHTML = `<i class="fas fa-check text-success" style="margin-right: 4px;"></i> ${file.name}`;
-                        fileNameDisplay.style.color = '#166534'; // Verde oscuro
+                        fileNameDisplay.style.color = '#166534'; 
                         wrapper.classList.add('has-file');
                         btnText.innerHTML = 'Cambiar archivo';
                     } else {
-                        // Si el usuario cancela la selección
                         wrapper.classList.remove('has-file');
                         fileNameDisplay.innerHTML = 'Ningún archivo seleccionado';
                         fileNameDisplay.style.color = '#94a3b8';
                         btnText.innerHTML = 'Seleccionar archivo';
                     }
+                });
+            }
+        })();
+
+        // --- LÓGICA PARA FORMULARIOS Y ARCHIVOS DE PRL (Riesgos y EPIs) ---
+        (function() {
+            // Manejador visual para los inputs de archivo
+            document.querySelectorAll('.prl-file-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const wrapper = this.closest('.custom-file-upload');
+                    const fileNameDisplay = wrapper.querySelector('.file-name-display');
+                    const btnText = wrapper.querySelector('.btn-text');
+
+                    if (this.files && this.files.length > 0) {
+                        const file = this.files[0];
+                        if (file.size > 10 * 1024 * 1024) {
+                            alert('El archivo supera el límite permitido de 10MB.');
+                            this.value = ''; 
+                            wrapper.classList.remove('has-file');
+                            fileNameDisplay.innerHTML = 'Ningún archivo seleccionado';
+                            btnText.innerHTML = 'Seleccionar archivo';
+                            return;
+                        }
+                        fileNameDisplay.innerHTML = `<i class="fas fa-check text-success" style="margin-right: 4px;"></i> ${file.name}`;
+                        fileNameDisplay.style.color = '#166534';
+                        wrapper.classList.add('has-file');
+                        btnText.innerHTML = 'Cambiar archivo';
+                    } else {
+                        wrapper.classList.remove('has-file');
+                        fileNameDisplay.innerHTML = 'Ningún archivo seleccionado';
+                        fileNameDisplay.style.color = '#94a3b8';
+                        btnText.innerHTML = 'Seleccionar archivo';
+                    }
+                });
+            });
+
+            // Manejador de envío AJAX para ambos formularios
+            document.querySelectorAll('.prl-upload-form').forEach(form => {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault(); 
+                    
+                    const btn = this.querySelector('.btn-submit-prl');
+                    const originalText = btn.innerHTML;
+                    const originalBg = btn.style.backgroundColor; 
+                    
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+                    btn.disabled = true;
+
+                    const personalId = this.getAttribute('data-personal-id');
+                    const tipo = this.getAttribute('data-tipo');
+                    
+                    const formData = new FormData(this);
+                    formData.append('tipo_documento', tipo);
+                    
+                    try {
+                        const response = await fetch(`/personal/${personalId}/entregas-epi`, {
+                            method: 'POST', 
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: formData 
+                        });
+
+                        if (response.ok) {
+                            btn.innerHTML = '<i class="fas fa-check-circle"></i> ¡Documento guardado!';
+                            btn.style.backgroundColor = '#10b981'; 
+                            btn.style.color = '#fff';
+                            
+                            setTimeout(() => {
+                                const url = new URL(window.location);
+                                url.searchParams.set('tab', 'tab-epis'); 
+                                window.location.href = url.toString();
+                            }, 1000);
+                        } else {
+                            const errorData = await response.json();
+                            alert(errorData.message || 'Error al guardar el documento. Verifica los datos.');
+                            btn.innerHTML = originalText;
+                            btn.style.backgroundColor = originalBg;
+                            btn.disabled = false;
+                        }
+                    } catch (error) {
+                        alert('Error de conexión al intentar comunicarse con el servidor.');
+                        btn.innerHTML = originalText;
+                        btn.style.backgroundColor = originalBg;
+                        btn.disabled = false;
+                    }
+                });
+            });
+        })();
+
+        // --- LÓGICA DEL FILTRO DE HISTORIAL PRL ---
+        (function() {
+            const toggleFilter = document.getElementById('toggle-history-filter');
+            const rows = document.querySelectorAll('.historial-row');
+
+            if (toggleFilter) {
+                toggleFilter.addEventListener('change', function() {
+                    const soloVigentes = this.checked;
+
+                    rows.forEach(row => {
+                        const isLatest = row.getAttribute('data-is-latest') === 'true';
+                        
+                        if (soloVigentes && !isLatest) {
+                            row.style.display = 'none'; // Ocultamos los antiguos
+                        } else {
+                            row.style.display = ''; // Mostramos todos
+                        }
+                    });
                 });
             }
         })();

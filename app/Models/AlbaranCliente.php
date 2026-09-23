@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\Models\Activity;
 
 class AlbaranCliente extends Model
 {
+    use Auditable;
     use HasFactory, SoftDeletes;
 
     /**
@@ -77,5 +81,36 @@ class AlbaranCliente extends Model
             'albaran_cliente_id',
             'pedido_cliente_id'
         )->withPivot('importe_imputado')->withTimestamps();
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $numero = trim((string) $this->getAttribute('numero'));
+        $titulo = trim((string) $this->getAttribute('titulo'));
+        $documento = trim((string) $this->getAttribute('documento'));
+        $ot = trim((string) $this->getAttribute('ot'));
+        $cliente = $this->relationLoaded('cliente') ? trim((string) $this->cliente?->empresa_nombre) : '';
+        $partes = array_values(array_filter([
+            $numero !== '' ? 'Albarán ' . $numero : null,
+            $titulo !== '' ? $titulo : null,
+            $documento !== '' ? 'Documento: ' . $documento : null,
+            $cliente !== '' ? 'Cliente: ' . $cliente : null,
+            $ot !== '' ? 'OT: ' . $ot : null,
+        ]));
+        $referencia = implode(' - ', $partes);
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

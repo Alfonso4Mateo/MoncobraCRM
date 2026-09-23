@@ -38,9 +38,15 @@ class PermissionSeeder extends Seeder
 
             // CURSOS
             'cursos.view', 'cursos.plantilla', 'cursos.normas', 'cursos.create', 'cursos.edit', 'cursos.alertas', 'cursos.export', 'cursos.delete',
+
+            // ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
+            'herramientas.view', 'herramientas.manage',
             
             // USUARIOS
             'users.view', 'users.manage', 'users.permissions',
+
+            // AUDITORIA
+            'activitylog.view',
         ];
 
         foreach ($permisos as $permiso) {

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,9 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\AlbaranCliente;
 use App\Models\Presupuesto;
+use Spatie\Activitylog\Models\Activity;
 
 class PedidoCliente extends Model
 {
+    use Auditable;
     use HasFactory, SoftDeletes;
 
     /**
@@ -114,5 +118,34 @@ class PedidoCliente extends Model
     public function facturacionesManuales(): HasMany
     {
         return $this->hasMany(FacturacionManual::class, 'pedido_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $numero = trim((string) $this->getAttribute('numero_pedido'));
+        $referenciaManual = trim((string) $this->getAttribute('referencia_manual'));
+        $ot = trim((string) $this->getAttribute('ot'));
+        $cliente = $this->relationLoaded('cliente') ? trim((string) $this->cliente?->empresa_nombre) : '';
+        $partes = array_values(array_filter([
+            $numero !== '' ? 'Pedido ' . $numero : null,
+            $referenciaManual !== '' ? $referenciaManual : null,
+            $ot !== '' ? 'OT: ' . $ot : null,
+            $cliente !== '' ? 'Cliente: ' . $cliente : null,
+        ]));
+        $referencia = implode(' - ', $partes);
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

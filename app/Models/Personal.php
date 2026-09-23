@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Activitylog\Models\Activity;
 
 class Personal extends Model
 {
+    use Auditable;
     use HasFactory;
 
     protected $table = 'personal';
@@ -70,8 +74,19 @@ class Personal extends Model
     public function cursos()
     {
         return $this->belongsToMany(Curso::class, 'curso_personal')
+                    ->using(PersonalCurso::class)
                     ->withPivot('fecha_realizacion', 'apto', 'descripcion_aptitud', 'archivo_diploma')
                     ->withTimestamps();
+    }
+
+    public function entregasEpis()
+    {
+        return $this->hasMany(\App\Models\EntregaEpi::class, 'personal_id');
+    }
+
+    public function historialPrl()
+    {
+        return $this->hasMany(\App\Models\HistorialPrl::class)->orderByDesc('created_at');
     }
 
     public function puestos()
@@ -82,5 +97,33 @@ class Personal extends Model
     public function puestoTrabajo()
     {
         return $this->belongsTo(PuestoTrabajo::class, 'puesto_trabajo_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $nombre = trim(implode(' ', array_filter([
+            $this->getAttribute('name'),
+            $this->getAttribute('apellido'),
+        ])));
+        $idRrhh = trim((string) $this->getAttribute('id_rrhh'));
+        $referencia = $nombre !== '' ? 'Personal: ' . $nombre : '';
+
+        if ($idRrhh !== '') {
+            $referencia .= ($referencia !== '' ? ' - ' : '') . 'RRHH: ' . $idRrhh;
+        }
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }

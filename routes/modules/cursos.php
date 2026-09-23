@@ -81,6 +81,18 @@ Route::get('puestos/{puesto}/exportar-auditoria', [App\Http\Controllers\PuestoCo
     ->name('puestos.auditoria.export')
     ->middleware('permission:cursos.export');
 
+Route::post('puestos/{puesto}/epis', [App\Http\Controllers\PuestoController::class, 'syncEpis'])
+    ->name('puestos.sync-epis')
+    ->middleware('permission:cursos.normas');
+
+Route::get('puestos/{puesto}/epis-pdf', [App\Http\Controllers\PuestoController::class, 'exportEpisPdf'])
+    ->name('puestos.epis.pdf')
+    ->middleware('permission:personal.export');
+
 // Módulo de EPI (Equipos de Protección Individual)
 Route::resource('epis', App\Http\Controllers\EpiController::class)
     ->middleware('permission:epis.gestion');
+
+Route::patch('epis/{epi}/toggle-activo', [App\Http\Controllers\EpiController::class, 'toggleActivo'])
+->name('epis.toggle-activo')
+->middleware('permission:epis.gestion');

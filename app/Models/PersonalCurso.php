@@ -2,13 +2,26 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 
 class PersonalCurso extends Pivot
 {
+    use Auditable;
+
     protected $table = 'curso_personal';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected $casts = [
         'fecha_realizacion' => 'date',
@@ -23,6 +36,36 @@ class PersonalCurso extends Pivot
     public function curso(): BelongsTo
     {
         return $this->belongsTo(Curso::class, 'curso_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $persona = $this->relationLoaded('personal') ? trim((string) $this->personal?->name . ' ' . (string) $this->personal?->apellido) : '';
+        $curso = $this->relationLoaded('curso') ? trim((string) $this->curso?->nombre) : '';
+        $persona = trim($persona);
+        $cursoId = $this->getAttribute('curso_id');
+        $personalId = $this->getAttribute('personal_id');
+        $referencia = $curso !== '' ? 'Curso: ' . $curso : ($cursoId ? 'Curso ID: ' . $cursoId : '');
+
+        if ($persona !== '') {
+            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Personal: ' . $persona;
+        } elseif ($personalId) {
+            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Personal ID: ' . $personalId;
+        }
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 
     public function getFechaCaducidadAttribute(): ?Carbon

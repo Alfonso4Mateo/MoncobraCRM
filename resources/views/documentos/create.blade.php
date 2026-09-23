@@ -424,15 +424,23 @@
         }
 
         const camposRrhh = document.getElementById('campos_rrhh');
+        
+        // Verifica si existe el contenedor antes de añadir el listener para evitar errores
+        if (camposRrhh && tipoSelect) {
             tipoSelect.addEventListener('change', function() {
-                if(this.value === 'certificados') {
+                // Añadimos 'riesgos' y 'plantillas_epi' a la condición
+                if(this.value === 'certificados' || this.value === 'riesgos' || this.value === 'plantillas_epi') {
                     camposRrhh.style.display = 'grid';
                 } else {
                     camposRrhh.style.display = 'none';
                     document.getElementById('nombre_trabajador').value = '';
                     document.getElementById('id_rrhh').value = '';
-                    }
-                });
+                }
+            });
+            
+            // Forzar disparo del evento al cargar por si hay datos 'old()' retenidos
+            tipoSelect.dispatchEvent(new Event('change'));
+        }
     });
 </script>
 @endsection

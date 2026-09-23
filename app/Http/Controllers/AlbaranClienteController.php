@@ -1596,7 +1596,6 @@ class AlbaranClienteController extends Controller
             }
         }
 
-        $pedidoLineas = array_values(array_filter($pedidoLineas, fn ($lineaPedido) => round((float) ($lineaPedido['cantidad'] ?? 0), 2) > 0));
         $pedido->forceFill(['lista_articulos' => $pedidoLineas])->save();
     }
 

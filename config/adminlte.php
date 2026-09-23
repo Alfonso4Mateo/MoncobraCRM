@@ -402,18 +402,25 @@ return [
             'can'  => ['herramientas.view'],
             'submenu' => [
                 [
-                    'text' => 'Equipos',
+                    'text' => 'Equipos informáticos',
                     'url' => 'equipos',
-                    'icon' => 'fas fa-fw fa-cogs',
+                    'icon' => 'fas fa-fw fa-desktop',
                     'active' => ['equipos*'],
-                    'can' => 'clientes.view', // Candado específico
+                    'can' => 'herramientas.view',
                 ],
                 [
-                    'text' => 'Herramientas',
+                    'text' => 'Herramientas de planta',
                     'url' => 'herramientas',
                     'icon' => 'fas fa-fw fa-tools',
                     'active' => ['herramientas*'],
-                    'can' => 'herramientas.view', // <-- Este ya lo tenías bien
+                    'can' => 'herramientas.view',
+                ],
+                [
+                    'text' => 'Aparatos calibrables',
+                    'url' => 'calibrables', 
+                    'icon' => 'fas fa-fw fa-ruler-combined',
+                    'active' => ['calibrables*'], 
+                    'can' => 'herramientas.view',
                 ],
             ],
         ],
@@ -449,6 +456,16 @@ return [
             'url' => 'herramientas/ayuda',
             'icon' => 'fas fa-fw fa-question-circle',
             'active' => ['herramientas/ayuda*'],
+            'classes' => 'sidebar-tools-item',
+        ],
+
+        // Registro de cambios del ERP
+        [
+            'text' => 'Auditoría de cambios',
+            'url' => 'auditoria', // <-- ELIMINA 'herramientas/'
+            'icon' => 'fas fa-fw fa-history',
+            'active' => ['auditoria*'], // <-- ELIMINA 'herramientas/'
+            'can' => 'activitylog.view',
             'classes' => 'sidebar-tools-item',
         ],
 

@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Activity;
 
 class Proyecto extends Model
 {
+    use Auditable;
     use HasFactory;
 
     /**
@@ -93,5 +97,30 @@ class Proyecto extends Model
     public function articulos(): HasMany
     {
         return $this->hasMany(Articulo::class, 'proyecto_id');
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $nombre = trim((string) $this->getAttribute('nombre'));
+        $localizacion = trim((string) $this->getAttribute('localizacion'));
+        $referencia = $nombre !== '' ? 'Proyecto: ' . $nombre : '';
+
+        if ($localizacion !== '') {
+            $referencia .= ($referencia !== '' ? ' - ' : '') . $localizacion;
+        }
+
+        if ($referencia === '') {
+            $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
+        }
+
+        $activity->properties = $activity->properties->merge([
+            'reference_name' => $referencia,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        if ($eventName === 'deleted' && !$activity->properties->get('old')) {
+            $activity->properties = $activity->properties->put('old', $this->getAttributes());
+        }
     }
 }
