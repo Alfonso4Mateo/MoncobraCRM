@@ -176,7 +176,6 @@
 
                 <div class="pedido-line-editor">
                     <div class="pedido-form-grid pedido-form-grid--line">
-                        <!-- Campo 'Código referencia' eliminado según petición: se mostrará Línea en la tabla -->
                         <div class="pedido-field pedido-field--wide">
                             <label for="line_descripcion">Descripción</label>
                             <textarea id="line_descripcion" class="pedido-input pedido-textarea" rows="2" placeholder="Descripción del artículo o servicio"></textarea>
@@ -318,11 +317,16 @@
 
             const formatMoney = (value) => `${moneyFormatter.format(value)} €`;
 
-            const computeTotal = (cantidad, precioUnitario, margen) => {
+            // CORRECCIÓN Camino B: Redondear precio unitario con margen primero
+            const computeTotal = (cantidad, precioUnitarioRaw, margenRaw) => {
                 const qty = Math.max(0, parseValue(cantidad));
-                const unit = Math.max(0, parseValue(precioUnitario));
-                const pct = Math.max(0, parseValue(margen));
-                return Number((qty * unit * (1 + (pct / 100))).toFixed(2));
+                const unit = Number(Math.max(0, parseValue(precioUnitarioRaw)).toFixed(2));
+                const pct = Number(Math.max(0, parseValue(margenRaw)).toFixed(2));
+                
+                const precioConMargen = unit * (1 + (pct / 100));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+                
+                return Number((qty * precioConMargenRounded).toFixed(2));
             };
 
             const normalizeLines = (lines) => Array.isArray(lines)

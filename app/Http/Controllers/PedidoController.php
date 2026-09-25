@@ -437,7 +437,9 @@ class PedidoController extends Controller
                 $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
                 $margen = max(0, (float) ($linea['margen'] ?? 0));
 
-                $total = $cantidad * $precioUnitario * (1 + ($margen / 100));
+                // CORRECCIÓN Camino B: Redondear precio unitario con margen primero
+                $precioConMargen = round($precioUnitario * (1 + ($margen / 100)), 2);
+                $totalLinea = round($cantidad * $precioConMargen, 2);
 
                 $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
                 $medida = $medida !== '' ? $medida : 'und';
@@ -452,7 +454,7 @@ class PedidoController extends Controller
                     'medida' => $medida,
                     'precio_unitario' => round($precioUnitario, 2),
                     'margen' => round($margen, 2),
-                    'total' => round($total, 2),
+                    'total' => $totalLinea,
                 ];
             })
             ->values()

@@ -4,8 +4,7 @@
 
 @section('content')
     @php
-        $isCarga = $modo === 'carga';
-        $volverUrl = $volverACliente && $clienteSeleccionadoId
+        $isCarga = $modo === 'carga';$volverUrl = $volverACliente &&$clienteSeleccionadoId
             ? route('clientes.show', $clienteSeleccionadoId)
             : route('presupuestos.index');
     @endphp
@@ -34,11 +33,11 @@
                 <input type="hidden" name="modo" value="{{ $modo }}">
                 <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
 
-                @if(isset($presupuesto) && $presupuesto->parent_id)
+                @if(isset($presupuesto) &&$presupuesto->parent_id)
                     <input type="hidden" name="parent_id" value="{{ $presupuesto->parent_id }}">
                 @endif
 
-                @if ($volverACliente && $clienteSeleccionadoId)
+                @if ($volverACliente &&$clienteSeleccionadoId)
                     <input type="hidden" name="redirect_cliente_id" value="{{ $clienteSeleccionadoId }}">
                 @endif
 
@@ -85,6 +84,7 @@
                             autocomplete="off"
                         >
                         <datalist id="cc_frecuentes">
+
                             @foreach($centrosCoste as $cc)
                                 <option value="{{ $cc->etiqueta_completa }}">
                             @endforeach
@@ -268,9 +268,19 @@
 
             const normalizeItem = (item) => {
                 const cantidad = Math.max(0, safeNumber(item?.cantidad));
-                const precioUnitario = Math.max(0, safeNumber(item?.precio_unitario));
-                const margen = Math.max(0, safeNumber(item?.margen));
-                const total = cantidad * precioUnitario * (1 + (margen / 100));
+                const precioUnitarioRaw = Math.max(0, safeNumber(item?.precio_unitario));
+                const margenRaw = Math.max(0, safeNumber(item?.margen));
+
+                // 1. Redondear las entradas a 2 decimales PRIMERO (Igual que hace PHP)
+                const precioUnitario = Number(precioUnitarioRaw.toFixed(2));
+                const margen = Number(margenRaw.toFixed(2));
+
+                // 2. Calcular precio con margen y redondear
+                const precioConMargen = precioUnitario * (1 + (margen / 100));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+
+                // 3. Calcular total
+                const total = cantidad * precioConMargenRounded;
 
                 return {
                     articulo: String(item?.articulo ?? '').trim(),
@@ -279,6 +289,7 @@
                     medida: String(item?.medida ?? item?.unidad ?? '').trim(),
                     precio_unitario: Number(precioUnitario.toFixed(2)),
                     margen: Number(margen.toFixed(2)),
+                    precio_con_margen: precioConMargenRounded,
                     total: Number(total.toFixed(2)),
                 };
             };
@@ -397,27 +408,37 @@
                 const descripcion = descripcionInput.value.trim();
                 const cantidad = Math.max(0, safeNumber(cantidadInput.value));
                 const medida = String(medidaInput.value || '').trim() || 'und';
-                const precioUnitario = Math.max(0, safeNumber(precioInput.value));
-                const margen = Math.max(0, safeNumber(margenInput.value));
+                const precioUnitarioRaw = Math.max(0, safeNumber(precioInput.value));
+                const margenRaw = Math.max(0, safeNumber(margenInput.value));
 
                 if (!descripcion || cantidad <= 0) {
                     window.alert('Complete al menos la descripción y una cantidad mayor que cero.');
                     return;
                 }
 
-                if (!validateLineValues(cantidad, precioUnitario, margen)) {
+                if (!validateLineValues(cantidad, precioUnitarioRaw, margenRaw)) {
                     return;
                 }
 
-                const total = cantidad * precioUnitario * (1 + (margen / 100));
+                // 1. Redondear las entradas a 2 decimales PRIMERO (Igual que hace PHP)
+                const precioUnitario = Number(precioUnitarioRaw.toFixed(2));
+                const margen = Number(margenRaw.toFixed(2));
+
+                // 2. Calcular precio con margen y redondear
+                const precioConMargen = precioUnitario * (1 + (margen / 100));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+
+                // 3. Calcular total
+                const total = cantidad * precioConMargenRounded;
 
                 const payload = {
                     articulo: '',
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
-                    precio_unitario: Number(precioUnitario.toFixed(2)),
-                    margen: Number(margen.toFixed(2)),
+                    precio_unitario: precioUnitario, // Guardamos el valor ya redondeado
+                    margen: margen,                 // Guardamos el valor ya redondeado
+                    precio_con_margen: precioConMargenRounded,
                     total: Number(total.toFixed(2)),
                 };
 

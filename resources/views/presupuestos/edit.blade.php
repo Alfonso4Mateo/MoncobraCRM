@@ -69,7 +69,7 @@
                 <div class="alert alert-danger presupuesto-detail-alert" role="alert" style="margin-bottom: 20px;">
                     <strong>No se pudo actualizar el presupuesto.</strong>
                     <ul>
-                        @foreach ($errors->all() as $error)
+                        @foreach ($errors->all() as$error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
@@ -101,8 +101,8 @@
                             <div class="field-group field-span-3">
                                 <label for="cliente_id">Cliente</label>
                                 <select id="cliente_id" name="cliente_id" required>
-                                    @foreach($clientes as $cliente)
-                                        <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) == $cliente->id ? 'selected' : '' }}>
+                                    @foreach($clientes as$cliente)
+                                        <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) ==$cliente->id ? 'selected' : '' }}>
                                             {{ $cliente->empresa_nombre }}
                                         </option>
                                     @endforeach
@@ -124,7 +124,7 @@
                                 >
                                 <datalist id="cc_frecuentes">
                                     @if(isset($centrosCoste))
-                                        @foreach($centrosCoste as $cc)
+                                        @foreach($centrosCoste as$cc)
                                             <option value="{{ $cc->etiqueta_completa }}">
                                         @endforeach
                                     @endif
@@ -417,24 +417,33 @@
                 const cantidadRaw = safeNumber(cantidadInput.value);
                 const cantidad = Math.max(1, Math.round(cantidadRaw));
                 const unidad = String(unidadInput.value || '').trim();
-                const precioUnitario = Math.max(0, safeNumber(precioInput.value));
-                const margen = Math.max(0, safeNumber(margenInput.value));
+                
+                // Obtenemos los valores introducidos sin redondear
+                const precioUnitarioRaw = Math.max(0, safeNumber(precioInput.value));
+                const margenRaw = Math.max(0, safeNumber(margenInput.value));
 
                 if (!descripcion || cantidad <= 0) {
                     window.alert('Complete al menos la descripcion y una cantidad entera mayor que cero.');
                     return;
                 }
 
+                // 1. Redondear las entradas a 2 decimales PRIMERO (Igual que hace PHP)
+                const precioUnitario = Number(precioUnitarioRaw.toFixed(2));
+                const margen = Number(margenRaw.toFixed(2));
+
+                // 2. Calcular precio con margen y redondear
                 const precioConMargen = precioUnitario * (1 + (margen / 100));
                 const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+
+                // 3. Calcular total
                 const total = cantidad * precioConMargenRounded;
 
                 const payload = {
                     descripcion,
                     cantidad: Number(cantidad),
                     unidad: unidad,
-                    precio_unitario: Number(precioUnitario.toFixed(2)),
-                    margen: Number(margen.toFixed(2)),
+                    precio_unitario: precioUnitario,
+                    margen: margen,
                     precio_con_margen: precioConMargenRounded,
                     total: Number(total.toFixed(2)),
                 };

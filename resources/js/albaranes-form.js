@@ -71,9 +71,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 .map((linea) => {
                     const cantidad = round2(linea.cantidad);
                     const cantidadMax = Math.max(cantidad, round2(linea.cantidad_max ?? linea.cantidad));
-                    const precioUnitario = round2(linea.precio_unitario ?? linea.precio);
-                    const margen = round2(linea.margen);
-                    const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+                    
+                    // CORRECCIÓN Camino B: Obtener y redondear la base a 2 decimales estrictos
+                    const precioRaw = clampNumber(linea.precio_unitario ?? linea.precio ?? 0);
+                    const margenRaw = clampNumber(linea.margen ?? 0);
+                    
+                    const precioUnitario = Number(precioRaw.toFixed(2));
+                    const margen = Number(margenRaw.toFixed(2));
+                    
+                    // Calcular el precio con el margen y redondearlo a 2 decimales
+                    const precioConMargen = precioUnitario * (1 + (margen / 100));
+                    const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+                    
+                    // Total definitivo con el precio base unitario ya convertido y redondeado a céntimos
+                    const total = Number((cantidad * precioConMargenRounded).toFixed(2));
 
                     return {
                         articulo_id: linea.articulo_id ?? null,
@@ -84,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         medida: String(linea.medida ?? linea.unidad ?? "").trim(),
                         precio_unitario: precioUnitario,
                         margen,
+                        precio_con_margen: precioConMargenRounded,
                         total,
                         selected: isPedidoRestrictoMode() ? linea.selected !== false : true,
                     };
@@ -169,7 +181,15 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             current.cantidad = round2(current.cantidad + round2(linea.cantidad ?? 0));
-            current.total = round2(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
+            
+            // CORRECCIÓN Camino B: Recálculo en agrupación múltiple
+            const pUnit = Number(current.precio_unitario.toFixed(2));
+            const pMarg = Number(current.margen.toFixed(2));
+            const pConMargen = pUnit * (1 + (pMarg / 100));
+            const pConMargenRounded = Number(pConMargen.toFixed(2));
+            
+            current.total = Number((current.cantidad * pConMargenRounded).toFixed(2));
+            
             grouped.set(signature, current);
         });
 
@@ -219,9 +239,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return merged;
     };
 
-    // NUEVO/CORREGIDO: Calcula las cantidades restantes en modo CREACIÓN para evitar que salgan artículos ya albaranados
+    // Calcula las cantidades restantes en modo CREACIÓN para evitar que salgan artículos ya albaranados
     const mergeCreateLinesWithRemaining = (pedidoLineas) => {
-        // Mapeamos lo que ya pudiera venir en el dataset original por seguridad (historial de este formulario)
         const yaAlbaranadoMap = new Map();
         lineasFromDataset.forEach((l) => {
             const sig = lineSignature(l);
@@ -231,16 +250,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return pedidoLineas.map((l) => {
             const sig = lineSignature(l);
             const consumido = yaAlbaranadoMap.get(sig) || 0;
-            // La cantidad disponible por albaranar será la solicitada en el pedido menos lo ya entregado
             const cantidadRestante = Math.max(0, round2((l.cantidad ?? 0) - consumido));
 
             return {
                 ...l,
                 cantidad: cantidadRestante,
                 cantidad_max: cantidadRestante,
-                selected: cantidadRestante > 0, // Si no queda stock, se desmarca por defecto
+                selected: cantidadRestante > 0, 
             };
-        }).filter(l => l.cantidad_max > 0); // Filtramos y eliminamos las líneas que ya han sido totalmente albaranadas
+        }).filter(l => l.cantidad_max > 0); 
     };
 
     const setSideButtonsState = () => {
@@ -274,7 +292,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         linea.cantidad = cantidad;
-        linea.total = round2(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
+        
+        // CORRECCIÓN Camino B: En modo de actualización de cantidad de la fila
+        const pUnit = Number(clampNumber(linea.precio_unitario).toFixed(2));
+        const pMarg = Number(clampNumber(linea.margen).toFixed(2));
+        const pConMargen = pUnit * (1 + (pMarg / 100));
+        const pConMargenRounded = Number(pConMargen.toFixed(2));
+        
+        linea.total = Number((cantidad * pConMargenRounded).toFixed(2));
     };
 
     const setPedidoMode = (enabled) => {
@@ -417,17 +442,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const articulo = '';
         const descripcion = descripcionInput.value.trim();
-        const cantidad = round2(cantidadInput.value);
+        const cantidadRaw = clampNumber(cantidadInput.value);
+        const cantidad = Math.max(0, round2(cantidadRaw));
         const medida = medidaInput.value.trim() || 'und';
-        const precioUnitario = round2(precioInput.value);
-        const margen = round2(margenInput.value);
+        
+        // CORRECCIÓN Camino B: Obtener valor en bruto del usuario
+        const precioUnitarioRaw = clampNumber(precioInput.value);
+        const margenRaw = clampNumber(margenInput.value);
 
         if (!descripcion || cantidad <= 0) {
             descripcionInput.focus();
             return;
         }
 
-        const total = round2(cantidad * precioUnitario * (1 + margen / 100));
+        // 1. Redondear las entradas a 2 decimales PRIMERO
+        const precioUnitario = Number(precioUnitarioRaw.toFixed(2));
+        const margen = Number(margenRaw.toFixed(2));
+
+        // 2. Calcular precio con margen y redondear a 2 decimales
+        const precioConMargen = precioUnitario * (1 + (margen / 100));
+        const precioConMargenRounded = Number(precioConMargen.toFixed(2));
+
+        // 3. Calcular total de la línea
+        const total = Number((cantidad * precioConMargenRounded).toFixed(2));
 
         const payload = {
             articulo_id: selectedIndex >= 0 && selectedIndex < lineas.length ? (lineas[selectedIndex].articulo_id ?? null) : null,
@@ -437,6 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
             medida,
             precio_unitario: precioUnitario,
             margen,
+            precio_con_margen: precioConMargenRounded,
             total,
         };
 
@@ -553,12 +591,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (hasLineas) {
                 if (isInitialEditLoad) {
-                    // CORRECCIÓN: Al abrir la edición por primera vez, respetamos EXACTAMENTE 
-                    // las líneas guardadas en el albarán, sin pisarlas con las del pedido.
+                    // Respetamos EXACTAMENTE las líneas guardadas en el albarán
                     lineas = editBaseLineas.map(linea => ({ ...linea }));
                     isInitialEditLoad = false;
                 } else if (rawLineas.length > 0) {
-                    // Si el usuario cambia el pedido manualmente en el desplegable, cargamos las nuevas
                     lineas = mergeCreateLinesWithRemaining(normalizedPedidoLineas);
                 } else if (!isExistingEditForm) {
                     lineas = [];
@@ -605,7 +641,7 @@ document.addEventListener("DOMContentLoaded", () => {
             placeholder: pedidoClienteSelect.dataset.placeholder || "Selecciona pedido...",
             allowClear: true,
             minimumResultsForSearch: 0,
-            tags: true // <-- Habilita la creación dinámica de opciones (texto libre)
+            tags: true
         });
 
         $pc.on('select2:select select2:unselect select2:clear', syncPedidoClienteFields);
@@ -627,7 +663,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // 1. Si el clic es en un botón de acción (editar, eliminar, etc.), mantenemos la lógica
+        // 1. Botón de acción (editar, eliminar)
         if (target) {
             const index = Number(target.dataset.index);
             const action = target.dataset.action;
@@ -665,27 +701,21 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // 2. Lógica para seleccionar la fila sin destruir el DOM
+        // 2. Lógica para seleccionar la fila
         if (row) {
             const index = Number(row.dataset.index);
             
-            // Si estamos en modo edición normal y pulsamos una fila diferente
             if (!isPedidoRestrictoMode() && selectedIndex !== index) {
                 selectedIndex = index;
 
-                // Quitamos la clase de selección de la fila anterior
                 const filaSeleccionadaPrevia = tableBody.querySelector('tr.is-selected');
                 if (filaSeleccionadaPrevia) {
                     filaSeleccionadaPrevia.classList.remove('is-selected');
                 }
 
-                // Añadimos la clase a la fila actual
                 row.classList.add('is-selected');
-
-                // Actualizamos los botones laterales (Editar/Eliminar)
                 setSideButtonsState();
             } else if (isPedidoRestrictoMode()) {
-                // En modo restrictivo (pedido cerrado), solo actualizamos el índice internamente
                 selectedIndex = index;
             }
         }
