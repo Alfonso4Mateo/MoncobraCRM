@@ -69,7 +69,7 @@
                 <div class="alert alert-danger presupuesto-detail-alert" role="alert" style="margin-bottom: 20px;">
                     <strong>No se pudo actualizar el presupuesto.</strong>
                     <ul>
-                        @foreach ($errors->all() as$error)
+                        @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
@@ -101,7 +101,7 @@
                             <div class="field-group field-span-3">
                                 <label for="cliente_id">Cliente</label>
                                 <select id="cliente_id" name="cliente_id" required>
-                                    @foreach($clientes as$cliente)
+                                    @foreach($clientes as $cliente)
                                         <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) ==$cliente->id ? 'selected' : '' }}>
                                             {{ $cliente->empresa_nombre }}
                                         </option>
@@ -124,7 +124,7 @@
                                 >
                                 <datalist id="cc_frecuentes">
                                     @if(isset($centrosCoste))
-                                        @foreach($centrosCoste as$cc)
+                                        @foreach($centrosCoste as $cc)
                                             <option value="{{ $cc->etiqueta_completa }}">
                                         @endforeach
                                     @endif
