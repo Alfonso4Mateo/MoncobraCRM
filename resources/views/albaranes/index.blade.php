@@ -207,7 +207,7 @@
                                                     
                                                     @if($pedidoVinculado['imputado'] > 0)
                                                         <span style="color: #64748b; margin-left: 4px;">
-                                                            ({{ number_format($pedidoVinculado['imputado'], 4, ',', '.') }}€)
+                                                            ({{ number_format($pedidoVinculado['imputado'], 2, ',', '.') }}€)
                                                         </span>
                                                     @endif
                                                 </div>
@@ -225,11 +225,11 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <div style="font-weight: 500;">{{ number_format($total, 4, ',', '.') }}€</div>
+                                    <div style="font-weight: 500;">{{ number_format($total, 2, ',', '.') }}€</div>
                                     @if(isset($albaran->ui_excedente) && $albaran->ui_excedente > 0)
                                         <div style="margin-top: 4px;">
                                             <span style="font-size: 0.82em; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: bold;" title="Saldo flotante disponible para absorber en futuras bolsas">
-                                                <i class="fas fa-coins" aria-hidden="true"></i> {{ number_format($albaran->ui_excedente, 4, ',', '.') }}€ libres
+                                                <i class="fas fa-coins" aria-hidden="true"></i> {{ number_format($albaran->ui_excedente, 2, ',', '.') }}€ libres
                                             </span>
                                         </div>
                                     @endif

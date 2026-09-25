@@ -187,7 +187,7 @@ class ClienteController extends Controller
                 }
             }
 
-            return $hayValores ? round($total, 4) : null;
+            return $hayValores ? round($total, 2) : null;
         };
 
         $presupuestos = null;
@@ -248,7 +248,7 @@ class ClienteController extends Controller
                     $total = $resolverTotalDesdeArticulos($pedidosPorOt->get($ot)?->lista_articulos);
                 }
 
-                $presupuesto->ui_total = $total !== null ? round($total, 4) : null;
+                $presupuesto->ui_total = $total !== null ? round($total, 2) : null;
 
                 return $presupuesto;
             });
@@ -305,7 +305,7 @@ class ClienteController extends Controller
                 $pedidoTotal = $pedido->total !== null
                     ? (float) $pedido->total
                     : $resolverTotalDesdeArticulos(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : null);
-                $pedido->ui_total = $pedidoTotal !== null ? round($pedidoTotal, 4) : null;
+                $pedido->ui_total = $pedidoTotal !== null ? round($pedidoTotal, 2) : null;
 
                 return $pedido;
             });
@@ -352,7 +352,7 @@ class ClienteController extends Controller
                 $albaran->ui_pedido_id = $pedidoRelacionado?->id;
                 $albaran->ui_pedido_numero = $pedidoRelacionado?->numero_pedido ?: ($pedidoNumero !== '' ? $pedidoNumero : null);
                 $albaranTotal = $albaran->total !== null ? (float) $albaran->total : null;
-                $albaran->ui_total = $albaranTotal !== null ? round($albaranTotal, 4) : null;
+                $albaran->ui_total = $albaranTotal !== null ? round($albaranTotal, 2) : null;
 
                 return $albaran;
             });

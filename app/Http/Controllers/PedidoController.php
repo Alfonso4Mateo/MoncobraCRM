@@ -213,7 +213,7 @@ class PedidoController extends Controller
             $pedido->ui_albaran_id = $pedido->ui_albaranes_count === 1
                 ? (int) ($albaranesPedido->first()->id ?? 0)
                 : null;
-            $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 4);
+            $pedido->ui_total_albaranes = round((float) $albaranesPedido->sum('total'), 2);
 
             $albaranesFacturados = $albaranesPedido->where('estado', 'facturado');
             $albaranesAContar = $pedido->bolsa ? $albaranesPedido : $albaranesFacturados;
@@ -229,7 +229,7 @@ class PedidoController extends Controller
             
             // LIMPIO DE CUOTAS
             $pedido->ui_total_facturaciones = round($sumaFacturada, 4);
-            $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_facturaciones, 4));
+            $pedido->ui_pendiente = max(0, round($pedido->ui_total - $pedido->ui_total_facturaciones, 2));
 
             return $pedido; 
         });
@@ -308,7 +308,7 @@ class PedidoController extends Controller
 
         $lineasIniciales = $this->normalizePedidoLineas($lineasInicialesRaw);
 
-        $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 4);
+        $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 2);
         $totalPedido = $baseImponible;
         $presupuestosParaPedido = $presupuestos->map(function (Presupuesto $presupuesto) {
             $lineas = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
@@ -420,7 +420,7 @@ class PedidoController extends Controller
         $total = 0.0;
 
         if ($bolsa) {
-            $total = round((float) ($validated['total'] ?? 0), 4);
+            $total = round((float) ($validated['total'] ?? 0), 2);
         } else {
             $lineas = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
             $lineas = is_array($lineas) ? $lineas : [];
@@ -450,9 +450,9 @@ class PedidoController extends Controller
                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                     'cantidad' => round($cantidad, 2),
                     'medida' => $medida,
-                    'precio_unitario' => round($precioUnitario, 4),
+                    'precio_unitario' => round($precioUnitario, 2),
                     'margen' => round($margen, 2),
-                    'total' => round($total, 4),
+                    'total' => round($total, 2),
                 ];
             })
             ->values()
@@ -501,7 +501,7 @@ class PedidoController extends Controller
                 'estado' => $validated['estado'] ?? 'pendiente',
                 'bolsa' => $bolsa,
                 'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
-                'total' => round($total, 4),
+                'total' => round($total, 2),
                 'lista_articulos' => $lineas ?: null,
             ]);
 
@@ -703,9 +703,9 @@ class PedidoController extends Controller
             $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
             $totalAlbaranes += $importe;
         }
-        $totalAlbaranes = round($totalAlbaranes, 4);
+        $totalAlbaranes = round($totalAlbaranes, 2);
 
-        $totalPedido = round((float) ($pedidoCliente->total ?? 0), 4);
+        $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
 
         $perPage = 10;
         $currentPage = max(1, (int) request()->query('page', 1));
@@ -723,10 +723,10 @@ class PedidoController extends Controller
             $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
             $totalAlbaranesFacturados += $importe;
         }
-        $totalAlbaranesFacturados = round($totalAlbaranesFacturados, 4);
+        $totalAlbaranesFacturados = round($totalAlbaranesFacturados, 2);
 
         // 3. El pendiente final es el total del pedido menos el total de los albaranes facturados
-        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranesFacturados), 4);
+        $pendienteFacturar = round(max(0, $totalPedido - $totalAlbaranesFacturados), 2);
 
         // --- 4. WIDGET GLOBAL DEL CLIENTE: lista de OTRAS bolsas activas, SIN sumarlas ---
         // No se agregan en un único saldo porque cada bolsa puede tener una función
@@ -746,7 +746,7 @@ class PedidoController extends Controller
                 ->get();
 
             $bolsasResumen = $bolsasActivas->map(function (PedidoCliente $bolsaActiva) use ($proyectoId) {
-                $totalBolsa = round((float) ($bolsaActiva->total ?? 0), 4);
+                $totalBolsa = round((float) ($bolsaActiva->total ?? 0), 2);
 
                 $albs = collect($bolsaActiva->albaranesPivot)
                     ->merge($bolsaActiva->albaran?->id ? collect([$bolsaActiva->albaran]) : collect())
@@ -761,7 +761,7 @@ class PedidoController extends Controller
                     $importe = ($importePivot > 0.001) ? $importePivot : (float) ($alb->total ?? 0);
                     $facturado += $importe;
                 }
-                $facturado = round($facturado, 4);
+                $facturado = round($facturado, 2);
 
                 return [
                     'id' => $bolsaActiva->id,
@@ -769,7 +769,7 @@ class PedidoController extends Controller
                     'ot' => $bolsaActiva->ot,
                     'total' => $totalBolsa,
                     'facturado' => $facturado,
-                    'saldo_disponible' => max(0, round($totalBolsa - $facturado, 4)),
+                    'saldo_disponible' => max(0, round($totalBolsa - $facturado, 2)),
                 ];
             })
             // ---> EL FILTRO MÁGICO: Ocultamos las bolsas antiguas o agotadas
@@ -973,9 +973,9 @@ class PedidoController extends Controller
                     'descripcion' => $descripcion,
                     'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
                     'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
-                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 4),
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
                     'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
-                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 4),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
                     'facturado' => false,
                 ]
             );

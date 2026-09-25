@@ -153,7 +153,7 @@
                 <!-- Total movido visualmente a la derecha -->
                 <div class="clean-total-row">
                     <span class="clean-label text-uppercase">Total Presupuesto</span>
-                    <strong class="clean-total-value">{{ number_format((float) ($presupuesto->total ?? 0), 4, ',', '.') }} EUR</strong>
+                    <strong class="clean-total-value">{{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR</strong>
                 </div>
             </div>
         </article>
@@ -205,9 +205,9 @@
                                             <td class="font-weight-bold text-dark">{{ $item['articulo'] ?? '-' }}</td>
                                             <td class="text-dark">{{ $item['descripcion'] ?? '-' }}</td>
                                             <td class="text-right">{{ number_format((float) ($item['cantidad'] ?? 0), 2, ',', '.') }}</td>
-                                            <td class="text-right">{{ number_format((float) ($item['precio_unitario'] ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right">{{ number_format((float) ($item['precio_unitario'] ?? 0), 2, ',', '.') }} €</td>
                                             <td class="text-right text-muted">{{ number_format((float) ($item['margen'] ?? 0), 2, ',', '.') }}%</td>
-                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($item['total'] ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($item['total'] ?? 0), 2, ',', '.') }} €</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -265,7 +265,7 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($pedido->total ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($pedido->total ?? 0), 2, ',', '.') }} €</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -298,7 +298,7 @@
                                         </td>
                                         <td class="text-dark">{{ optional($revision->fecha)->format('d/m/Y') }}</td>
                                         <td class="text-dark">{{ $revision->titulo ?: 'Sin título' }}</td>
-                                        <td class="text-dark">{{ number_format((float) ($revision->total ?? 0), 4, ',', '.') }} €</td>
+                                        <td class="text-dark">{{ number_format((float) ($revision->total ?? 0), 2, ',', '.') }} €</td>
                                         <td>
                                             @php
                                                 $revEstadoClass = match (strtolower($revision->estado)) {

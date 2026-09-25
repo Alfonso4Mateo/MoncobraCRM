@@ -207,7 +207,7 @@
                     </div>
                     <div class="field-group flex-1">
                         <label for="linea_precio">P. unitario</label>
-                        <input type="number" id="linea_precio" value="0.00" min="0" max="10000000" step="0.01">
+                        <input type="number" id="linea_precio" value="0" min="0" max="10000000" step="0.01">
                     </div>
                     <div class="field-group flex-1">
                         <label for="linea_margen">Margen (%)</label>

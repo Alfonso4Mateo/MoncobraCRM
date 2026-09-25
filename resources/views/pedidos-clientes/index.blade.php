@@ -252,11 +252,11 @@
                                     <div class="pedido-facturacion-cell">
                                         <div class="pedido-facturacion-line">
                                             <span class="pedido-facturacion-label">Total:</span>
-                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 4, ',', '.') }}€</strong>
+                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 2, ',', '.') }}€</strong>
                                         </div>
                                         <div class="pedido-facturacion-line pedido-facturacion-line--pending">
                                             <span class="pedido-facturacion-label">Pendiente a facturar:</span>
-                                            <strong>{{ number_format($pedido->ui_pendiente, 4, ',', '.') }}€</strong>
+                                            <strong>{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}€</strong>
                                         </div>
                                     </div>
                                 </td>

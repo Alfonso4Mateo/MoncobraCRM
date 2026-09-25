@@ -1,6 +1,6 @@
 const moneyFormatter = new Intl.NumberFormat("es-ES", {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
 });
 
 const numberFormatter = new Intl.NumberFormat("es-ES", {
@@ -71,9 +71,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 .map((linea) => {
                     const cantidad = round2(linea.cantidad);
                     const cantidadMax = Math.max(cantidad, round2(linea.cantidad_max ?? linea.cantidad));
-                    const precioUnitario = round4(linea.precio_unitario ?? linea.precio);
+                    const precioUnitario = round2(linea.precio_unitario ?? linea.precio);
                     const margen = round2(linea.margen);
-                    const total = round4(cantidad * precioUnitario * (1 + margen / 100));
+                    const total = round2(cantidad * precioUnitario * (1 + margen / 100));
 
                     return {
                         articulo_id: linea.articulo_id ?? null,
@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateTotal = () => {
         const total = lineas.reduce((acc, linea) => acc + (isPedidoRestrictoMode() && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
-        totalElement.textContent = `${moneyFormatter.format(round4(total))} €`;
+        totalElement.textContent = `${moneyFormatter.format(round2(total))} €`;
     };
 
     const lineSignature = (linea) => {
@@ -163,13 +163,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 descripcion,
                 cantidad: 0,
                 medida: String(linea.medida ?? linea.unidad ?? '').trim(),
-                precio_unitario: round4(linea.precio_unitario ?? linea.precio ?? 0),
+                precio_unitario: round2(linea.precio_unitario ?? linea.precio ?? 0),
                 margen: round2(linea.margen ?? 0),
                 total: 0,
             };
 
             current.cantidad = round2(current.cantidad + round2(linea.cantidad ?? 0));
-            current.total = round4(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
+            current.total = round2(current.cantidad * current.precio_unitario * (1 + current.margen / 100));
             grouped.set(signature, current);
         });
 
@@ -274,7 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         linea.cantidad = cantidad;
-        linea.total = round4(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
+        linea.total = round2(cantidad * linea.precio_unitario * (1 + linea.margen / 100));
     };
 
     const setPedidoMode = (enabled) => {
@@ -419,7 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const descripcion = descripcionInput.value.trim();
         const cantidad = round2(cantidadInput.value);
         const medida = medidaInput.value.trim() || 'und';
-        const precioUnitario = round4(precioInput.value);
+        const precioUnitario = round2(precioInput.value);
         const margen = round2(margenInput.value);
 
         if (!descripcion || cantidad <= 0) {
@@ -427,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const total = round4(cantidad * precioUnitario * (1 + margen / 100));
+        const total = round2(cantidad * precioUnitario * (1 + margen / 100));
 
         const payload = {
             articulo_id: selectedIndex >= 0 && selectedIndex < lineas.length ? (lineas[selectedIndex].articulo_id ?? null) : null,
@@ -599,8 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     if (pedidoClienteSelect && window.jQuery && typeof window.jQuery.fn.select2 === "function") {
-        const $pc = window.jQuery(pedidoClienteSelect);
-        $pc.select2({
+        const $pc = window.jQuery(pedidoClienteSelect);$pc.select2({
             theme: "bootstrap4",
             width: "100%",
             placeholder: pedidoClienteSelect.dataset.placeholder || "Selecciona pedido...",
@@ -610,8 +609,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         $pc.on('select2:select select2:unselect select2:clear', syncPedidoClienteFields);
-        $pc.on('change', syncPedidoClienteFields);
-        $pc.trigger('change');
+        $pc.on('change', syncPedidoClienteFields);$pc.trigger('change');
     }
 
     if (pedidoClienteSelect) {

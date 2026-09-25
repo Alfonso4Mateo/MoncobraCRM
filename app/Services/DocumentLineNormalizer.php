@@ -40,13 +40,17 @@ class DocumentLineNormalizer
                 $margin = max(0, (float) ($line['margen'] ?? 0));
 
                 $normalizedQuantity = $quantityAsInteger ? (int) max(0, round($quantity, 0)) : round($quantity, 2);
-                $normalizedUnitPrice = round($unitPrice, 4);
+                
+                // REVERSIÓN A 2 DECIMALES
+                $normalizedUnitPrice = round($unitPrice, 2); 
                 $normalizedMargin = round($margin, 2);
 
                 // El margen se aplica en servidor para evitar divergencias entre formularios y PDFs.
                 $priceWithMargin = $normalizedUnitPrice * (1 + ($normalizedMargin / 100));
-                $normalizedPriceWithMargin = round($priceWithMargin, 4);
-                $lineTotal = round($normalizedPriceWithMargin * $normalizedQuantity, 4);
+                
+                // REVERSIÓN A 2 DECIMALES
+                $normalizedPriceWithMargin = round($priceWithMargin, 2); 
+                $lineTotal = round($normalizedPriceWithMargin * $normalizedQuantity, 2); 
 
                 $measure = trim((string) ($line['medida'] ?? ($line['unidad'] ?? '')));
                 $measure = $measure !== '' ? $measure : null;

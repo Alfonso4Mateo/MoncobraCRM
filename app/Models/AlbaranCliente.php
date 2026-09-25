@@ -47,7 +47,7 @@ class AlbaranCliente extends Model
     protected $casts = [
         'fecha' => 'date',
         'lista_articulos' => 'array',
-        'total' => 'decimal:4',
+        'total' => 'decimal:2',
     ];
 
     /**

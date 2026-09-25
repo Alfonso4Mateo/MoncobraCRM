@@ -107,9 +107,9 @@
                                 {{ $bolsa['numero_pedido'] ?: 'Sin número' }}{{ $bolsa['ot'] ? ' · OT ' . $bolsa['ot'] : '' }}
                             </span>
                             <strong style="display: block; font-size: 1.25rem; color: #92400e; line-height: 1.3;">
-                                {{ number_format($bolsa['saldo_disponible'], 4, ',', '.') }} € libres
+                                {{ number_format($bolsa['saldo_disponible'], 2, ',', '.') }} € libres
                             </strong>
-                            <span style="font-size: 0.78rem; color: #92400e;">de {{ number_format($bolsa['total'], 4, ',', '.') }} € totales</span>
+                            <span style="font-size: 0.78rem; color: #92400e;">de {{ number_format($bolsa['total'], 2, ',', '.') }} € totales</span>
                         </div>
                     @endforeach
                 </div>
@@ -150,19 +150,19 @@
                 <div class="albaran-pago-item">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Total del Pedido</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalPedido, 4, ',', '.') }}</strong>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalPedido, 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--paid">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Total Facturado (Albaranes)</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalAlbaranes, 4, ',', '.') }}</strong>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalAlbaranes, 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--pending">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Pendiente de Facturar</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) ($pendienteFacturar ?? 0), 4, ',', '.') }}</strong>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) ($pendienteFacturar ?? 0), 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--count">
@@ -246,12 +246,12 @@
                                             }
                                         @endphp
                                         
-                                        <strong class="pedido-total">€{{ number_format($importeImputado, 4, ',', '.') }}</strong>
+                                        <strong class="pedido-total">€{{ number_format($importeImputado, 2, ',', '.') }}</strong>
                                         
                                         @if($importeImputado < $totalRealAlbaran)
                                             <br>
-                                            <small style="color: #64748b; font-size: 0.8em;" title="Total real del albarán: €{{ number_format($totalRealAlbaran, 4, ',', '.') }}">
-                                                (de €{{ number_format($totalRealAlbaran, 4, ',', '.') }})
+                                            <small style="color: #64748b; font-size: 0.8em;" title="Total real del albarán: €{{ number_format($totalRealAlbaran, 2, ',', '.') }}">
+                                                (de €{{ number_format($totalRealAlbaran, 2, ',', '.') }})
                                             </small>
                                         @endif
                                     </td>

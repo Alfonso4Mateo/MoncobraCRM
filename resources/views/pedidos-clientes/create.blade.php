@@ -41,14 +41,14 @@
         $presupuestosParaPedidoJs = $presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
-        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 4, '.', ''));
+        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 2, '.', ''));
     @endphp
 
     <form id="pedido-cliente-form" action="{{ route('pedidos-clientes.store') }}" method="POST" class="pedido-create-layout" novalidate>
         @csrf
         <input type="hidden" name="bolsa" value="0">
         <input type="hidden" name="estado" id="pedido_estado" value="{{ $estadoActual }}">
-        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 4, '.', '') }}">
+        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 2, '.', '') }}">
         <input type="hidden" name="lista_articulos" id="pedido_lista_articulos" value="{{ $lineasJson }}">
 
         <section class="pedido-create-main">
@@ -241,11 +241,11 @@
                 <div class="pedido-summary-list">
                     <div class="pedido-summary-row">
                         <span>Base imponible</span>
-                            <strong id="summary-base">{{ number_format($baseImponible, 4, ',', '.') }} €</strong>
+                            <strong id="summary-base">{{ number_format($baseImponible, 2, ',', '.') }} €</strong>
                     </div>
                     <div class="pedido-summary-row pedido-summary-row--total">
                         <span>Total pedido</span>
-                            <strong id="summary-total">{{ number_format($totalPedido, 4, ',', '.') }} €</strong>
+                            <strong id="summary-total">{{ number_format($totalPedido, 2, ',', '.') }} €</strong>
                     </div>
                 </div>
 
@@ -302,8 +302,8 @@
             let bolsaMode = bolsaCheckbox.checked;
 
             const moneyFormatter = new Intl.NumberFormat('es-ES', {
-                minimumFractionDigits: 4,
-                maximumFractionDigits: 4,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
             });
 
             const parseValue = (value) => {
@@ -322,7 +322,7 @@
                 const qty = Math.max(0, parseValue(cantidad));
                 const unit = Math.max(0, parseValue(precioUnitario));
                 const pct = Math.max(0, parseValue(margen));
-                return Number((qty * unit * (1 + (pct / 100))).toFixed(4));
+                return Number((qty * unit * (1 + (pct / 100))).toFixed(2));
             };
 
             const normalizeLines = (lines) => Array.isArray(lines)
@@ -330,7 +330,7 @@
                     .filter((line) => line && typeof line === 'object')
                     .map((line) => {
                         const cantidad = Number(parseValue(line.cantidad).toFixed(2));
-                        const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(4));
+                        const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(2));
                         const margen = Number(parseValue(line.margen).toFixed(2));
 
                         return {
@@ -407,7 +407,7 @@
                 const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
                 const total = bolsaMode ? parseValue(bolsaTotalInput.value) : base;
 
-                hiddenTotal.value = total.toFixed(4);
+                hiddenTotal.value = total.toFixed(2);
                 summaryBase.textContent = formatMoney(bolsaMode ? 0 : base);
                 summaryTotal.textContent = formatMoney(total);
             };
@@ -524,7 +524,7 @@
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
-                    precio_unitario: Number(precioUnitario.toFixed(4)),
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
                     margen: Number(margen.toFixed(2)),
                     total,
                 });
@@ -622,7 +622,7 @@
                 }
 
                 if (bolsaCheckbox.checked) {
-                    hiddenTotal.value = parseValue(bolsaTotalInput.value).toFixed(4);
+                    hiddenTotal.value = parseValue(bolsaTotalInput.value).toFixed(2);
                     hiddenLines.value = '[]';
                 } else if (bolsaTextoInput) {
                     bolsaTextoInput.value = '';

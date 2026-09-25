@@ -68,9 +68,9 @@
                                         <td>{{ $linea['descripcion'] ?? '-' }}</td>
                                         <td>{{ isset($linea['cantidad']) ? number_format((float) $linea['cantidad'], 2, ',', '.') : '-' }}</td>
                                         <td>
-                                            {{ isset($linea['precio_unitario']) ? number_format((float) $linea['precio_unitario'], 4, ',', '.') . '€' : '-' }}
+                                            {{ isset($linea['precio_unitario']) ? number_format((float) $linea['precio_unitario'], 2, ',', '.') . '€' : '-' }}
                                         </td>
-                                        <td>{{ isset($linea['total']) ? number_format((float) $linea['total'], 4, ',', '.') . '€' : '-' }}</td>
+                                        <td>{{ isset($linea['total']) ? number_format((float) $linea['total'], 2, ',', '.') . '€' : '-' }}</td>
                                         <td>
                                             <button type="button" class="btn btn-sm btn-primary" 
                                                     style="background-color: #2a6fb0; border-color: #2a6fb0;"

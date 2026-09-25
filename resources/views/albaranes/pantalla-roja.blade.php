@@ -180,7 +180,7 @@
 
                         <div class="total-box">
                             <span>TOTAL ALBARÁN</span>
-                            <strong id="albaranTotalValue">{{ number_format((float) ($albaran->total ?? 0), 4, ',', '.') }} €</strong>
+                            <strong id="albaranTotalValue">{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }} €</strong>
                         </div>
                     </section>
                 </main>
