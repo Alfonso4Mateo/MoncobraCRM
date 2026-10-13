@@ -227,7 +227,13 @@
                 @foreach($lineasValidas as $i => $line)
                     @php
                         $cantidad = (float) ($line['cantidad'] ?? 0);
-                        $precio = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
+                        // Extraemos precio base y margen
+                        $precioBase = (float) ($line['precio_unitario'] ?? ($line['precio'] ?? 0));
+                        $margen = (float) ($line['margen'] ?? 0);
+                        
+                        // Calculamos el precio de venta real al cliente
+                        $precioConMargen = isset($line['precio_con_margen']) ? (float) $line['precio_con_margen'] : ($precioBase * (1 + ($margen / 100)));
+                        
                         $totalLinea = (float) ($line['total'] ?? 0);
                         $medida = $line['medida'] ?? ($line['unidad'] ?? null);
                         $medida = is_string($medida) ? trim($medida) : $medida;
@@ -242,7 +248,8 @@
                         <td style="white-space: pre-wrap;">{!! nl2br(e($textoLimpio)) !!}</td>
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                        <td align="right" class="evitar-salto">{{ number_format($precio, 4, ',', '.') }} €</td>
+                        <!-- Imprimimos el precio final calculado con el margen -->
+                        <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 4, ',', '.') }} €</td>
                         <td align="right" class="evitar-salto">{{ number_format($totalLinea, 4, ',', '.') }} €</td>
                     </tr>
                 @endforeach

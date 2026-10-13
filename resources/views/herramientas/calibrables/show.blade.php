@@ -171,9 +171,37 @@
                 </div>
                 <div>
                     <dt>Ubicación física</dt>
-                    <dd>{{ $herramienta->ubicacion ?: 'Almacén' }}</dd>
+                    <dd>{{ $herramienta->ubicacion->nombre ?? 'Almacén' }}</dd>
                 </div>
             </dl>
+        </section>
+
+        <!-- TARJETA DE TIEMPOS DE PARADA -->
+        <section class="cal-panel" style="margin-top: 20px; padding: 16px;">
+            <h2 style="font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #52636d; border-bottom: 1px solid #edf0f2; padding-bottom: 10px; margin-bottom: 12px;">
+                <i class="fas fa-stopwatch mr-1"></i> Tiempos de parada históricos
+            </h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: #687681;"><i class="fas fa-wrench mr-2" style="color: var(--cal-amber);"></i> Reparación / Ajuste</span>
+                    <strong style="background: var(--cal-low); padding: 3px 8px; border-radius: 4px; color: var(--cal-ink);">
+                        {{ $herramienta->getDiasEnEstado('reparacion') }} días
+                    </strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: #687681;"><i class="fas fa-flask mr-2" style="color: var(--cal-blue);"></i> En laboratorio externo</span>
+                    <strong style="background: var(--cal-low); padding: 3px 8px; border-radius: 4px; color: var(--cal-ink);">
+                        {{ $herramienta->getDiasEnEstado('calibracion') }} días
+                    </strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: #687681;"><i class="fas fa-ban mr-2" style="color: var(--cal-red);"></i> Aislado / No conforme</span>
+                    <strong style="background: var(--cal-low); padding: 3px 8px; border-radius: 4px; color: var(--cal-ink);">
+                        {{ $herramienta->getDiasEnEstado('aislado') }} días
+                    </strong>
+                </div>
+            </div>
         </section>
     </aside>
 
@@ -270,20 +298,27 @@
 <!-- Modal para registrar una nueva calibración/certificado -->
 <div class="detail-modal" id="event-modal">
     <div class="detail-dialog">
-        <h2>Añadir Registro Metrológico</h2>
+        <h2>Añadir Registro</h2>
         <p>Añade un nuevo certificado de calibración, reporta un fallo de tolerancia o documenta un movimiento interno.</p>
         
         <form method="POST" action="{{ route('calibrables.eventos.store', $herramienta) }}" enctype="multipart/form-data">
             @csrf
             
             <label>Tipo de registro *</label>
-            <select required name="tipo" class="form-control">
+            <!-- Añadimos un ID al select -->
+            <select required name="tipo" id="tipo_evento_select" class="form-control">
                 <option value="calibracion">Nueva Calibración (Subida de Certificado)</option>
                 <option value="reparacion">Reparación / Ajuste interno</option>
                 <option value="averia">Fallo o Avería (Desviación metrológica)</option>
                 <option value="responsable">Asignación a área/usuario</option>
                 <option value="otro">Otro suceso</option>
             </select>
+            
+            <!-- NUEVO: Campo dinámico de Caducidad -->
+            <div id="wrapper_caducidad" style="display: none; padding: 12px; background: #fff4e4; border: 1px dashed #dca54a; border-radius: 4px; margin-bottom: 16px;">
+                <label style="color: #9a6512; margin-bottom: 5px;"><i class="fas fa-calendar-check mr-1"></i>Renovar fecha de caducidad (Próxima calibración) *</label>
+                <input type="date" name="proxima_calibracion" id="input_proxima_calibracion" class="form-control" style="margin-bottom: 0; background: #fff; border: 1px solid #dca54a;">
+            </div>
             
             <label>Título breve *</label>
             <input required type="text" name="titulo" class="form-control" placeholder="Ej. Certificado anual ENAC, Calibración interna... ">
@@ -295,7 +330,7 @@
             <textarea name="descripcion" rows="4" class="form-control" placeholder="Anota si se ha requerido ajuste, si hay derivas importantes en las mediciones..."></textarea>
             
             <label>Certificado Oficial (PDF) o Foto</label>
-            <input type="file" name="archivo_adjunto" class="form-control" accept=".pdf, image/*" style="padding: 6px;">
+            <input type="file" name="archivo_adjunto" class="form-control" accept=".pdf, image/*" style="padding: 6px; margin-bottom: 16px;">
             
             <div class="detail-modal-actions">
                 <button type="button" class="cal-btn cal-btn-soft" onclick="document.getElementById('event-modal').classList.remove('show')">Cancelar</button>
@@ -307,9 +342,28 @@
 
 @push('js')
 <script>
+    // Abrir Modal
     document.querySelector('[data-target="#event-modal"]').addEventListener('click', function() {
         document.getElementById('event-modal').classList.add('show');
     });
+
+    // LÓGICA DE UX: Mostrar campo de caducidad si selecciona "calibración"
+    document.getElementById('tipo_evento_select').addEventListener('change', function() {
+        let wrapper = document.getElementById('wrapper_caducidad');
+        let input = document.getElementById('input_proxima_calibracion');
+
+        if (this.value === 'calibracion') {
+            wrapper.style.display = 'block';
+            input.required = true;
+        } else {
+            wrapper.style.display = 'none';
+            input.required = false;
+            input.value = ''; // Limpiamos por si se equivoca
+        }
+    });
+
+    // Forzamos el evento al cargar para que compruebe el estado inicial
+    document.getElementById('tipo_evento_select').dispatchEvent(new Event('change'));
 </script>
 @endpush
 @stop

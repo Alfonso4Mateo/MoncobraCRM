@@ -167,35 +167,6 @@ class PresupuestoController extends Controller
             'lista_articulos' => 'nullable|json',
         ]);
 
-        // --- LÓGICA DE REVISIÓN ---
-        $esRevision = !empty($validated['parent_id']);
-
-        $numeroManual = trim((string) ($validated['numero'] ?? ''));
-        $correlativoActual = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
-        $formatoActual = $correlativoActual['formato'];
-        $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
-        
-        $correlativoFinal = $correlativoActual['correlativo'];
-        $manualCorrelativo = null;
-
-        // Si NO es revisión extraemos el correlativo; si lo es, lo ponemos a 0 para no gastarlo
-        if (!$esRevision) {
-            $manualCorrelativo = $this->extractCorrelativoFromNumero($formatoActual, $numeroFinal);
-            if ($manualCorrelativo !== null) {
-                $correlativoFinal = $manualCorrelativo;
-            }
-        } else {
-            $correlativoFinal = 0; 
-        }
-
-        $validated['numero'] = $numeroFinal;
-        $validated['proyecto_id'] = $proyectoId;
-        $validated['numero_correlativo'] = $correlativoFinal;
-
-        if ($request->hasFile('archivo_pdf')) {
-            $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('presupuestos', 'public');
-        }
-
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
         $lineasFiltradas = array_map(function (array $linea) {
@@ -217,26 +188,81 @@ class PresupuestoController extends Controller
         });
         $validated['estado'] = 'pendiente';
 
-        $presupuesto = Presupuesto::create($validated);
-        $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
+        // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK (Double Submit) ---
+        // Buscamos si existe un presupuesto idéntico creado hace menos de 10 segundos
+        $dobleEnvio = Presupuesto::where('proyecto_id', $proyectoId)
+            ->where('cliente_id', $validated['cliente_id'])
+            ->where('total', $validated['total'])
+            ->where('created_at', '>=', Carbon::now()->subSeconds(10))
+            ->first();
 
-        // --- AVANZAR EL CONTADOR GLOBAL SÓLO SI ES UN PRESUPUESTO NUEVO (NO REVISIÓN) ---
-        // CAMBIO APLICADO AQUÍ PARA PREVENIR EL SALTO DE NÚMEROS
-        if (!$esRevision) {
-            if ($manualCorrelativo !== null) {
-                // Si usó el número por defecto o introdujo manualmente otro con formato válido (ej. 134)
-                // El siguiente será ese número + 1. Usamos max() para no retroceder el contador si escribe un número viejo.
-                $siguienteCorrelativo = max($correlativoActual['correlativo'], $manualCorrelativo + 1);
-            } else {
-                // Si introdujo un texto libre o inventado (ej. "PRESUPUESTO-ALTERNO")
-                // No gastamos el correlativo actual, lo mantenemos intacto para el próximo intento.
-                $siguienteCorrelativo = $correlativoActual['correlativo'];
+        if ($dobleEnvio) {
+            // Si el usuario presionó dos veces, simulamos éxito y omitimos la duplicidad
+            if ($redirectClienteId > 0 && $redirectClienteId === (int) $validated['cliente_id']) {
+                return redirect()->route('clientes.show', $redirectClienteId)->with('success', 'Presupuesto cargado correctamente');
             }
-            
-            $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
+            return redirect()->route('presupuestos.index')->with('success', 'Presupuesto creado');
+        }
+        // --- FIN PROTECCIÓN DOBLE CLICK ---
+
+        // Lógica de archivo y revisión general (fuera de la transacción para no bloquear BD)
+        $esRevision = !empty($validated['parent_id']);
+        $numeroManual = trim((string) ($validated['numero'] ?? ''));
+
+        if ($request->hasFile('archivo_pdf')) {
+            $validated['archivo_pdf'] = $request->file('archivo_pdf')->store('presupuestos', 'public');
         }
 
-        // Attempt to generate and store a PDF copy of the presupuesto if a PDF library is available
+        // --- TRANSACCIÓN PARA ASEGURAR ATOMICIDAD DEL CONTADOR ---
+        $presupuesto = DB::transaction(function () use (&$validated, $proyectoId, $esRevision, $numeroManual) {
+            
+            // Bloqueamos la fila del contador para que peticiones simultáneas esperen
+            DB::table('contadores')
+                ->where('proyecto_id', $proyectoId)
+                ->where('clave', 'presupuestos_next_correlativo')
+                ->lockForUpdate()
+                ->first();
+
+            $correlativoActual = $this->nextNumeroPresupuestoCorrelativo($proyectoId);
+            $formatoActual = $correlativoActual['formato'];
+            $numeroFinal = $numeroManual !== '' ? $numeroManual : $correlativoActual['numero'];
+            
+            $correlativoFinal = $correlativoActual['correlativo'];
+            $manualCorrelativo = null;
+
+            // Si NO es revisión extraemos el correlativo; si lo es, lo ponemos a 0 para no gastarlo
+            if (!$esRevision) {
+                $manualCorrelativo = $this->extractCorrelativoFromNumero($formatoActual, $numeroFinal);
+                if ($manualCorrelativo !== null) {
+                    $correlativoFinal = $manualCorrelativo;
+                }
+            } else {
+                $correlativoFinal = 0; 
+            }
+
+            $validated['numero'] = $numeroFinal;
+            $validated['proyecto_id'] = $proyectoId;
+            $validated['numero_correlativo'] = $correlativoFinal;
+
+            $presupuesto = Presupuesto::create($validated);
+            $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
+
+            // Avanzar contador global solo si es nuevo
+            if (!$esRevision) {
+                if ($manualCorrelativo !== null) {
+                    $siguienteCorrelativo = max($correlativoActual['correlativo'], $manualCorrelativo + 1);
+                } else {
+                    $siguienteCorrelativo = $correlativoActual['correlativo'];
+                }
+                
+                $this->setContadorValue($proyectoId, 'presupuestos_next_correlativo', $siguienteCorrelativo);
+            }
+
+            return $presupuesto;
+        });
+        // --- FIN DE LA TRANSACCIÓN ---
+
+        // Attempt to generate and store a PDF copy of the presupuesto
         try {
             if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
                 $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
@@ -441,7 +467,7 @@ class PresupuestoController extends Controller
         }
 
         $validated = $request->validate([
-            'estado' => ['required', Rule::in(['pendiente', 'aceptado', 'rechazado', 'pendiente pedido'])],
+            'estado' => ['required', Rule::in(['pendiente', 'aceptado', 'rechazado', 'pedido_pendiente'])],
         ]);
 
         $presupuesto->update([
@@ -460,6 +486,12 @@ class PresupuestoController extends Controller
 
         if ((int) $presupuesto->proyecto_id !== (int) $proyectoId) {
             abort(404);
+        }
+
+        // --- PROTECCIÓN BACKEND CONTRA DOBRE CLICK EN ACTUALIZAR ---
+        // Si el usuario hace doble clic, omitimos el segundo para no colapsar la BBDD haciendo el PDF 2 veces.
+        if ($presupuesto->updated_at && $presupuesto->updated_at->diffInSeconds(now()) < 5) {
+            return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Presupuesto actualizado correctamente');
         }
 
         $user = $request->user();
@@ -964,6 +996,7 @@ class PresupuestoController extends Controller
         $nuevaRevision->fecha = now()->toDateString();
         $nuevaRevision->estado = 'pendiente'; 
         $nuevaRevision->numero = $nuevoNumero;
+        $centrosCoste = CentroCoste::orderBy('codigo')->get();
 
         return view('presupuestos.create', [
             'presupuesto' => $nuevaRevision,
@@ -971,7 +1004,8 @@ class PresupuestoController extends Controller
             'clienteSeleccionadoId' => $nuevaRevision->cliente_id,
             'volverACliente' => false,
             'modo' => 'revision',
-            'siguienteNumero' => $nuevoNumero
+            'siguienteNumero' => $nuevoNumero,
+            'centrosCoste' => $centrosCoste
         ]);
     }
 }

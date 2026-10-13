@@ -4,44 +4,40 @@
 
 @section('css')
     @vite(['resources/css/pedidos-clientes-index.css'])
-@endsection
-
-@section('content_header')
-    <div class="pedidos-clientes-header">
-        <div class="pedidos-clientes-header__copy">
-            <h1>Albaranes del Pedido</h1>
-            <p>Gestión y seguimiento de albaranes asociados.</p>
-        </div>
-
-        <div class="pedidos-clientes-header__actions">
-            <a href="{{ route('pedidos-clientes.index') }}" class="pedidos-clientes-action-btn pedidos-clientes-action-btn--secondary">
-                <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                Volver
-            </a>
-            @php
-                $pedidoFacturado = (string) ($pedidoCliente->estado ?? '') === 'facturado';
-                $crearAlbaranUrl = route('albaranes.create', ['pedido_id' => $pedidoCliente->id, 'pedido_cliente' => $pedidoCliente->numero_pedido, 'cliente_id' => $pedidoCliente->id_cliente, 'ot' => $pedidoCliente->ot]);
-            @endphp
-            @if ($pedidoFacturado)
-                <span
-                    class="pedidos-clientes-create-btn pedidos-clientes-create-btn--disabled"
-                    aria-disabled="true"
-                    title="Este pedido ya está facturado"
-                >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    Agregar Albarán
-                </span>
-            @else
-                <a
-                    href="{{ $crearAlbaranUrl }}"
-                    class="pedidos-clientes-create-btn"
-                >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    Agregar Albarán
-                </a>
-            @endif
-        </div>
-    </div>
+    <style>
+        .drilldown-link {
+            color: #1f74dd;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: underline dashed;
+            text-underline-offset: 4px;
+            padding: 2px 6px;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+        .drilldown-link:hover {
+            color: #165ab0;
+            background-color: #eff6ff;
+            text-decoration: underline solid;
+        }
+        
+        .modal-desglose .modal-header {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .modal-desglose .modal-title {
+            color: #1e293b;
+            font-weight: 800;
+            font-size: 1.15rem;
+        }
+        .modal-desglose .table th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
 @endsection
 
 @section('content_header')
@@ -88,7 +84,7 @@
 @section('content')
     <section class="pedidos-clientes-shell">
         
-        <!-- WIDGET GLOBAL DEL CLIENTE (Solo se renderiza si hay OTRAS bolsas activas) -->
+        <!-- WIDGET GLOBAL DEL CLIENTE -->
         @if(isset($resumenBolsasCliente) && !empty($resumenBolsasCliente['bolsas']))
             <article class="pedidos-clientes-card" style="background: #fef3c7; border: 1px solid #f59e0b; border-left: 4px solid #d97706; padding: 16px; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 14px;">
@@ -185,7 +181,169 @@
             </div>
         </article>
 
-        <!-- Selector unificado de Albaranes y Facturación (Pestañas) -->
+        <!-- ========================================== -->
+        <!-- DESGLOSE DE CONSUMO CON DRILL-DOWN (BOLSA) -->
+        <!-- ========================================== -->
+        @php
+            $esBolsaV2 = (bool) ($pedidoCliente->bolsa ?? false);
+            $lineasBolsa = [];
+
+            if ($esBolsaV2) {
+                try {
+                    if (!$pedidoCliente->lineasBolsa()->exists() && !empty($pedidoCliente->lista_articulos)) {
+                        (new \App\Services\LineaBolsaService())->sincronizarLineasDePartida(
+                            $pedidoCliente,
+                            is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : []
+                        );
+                        $pedidoCliente->unsetRelation('lineasBolsa');
+                    }
+
+                    $lineasPartida = $pedidoCliente->lineasBolsa()->get();
+
+                    foreach ($lineasPartida as $linea) {
+                        $modoConsumo = $linea->modo_consumo ?? 'cantidad';
+                        $medida = $linea->medida ?: 'und';
+                        $precioUnitario = (float) $linea->precio_unitario;
+                        $margen = (float) $linea->margen;
+                        $unitPriceConMargen = $precioUnitario * (1 + ($margen / 100));
+
+                        $totalOriginal = round((float) $linea->pivot->importe_asignado, 4);
+
+                        $cantOriginal = $modoConsumo === 'importe'
+                            ? 1.0
+                            : ($unitPriceConMargen > 0 ? round($totalOriginal / $unitPriceConMargen, 2) : 0.0);
+
+                        $consumosPartida = \Illuminate\Support\Facades\DB::table('albaran_linea_partida')
+                            ->join('albaranes_clientes', 'albaran_linea_partida.albaran_id', '=', 'albaranes_clientes.id')
+                            ->where('albaran_linea_partida.linea_id', $linea->id)
+                            ->where('albaran_linea_partida.pedido_id', $pedidoCliente->id)
+                            ->select(
+                                'albaran_linea_partida.importe',
+                                'albaranes_clientes.id as albaran_id',
+                                'albaranes_clientes.numero as albaran_numero',
+                                'albaranes_clientes.fecha as albaran_fecha'
+                            )
+                            ->get();
+
+                        $totalConsumido = round((float) $consumosPartida->sum('importe'), 4);
+
+                        $cantConsumida = $modoConsumo === 'importe'
+                            ? ($totalOriginal > 0 ? round($cantOriginal * ($totalConsumido / $totalOriginal), 4) : 0.0)
+                            : ($unitPriceConMargen > 0 ? round($totalConsumido / $unitPriceConMargen, 2) : 0.0);
+
+                        $detallesConsumo = [];
+                        foreach ($consumosPartida as $consumo) {
+                            $importeConsumo = (float) $consumo->importe;
+                            $cantFisica = $modoConsumo === 'importe'
+                                ? ($totalOriginal > 0 ? round($cantOriginal * ($importeConsumo / $totalOriginal), 4) : 0.0)
+                                : ($unitPriceConMargen > 0 ? round($importeConsumo / $unitPriceConMargen, 2) : 0.0);
+
+                            $detallesConsumo[] = [
+                                'numero' => $consumo->albaran_numero,
+                                'fecha' => $consumo->albaran_fecha ? \Carbon\Carbon::parse($consumo->albaran_fecha)->format('d/m/Y') : '-',
+                                'cantidad' => $cantFisica,
+                                'total' => $importeConsumo,
+                                'url' => route('albaranes.show', $consumo->albaran_id)
+                            ];
+                        }
+
+                        $lineasBolsa[] = [
+                            'descripcion' => $linea->descripcion ?: 'Sin descripción',
+                            'medida' => $medida,
+                            'precio_unitario' => $unitPriceConMargen, // <--- AQUÍ ESTÁ LA CORRECCIÓN
+                            'cant_original' => $cantOriginal,
+                            'total_original' => $totalOriginal,
+                            'cant_consumida' => $cantConsumida,
+                            'total_consumido' => $totalConsumido,
+                            'cant_pendiente' => max(0, $cantOriginal - $cantConsumida),
+                            'total_pendiente' => max(0, $totalOriginal - $totalConsumido),
+                            'detalles_json' => json_encode($detallesConsumo)
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    // Si falla la DB, ignoramos para no romper la vista
+                }
+            }
+        @endphp
+
+        @if($esBolsaV2 && count($lineasBolsa) > 0)
+        <article class="pedidos-clientes-card" style="border-top: 4px solid #3b82f6;">
+            <header class="pedidos-clientes-card__header">
+                <div>
+                    <h3>Desglose de Consumo (Bolsa)</h3>
+                    <p class="card-subtitle">Haz clic en los importes consumidos para ver el desglose de albaranes.</p>
+                </div>
+            </header>
+
+            <div class="card-body p-0">
+                <div class="table-responsive pedidos-clientes-table-wrap m-0">
+                    <table class="table pedidos-clientes-table mb-0">
+                        <thead style="background-color: #f8fafc;">
+                            <tr>
+                                <th>Descripción</th>
+                                <th class="text-right">P. Unitario</th>
+                                <th class="text-right">Cant. Inicial</th>
+                                <th class="text-right" style="color: #16a34a;">Cant. Consumida</th>
+                                <th class="text-right" style="color: #ea580c;">Cant. Pdte.</th>
+                                <th class="text-right">Importe Inicial</th>
+                                <th class="text-right" style="color: #16a34a;">Imp. Consumido</th>
+                                <th class="text-right" style="color: #ea580c;">Imp. Pdte.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($lineasBolsa as $lb)
+                                <tr>
+                                    <td>{{ $lb['descripcion'] }}</td>
+                                    <td class="text-right">€{{ number_format($lb['precio_unitario'], 4, ',', '.') }}</td>
+                                    
+                                    <!-- Cantidades -->
+                                    <td class="text-right">{{ number_format($lb['cant_original'], 2, ',', '.') }} {{ $lb['medida'] }}</td>
+                                    
+                                    <td class="text-right">
+                                        @if($lb['cant_consumida'] > 0)
+                                            <span class="drilldown-link" data-detalles="{{ $lb['detalles_json'] }}" data-descripcion="{{ $lb['descripcion'] }}" data-medida="{{ $lb['medida'] }}" title="Ver albaranes imputados">
+                                                {{ number_format($lb['cant_consumida'], 2, ',', '.') }}
+                                            </span>
+                                        @else
+                                            <span style="color: #16a34a; font-weight: bold;">
+                                                {{ number_format($lb['cant_consumida'], 2, ',', '.') }}
+                                            </span>
+                                        @endif
+                                    </td>
+
+                                    <td class="text-right" style="color: #ea580c; font-weight: bold;">
+                                        {{ number_format($lb['cant_pendiente'], 2, ',', '.') }}
+                                    </td>
+
+                                    <!-- Importes -->
+                                    <td class="text-right">€{{ number_format($lb['total_original'], 4, ',', '.') }}</td>
+                                    
+                                    <td class="text-right">
+                                        @if($lb['total_consumido'] > 0)
+                                            <span class="drilldown-link" data-detalles="{{ $lb['detalles_json'] }}" data-descripcion="{{ $lb['descripcion'] }}" data-medida="{{ $lb['medida'] }}" title="Ver albaranes imputados">
+                                                €{{ number_format($lb['total_consumido'], 4, ',', '.') }}
+                                            </span>
+                                        @else
+                                            <span style="color: #16a34a; font-weight: bold;">
+                                                €{{ number_format($lb['total_consumido'], 4, ',', '.') }}
+                                            </span>
+                                        @endif
+                                    </td>
+
+                                    <td class="text-right" style="color: #ea580c; font-weight: bold;">
+                                        €{{ number_format($lb['total_pendiente'], 4, ',', '.') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </article>
+        @endif
+        <!-- ========================================== -->
+
+
         <!-- Listado de Albaranes -->
         <article class="pedidos-clientes-card">
             <header class="pedidos-clientes-card__header">
@@ -211,7 +369,6 @@
                             @forelse ($albaranes as $albaran)
                                 @php
                                     $estadoAlbaran = (string) ($albaran->estado ?: 'pendiente');
-                                    // Nuevos colores para los 3 estados
                                     $estadoClass = match($estadoAlbaran) {
                                         'facturado' => 'pedido-chip pedido-chip--paid',
                                         'recibido' => 'pedido-chip pedido-chip--partial',
@@ -236,7 +393,7 @@
                                         @php
                                             $totalRealAlbaran = (float) ($albaran->total ?? 0);
                                             
-                                            // Si es bolsa, confiamos ciegamente en el pivote (incluso si es 0).
+                                            // Si es bolsa, confiamos ciegamente en el pivote
                                             if ($pedidoCliente->bolsa) {
                                                 $importeImputado = isset($albaran->pivot) ? (float) $albaran->pivot->importe_imputado : $totalRealAlbaran;
                                             } else {
@@ -312,5 +469,114 @@
                 @endif
             </div>
         </article>
+
+        <!-- MODAL DE DESGLOSE (DRILL-DOWN) -->
+        <div class="modal fade modal-desglose" id="modalDesgloseLinea" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-list-ul" style="color: #1f74dd; margin-right: 8px;"></i> Desglose de Consumo
+                        </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="p-3" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                            <strong style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Artículo / Servicio</strong>
+                            <div id="modalDesgloseDescripcion" style="color: #0f172a; font-weight: 700; font-size: 1.05rem;"></div>
+                        </div>
+                        <div class="table-responsive m-0">
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Albarán</th>
+                                        <th>Fecha</th>
+                                        <th class="text-right">Cant. Imputada</th>
+                                        <th class="text-right">Importe Imputado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modalDesgloseBody">
+                                    <!-- Inyectado por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="background-color: #f8fafc;">
+                        <button type="button" class="btn btn-secondary" style="background-color: #e2e8f0; color: #475569; border: none; font-weight: bold;" data-dismiss="modal">Cerrar detalle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- FIN MODAL -->
+
     </section>
+@endsection
+
+@section('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Formateadores locales para pintar el desglose en el JS
+            const numFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const moneyFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+
+            // Capturar clics en los enlaces de Drill-down
+            document.querySelectorAll('.drilldown-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    const detalles = JSON.parse(this.dataset.detalles);
+                    const descripcion = this.dataset.descripcion;
+                    const medida = this.dataset.medida;
+
+                    // Poblar la cabecera
+                    document.getElementById('modalDesgloseDescripcion').textContent = descripcion;
+
+                    // Poblar la tabla
+                    const tbody = document.getElementById('modalDesgloseBody');
+                    tbody.innerHTML = '';
+
+                    if (detalles.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color: #64748b; padding: 2rem;">No se encontraron movimientos para esta línea.</td></tr>';
+                    } else {
+                        let totalCant = 0;
+                        let totalImp = 0;
+                        
+                        detalles.forEach(d => {
+                            totalCant += d.cantidad;
+                            totalImp += d.total;
+
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>
+                                    <a href="${d.url}" target="_blank" style="color: #1f74dd; font-weight: 800; text-decoration: none;">
+                                        ${d.numero} <i class="fas fa-external-link-alt" style="font-size: 0.7em; margin-left: 2px;"></i>
+                                    </a>
+                                </td>
+                                <td style="color: #475569;">${d.fecha}</td>
+                                <td class="text-right" style="color: #334155;">${numFormatter.format(d.cantidad)} <small style="color: #94a3b8;">${medida}</small></td>
+                                <td class="text-right" style="color: #16a34a; font-weight: 800;">€${moneyFormatter.format(d.total)}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+
+                        // Fila de Total
+                        const trTotal = document.createElement('tr');
+                        trTotal.style.backgroundColor = '#f1f5f9';
+                        trTotal.innerHTML = `
+                            <td colspan="2" class="text-right" style="color: #475569; font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">Total Imputado:</td>
+                            <td class="text-right" style="color: #0f172a; font-weight: 800;">${numFormatter.format(totalCant)} <small style="color: #64748b;">${medida}</small></td>
+                            <td class="text-right" style="color: #16a34a; font-weight: 900;">€${moneyFormatter.format(totalImp)}</td>
+                        `;
+                        tbody.appendChild(trTotal);
+                    }
+
+                    // Abrir el Modal de Bootstrap
+                    if (window.$) {$('#modalDesgloseLinea').modal('show');
+                    } else {
+                        console.error("jQuery o Bootstrap.js no están cargados. El modal no se puede abrir.");
+                    }
+                });
+            });
+        });
+    </script>
 @endsection

@@ -36,6 +36,13 @@
             </div>
         @endif
 
+        @if (session('warning'))
+            <div class="albaranes-alert-warning" style="background-color: #fffbeb; color: #b45309; border: 1px solid #fcd34d; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                {{ session('warning') }}
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="albaran-alert albaran-alert-error">
                 <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
@@ -50,7 +57,7 @@
             </div>
         @endif
 
-        <form action="{{ route('albaranes.update', $albaran) }}" method="POST" class="layout-grid-form">
+        <form action="{{ route('albaranes.update', $albaran) }}" method="POST" class="layout-grid-form" id="form-albaran">
             @csrf
             @method('PUT')
             <input type="hidden" name="return_to" value="{{ old('return_to', url()->previous()) }}">
@@ -84,31 +91,55 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="field">
-                                <label for="ot">CC (Centro de Coste)</label>
-                                <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}">
-                            </div>
+                            
+                            <!-- Agrupamos OT y Pedido Cliente en las 2 columnas restantes de la fila -->
+                            <div class="span-2" style="display: flex; flex-direction: row; gap: 1rem;">
+                                <!-- Caja de OT (25% del espacio) -->
+                                <div class="field" style="flex: 0 0 25%; margin-bottom: 0;">
+                                    <label for="ot">CC (Centro de Coste)</label>
+                                    <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}" style="width: 100%;">
+                                </div>
 
-                            @php
-                                // Recuperamos las bolsas que ya tiene guardadas el albarán
-                                $pedidosVinculados = old('pedidos_cliente', $albaran->pedidosClientes->pluck('numero_pedido')->toArray());
-                                // Fallback para albaranes antiguos
-                                if (empty($pedidosVinculados) && !empty($albaran->pedido_cliente)) {
-                                    $pedidosVinculados = [$albaran->pedido_cliente];
-                                }
-                            @endphp
-                            <div class="field">
-                                <label for="pedido_cliente">Pedido cliente</label>
-                                <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas...">
-                                    @foreach ($pedidosClientes as $pedido)
-                                        @php
-                                            $pedidoLabel = trim(($pedido->bolsa ? '📦 [BOLSA] ' : '') . ($pedido->numero_pedido ?: 'Sin número') . ' | ' . ($pedido->cliente?->empresa_nombre ?: 'Sin cliente'));
-                                        @endphp
-                                        <option value="{{ $pedido->numero_pedido }}" @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))>
-                                            {{ $pedidoLabel }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                @php
+                                    // Recuperamos las bolsas que ya tiene guardadas el albarán
+                                    $pedidosVinculados = old('pedidos_cliente', $albaran->pedidosClientes->pluck('numero_pedido')->toArray());
+                                    // Fallback para albaranes antiguos
+                                    if (empty($pedidosVinculados) && !empty($albaran->pedido_cliente)) {
+                                        $pedidosVinculados = [$albaran->pedido_cliente];
+                                    }
+                                @endphp
+                                
+                                <!-- Caja de Pedido Cliente (75% del espacio restante) -->
+                                <div class="field" style="flex: 1; margin-bottom: 0;">
+                                    <label for="pedido_cliente">Pedido cliente</label>
+                                    <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas..." style="width: 100%;">
+                                        @foreach ($pedidosClientes as $pedido)
+                                            @php
+                                                $clienteNombre = $pedido->cliente?->empresa_nombre ?: 'Sin cliente';
+                                                $otTexto = $pedido->ot ? ' | OT ' . $pedido->ot : '';
+                                                
+                                                if ($pedido->bolsa) {
+                                                    $macroRef = $pedido->bolsaGlobal ? ($pedido->bolsaGlobal->numero ?: $pedido->bolsaGlobal->id) : 'Suelta';
+                                                    $partidaRef = $pedido->numero_pedido ?: 'Sin número';
+                                                    
+                                                    $pedidoLabel = "📦 Bolsa {$macroRef} | Partida {$partidaRef} | {$clienteNombre}{$otTexto}";
+                                                } else {
+                                                    $pedidoRef = $pedido->numero_pedido ?: 'Sin número';
+                                                    
+                                                    $pedidoLabel = "{$pedidoRef} | {$clienteNombre}{$otTexto}";
+                                                }
+                                            @endphp
+                                            <option 
+                                                value="{{ $pedido->numero_pedido }}" 
+                                                data-pedido-id="{{ $pedido->id }}" 
+                                                data-cliente-id="{{ $pedido->id_cliente }}" 
+                                                data-ot="{{ $pedido->ot }}"
+                                                @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))>
+                                                {{ $pedidoLabel }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
 
                             <div class="field span-2">
@@ -120,10 +151,6 @@
 
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
-                            <div class="albaran-selection-note">
-                                <i class="fas fa-circle-info" aria-hidden="true"></i>
-                                Este albarán pertenece a un pedido no bolsa, por lo que no se pueden agregar nuevas líneas.
-                            </div>
                             <div class="line-row linea-input-row">
                                 <div class="field flex-6">
                                     <label for="linea_descripcion">Descripción</label>
@@ -179,10 +206,17 @@
                     <section class="card-block bottom-bar">
                         <div class="field estado-field">
                             <label for="estado">Estado</label>
+                            @php
+                                $estadosAlbaran = [
+                                    'pendiente' => 'Pendiente', 'recibido' => 'Recibido',
+                                    'facturado' => 'Facturado', 'facturado_parcial' => 'Facturado parcial',
+                                    'cancelado' => 'Cancelado',
+                                ];
+                            @endphp
                             <select id="estado" name="estado">
-                                <option value="pendiente" @selected($currentEstado === 'pendiente')>Pendiente</option>
-                                <option value="recibido" @selected($currentEstado === 'recibido')>Recibido</option>
-                                <option value="entregado" @selected($currentEstado === 'entregado')>Entregado</option>
+                                @foreach ($estadosAlbaran as $valor => $label)
+                                    <option value="{{ $valor }}" @selected($currentEstado === $valor)>{{ $label }}</option>
+                                @endforeach
                             </select>
                         </div>
 
@@ -224,15 +258,13 @@
 @endsection
 
 @section('css')
-    <!-- Cargamos los estilos de Select2 -->
-    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap4.min.css" rel="stylesheet">
     
     @vite(['resources/css/albaranes-edit.css'])
     
     <style>
         /* Ajuste visual para que la caja múltiple encaje con tu diseño */
-        .select2-container--bootstrap4 .select2-selection--multiple {
+        .ts-control {
             border: 1px solid #d8e1ec !important;
             border-radius: 0.5rem !important;
             background: #f8fbff !important;
@@ -242,20 +274,40 @@
 @endsection
 
 @section('js')
-    <!-- Cargamos el motor JavaScript de Select2 -->
-    <script src="{{ asset('vendor/select2/js/select2.full.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     @vite(['resources/js/albaranes-form.js'])
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
-                window.jQuery('#pedido_cliente').select2({
-                    theme: 'bootstrap4',
-                    placeholder: "Selecciona una o varias bolsas...",
-                    allowClear: true,
-                    width: '100%'
+            // --- PROTECCIÓN FRONTEND CONTRA DOBLE ENVÍO ---
+            const formularios = document.querySelectorAll('form');
+            formularios.forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    
+                    // --- NUEVA LÓGICA DE BLOQUEO ---
+                    // Buscamos si hay algún input con el borde rojo (que indica que se excedió el límite)
+                    const inputsConError = tableContainer.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
+                    if (inputsConError.length > 0) {
+                        e.preventDefault(); // Detenemos el envío
+                        alert("Por favor, corrige los importes o cantidades marcados en rojo antes de guardar. Hay líneas que superan el saldo disponible.");
+                        return false;
+                    }
+                    // --- FIN NUEVA LÓGICA ---
+                    
+                    const btnSubmit = this.querySelector('button[type="submit"]');
+                    if (btnSubmit) {
+                        if (!this.checkValidity()) return;
+                        
+                        btnSubmit.disabled = true;
+                        btnSubmit.style.pointerEvents = 'none';
+                        
+                        const originalWidth = btnSubmit.offsetWidth;
+                        if(originalWidth > 0) btnSubmit.style.width = originalWidth + 'px';
+                        
+                        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando';
+                    }
                 });
-            }
+            });
         });
     </script>
 @endsection

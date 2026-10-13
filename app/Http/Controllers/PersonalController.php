@@ -919,4 +919,64 @@ class PersonalController extends Controller
 
         return view('personal.puestos', compact('puestos'));
     }
+
+    public function addPuesto(Request $request, Personal $personal)
+    {
+        $this->authorize('cursos.edit');
+
+        $request->validate([
+            'puesto_id' => 'required|exists:puestos,id'
+        ]);
+
+        try {
+            // Asignar el perfil al trabajador sin duplicarlo
+            $personal->puestos()->syncWithoutDetaching([$request->puesto_id]);
+
+            // MACRO AUTOMÁTICA: Inyectar cursos obligatorios del perfil
+            $puesto = \App\Models\Puesto::with('cursos')->find($request->puesto_id);
+            
+            if ($puesto && $puesto->cursos->count() > 0) {
+                $cursosActualesIds = $personal->cursos()->pluck('cursos.id')->toArray();
+                $cursosObligatoriosIds = $puesto->cursos->pluck('id')->toArray();
+                
+                // Extraer solo los cursos que el trabajador no tenga ya asignados
+                $cursosNuevos = array_diff($cursosObligatoriosIds, $cursosActualesIds);
+
+                if (!empty($cursosNuevos)) {
+                    $syncData = [];
+                    foreach ($cursosNuevos as $cursoId) {
+                        $syncData[$cursoId] = [
+                            'apto' => false,
+                            'fecha_realizacion' => null,
+                            'descripcion_aptitud' => 'Asignado automáticamente por perfil formativo: ' . $puesto->nombre
+                        ];
+                    }
+                    $personal->cursos()->attach($syncData);
+                }
+            }
+
+            return response()->json(['success' => true]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Error en el servidor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function removePuesto(Personal $personal, $puestoId)
+    {
+        $this->authorize('cursos.edit');
+
+        try {
+            $personal->puestos()->detach($puestoId);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Error en el servidor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

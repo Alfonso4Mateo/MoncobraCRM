@@ -168,7 +168,7 @@
                 </div>
                 <div>
                     <dt>Ubicación física</dt>
-                    <dd>{{ $herramienta->ubicacion ?: 'No indicada' }}</dd>
+                    <dd>{{ $herramienta->ubicacion->nombre ?? 'Almacén' }}</dd>
                 </div>
             </dl>
 
@@ -313,13 +313,21 @@
         
         <form method="POST" action="{{ route('herramientas.planta.eventos.store', $herramienta) }}" enctype="multipart/form-data">
             @csrf
+            
             <label>Tipo de intervención *</label>
-            <select required name="tipo" class="form-control">
+            <!-- Añadimos un ID al select -->
+            <select required name="tipo" id="tipo_evento_select" class="form-control">
                 <option value="mantenimiento">Mantenimiento preventivo</option>
                 <option value="averia">Avería en obra</option>
                 <option value="reparacion">Reparación / Sustitución de piezas</option>
                 <option value="otro">Otro registro documental</option>
             </select>
+            
+            <!-- NUEVO: Campo dinámico de Mantenimiento -->
+            <div id="wrapper_mantenimiento" style="display: none; padding: 12px; background: #fff4e4; border: 1px dashed #dca54a; border-radius: 4px; margin-bottom: 16px;">
+                <label style="color: #9a6512; margin-bottom: 5px;"><i class="fas fa-calendar-check mr-1"></i>Programar próximo mantenimiento preventivo *</label>
+                <input type="date" name="fecha_mantenimiento" id="input_proxima_fecha" class="form-control" style="margin-bottom: 0; background: #fff; border: 1px solid #dca54a;">
+            </div>
             
             <label>Título del parte *</label>
             <input required type="text" name="titulo" class="form-control" placeholder="Ej. Cambio de escobillas del motor...">
@@ -331,7 +339,7 @@
             <textarea name="descripcion" rows="4" class="form-control" placeholder="Detalla los trabajos realizados o el diagnóstico..."></textarea>
             
             <label>Parte de trabajo / Factura adjunta (Opcional)</label>
-            <input type="file" name="archivo_adjunto" class="form-control" accept=".pdf, image/jpeg, image/png" style="padding: 6px;">
+            <input type="file" name="archivo_adjunto" class="form-control" accept=".pdf, image/jpeg, image/png, image/webp" style="padding: 6px; margin-bottom: 16px;">
             
             <div class="detail-modal-actions" style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button type="button" class="detail-btn detail-btn-soft" onclick="document.getElementById('event-modal').classList.remove('show')">Cancelar</button>
@@ -341,4 +349,28 @@
     </div>
 </div>
 
+@push('js')
+<script>
+    document.querySelector('[data-target="#event-modal"]').addEventListener('click', function() {
+        document.getElementById('event-modal').classList.add('show');
+    });
+
+    // LÓGICA DE UX: Mostrar campo de fecha si selecciona "mantenimiento"
+    document.getElementById('tipo_evento_select').addEventListener('change', function() {
+        let wrapper = document.getElementById('wrapper_mantenimiento');
+        let input = document.getElementById('input_proxima_fecha');
+
+        if (this.value === 'mantenimiento') {
+            wrapper.style.display = 'block';
+            input.required = true;
+        } else {
+            wrapper.style.display = 'none';
+            input.required = false;
+            input.value = ''; // Limpiamos
+        }
+    });
+
+    document.getElementById('tipo_evento_select').dispatchEvent(new Event('change'));
+</script>
+@endpush
 @stop

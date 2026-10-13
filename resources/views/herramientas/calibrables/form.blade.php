@@ -100,6 +100,39 @@
                 </div>
             </div>
 
+            <!-- NUEVA FILA: DEPARTAMENTO Y CLASE -->
+            <div class="row">
+                <div class="col-md-6 form-group">
+                    <label>Departamento</label>
+                    <select name="departamento_id" class="form-control">
+                        <option value="">Seleccionar departamento (Opcional)</option>
+                        @foreach($departamentos as $departamento)
+                            <option value="{{ $departamento->id }}" @selected(old('departamento_id', $item->departamento_id ?? '') == $departamento->id)>
+                                {{ $departamento->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label>Clase</label>
+                    <div class="input-group">
+                        <select name="clase" id="clase_select" class="form-control" style="border-radius: 4px 0 0 4px; height: 38px; border: 0; background: #eef2f5; font-size: 12px;">
+                            <option value="">Seleccionar clase (Opcional)</option>
+                            @foreach($clasesCatalogo as $cls)
+                                <option value="{{ $cls->nombre }}" @selected(old('clase', $item->clase ?? '') === $cls->nombre)>
+                                    {{ $cls->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="input-group-append">
+                            <button type="button" class="btn" style="background: #002442; color: #fff; border: 0; border-radius: 0 4px 4px 0; height: 38px; padding: 0 15px;" onclick="abrirModalClase()" title="Añadir nueva clase">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="met-section">Características metrológicas (Parámetros)</div>
             <div class="row">
                 <div class="col-md-3 form-group">
@@ -154,7 +187,21 @@
                 </div>
                 <div class="col-md-6 form-group">
                     <label>Ubicación física (Si no está asignado)</label>
-                    <input name="ubicacion" class="form-control" placeholder="Ej. Armario Metrología A" value="{{ old('ubicacion', $item->ubicacion ?? '') }}">
+                    <div class="input-group">
+                        <select name="ubicacion_id" id="ubicacion_id_select" class="form-control" style="border-radius: 4px 0 0 4px; height: 38px; border: 0; background: #eef2f5; font-size: 12px;">
+                            <option value="">Seleccionar del catálogo...</option>
+                            @foreach($ubicaciones as $ubicacion)
+                                <option value="{{ $ubicacion->id }}" @selected(old('ubicacion_id', $item->ubicacion_id ?? '') == $ubicacion->id)>
+                                    {{ $ubicacion->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="input-group-append">
+                            <button type="button" class="btn" style="background: #002442; color: #fff; border: 0; border-radius: 0 4px 4px 0; height: 38px; padding: 0 15px;" onclick="abrirModalUbicacion()" title="Añadir nueva ubicación">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -182,4 +229,7 @@
         </div>
     </form>
 </div>
+
+@include('herramientas.partials.modal-ubicacion')
+@include('herramientas.partials.modal-clase')
 @stop

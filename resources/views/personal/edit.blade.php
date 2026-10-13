@@ -372,7 +372,7 @@
                                         </div>
 
                                         <!-- Última Graduación -->
-                                        <div class="profile-edit-form-group">
+                                        <div class="profile-edit-form-group js-graduacion-field">
                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                                 <label for="ultima_graduacion" style="margin-bottom: 0;">Última graduación</label>
                                                 <button type="button" id="set-graduacion-hoy" class="profile-edit-today-btn">Poner hoy</button>
@@ -387,7 +387,7 @@
                                         </div>
 
                                         <!-- Reconocido en -->
-                                        <div class="profile-edit-form-group js-graduacion-field">
+                                        <div class="profile-edit-form-group">
                                             <label for="reconocido_en" style="margin-bottom: 8px;">Reconocido en:</label>
                                             <input type="text" id="reconocido_en" name="reconocido_en" value="{{ old('reconocido_en', $personal->reconocido_en ?? '') }}" class="@error('reconocido_en') is-invalid @enderror">
                                         </div>
@@ -689,6 +689,43 @@
                 ultimaGradInput.addEventListener('input', function() {
                     setNextFrom(parseDate(ultimaGradInput.value), proximaGradInput);
                 });
+            }
+        })();
+
+        // LÓGICA PARA MOSTRAR/OCULTAR CAMPOS DE GRADUACIÓN
+        (function() {
+            // Seleccionamos el campo de gafas y todos los campos que dependen de él
+            const gafasSelect = document.getElementById('gafas');
+            const graduacionFields = document.querySelectorAll('.js-graduacion-field');
+
+            const toggleGraduacionFields = () => {
+                if (!gafasSelect) return;
+                
+                // Comprobamos si el valor exacto es 'Graduadas'
+                const isGraduadas = gafasSelect.value === 'Graduadas';
+                
+                graduacionFields.forEach(field => {
+                    // Si es "Graduadas", mostramos el elemento con 'block', si no, lo ocultamos con 'none'
+                    field.style.display = isGraduadas ? 'block' : 'none';
+                    
+                    // Opcional: Si quieres que los campos se borren al ocultarse para que 
+                    // no se envíe información errónea a la base de datos, descomenta estas líneas:
+                    /*
+                    if (!isGraduadas) {
+                        const input = field.querySelector('input');
+                        if (input) input.value = '';
+                    }
+                    */
+                });
+            };
+
+            // Asegurarnos de que existe el selector en la página antes de añadir eventos
+            if (gafasSelect) {
+                // Cada vez que el usuario cambie la opción del selector, verificamos
+                gafasSelect.addEventListener('change', toggleGraduacionFields);
+                
+                // Ejecutamos la función inmediatamente al cargar la página para revisar el estado inicial
+                toggleGraduacionFields(); 
             }
         })();
 

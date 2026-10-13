@@ -19,47 +19,8 @@
     </div>
 @endsection
 
-@section('content_header')
-    <div class="presupuestos-header">
-        <div class="presupuestos-header__copy">
-            <h1>Seguimiento de Presupuestos</h1>
-            <p>Visualiza, filtra y gestiona las ofertas comerciales del proyecto activo.</p>
-        </div>
-
-        <div class="presupuestos-actions">
-            @can('presupuestos.manage')
-                <!-- Correlativo está vinculado a la gestión -->
-                @if(auth()->check() && in_array(auth()->user()->role, ['admin','superadmin'], true))
-                    <a href="{{ route('presupuestos.correlativo.edit') }}" class="presupuestos-create-btn">
-                        <i class="fas fa-cog"></i>
-                        Ajustar correlativo
-                    </a>
-                @endif
-
-                <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
-                    <i class="fas fa-plus"></i>
-                    Nuevo Presupuesto
-                </a>
-            @endcan
-        </div>
-    </div>
-@endsection
-
-@section('content_header')
-    <div class="presupuesto-detail-header">
-        <div class="presupuesto-detail-header__copy">
-            <h1>Editar Artículos del Presupuesto</h1>
-            <p>Modifica los productos, cantidades, unidades de medida y márgenes del presupuesto.</p>
-        </div>
-        <a href="{{ route('presupuestos.show', $presupuesto) }}" class="presupuesto-detail-btn presupuesto-detail-btn--ghost">
-            <i class="fas fa-arrow-left" aria-hidden="true"></i>
-            Volver al detalle
-        </a>
-    </div>
-@endsection
-
 @section('content')
-    <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate>
+    <form action="{{ route('presupuestos.update', $presupuesto) }}" method="POST" enctype="multipart/form-data" novalidate id="form-editar-presupuesto">
         @csrf
         @method('PUT')
 
@@ -102,7 +63,7 @@
                                 <label for="cliente_id">Cliente</label>
                                 <select id="cliente_id" name="cliente_id" required>
                                     @foreach($clientes as $cliente)
-                                        <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) == $cliente->id ? 'selected' : '' }}>
+                                        <option value="{{ $cliente->id }}" {{ old('cliente_id', $presupuesto->cliente_id) ==$cliente->id ? 'selected' : '' }}>
                                             {{ $cliente->empresa_nombre }}
                                         </option>
                                     @endforeach
@@ -164,7 +125,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="item_cantidad">Cantidad</label>
-                                <input type="number" id="item_cantidad" min="1" max="1000000" step="1" value="1">
+                                <input type="number" id="item_cantidad" min="0" max="1000000" step="0.01" value="1">
                             </div>
                             <div class="field-group">
                                 <label for="item_unidad">Unidades de medida</label>
@@ -229,7 +190,7 @@
                                 <i class="fas fa-times" aria-hidden="true"></i>
                                 Cancelar
                             </a>
-                            <button type="submit" class="btn-guardar">
+                            <button type="submit" class="btn-guardar" id="btn-submit-form">
                             <i class="fas fa-save" aria-hidden="true"></i>
                                 Guardar cambios
                             </button>
@@ -255,6 +216,8 @@
 @section('js')
     <script>
         (function () {
+            const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+
             const hiddenInput = document.getElementById('lista_articulos');
             const tbody = document.getElementById('items_tbody');
             const subtotalEl = document.getElementById('items_subtotal');
@@ -278,7 +241,8 @@
             const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
-            const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            // CAMBIO 2: Formateador permite hasta 2 decimales para la tabla visual
+            const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
             const safeNumber = (value) => {
                 const numeric = Number.parseFloat(String(value).replace(',', '.'));
@@ -392,8 +356,8 @@
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.descripcion}</td>
-                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + item.unidad : ''}</td>
+                        <td style="white-space: pre-wrap">${esc(item.descripcion)}</td>
+                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + esc(item.unidad) : ''}</td>
                         <td>${eur.format(safeNumber(item.precio_con_margen || item.precio_unitario))} EUR</td>
                         <td>${eur.format(safeNumber(item.total))} EUR</td>
                         <td class="actions-col">
@@ -415,13 +379,15 @@
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
                 const cantidadRaw = safeNumber(cantidadInput.value);
-                const cantidad = Math.max(1, Math.round(cantidadRaw));
+                // CAMBIO 3: Se permite decimales y valores mayores o iguales a 0, sin forzar a entero
+                const cantidad = Math.max(0, cantidadRaw); 
                 const unidad = String(unidadInput.value || '').trim();
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
                 const margen = Math.max(0, safeNumber(margenInput.value));
 
+                // CAMBIO 4: Actualizar mensaje de error si se introduce un valor menor o igual a 0
                 if (!descripcion || cantidad <= 0) {
-                    window.alert('Complete al menos la descripcion y una cantidad entera mayor que cero.');
+                    window.alert('Complete al menos la descripcion y una cantidad mayor que cero.');
                     return;
                 }
 
@@ -503,20 +469,16 @@
                 if (row instanceof HTMLElement) {
                     const index = Number.parseInt(row.dataset.index || '-1', 10);
                     if (index >= 0 && index < items.length) {
-                        // Solo realizamos cambios si seleccionamos una fila diferente
                         if (selectedIndex !== index) {
                             selectedIndex = index;
                             
-                            // 1. Buscamos si hay una fila previamente seleccionada y le quitamos la clase
                             const filaSeleccionadaPrevia = tbody.querySelector('.item-selected');
                             if (filaSeleccionadaPrevia) {
                                 filaSeleccionadaPrevia.classList.remove('item-selected');
                             }
                             
-                            // 2. Le añadimos la clase de selección a la fila donde acabamos de hacer clic
                             row.classList.add('item-selected');
                             
-                            // 3. Actualizamos los botones de "Editar" y "Eliminar" para que se activen
                             setButtonsState();
                         }
                     }
@@ -524,6 +486,25 @@
             });
 
             renderRows();
+
+            // --- PROTECCIÓN CONTRA DOBLE ENVÍO (Double Submit Guard) ---
+            const form = document.getElementById('form-editar-presupuesto');
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    const btnSubmit = document.getElementById('btn-submit-form');
+                    if (btnSubmit) {
+                        if (!form.checkValidity()) {
+                            return; 
+                        }
+                        
+                        btnSubmit.disabled = true;
+                        btnSubmit.style.pointerEvents = 'none';
+                        const anchoOriginal = btnSubmit.offsetWidth;
+                        btnSubmit.style.width = anchoOriginal + 'px'; 
+                        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Procesando';
+                    }
+                });
+            }
         })();
     </script>
 @endsection

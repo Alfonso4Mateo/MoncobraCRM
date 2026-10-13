@@ -113,11 +113,11 @@ return [
         'enabled' => true,
         'mode' => 'fullscreen',
         'img' => [
-            'path' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
-            'alt' => 'AdminLTE Preloader Image',
+            'path' => 'images/carga_moncobra.png',
+            'alt' => 'logo_moncobra',
             'effect' => 'animation__shake',
-            'width' => 60,
-            'height' => 60,
+            'width' => 80,
+            'height' => 80,
         ],
     ],
 
@@ -347,6 +347,13 @@ return [
                     'icon' => 'fas fa-fw fa-briefcase',
                     'active' => ['pedidos-clientes*'],
                     'can' => 'pedidos.view', // Candado específico
+                ],
+                [
+                    'text' => 'Gestión de Bolsas',
+                    'url' => 'bolsas',
+                    'icon' => 'fas fa-fw fa-briefcase',
+                    'active' => ['bolsas', 'bolsas/*'],
+                    'can' => 'bolsas.view', // Candado específico
                 ],
                 [
                     'text' => 'Albaranes Clientes',

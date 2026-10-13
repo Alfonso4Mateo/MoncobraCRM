@@ -43,6 +43,9 @@ class ActivityLogController extends Controller
             ->orderBy('subject_type')
             ->pluck('subject_type');
 
+        $diccionarioClientes = \App\Models\Cliente::withTrashed()->pluck('empresa_nombre', 'id')->toArray();
+        $diccionarioProyectos = \App\Models\Proyecto::withTrashed()->pluck('nombre', 'id')->toArray();
+
         return view('activity-log.index', compact('activities', 'models'));
     }
 }

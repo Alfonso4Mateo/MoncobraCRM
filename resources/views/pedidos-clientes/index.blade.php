@@ -14,28 +14,16 @@
         </div>
 
         <div class="pedidos-clientes-header__actions">
-            <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
-                <i class="fas fa-plus" aria-hidden="true"></i>
-                Nuevo Pedido
-            </a>
-        </div>
-    </div>
-@endsection
-
-@section('content_header')
-    <div class="pedidos-clientes-header">
-        <div class="pedidos-clientes-header__copy">
-            <h1>Pedidos de Clientes</h1>
-            <p>Trazabilidad completa desde presupuesto hasta albarán.</p>
-        </div>
-
-        <div class="pedidos-clientes-header__actions">
             @can('pedidos.manage')
             <a href="{{ route('pedidos-clientes.create') }}" class="pedidos-clientes-create-btn">
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 Nuevo Pedido
             </a>
             @endcan
+
+            <a href="{{ route('bolsas.index') }}" class="btn btn-warning font-weight-bold mr-2" style="background-color: #f59e0b; color: white; border: none;">
+                <i class="fas fa-briefcase"></i> Gestión de Bolsas Globales
+            </a>
         </div>
     </div>
 @endsection
@@ -164,6 +152,7 @@
                             <th>Pedido-cliente</th>
                             <th>Nº-Ref-Interna</th>
                             <th>Presupuesto origen</th>
+                            <th>Bolsa</th>
                             <th>Cliente</th>
                             <th>CC</th>
                             <th>Fecha</th>
@@ -207,6 +196,26 @@
                                         @else
                                         <span class="pedido-muted">{{ $pedido->ui_presupuesto_numero }}</span>
                                         @endcan
+                                    @else
+                                        <span class="pedido-muted">—</span>
+                                    @endif
+                                </td>
+                                <td data-label="Bolsa">
+                                    @if ($pedido->bolsa_id)
+                                        @php
+                                            // Buscamos la referencia de la bolsa. Si no tiene, mostramos su ID.
+                                            $refBolsa = $pedido->bolsaGlobal?->numero 
+                                                ?? \App\Models\Bolsa::find($pedido->bolsa_id)?->numero 
+                                                ?? 'Bolsa #' . $pedido->bolsa_id;
+                                        @endphp
+                                        <a href="{{ route('bolsas.show', $pedido->bolsa_id) }}" class="badge badge-info p-2 text-white" style="background-color: #3b82f6;" title="Ver detalle de la bolsa global">
+                                            <i class="fas fa-briefcase mr-1"></i> {{ $refBolsa }}
+                                        </a>
+                                    @elseif ($pedido->bolsa)
+                                        {{-- Es un pedido modo bolsa, pero suelto --}}
+                                        <span class="badge badge-secondary p-2">
+                                            <i class="fas fa-layer-group mr-1"></i> Bolsa Suelta
+                                        </span>
                                     @else
                                         <span class="pedido-muted">—</span>
                                     @endif
@@ -262,6 +271,13 @@
                                 </td>
                                 <td data-label="Acciones">
                                     <div class="presupuesto-action-group">
+
+                                        @can('pedidos.manage')
+                                        <a href="{{ route('pedidos-clientes.edit', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--edit" aria-label="Editar pedido" title="Editar pedido">
+                                            <i class="fas fa-pen"></i>
+                                        </a>
+                                        @endcan
+
                                         @can('pedidos.download')
                                         <a href="{{ route('pedidos-clientes.preview', $pedido) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar PDF del pedido" title="Previsualizar PDF del pedido">
                                             <i class="fas fa-file-pdf"></i>

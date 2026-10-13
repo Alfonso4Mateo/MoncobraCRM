@@ -18,13 +18,13 @@ class PermissionSeeder extends Seeder
             // CLIENTES
             'clientes.view', 'clientes.manage', 'clientes.historial', 'clientes.export', 'clientes.delete',
 
-            //PRESUPUESTOS
+            // PRESUPUESTOS
             'presupuestos.view', 'presupuestos.manage', 'presupuestos.download', 'presupuestos.delete',
 
-            //PEDIDOS CLIENTE
+            // PEDIDOS CLIENTE
             'pedidos.view', 'pedidos.manage', 'pedidos.download', 'pedidos.delete',
 
-            //ALBARANES CLIENTE
+            // ALBARANES CLIENTE
             'albaranes.view', 'albaranes.manage', 'albaranes.download', 'albaranes.delete',
             
             // INVENTARIO
@@ -39,18 +39,29 @@ class PermissionSeeder extends Seeder
             // CURSOS
             'cursos.view', 'cursos.plantilla', 'cursos.normas', 'cursos.create', 'cursos.edit', 'cursos.alertas', 'cursos.export', 'cursos.delete',
 
-            // ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
-            'herramientas.view', 'herramientas.manage',
-            
+            // HERRAMIENTAS PLANTA (Actualizado)
+            'activos.manage',
+            'herramientas.view', 'herramientas.manage', 'herramientas.movimientos', 'herramientas.eventos', 'herramientas.documentos', 'herramientas.delete',
+
+            // EQUIPOS INFORMÁTICOS (Nuevo)
+            'equipos.view', 'equipos.manage', 'equipos.movimientos', 'equipos.eventos', 'equipos.delete',
+
+            // APARATOS CALIBRABLES - METROLOGÍA (Nuevo)
+            'calibrables.view', 'calibrables.manage', 'calibrables.movimientos', 'calibrables.eventos', 'calibrables.delete',
+
+            // ALERTAS Y CONTROL TOWER (Nuevo)
+            'alertas.view', 'alertas.config', 'alertas.enviar', 'alertas.delete',
+
             // USUARIOS
             'users.view', 'users.manage', 'users.permissions',
 
-            // AUDITORIA
-            'activitylog.view',
+            // AUDITORIA (Corregido y expandido)
+            'audit.view', 'audit.export', 'audit.delete',
         ];
 
         foreach ($permisos as $permiso) {
-            Permission::firstOrCreate(['name' => $permiso]);
+            // Usar firstOrCreate asegura que no se dupliquen si ya existen en la base de datos
+            Permission::firstOrCreate(['name' => $permiso, 'guard_name' => 'web']);
         }
     }
 }

@@ -29,7 +29,7 @@
                 <h2>Presupuesto cliente</h2>
             </header>
 
-            <form action="{{ route('presupuestos.store') }}" method="POST" enctype="multipart/form-data" novalidate>
+            <form action="{{ route('presupuestos.store') }}" method="POST" enctype="multipart/form-data" novalidate id="form-crear-presupuesto">
                 @csrf
                 <input type="hidden" name="modo" value="{{ $modo }}">
                 <input type="hidden" id="documento" name="documento" value="PRESUPUESTO">
@@ -181,7 +181,7 @@
                             <i class="fas fa-times" aria-hidden="true"></i>
                             Salir
                         </a>
-                        <button type="submit" class="btn-guardar">
+                        <button type="submit" class="btn-guardar" id="btn-submit-form">
                         <i class="fas fa-save" aria-hidden="true"></i>
                             Guardar
                         </button>
@@ -210,6 +210,8 @@
 @section('js')
     <script>
         (function () {
+            const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+
             const hiddenInput = document.getElementById('lista_articulos');
             const tbody = document.getElementById('items_tbody');
             const subtotalEl = document.getElementById('items_subtotal');
@@ -234,7 +236,8 @@
             const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
-            const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            // CAMBIO 2: Formateador permite hasta 2 decimales para la tabla visual
+            const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
             const safeNumber = (value) => {
                 const numeric = Number.parseFloat(String(value).replace(',', '.'));
@@ -267,6 +270,7 @@
             };
 
             const normalizeItem = (item) => {
+                // CAMBIO 3: Se quita Math.round() para permitir decimales en la cantidad
                 const cantidad = Math.max(0, safeNumber(item?.cantidad));
                 const precioUnitario = Math.max(0, safeNumber(item?.precio_unitario));
                 const margen = Math.max(0, safeNumber(item?.margen));
@@ -368,12 +372,13 @@
 
                 emptyState.hidden = true;
 
+                // CAMBIO 5: Se utiliza qtyFmt para renderizar la cantidad en la tabla
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.descripcion}</td>
-                        <td style="text-align:right">${eur.format(safeNumber(item.cantidad))}</td>
-                        <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
+                        <td style="white-space: pre-wrap">${esc(item.descripcion)}</td>
+                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}</td>
+                        <td>${esc(item.medida)}</td>
                         <td>${eur.format(safeNumber(item.precio_unitario))} EUR</td>
                         <td>${eur.format(safeNumber(item.margen))} %</td>
                         <td>${eur.format(safeNumber(item.total))} EUR</td>
@@ -395,6 +400,7 @@
 
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
+                // CAMBIO 4: Se permite decimales y valores mayores o iguales a 0, sin forzar a entero
                 const cantidad = Math.max(0, safeNumber(cantidadInput.value));
                 const medida = String(medidaInput.value || '').trim() || 'und';
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
@@ -506,6 +512,25 @@
             });
 
             renderRows();
+
+            // --- PROTECCIÓN CONTRA DOBLE ENVÍO (Double Submit Guard) ---
+            const form = document.getElementById('form-crear-presupuesto');
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    const btnSubmit = document.getElementById('btn-submit-form');
+                    if (btnSubmit) {
+                        if (!form.checkValidity()) {
+                            return; // Deja que HTML5 maneje los errores visuales
+                        }
+                        
+                        btnSubmit.disabled = true;
+                        btnSubmit.style.pointerEvents = 'none';
+                        const anchoOriginal = btnSubmit.offsetWidth;
+                        btnSubmit.style.width = anchoOriginal + 'px'; // Mantiene el botón estable
+                        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Procesando';
+                    }
+                });
+            }
         })();
     </script>
 @endsection

@@ -15,10 +15,17 @@ use App\Http\Controllers\CalibrablesController;
 use App\Http\Controllers\EquiposController;
 use App\Http\Controllers\HerramientasPlantaController;
 use App\Http\Controllers\AlertasMantenimientoController;
+use App\Http\Controllers\UbicacionController;
 
 // ==========================================
 // 0. ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
 // ==========================================
+
+Route::middleware(['auth', 'permission:activos.manage'])->group(function () {
+Route::post('/ubicaciones/ajax', [UbicacionController::class, 'storeAjax'])->name('ubicaciones.ajax');
+Route::delete('/ubicaciones/ajax/{ubicacion}', [App\Http\Controllers\UbicacionController::class, 'destroyAjax']);
+Route::post('/clases-herramientas/ajax', [App\Http\Controllers\ClaseHerramientaController::class, 'storeAjax'])->name('clases_herramientas.ajax');
+Route::delete('/clases-herramientas/ajax/{claseHerramienta}', [App\Http\Controllers\ClaseHerramientaController::class, 'destroyAjax']);
 
 // EQUIPOS INFORMÁTICOS
 Route::get('equipos', [EquiposController::class, 'index'])->name('equipos.index');
@@ -75,6 +82,7 @@ Route::get('activos/{id}', function (int $id) {
     if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.show', $id);
     return redirect()->route('herramientas.planta.show', $id);
 })->name('herramientas.show');
+});
 
 // ==========================================
 // 1. INVENTARIO: ACCIONES, STOCK Y MOVIMIENTOS

@@ -192,10 +192,10 @@
 
 <form class="plant-filters" method="GET" action="{{ route('herramientas.index') }}">
     <div class="row">
-        <div class="col-lg-3 mb-2 mb-lg-0">
+        <div class="col-lg-2 mb-2 mb-lg-0">
             <div class="input-group">
                 <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-search"></i></span></div>
-                <input class="form-control" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar por ID, modelo...">
+                <input class="form-control" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar ID, modelo...">
             </div>
         </div>
         <div class="col-lg-2 mb-2 mb-lg-0">
@@ -214,7 +214,16 @@
                 @endforeach
             </select>
         </div>
-        <!-- NUEVO FILTRO DE ALERTAS LEGALES -->
+        <div class="col-lg-2 mb-2 mb-lg-0">
+            <select name="ubicacion_id" class="form-control">
+                <option value="">Ubicación (Todas)</option>
+                @foreach($ubicaciones as $ubicacion)
+                    <option value="{{ $ubicacion->id }}" @selected(request('ubicacion_id') == $ubicacion->id)>
+                        {{ $ubicacion->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
         <div class="col-lg-4 mb-2 mb-lg-0">
             <select name="alerta" class="form-control">
                 <option value="">Alertas de Inspección / Taller</option>
@@ -223,7 +232,27 @@
                 <option value="mantenimiento" @selected(request('alerta') === 'mantenimiento')>Mantenimiento Interno Vencido</option>
             </select>
         </div>
-        <div class="col-lg-1">
+    </div>
+    
+    <!-- NUEVA FILA PARA DEPARTAMENTO Y CLASE -->
+    <div class="row mt-2">
+        <div class="col-lg-3 mb-2 mb-lg-0">
+            <select class="form-control" name="departamento_id">
+                <option value="">Departamento (Todos)</option>
+                @foreach($departamentos as $departamento)
+                    <option value="{{ $departamento->id }}" @selected(request('departamento_id') == $departamento->id)>{{ $departamento->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-lg-2 mb-2 mb-lg-0">
+            <select class="form-control" name="clase">
+                <option value="">Clase (Todas)</option>
+                @foreach($clasesCatalogo as $cls)
+                    <option value="{{ $cls->nombre }}" @selected(request('clase') === $cls->nombre)>{{$cls->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-lg-1 offset-lg-6">
             <button class="plant-btn plant-btn-main w-100" title="Filtrar"><i class="fas fa-filter"></i></button>
         </div>
     </div>
@@ -233,7 +262,10 @@
     @forelse($items as $item)
         @php 
             $image = $item->imagen ? asset('storage/'.$item->imagen) : null; 
-            $blocked = $item->bloqueado;
+            
+            // LÓGICA DE ESTADOS Y ALERTAS
+            $blocked = in_array($item->estado, ['averiado', 'aislado', 'baja', 'reparacion']);
+            $alert   = in_array($item->estado, ['mantenimiento', 'revision']);
             
             // Calculamos las alertas de fechas
             $inspeccionCaducada = $item->fecha_inspeccion && $item->fecha_inspeccion->isPast();
@@ -279,8 +311,10 @@
                     </div>
                     
                     <!-- Nombre y Píldora de Garantía -->
-                    <h3 style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        {{ $item->nombre }}
+                   <h3 style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <a href="{{ route('herramientas.planta.show', $item) }}" style="color: inherit; text-decoration: none;" title="Abrir ficha y bitácora">
+                            {{ $item->nombre }}
+                        </a>
                         @if($item->garantia_hasta && $item->garantia_hasta->isFuture())
                             <span style="font-size: 9px; padding: 2px 6px; background: #e2f7ee; color: #08734e; border-radius: 4px; border: 1px solid #b8e6d3; white-space: nowrap;">
                                 <i class="fas fa-shield-alt mr-1"></i> Garantía de: {{ $item->garantia_hasta->diffForHumans(['parts' => 2, 'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) }}
@@ -295,7 +329,7 @@
                         @php
                             $fechaLimiteBaja = \Carbon\Carbon::parse($item->fecha_baja)->addDays($item->dias_estimados_baja);
                             $retrasoBaja = $item->fecha_baja && now()->gt($fechaLimiteBaja);
-                            $diasRetraso = $retrasoBaja ? $fechaLimiteBaja->diffInDays(now()) : 0;
+                            $diasRetraso = $retrasoBaja ? (int) $fechaLimiteBaja->diffInDays(now()) : 0;
                         @endphp
                         <small style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: {{ $retrasoBaja ? '#c92328' : '#87949b' }}; margin-top: 2px;">
                             <i class="fas fa-hourglass-half"></i>
@@ -329,14 +363,14 @@
             @if($item->fecha_inspeccion && $item->fecha_inspeccion->isPast())
                 <div class="plant-alert-ribbon danger"><i class="fas fa-ban mr-1"></i> INSPECCIÓN LEGAL CADUCADA (Prohibido su uso)</div>
             @elseif($item->fecha_inspeccion && $item->fecha_inspeccion->diffInDays(now()) <= 30)
-                <div class="plant-alert-ribbon warning" style="background: #fff4df; color: #705319;"><i class="fas fa-clipboard-check mr-1"></i> Inspección legal caduca en {{ now()->diffInDays($item->fecha_inspeccion) }} días</div>
+               <div class="plant-alert-ribbon warning" style="background: #fff4df; color: #705319;"><i class="fas fa-clipboard-check mr-1"></i> Inspección legal caduca en {{ (int) now()->diffInDays($item->fecha_inspeccion) }} días</div>
             @endif
             
             <!-- Alertas de Mantenimiento Interno -->
             @if($item->fecha_mantenimiento && $item->fecha_mantenimiento->isPast())
                 <div class="plant-alert-ribbon warning"><i class="fas fa-exclamation-triangle mr-1"></i> Mantenimiento interno vencido</div>
             @elseif($item->fecha_mantenimiento && $item->fecha_mantenimiento->diffInDays(now()) <= 15)
-                <div class="plant-alert-ribbon" style="background: #eef2f5; color: #52636d;"><i class="fas fa-wrench mr-1"></i> Mantenimiento en {{ now()->diffInDays($item->fecha_mantenimiento) }} días</div>
+               <div class="plant-alert-ribbon" style="background: #eef2f5; color: #52636d;"><i class="fas fa-wrench mr-1"></i> Mantenimiento en {{ (int) now()->diffInDays($item->fecha_mantenimiento) }} días</div>
             @endif
 
             <!-- Datos principales -->
@@ -347,7 +381,7 @@
                 </div>
                 <div class="plant-data-item">
                     <label>Sitio / Obra actual</label>
-                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion ?: 'Almacén Central' }}</strong>
+                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion->nombre ?? 'Almacén' }}</strong>
                 </div>
                 
                 <!-- Fecha Mantenimiento (Se pinta de ámbar si está vencida) -->
@@ -405,7 +439,7 @@
 </div>
 
 <div class="plant-bottom">
-    <span>Mostrando {{ $items->firstItem() ?: 0 }} - {{ $items->lastItem() ?: 0 }} de {{ $items->total() }} herramientas activas</span>
+    <span>Mostrando {{ $items->firstItem() ?: 0 }} - {{ $items->lastItem() ?: 0 }} de {{$items->total() }} herramientas activas</span>
     {{ $items->links() }}
 </div>
 

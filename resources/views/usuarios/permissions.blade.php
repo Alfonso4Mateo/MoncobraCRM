@@ -37,7 +37,31 @@
                     Utiliza el interruptor principal de cada módulo para dar acceso general. Una vez habilitado, podrás afinar los permisos específicos.
                 </p>
 
+                {{-- Botonera Global de Selección --}}
+                <div class="d-flex justify-content-end mb-2 gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary mr-2" id="btn-uncheck-all">
+                        <i class="fas fa-eraser"></i> Desmarcar todo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-check-all">
+                        <i class="fas fa-check-double"></i> Habilitar todos los permisos
+                    </button>
+                </div>
+
                 <div class="row mt-4">
+
+                    {{-- Acceso global al módulo de activos --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold m-0" style="color: #0f766e;"><i class="fas fa-boxes"></i> Activos</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="activos.manage" class="custom-control-input" id="activos_manage" @checked($user->hasPermissionTo('activos.manage'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="activos_manage">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            <p class="text-muted text-sm mb-0" style="font-size: 0.85rem;">Permite acceder a equipos informáticos, herramientas de planta, aparatos calibrables, alertas y sus operaciones auxiliares.</p>
+                        </div>
+                    </div>
                     
                     {{-- 1. Submódulo: Gestión de Clientes --}}
                     <div class="col-md-6 mb-4">
@@ -345,6 +369,183 @@
                         </div>
                     </div>
 
+                    {{-- Submódulo: Herramientas de Planta --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold m-0" style="color: #17619a;"><i class="fas fa-tools"></i> Herramientas Planta</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.view" class="custom-control-input master-switch" id="master_herramientas" data-module="herramientas" @checked($user->hasPermissionTo('herramientas.view'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="master_herramientas">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            
+                            <div class="sub-permissions" id="sub_herramientas">
+                                <p class="text-muted text-sm mb-3" style="font-size: 0.85rem;">Permite ver el catálogo, KPIs y estado actual de la maquinaria.</p>
+
+                                <h6 class="text-muted text-uppercase text-sm font-weight-bold mt-3">Operativa</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.manage" class="custom-control-input child-herramientas" id="h_manage" @checked($user->hasPermissionTo('herramientas.manage'))>
+                                    <label class="custom-control-label font-weight-normal" for="h_manage">Crear y editar fichas de herramientas</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.movimientos" class="custom-control-input child-herramientas" id="h_movimientos" @checked($user->hasPermissionTo('herramientas.movimientos'))>
+                                    <label class="custom-control-label font-weight-normal" for="h_movimientos">Cambiar estados y asignar/trasladar a obra</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.eventos" class="custom-control-input child-herramientas" id="h_eventos" @checked($user->hasPermissionTo('herramientas.eventos'))>
+                                    <label class="custom-control-label font-weight-normal" for="h_eventos">Registrar partes de avería y mantenimientos</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.documentos" class="custom-control-input child-herramientas" id="h_documentos" @checked($user->hasPermissionTo('herramientas.documentos'))>
+                                    <label class="custom-control-label font-weight-normal" for="h_documentos">Generar etiquetas QR y subir manuales PDF</label>
+                                </div>
+
+                                <h6 class="text-danger text-uppercase text-sm font-weight-bold mt-3">Peligro</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="herramientas.delete" class="custom-control-input child-herramientas" id="h_delete" @checked($user->hasPermissionTo('herramientas.delete'))>
+                                    <label class="custom-control-label font-weight-normal text-danger" for="h_delete">Eliminar herramientas permanentemente</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Submódulo: Equipos Informáticos (IT) --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold m-0" style="color: #135381;"><i class="fas fa-desktop"></i> Equipos IT</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="equipos.view" class="custom-control-input master-switch" id="master_equipos" data-module="equipos" @checked($user->hasPermissionTo('equipos.view'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="master_equipos">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            
+                            <div class="sub-permissions" id="sub_equipos">
+                                <p class="text-muted text-sm mb-3" style="font-size: 0.85rem;">Permite ver el parque informático, estado actual y KPIs del sistema.</p>
+
+                                <h6 class="text-muted text-uppercase text-sm font-weight-bold mt-3">Operativa</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="equipos.manage" class="custom-control-input child-equipos" id="eq_manage" @checked($user->hasPermissionTo('equipos.manage'))>
+                                    <label class="custom-control-label font-weight-normal" for="eq_manage">Crear y editar fichas de hardware (IT)</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="equipos.movimientos" class="custom-control-input child-equipos" id="eq_movimientos" @checked($user->hasPermissionTo('equipos.movimientos'))>
+                                    <label class="custom-control-label font-weight-normal" for="eq_movimientos">Gestionar estados y asignar responsables (custodios)</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="equipos.eventos" class="custom-control-input child-equipos" id="eq_eventos" @checked($user->hasPermissionTo('equipos.eventos'))>
+                                    <label class="custom-control-label font-weight-normal" for="eq_eventos">Registrar incidencias, mantenimientos y entregas</label>
+                                </div>
+
+                                <h6 class="text-danger text-uppercase text-sm font-weight-bold mt-3">Peligro</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="equipos.delete" class="custom-control-input child-equipos" id="eq_delete" @checked($user->hasPermissionTo('equipos.delete'))>
+                                    <label class="custom-control-label font-weight-normal text-danger" for="eq_delete">Eliminar equipos informáticos permanentemente</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Submódulo: Aparatos Calibrables (Metrología) --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold m-0" style="color: #002442;"><i class="fas fa-ruler-combined"></i> Metrología y Calibración</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="calibrables.view" class="custom-control-input master-switch" id="master_calibrables" data-module="calibrables" @checked($user->hasPermissionTo('calibrables.view'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="master_calibrables">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            
+                            <div class="sub-permissions" id="sub_calibrables">
+                                <p class="text-muted text-sm mb-3" style="font-size: 0.85rem;">Permite ver el directorio de instrumentos de medición, estado de certificaciones y alertas de caducidad.</p>
+
+                                <h6 class="text-muted text-uppercase text-sm font-weight-bold mt-3">Operativa</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="calibrables.manage" class="custom-control-input child-calibrables" id="cal_manage" @checked($user->hasPermissionTo('calibrables.manage'))>
+                                    <label class="custom-control-label font-weight-normal" for="cal_manage">Crear y editar fichas de metrología</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="calibrables.movimientos" class="custom-control-input child-calibrables" id="cal_movimientos" @checked($user->hasPermissionTo('calibrables.movimientos'))>
+                                    <label class="custom-control-label font-weight-normal" for="cal_movimientos">Cambiar estados metrológicos (Aislar, enviar a Laboratorio) y asignar</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="calibrables.eventos" class="custom-control-input child-calibrables" id="cal_eventos" @checked($user->hasPermissionTo('calibrables.eventos'))>
+                                    <label class="custom-control-label font-weight-normal" for="cal_eventos">Añadir registros de calibración y subir certificados a la bitácora</label>
+                                </div>
+
+                                <h6 class="text-danger text-uppercase text-sm font-weight-bold mt-3">Peligro</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="calibrables.delete" class="custom-control-input child-calibrables" id="cal_delete" @checked($user->hasPermissionTo('calibrables.delete'))>
+                                    <label class="custom-control-label font-weight-normal text-danger" for="cal_delete">Eliminar instrumentos calibrables permanentemente</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Submódulo Transversal: Centro de Control de Activos --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold m-0" style="color: #e06c2b;"><i class="fas fa-bell"></i> Alertas y Control (Global)</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="alertas.view" class="custom-control-input master-switch" id="master_alertas" data-module="alertas" @checked($user->hasPermissionTo('alertas.view'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="master_alertas">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            
+                            <div class="sub-permissions" id="sub_alertas">
+                                <p class="text-muted text-sm mb-3" style="font-size: 0.85rem;">Módulo transversal. Permite el acceso al panel resumen (Control Tower) de todos los activos de la empresa.</p>
+
+                                <h6 class="text-muted text-uppercase text-sm font-weight-bold mt-3">Operativa</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="alertas.config" class="custom-control-input child-alertas" id="alt_config" @checked($user->hasPermissionTo('alertas.config'))>
+                                    <label class="custom-control-label font-weight-normal" for="alt_config">Configurar automatismos (Destinatarios y frecuencias de envío)</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="alertas.enviar" class="custom-control-input child-alertas" id="alt_enviar" @checked($user->hasPermissionTo('alertas.enviar'))>
+                                    <label class="custom-control-label font-weight-normal" for="alt_enviar">Forzar envíos manuales de reportes de caducidades o averías</label>
+                                </div>
+
+                                <h6 class="text-danger text-uppercase text-sm font-weight-bold mt-3">Peligro</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="alertas.delete" class="custom-control-input child-alertas" id="alt_delete" @checked($user->hasPermissionTo('alertas.delete'))>
+                                    <label class="custom-control-label font-weight-normal text-danger" for="alt_delete">Vaciar lista de distribución de correos</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Submódulo: Auditoría de Sistema (Log) --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <h5 class="font-weight-bold text-dark m-0"><i class="fas fa-shield-alt"></i> Auditoría (Logs)</h5>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="permissions[]" value="audit.view" class="custom-control-input master-switch" id="master_audit" data-module="audit" @checked($user->hasPermissionTo('audit.view'))>
+                                    <label class="custom-control-label font-weight-bold" style="cursor:pointer;" for="master_audit">Habilitar Módulo</label>
+                                </div>
+                            </div>
+                            
+                            <div class="sub-permissions" id="sub_audit">
+                                <p class="text-muted text-sm mb-3" style="font-size: 0.85rem;">Acceso al registro de eventos del sistema (Trazabilidad y seguridad).</p>
+
+                                <h6 class="text-muted text-uppercase text-sm font-weight-bold mt-3">Operativa</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="audit.export" class="custom-control-input child-audit" id="au_export" @checked($user->hasPermissionTo('audit.export'))>
+                                    <label class="custom-control-label font-weight-normal" for="au_export">Permitir exportar registros de auditoría</label>
+                                </div>
+
+                                <h6 class="text-danger text-uppercase text-sm font-weight-bold mt-3">Peligro</h6>
+                                <div class="custom-control custom-checkbox mb-2">
+                                    <input type="checkbox" name="permissions[]" value="audit.delete" class="custom-control-input child-audit" id="au_delete" @checked($user->hasPermissionTo('audit.delete'))>
+                                    <label class="custom-control-label font-weight-normal text-danger" for="au_delete">Eliminar/Purgar registros del log de auditoría</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- Panel de usuario --}}
                     <div class="col-md-6 mb-4">
                         <div class="p-3 bg-light rounded border h-100">
@@ -392,36 +593,94 @@
     document.addEventListener('DOMContentLoaded', function() {
         const masterSwitches = document.querySelectorAll('.master-switch');
 
+        // Función original: Enciende o apaga el contenedor de permisos hijos
         function toggleModulePermissions(masterElement) {
             const moduleName = masterElement.getAttribute('data-module');
             const childCheckboxes = document.querySelectorAll(`.child-${moduleName}`);
             const container = document.getElementById(`sub_${moduleName}`);
 
             if (masterElement.checked) {
-                // Si el maestro está activo, habilitamos los hijos
                 childCheckboxes.forEach(checkbox => checkbox.disabled = false);
                 container.style.opacity = '1';
                 container.style.pointerEvents = 'auto';
             } else {
-                // Si el maestro se apaga, desmarcamos y bloqueamos los hijos
                 childCheckboxes.forEach(checkbox => {
                     checkbox.checked = false;
                     checkbox.disabled = true;
                 });
-                container.style.opacity = '0.5'; // Efecto visual de apagado
-                container.style.pointerEvents = 'none'; // Evita clics accidentales
+                container.style.opacity = '0.5';
+                container.style.pointerEvents = 'none';
             }
         }
 
-        // 1. Inicializar el estado al cargar la página (por si vienen datos guardados de BD)
+        // Iterar sobre cada módulo para iniciar su estado e inyectar el botón
         masterSwitches.forEach(sw => {
+            // 1. Inicializar estado visual
             toggleModulePermissions(sw);
             
-            // 2. Escuchar los clicks del usuario
+            // 2. Escuchar cambios manuales
             sw.addEventListener('change', function() {
                 toggleModulePermissions(this);
             });
+
+            // 3. INYECCIÓN AUTOMÁTICA: Crear el botón "Marcar Todos" para esta tarjeta
+            const moduleName = sw.getAttribute('data-module');
+            const titleContainer = sw.closest('.p-3').querySelector('h5');
+            
+            const selectAllBtn = document.createElement('button');
+            selectAllBtn.type = 'button';
+            selectAllBtn.className = 'btn btn-xs btn-outline-primary ml-3';
+            selectAllBtn.style.fontSize = '0.65rem';
+            selectAllBtn.style.padding = '0.15rem 0.4rem';
+            selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> Seleccionar todo';
+            
+            selectAllBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Si el módulo estaba apagado, lo encendemos forzosamente
+                if (!sw.checked) {
+                    sw.checked = true;
+                    toggleModulePermissions(sw);
+                }
+                // Marcamos todos los checkboxes de este módulo concreto
+                document.querySelectorAll(`.child-${moduleName}`).forEach(child => {
+                    child.checked = true;
+                });
+            });
+
+            // Insertamos el botón justo al lado del icono y el texto del H5
+            titleContainer.appendChild(selectAllBtn);
         });
+
+        // 4. LÓGICA GLOBAL: Botón maestro "Habilitar todos"
+        const btnCheckAll = document.getElementById('btn-check-all');
+        if (btnCheckAll) {
+            btnCheckAll.addEventListener('click', () => {
+                // Primero encendemos todos los módulos maestros
+                masterSwitches.forEach(sw => {
+                    sw.checked = true;
+                    toggleModulePermissions(sw);
+                });
+                // Luego marcamos todas las casillas de todo el formulario
+                document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = true;
+                });
+            });
+        }
+
+        // 5. LÓGICA GLOBAL: Botón maestro "Desmarcar todo"
+        const btnUncheckAll = document.getElementById('btn-uncheck-all');
+        if (btnUncheckAll) {
+            btnUncheckAll.addEventListener('click', () => {
+                // Desmarcamos todo
+                document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = false;
+                });
+                // Repasamos los módulos maestros para que se aplique el efecto de bloqueo visual (opacity 0.5)
+                masterSwitches.forEach(sw => {
+                    toggleModulePermissions(sw);
+                });
+            });
+        }
     });
 </script>
 @endsection

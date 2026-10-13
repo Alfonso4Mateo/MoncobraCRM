@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\EquipoInformatico;
+use App\Models\Ubicacion;
+use App\Models\Departamento;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -30,14 +32,20 @@ class EquiposController extends Controller
         return view('herramientas.equipos.index', [
             'items' => $items,
             'stats' => $stats,
-            'ubicaciones' => EquipoInformatico::where('activo', true)->whereNotNull('ubicacion')->distinct()->orderBy('ubicacion')->pluck('ubicacion'),
+            'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
             'estados' => EquipoInformatico::where('activo', true)->distinct()->orderBy('estado')->pluck('estado'),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
         ]);
     }
 
-    public function create()
+   public function create()
     {
-        return view('herramientas.equipos.form');
+        return view('herramientas.equipos.form', [
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+        ]);
     }
 
     public function store(Request $request)
@@ -58,19 +66,39 @@ class EquiposController extends Controller
         $data = $this->eventValidated($request);
         $data['usuario_id'] = auth()->id();
         
-        // Verificamos si se ha subido un archivo en el formulario
+        // Extraemos la fecha del próximo mantenimiento
+        $proximoMantenimiento = $data['fecha_mantenimiento'] ?? null;
+        unset($data['fecha_mantenimiento']);
+        
         if ($request->hasFile('archivo_adjunto')) {
-            // Guardamos el archivo en la carpeta storage/app/public/eventos_it
             $data['archivo_adjunto'] = $request->file('archivo_adjunto')->store('eventos_it', 'public');
         }
 
+        // Guardamos el parte en la bitácora
         $equipo->eventos()->create($data);
-        return back()->with('success', 'Evento documentado y añadido a la bitácora.');
+
+        // Si ha registrado un mantenimiento, actualizamos la ficha del equipo principal
+        if ($request->tipo === 'mantenimiento' && $proximoMantenimiento) {
+            $equipo->update([
+                'fecha_mantenimiento' => $proximoMantenimiento,
+                // Si el equipo estaba marcado en rojo por revisión caducada, lo devolvemos a operativo
+                'estado' => 'operativo', 
+                'dias_estimados_baja' => null,
+                'fecha_baja' => null
+            ]);
+        }
+
+        return back()->with('success', 'Parte documentado en bitácora y fecha de revisión actualizada.');
     }
 
     public function edit(EquipoInformatico $equipo)
     {
-        return view('herramientas.equipos.form', ['item' => $equipo]);
+        return view('herramientas.equipos.form', [
+            'item' => $equipo,
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+        ]);
     }
 
     public function update(Request $request, EquipoInformatico $equipo)
@@ -101,7 +129,15 @@ class EquiposController extends Controller
             });
         }
         if ($request->filled('estado')) $query->where('estado', (string) $request->string('estado'));
-        if ($request->filled('ubicacion')) $query->where('ubicacion', (string) $request->string('ubicacion'));
+        if ($request->filled('ubicacion_id')) {
+            $query->where('ubicacion_id', $request->integer('ubicacion_id'));
+        }
+        if ($request->filled('departamento_id')) {
+            $query->where('departamento_id', $request->integer('departamento_id'));
+        }
+        if ($request->filled('clase')) {
+            $query->where('clase', (string) $request->string('clase'));
+        }
         if ($request->filled('alerta')) {
             if ($request->alerta === 'obsoleto') {
                 $query->whereDate('soporte_hasta', '<', now());
@@ -118,7 +154,7 @@ class EquiposController extends Controller
             'numero_serie' => ['nullable', 'string', 'max:150'], 'marca' => ['nullable', 'string', 'max:100'],
             'modelo' => ['nullable', 'string', 'max:150'], 'categoria' => ['nullable', 'string', 'max:150'],
             'estado' => ['required', Rule::in(['operativo', 'asignado', 'mantenimiento', 'reparacion'])],
-            'ubicacion' => ['nullable', 'string', 'max:150'], 'responsable' => ['nullable', 'string', 'max:150'],
+            'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'], 'responsable' => ['nullable', 'string', 'max:150'],
             'proveedor' => ['nullable', 'string', 'max:150'], 'fecha_adquisicion' => ['nullable', 'date'],
             'fecha_mantenimiento' => ['nullable', 'date'], 'descripcion' => ['nullable', 'string'],
             'imagen' => ['nullable', 'image', 'max:4096'], 'tipo_equipo' => ['nullable', 'string', 'max:100'],
@@ -127,6 +163,8 @@ class EquiposController extends Controller
             'mac_address' => ['nullable', 'string', 'max:50'], 'ip_address' => ['nullable', 'string', 'max:50'],
             'garantia_hasta' => ['nullable', 'date'], 'soporte_hasta' => ['nullable', 'date'],
             'condicion_fisica' => ['nullable', 'string', 'max:40'], 'etiqueta_color' => ['nullable', 'string', 'max:30'],
+            'departamento_id' => ['nullable', 'exists:departamentos,id'],
+            'clase' => ['nullable', 'string', 'max:100'],
         ]);
     }
 
@@ -137,19 +175,19 @@ class EquiposController extends Controller
             'titulo' => ['required', 'string', 'max:180'], 
             'descripcion' => ['nullable', 'string', 'max:5000'],
             'fecha' => ['required', 'date'],
-            // Validamos que sea un documento o imagen con un tamaño razonable (ej. máx 5MB)
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'], 
+            'fecha_mantenimiento' => ['nullable', 'date'], 
         ]);
     }
 
     public function updateEstado(Request $request, EquipoInformatico $equipo)
     {
         $request->validate([
-            'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'mantenimiento', 'reparacion'])],
-            'titulo_evento' => ['required', 'string', 'max:180'],
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
-            'dias_estimados_baja' => ['nullable', 'integer', 'min:1', 'max:365'],
-        ]);
+        'responsable' => ['required', 'string', 'max:150'],
+        'ubicacion_id' => ['required', 'exists:ubicaciones,id'], 
+        'titulo_evento' => ['required', 'string', 'max:180'],
+        'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+    ]);
 
         $dataToUpdate = ['estado' => $request->estado];
         
@@ -194,10 +232,10 @@ class EquiposController extends Controller
 
         // 1. Asignamos el equipo
         $equipo->update([
-            'estado' => 'asignado',
-            'responsable' => $request->responsable,
-            'ubicacion' => $request->ubicacion,
-        ]);
+        'estado' => 'asignado',
+        'responsable' => $request->responsable,
+        'ubicacion_id' => $request->ubicacion_id, 
+    ]);
 
         // 2. Procesamos el archivo adjunto si existe (ej. albarán de entrega firmado)
         $rutaArchivo = null;
@@ -206,10 +244,12 @@ class EquiposController extends Controller
         }
 
         // 3. Registramos el movimiento en la bitácora
+        $nombreSitio = \App\Models\Ubicacion::find($request->ubicacion_id)?->nombre ?? 'S/C';
+
         $equipo->eventos()->create([
             'tipo' => 'responsable',
             'titulo' => $request->titulo_evento,
-            'descripcion' => "Equipo entregado a: {$request->responsable} | Puesto: {$request->ubicacion}",
+            'descripcion' => "Equipo entregado a: {$request->responsable} | Puesto: {$nombreSitio}", 
             'fecha' => now(),
             'archivo_adjunto' => $rutaArchivo,
             'usuario_id' => auth()->id(),

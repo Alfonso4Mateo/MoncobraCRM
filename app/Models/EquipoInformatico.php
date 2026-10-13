@@ -19,7 +19,8 @@ class EquipoInformatico extends Model
 
     protected $fillable = [
         'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria', 'estado',
-        'ubicacion', 'responsable', 'proveedor', 'fecha_adquisicion', 'fecha_mantenimiento',
+        'ubicacion_id', 'departamento_id','clase',
+        'responsable', 'proveedor', 'fecha_adquisicion', 'fecha_mantenimiento',
         'descripcion', 'imagen', 'activo', 'tipo_equipo', 'sistema_operativo', 'procesador',
         'memoria_ram', 'almacenamiento', 'mac_address', 'ip_address', 'garantia_hasta',
         'soporte_hasta', 'condicion_fisica', 'etiqueta_color', 'dias_estimados_baja', 'fecha_baja',
@@ -75,5 +76,16 @@ class EquipoInformatico extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function ubicacion() 
+    {
+        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
+        return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
+    }
+
+    public function departamento()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 }

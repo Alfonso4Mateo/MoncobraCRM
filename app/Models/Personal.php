@@ -91,7 +91,8 @@ class Personal extends Model
 
     public function puestos()
     {
-        return $this->belongsTo(Puesto::class, 'puesto_id');
+        return $this->belongsToMany(Puesto::class, 'personal_puesto', 'personal_id', 'puesto_id')
+                    ->withTimestamps();
     }
 
     public function puestoTrabajo()

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\FamiliaHerramienta;
 use App\Models\HerramientaPlanta;
+use App\Models\Ubicacion;
+use App\Models\Departamento;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -34,9 +36,11 @@ class HerramientasPlantaController extends Controller
         return view('herramientas.planta.index', [
             'items' => $items, 
             'stats' => $stats,
-            'ubicaciones' => HerramientaPlanta::whereNotNull('ubicacion')->distinct()->orderBy('ubicacion')->pluck('ubicacion'),
+            'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
             'estados' => HerramientaPlanta::distinct()->orderBy('estado')->pluck('estado'),
             'familias' => FamiliaHerramienta::where('activo', true)->orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
         ]);
     }
 
@@ -51,12 +55,18 @@ class HerramientasPlantaController extends Controller
             });
         }
         
+        if ($request->filled('departamento_id')) {
+            $query->where('departamento_id', $request->integer('departamento_id'));
+        }
+        if ($request->filled('clase')) {
+            $query->where('clase', (string) $request->string('clase'));
+        }
         if ($request->filled('estado')) {
             $query->where('estado', (string) $request->string('estado'));
         }
         
-        if ($request->filled('ubicacion')) {
-            $query->where('ubicacion', (string) $request->string('ubicacion'));
+        if ($request->filled('ubicacion_id')) {
+            $query->where('ubicacion_id', $request->integer('ubicacion_id'));
         }
         
         if ($request->filled('familia')) {
@@ -77,7 +87,12 @@ class HerramientasPlantaController extends Controller
 
     public function create()
     {
-        return view('herramientas.planta.form', ['familias' => FamiliaHerramienta::where('activo', true)->orderBy('nombre')->get()]);
+        return view('herramientas.planta.form', [
+            'familias' => FamiliaHerramienta::where('activo', true)->orderBy('nombre')->get(),
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+        ]);
     }
 
     public function storeFamilia(Request $request)
@@ -114,18 +129,42 @@ class HerramientasPlantaController extends Controller
         $data = $this->eventValidated($request);
         $data['usuario_id'] = auth()->id();
         
-        // Atrapamos el archivo si el operario ha subido uno
+        // Extraemos la fecha del próximo mantenimiento
+        $proximoMantenimiento = $data['fecha_mantenimiento'] ?? null;
+        unset($data['fecha_mantenimiento']);
+        
         if ($request->hasFile('archivo_adjunto')) {
             $data['archivo_adjunto'] = $request->file('archivo_adjunto')->store('eventos_planta', 'public');
         }
 
+        // Guardamos el parte en la bitácora
         $herramientaPlanta->eventos()->create($data);
-        return back()->with('success', 'Evento documentado y añadido a la bitácora.');
+
+        // Si ha registrado un mantenimiento, actualizamos la ficha de la máquina principal
+        if ($request->tipo === 'mantenimiento' && $proximoMantenimiento) {
+            $herramientaPlanta->update([
+                'fecha_mantenimiento' => $proximoMantenimiento,
+                // Si la máquina estaba bloqueada o en taller, la devolvemos a operativo
+                'estado' => 'operativo',
+                'bloqueado' => false,
+                'motivo_bloqueo' => null,
+                'dias_estimados_baja' => null,
+                'fecha_baja' => null
+            ]);
+        }
+
+        return back()->with('success', 'Evento documentado en bitácora y revisión actualizada.');
     }
 
     public function edit(HerramientaPlanta $herramientaPlanta)
     {
-        return view('herramientas.planta.form', ['item' => $herramientaPlanta, 'familias' => FamiliaHerramienta::where('activo', true)->orderBy('nombre')->get()]);
+        return view('herramientas.planta.form', [
+            'item' => $herramientaPlanta, 
+            'familias' => FamiliaHerramienta::where('activo', true)->orderBy('nombre')->get(),
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+        ]);
     }
 
     public function update(Request $request, HerramientaPlanta $herramientaPlanta)
@@ -153,7 +192,7 @@ class HerramientasPlantaController extends Controller
             'numero_serie' => ['nullable', 'string', 'max:150'], 'marca' => ['nullable', 'string', 'max:100'],
             'modelo' => ['nullable', 'string', 'max:150'], 'categoria' => ['nullable', 'string', 'max:150'],
             'estado' => ['required', Rule::in(['operativo', 'asignado', 'mantenimiento', 'reparacion'])],
-            'ubicacion' => ['nullable', 'string', 'max:150'], 'ubicacion_2' => ['nullable', 'string', 'max:150'],
+           'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
             'responsable' => ['nullable', 'string', 'max:150'], 'proveedor' => ['nullable', 'string', 'max:150'],
             'id_proveedor' => ['nullable', 'string', 'max:100'], 'almacen' => ['nullable', 'string', 'max:150'],
             'stock' => ['required', 'numeric', 'min:0'], 'unidad_medida' => ['required', 'string', 'max:30'],
@@ -165,6 +204,8 @@ class HerramientasPlantaController extends Controller
             'criticidad' => ['nullable', 'string', 'max:30'], 'horas_uso' => ['nullable', 'integer', 'min:0'],
             'bloqueado' => ['required', 'boolean'], 'motivo_bloqueo' => ['nullable', 'string', 'max:255'],
             'garantia_hasta' => ['nullable', 'date'],'fecha_inspeccion' => ['nullable', 'date'],
+            'departamento_id' => ['nullable', 'exists:departamentos,id'],
+            'clase' => ['nullable', 'string', 'max:100'],
         ]);
     }
 
@@ -175,8 +216,8 @@ class HerramientasPlantaController extends Controller
             'titulo' => ['required', 'string', 'max:180'], 
             'descripcion' => ['nullable', 'string', 'max:5000'],
             'fecha' => ['required', 'date'],
-            // Le decimos al validador que acepte archivos
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'], 
+            'fecha_mantenimiento' => ['nullable', 'date'], 
         ]);
     }
 

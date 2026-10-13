@@ -3,8 +3,7 @@
 @section('title', 'Crear Nuevo Pedido - MoncobraCRM')
 
 @section('css')
-    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap4.min.css" rel="stylesheet">
     @vite(['resources/css/pedidos-clientes-create.css'])
 @endsection
 
@@ -26,19 +25,18 @@
 
 @section('content')
     @php
-        $clienteSeleccionadoId = (string) old('id_cliente', $clienteSeleccionadoId ?? '');
-        $presupuestoSeleccionadoId = (string) old('presupuesto_id', $presupuestoSeleccionadoId ?? '');
+        $clienteSeleccionadoId = (string) old('id_cliente',$clienteSeleccionadoId ?? '');
+        $presupuestoSeleccionadoId = (string) old('presupuesto_id',$presupuestoSeleccionadoId ?? '');
         $estadoActual = (string) old('estado', 'pendiente');
-        $pedidoBolsa = (bool) old('bolsa', false);
-        $numeroPedido = old('numero_pedido', '');
-        $fechaPedido = old('fecha_pedido', $fechaPedido ?? now()->toDateString());
-        $otPedido = old('ot', $presupuestoSeleccionado?->ot ?? null);
-        $referenciaManual = old('referencia_manual');
-        $bolsaTexto = old('bolsa_texto', '');
+        $pedidoBolsa = (bool) old('bolsa', $bolsaPreseleccionada ?? false);
+        $bolsaSeleccionadaId = (string) old('bolsa_id', $bolsaIdPreseleccionada ?? '');;$numeroPedido = old('numero_pedido', '');
+        $fechaPedido = old('fecha_pedido',$fechaPedido ?? now()->toDateString());
+        $otPedido = old('ot',$presupuestoSeleccionado?->ot ?? null);
+        $referenciaManual = old('referencia_manual');$bolsaTexto = old('bolsa_texto', '');
         $lineasJson = old('lista_articulos', json_encode($lineasIniciales ?? [], JSON_UNESCAPED_UNICODE));
         $lineasInicialesJs = json_decode($lineasJson, true);
         $lineasInicialesJs = is_array($lineasInicialesJs) ? $lineasInicialesJs : ($lineasIniciales ?? []);
-        $presupuestosParaPedidoJs = $presupuestosParaPedido ?? [];
+        $presupuestosParaPedidoJs =$presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
         $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 4, '.', ''));
@@ -96,8 +94,8 @@
                         <select id="presupuesto_id" name="presupuesto_id" class="pedido-select pedido-select--search">
                             <option value="">Sin presupuesto</option>
                             @foreach ($presupuestos as $presupuesto)
-                                <option value="{{ $presupuesto->id }}" {{ $presupuestoSeleccionadoId === (string) $presupuesto->id ? 'selected' : '' }}>
-                                    {{ $presupuesto->numero ?? ('PR-' . $presupuesto->id) }} - {{ $presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}
+                                <option value="{{ $presupuesto->id }}" {{ $presupuestoSeleccionadoId === (string)$presupuesto->id ? 'selected' : '' }}>
+                                    {{ $presupuesto->numero ?? ('PR-' . $presupuesto->id) }} - {{$presupuesto->cliente?->empresa_nombre ?? 'Sin cliente' }}
                                 </option>
                             @endforeach
                         </select>
@@ -125,7 +123,7 @@
                         <select id="id_cliente" name="id_cliente" class="pedido-select" required {{ $presupuestoSeleccionadoId !== '' ? 'disabled' : '' }}>
                                <option value="">Selecciona un cliente</option>
                             @foreach ($clientes as $cliente)
-                                <option value="{{ $cliente->id }}" {{ $clienteSeleccionadoId === (string) $cliente->id ? 'selected' : '' }}>
+                                <option value="{{ $cliente->id }}" {{ $clienteSeleccionadoId === (string)$cliente->id ? 'selected' : '' }}>
                                     {{ $cliente->empresa_nombre }}
                                 </option>
                             @endforeach
@@ -155,7 +153,7 @@
                             <input type="checkbox" id="pedido_bolsa" name="bolsa" value="1" {{ $pedidoBolsa ? 'checked' : '' }}>
                             <span>Activar modo bolsa</span>
                         </label>
-                        <small class="pedido-help">En modo bolsa no se usan líneas y solo se introduce el total del pedido.</small>
+                        <small class="pedido-help">La bolsa permite a los albaranes consumir saldos de las líneas de forma fraccionada.</small>
                     </div>
                 </div>
             </article>
@@ -176,7 +174,6 @@
 
                 <div class="pedido-line-editor">
                     <div class="pedido-form-grid pedido-form-grid--line">
-                        <!-- Campo 'Código referencia' eliminado según petición: se mostrará Línea en la tabla -->
                         <div class="pedido-field pedido-field--wide">
                             <label for="line_descripcion">Descripción</label>
                             <textarea id="line_descripcion" class="pedido-input pedido-textarea" rows="2" placeholder="Descripción del artículo o servicio"></textarea>
@@ -197,17 +194,36 @@
                             <label for="line_margen">Margen</label>
                             <input type="number" step="0.01" min="0" max="1000" id="line_margen" class="pedido-input" value="0">
                         </div>
+                        <div class="pedido-field pedido-field--compact" id="line_modo_consumo_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
+                            <label for="line_modo_consumo">Consumo</label>
+                            <select id="line_modo_consumo" class="pedido-select">
+                                <option value="cantidad">Por unidades</option>
+                                <option value="importe">Por importe (límite)</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_total_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
-                        <label for="pedido_bolsa_total">Total del pedido</label>
-                            <input type="number" step="0.01" min="0" max="10000000" id="pedido_bolsa_total" class="pedido-input" value="{{ $totalPedidoManual }}" placeholder="Importe total del pedido">
-                        <small class="pedido-help">Rellena este importe solo si el pedido es bolsa.</small>
+                    <!-- CAMPO MANUAL OCULTO (Mantenido en el DOM por compatibilidad con selectores, pero oculto al usuario) -->
+                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_total_wrap" style="display: none;">
+                        <label for="pedido_bolsa_total">Total del pedido manual</label>
+                            <input type="number" step="0.01" min="0" max="10000000" id="pedido_bolsa_total" class="pedido-input" value="{{ $totalPedidoManual }}" placeholder="Importe total">
                     </div>
-                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_texto_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
-                        <label for="pedido_bolsa_texto">Texto del pedido bolsa</label>
-                        <textarea id="pedido_bolsa_texto" name="bolsa_texto" class="pedido-input pedido-textarea" rows="3" placeholder="Describe el pedido bolsa">{{ $bolsaTexto }}</textarea>
-                        <small class="pedido-help">Se mostrara como descripcion si no hay lineas en el PDF.</small>
+
+                    <div class="pedido-field pedido-field--wide" id="pedido_bolsa_global_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
+                        <label for="pedido_bolsa_id">Bolsa global</label>
+                        <select id="pedido_bolsa_id" name="bolsa_id" class="pedido-select">
+                            <option value="">Bolsa suelta (sin bolsa global)</option>
+                            @foreach ($bolsasParaPedido ?? [] as $bolsaOption)
+                                <option value="{{ $bolsaOption['id'] }}"
+                                        data-cliente-id="{{ $bolsaOption['id_cliente'] }}"
+                                        {{ $bolsaSeleccionadaId === (string) $bolsaOption['id'] ? 'selected' : '' }}>
+                                    {{ $bolsaOption['numero'] ?: ('Bolsa #' . $bolsaOption['id']) }} ({{ $bolsaOption['tipo_bolsa'] }}) — {{ $bolsaOption['saldo_texto'] ?? '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="pedido-help">
+                            Solo se muestran las bolsas del cliente seleccionado. Si no ves la que buscas, créala primero desde <a href="{{ route('bolsas.create') }}" target="_blank">Bolsas</a>.
+                        </small>
                     </div>
                 </div>
 
@@ -221,6 +237,7 @@
                                 <th style="width: 10%">Medida</th>
                                 <th style="width: 14%">P. unitario</th>
                                 <th style="width: 10%">Margen</th>
+                                <th style="width: 10%" id="th-modo-consumo" {{ $pedidoBolsa ? '' : 'hidden' }}>Consumo</th>
                                 <th style="width: 14%">Total</th>
                                 <th style="width: 6%"></th>
                             </tr>
@@ -249,6 +266,10 @@
                     </div>
                 </div>
 
+                <div id="bolsa-limit-warning" class="pedido-alert pedido-alert--danger" style="display: none; margin: 15px 20px; font-size: 0.85rem;">
+                    <i class="fas fa-exclamation-triangle"></i> El total supera el saldo de la bolsa global seleccionada. (Máximo: <strong id="bolsa-limit-amount"></strong>)
+                </div>
+
                 <div class="pedido-summary-actions">
                     <button type="submit" class="pedido-action-btn pedido-action-btn--secondary" data-estado="pendiente">
                         Guardar como borrador
@@ -269,8 +290,10 @@
 @endsection
 
 @section('js')
-    <script src="{{ asset('vendor/select2/js/select2.full.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('pedido-cliente-form');
             const body = document.getElementById('pedido-lines-body');
@@ -278,8 +301,11 @@
             const bolsaCheckbox = document.getElementById('pedido_bolsa');
             const bolsaTotalWrap = document.getElementById('pedido_bolsa_total_wrap');
             const bolsaTotalInput = document.getElementById('pedido_bolsa_total');
-            const bolsaTextoWrap = document.getElementById('pedido_bolsa_texto_wrap');
-            const bolsaTextoInput = document.getElementById('pedido_bolsa_texto');
+            const bolsaGlobalWrap = document.getElementById('pedido_bolsa_global_wrap');
+            const bolsaIdSelect = document.getElementById('pedido_bolsa_id');
+            const modoConsumoWrap = document.getElementById('line_modo_consumo_wrap');
+            const modoConsumoSelect = document.getElementById('line_modo_consumo');
+            const thModoConsumo = document.getElementById('th-modo-consumo');
             const descripcionInput = document.getElementById('line_descripcion');
             const cantidadInput = document.getElementById('line_cantidad');
             const medidaInput = document.getElementById('line_medida');
@@ -299,6 +325,7 @@
             const lineTableWrap = document.querySelector('.pedido-table-wrap');
             const initialLines = @json($lineasInicialesJs ?? []);
             const presupuestos = @json($presupuestosParaPedidoJs ?? []);
+            const bolsasData = @json($bolsasParaPedido ?? []);
             let bolsaMode = bolsaCheckbox.checked;
 
             const moneyFormatter = new Intl.NumberFormat('es-ES', {
@@ -318,6 +345,23 @@
 
             const formatMoney = (value) => `${moneyFormatter.format(value)} €`;
 
+            const syncModoConsumoUi = () => {
+                if (!modoConsumoSelect) {
+                    return;
+                }
+
+                const esImporte = bolsaMode && modoConsumoSelect.value === 'importe';
+
+                // En modo importe la unidad de la línea es siempre 1 (no sabes
+                // cuántos "trabajos" vas a hacer, pero sí el importe límite).
+                if (esImporte) {
+                    cantidadInput.value = '1';
+                    cantidadInput.disabled = true;
+                } else {
+                    cantidadInput.disabled = false;
+                }
+            };
+
             const computeTotal = (cantidad, precioUnitario, margen) => {
                 const qty = Math.max(0, parseValue(cantidad));
                 const unit = Math.max(0, parseValue(precioUnitario));
@@ -329,7 +373,8 @@
                 ? lines
                     .filter((line) => line && typeof line === 'object')
                     .map((line) => {
-                        const cantidad = Number(parseValue(line.cantidad).toFixed(2));
+                        const modoConsumo = line.modo_consumo === 'importe' ? 'importe' : 'cantidad';
+                        const cantidad = modoConsumo === 'importe' ? 1 : Number(parseValue(line.cantidad).toFixed(2));
                         const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(4));
                         const margen = Number(parseValue(line.margen).toFixed(2));
 
@@ -340,6 +385,7 @@
                             medida: String(line.medida ?? line.unidad ?? '').trim(),
                             precio_unitario: precioUnitario,
                             margen,
+                            modo_consumo: modoConsumo,
                             total: computeTotal(cantidad, precioUnitario, margen),
                         };
                     })
@@ -371,31 +417,72 @@
                 }
             };
 
+            const filterBolsaIdOptions = () => {
+                if (!bolsaIdSelect) {
+                    return;
+                }
+
+                const clienteId = String(clienteLockedInput.value || clienteSelect.value || '').trim();
+
+                Array.from(bolsaIdSelect.options).forEach((option) => {
+                    if (option.value === '') {
+                        option.hidden = false;
+                        return;
+                    }
+                    const perteneceAlCliente = String(option.dataset.clienteId || '') === clienteId;
+                    option.hidden = !perteneceAlCliente;
+                });
+
+                const seleccionActual = bolsaIdSelect.selectedOptions[0];
+                if (seleccionActual && seleccionActual.hidden) {
+                    bolsaIdSelect.value = '';
+                }
+            };
+
             const syncBolsaUi = () => {
                 bolsaMode = bolsaCheckbox.checked;
-                bolsaTotalWrap.hidden = !bolsaMode;
-                bolsaTextoWrap.hidden = !bolsaMode;
-                lineFormGrid.hidden = bolsaMode;
-                lineTableWrap.hidden = bolsaMode;
-                bolsaTotalInput.required = bolsaMode;
-                addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
+                
+                // NUEVO COMPORTAMIENTO: La bolsa V2 siempre usa líneas
+                bolsaTotalWrap.hidden = true; 
+                lineFormGrid.hidden = false; 
+                lineTableWrap.hidden = false; 
+                bolsaTotalInput.required = false;
 
-                if (bolsaMode) {
-                    items.splice(0, items.length);
-                    syncHidden();
+                if (bolsaGlobalWrap) {
+                    bolsaGlobalWrap.hidden = !bolsaMode;
                 }
+                if (modoConsumoWrap) {
+                    modoConsumoWrap.hidden = !bolsaMode;
+                }
+                if (thModoConsumo) {
+                    thModoConsumo.hidden = !bolsaMode;
+                }
+                if (!bolsaMode && bolsaIdSelect) {
+                    bolsaIdSelect.value = '';
+                }
+                if (!bolsaMode && modoConsumoSelect) {
+                    modoConsumoSelect.value = 'cantidad';
+                }
+
+                filterBolsaIdOptions();
+                syncModoConsumoUi();
+                
+                addLineButton.disabled = descripcionInput.value.trim().length === 0;
 
                 renderRows();
             };
 
-            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
-                window.jQuery(presupuestoSelect).select2({
-                    theme: 'bootstrap4',
-                    width: '100%',
-                    placeholder: 'Buscar presupuesto',
-                    allowClear: true,
-                });
-            }
+            document.querySelectorAll('.pedido-select, .select2').forEach((select) => {
+                if (!select.tomselect) {
+                    new TomSelect(select, {
+                        create: false,
+                        ...(select === presupuestoSelect ? {
+                            placeholder: 'Buscar presupuesto',
+                            allowEmptyOption: true,
+                        } : {}),
+                    });
+                }
+            });
 
             const items = normalizeLines(initialLines);
 
@@ -404,24 +491,43 @@
             };
 
             const renderTotals = () => {
-                const base = items.reduce((carry, item) => carry + parseValue(item.total), 0);
-                const total = bolsaMode ? parseValue(bolsaTotalInput.value) : base;
-
+                // 1. Calcula totales normales
+                const total = items.reduce((carry, item) => carry + parseValue(item.total), 0);
                 hiddenTotal.value = total.toFixed(4);
-                summaryBase.textContent = formatMoney(bolsaMode ? 0 : base);
+                summaryBase.textContent = formatMoney(total);
                 summaryTotal.textContent = formatMoney(total);
+                
+                // 2. NUEVA LÓGICA DE BLOQUEO
+                const warningEl = document.getElementById('bolsa-limit-warning');
+                const amountSpan = document.getElementById('bolsa-limit-amount');
+                const submitBtns = document.querySelectorAll('.pedido-summary-actions button[type="submit"]');
+                
+                let exceedsLimit = false;
+
+                // Solo validamos si estamos en modo bolsa y hay una bolsa global seleccionada
+                if (bolsaMode && bolsaIdSelect && bolsaIdSelect.value) {
+                    const bolsa = bolsasData.find(b => String(b.id) === bolsaIdSelect.value);
+                    
+                    // Si la bolsa no es infinita (abierta) y nos pasamos del límite
+                    if (bolsa && !bolsa.es_abierta && total > bolsa.saldo_disponible) {
+                        exceedsLimit = true;
+                        if(amountSpan) amountSpan.textContent = formatMoney(bolsa.saldo_disponible);
+                    }
+                }
+
+                // Aplicamos los cambios visuales y bloqueos
+                if (exceedsLimit) {
+                    if(warningEl) warningEl.style.display = 'block';
+                    submitBtns.forEach(btn => btn.disabled = true);
+                } else {
+                    if(warningEl) warningEl.style.display = 'none';
+                    submitBtns.forEach(btn => btn.disabled = false);
+                }
             };
 
             const renderRows = () => {
-                if (bolsaMode) {
-                    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Modo bolsa activado. No se usan líneas.</td></tr>';
-                    syncHidden();
-                    renderTotals();
-                    return;
-                }
-
                 if (items.length === 0) {
-                    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay items agregados.</td></tr>';
+                    body.innerHTML = `<tr><td colspan="${bolsaMode ? 9 : 8}" class="text-center text-muted py-4">No hay items agregados.</td></tr>`;
                     syncHidden();
                     renderTotals();
                     return;
@@ -430,14 +536,18 @@
                 body.innerHTML = items.map((item, index) => `
                     <tr>
                         <td>${String(index + 1).padStart(2, '0')}</td>
-                        <td>${item.descripcion || '<span class="text-muted">Sin descripción</span>'}</td>
+                        <td style="white-space: pre-wrap">${esc(item.descripcion) || '<span class="text-muted">Sin descripción</span>'}</td>
                         <td>${moneyFormatter.format(parseValue(item.cantidad))}</td>
-                        <td>${item.medida ? item.medida : '<span class="text-muted">-</span>'}</td>
+                        <td>${item.medida ? esc(item.medida) : '<span class="text-muted">-</span>'}</td>
                         <td>${moneyFormatter.format(parseValue(item.precio_unitario))} €</td>
                         <td>${moneyFormatter.format(parseValue(item.margen))} %</td>
+                        ${bolsaMode ? `<td>${item.modo_consumo === 'importe' ? 'Importe' : 'Unidades'}</td>` : ''}
                         <td>${moneyFormatter.format(parseValue(item.total))} €</td>
-                        <td>
-                            <button type="button" class="pedido-line-remove" data-index="${index}" aria-label="Eliminar línea">
+                        <td style="white-space: nowrap;">
+                            <button type="button" class="pedido-line-edit mr-1" data-index="${index}" aria-label="Editar línea" style="background: none; border: none; color: #64748b; cursor: pointer; padding: 4px;">
+                                <i class="fas fa-pencil-alt" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="pedido-line-remove" data-index="${index}" aria-label="Eliminar línea" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px;">
                                 <i class="fas fa-trash-alt" aria-hidden="true"></i>
                             </button>
                         </td>
@@ -451,9 +561,13 @@
             const resetLineForm = () => {
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
+                cantidadInput.disabled = false;
                 medidaInput.value = 'und';
                 precioInput.value = '0';
                 margenInput.value = '0';
+                if (modoConsumoSelect) {
+                    modoConsumoSelect.value = 'cantidad';
+                }
                 autoResizeDescripcion();
                 descripcionInput.focus();
             };
@@ -501,12 +615,9 @@
             };
 
             const addLine = () => {
-                if (bolsaMode) {
-                    return;
-                }
-
                 const descripcion = descripcionInput.value.trim();
-                const cantidad = Math.max(0, parseValue(cantidadInput.value));
+                const modoConsumo = (bolsaMode && modoConsumoSelect && modoConsumoSelect.value === 'importe') ? 'importe' : 'cantidad';
+                const cantidad = modoConsumo === 'importe' ? 1 : Math.max(0, parseValue(cantidadInput.value));
                 const medida = medidaInput.value.trim() || 'und';
                 const precioUnitario = Math.max(0, parseValue(precioInput.value));
                 const margen = Math.max(0, parseValue(margenInput.value));
@@ -526,6 +637,7 @@
                     medida,
                     precio_unitario: Number(precioUnitario.toFixed(4)),
                     margen: Number(margen.toFixed(2)),
+                    modo_consumo: modoConsumo,
                     total,
                 });
 
@@ -542,7 +654,7 @@
             };
 
             descripcionInput.addEventListener('input', () => {
-                addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
+                addLineButton.disabled = descripcionInput.value.trim().length === 0;
                 autoResizeDescripcion();
             });
 
@@ -563,7 +675,7 @@
 
             [cantidadInput, precioInput, margenInput].forEach((input) => {
                 input.addEventListener('input', () => {
-                    addLineButton.disabled = bolsaMode || descripcionInput.value.trim().length === 0;
+                    addLineButton.disabled = descripcionInput.value.trim().length === 0;
                 });
             });
 
@@ -571,36 +683,69 @@
                 syncBolsaUi();
             });
 
-            bolsaTotalInput.addEventListener('input', () => {
-                renderTotals();
-            });
+            if (modoConsumoSelect) {
+                modoConsumoSelect.addEventListener('change', syncModoConsumoUi);
+            }
 
-            clienteSelect.addEventListener('change', syncClienteFromSelect);
+            clienteSelect.addEventListener('change', () => {
+                syncClienteFromSelect();
+                filterBolsaIdOptions();
+            });
+            
+            if (bolsaIdSelect) {
+                bolsaIdSelect.addEventListener('change', renderTotals);
+            }
 
             presupuestoSelect.addEventListener('change', refreshFromBudgetSelectionDeferred);
             presupuestoSelect.addEventListener('input', refreshFromBudgetSelectionDeferred);
-
-            if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
-                window.jQuery(presupuestoSelect).on('select2:select select2:clear change', refreshFromBudgetSelectionDeferred);
-            }
 
             addLineButton.addEventListener('click', addLine);
 
             body.addEventListener('click', (event) => {
                 const target = event.target instanceof HTMLElement ? event.target : null;
+                
+                // --- LÓGICA DE BORRADO ---
                 const removeButton = target?.closest('.pedido-line-remove');
-
-                if (!(removeButton instanceof HTMLElement)) {
+                if (removeButton instanceof HTMLElement) {
+                    const index = Number.parseInt(removeButton.dataset.index || '-1', 10);
+                    if (index >= 0 && index < items.length) {
+                        items.splice(index, 1);
+                        renderRows();
+                    }
                     return;
                 }
 
-                const index = Number.parseInt(removeButton.dataset.index || '-1', 10);
-                if (index < 0 || index >= items.length) {
+                // --- LÓGICA DE EDICIÓN ---
+                const editButton = target?.closest('.pedido-line-edit');
+                if (editButton instanceof HTMLElement) {
+                    const index = Number.parseInt(editButton.dataset.index || '-1', 10);
+                    if (index >= 0 && index < items.length) {
+                        const itemToEdit = items[index];
+                        
+                        // 1. Cargar los datos de la línea en el formulario superior
+                        descripcionInput.value = itemToEdit.descripcion;
+                        cantidadInput.value = itemToEdit.cantidad;
+                        medidaInput.value = itemToEdit.medida;
+                        precioInput.value = itemToEdit.precio_unitario;
+                        margenInput.value = itemToEdit.margen;
+                        
+                        if (modoConsumoSelect && itemToEdit.modo_consumo) {
+                            modoConsumoSelect.value = itemToEdit.modo_consumo;
+                            syncModoConsumoUi(); // Para bloquear la cantidad si es 'importe'
+                        }
+                        
+                        autoResizeDescripcion();
+                        
+                        // 2. Eliminar la línea original de la tabla
+                        items.splice(index, 1);
+                        renderRows();
+                        
+                        // 3. Hacer scroll hacia el formulario y dar foco a la descripción
+                        descripcionInput.focus();
+                        descripcionInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                     return;
                 }
-
-                items.splice(index, 1);
-                renderRows();
             });
 
             renderRows();
@@ -616,16 +761,15 @@
             }
 
             form.addEventListener('submit', () => {
+                // 1. Validar primero con HTML5
+                if (!form.checkValidity()) {
+                    return;
+                }
+
+                // 2. Sincronizar datos ocultos
                 const button = document.activeElement;
                 if (button && button.dataset && button.dataset.estado) {
                     hiddenState.value = button.dataset.estado;
-                }
-
-                if (bolsaCheckbox.checked) {
-                    hiddenTotal.value = parseValue(bolsaTotalInput.value).toFixed(4);
-                    hiddenLines.value = '[]';
-                } else if (bolsaTextoInput) {
-                    bolsaTextoInput.value = '';
                 }
 
                 if (clienteSelect.disabled) {
@@ -638,6 +782,18 @@
 
                 syncHidden();
                 renderTotals();
+
+                // 3. PROTECCIÓN FRONTEND CONTRA DOBLE ENVÍO
+                setTimeout(() => {
+                    const btns = form.querySelectorAll('button[type="submit"]');
+                    btns.forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.pointerEvents = 'none';
+                        const anchoOriginal = btn.offsetWidth;
+                        if(anchoOriginal > 0) btn.style.width = anchoOriginal + 'px';
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando';
+                    });
+                }, 50);
             });
         });
     </script>

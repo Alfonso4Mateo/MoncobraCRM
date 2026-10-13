@@ -19,7 +19,8 @@ class HerramientaPlanta extends Model
 
     protected $fillable = [
         'id_interno', 'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria',
-        'estado', 'ubicacion', 'ubicacion_2', 'responsable', 'proveedor', 'id_proveedor',
+        'estado', 'ubicacion_id', 'departamento_id','clase',
+        'responsable', 'proveedor', 'id_proveedor',
         'almacen', 'stock', 'unidad_medida', 'fecha_registro', 'fecha_adquisicion',
         'fecha_mantenimiento', 'descripcion', 'imagen', 'familia_id', 'familia_energetica',
         'potencia', 'tension', 'combustible', 'criticidad', 'horas_uso', 'bloqueado',
@@ -82,5 +83,16 @@ class HerramientaPlanta extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function ubicacion() 
+    {
+        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
+        return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
+    }
+
+    public function departamento()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 }

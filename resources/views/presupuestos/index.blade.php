@@ -120,6 +120,7 @@
                     <thead>
                         <tr>
                             <th>Número</th>
+                            <th>Título</th>
                             <th>Fecha</th>
                             <th>Cliente</th>
                             <th>CC</th>
@@ -133,6 +134,9 @@
                             <tr>
                                 <td data-label="Número">
                                     <span class="presupuesto-reference">{{ $presupuesto->numero }}</span>
+                                </td>
+                                <td data-label="Título">
+                                    <span class="presupuesto-titulo">{{ $presupuesto->titulo }}</span>
                                 </td>
                                 <td data-label="Fecha">
                                     <span class="presupuesto-date">

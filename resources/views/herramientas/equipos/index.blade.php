@@ -182,15 +182,17 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-md-2 mb-2 mb-md-0">
-            <select class="form-control" name="ubicacion">
+        <div class="col-md-3 mb-2 mb-md-0">
+            <select class="form-control" name="ubicacion_id">
                 <option value="">Ubicación (Todas)</option>
                 @foreach($ubicaciones as $ubicacion)
-                    <option value="{{ $ubicacion }}" @selected(request('ubicacion') === $ubicacion)>{{ $ubicacion }}</option>
+                    <option value="{{ $ubicacion->id }}" @selected(request('ubicacion_id') == $ubicacion->id)>
+                        {{ $ubicacion->nombre }}
+                    </option>
                 @endforeach
             </select>
         </div>
-        <!-- NUEVO FILTRO DE ALERTAS IT -->
+        <!-- FILTRO DE ALERTAS IT -->
         <div class="col-md-3 mb-2 mb-md-0">
             <select class="form-control" name="alerta">
                 <option value="">Alertas de Ciclo / EOL</option>
@@ -198,7 +200,26 @@
                 <option value="mantenimiento" @selected(request('alerta') === 'mantenimiento')>Mantenimiento Vencido</option>
             </select>
         </div>
-        <div class="col-md-1">
+    </div>
+    <!-- NUEVA FILA PARA DEPARTAMENTO Y CLASE -->
+    <div class="row mt-2">
+        <div class="col-md-3 mb-2 mb-md-0">
+            <select class="form-control" name="departamento_id">
+                <option value="">Departamento (Todos)</option>
+                @foreach($departamentos as $departamento)
+                    <option value="{{ $departamento->id }}" @selected(request('departamento_id') == $departamento->id)>{{ $departamento->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-2 mb-2 mb-md-0">
+            <select class="form-control" name="clase">
+                <option value="">Clase (Todas)</option>
+                @foreach($clasesCatalogo as $cls)
+                    <option value="{{ $cls->nombre }}" @selected(request('clase') === $cls->nombre)>{{$cls->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-1 offset-md-6">
             <button class="it-btn it-btn-primary w-100" title="Filtrar"><i class="fas fa-filter"></i></button>
         </div>
     </div>
@@ -209,9 +230,11 @@
         @php 
             $image = $item->imagen ? asset('storage/'.$item->imagen) : null; 
             
-            // MOTOR LÓGICO DE ALERTAS IT
-            $isReparacion = $item->estado === 'reparacion';
-            $isMantenimiento = $item->estado === 'mantenimiento';
+            // MOTOR LÓGICO DE ESTADOS Y ALERTAS IT (Corrección)
+            $isReparacion = in_array($item->estado, ['averiado', 'reparacion', 'aislado']);
+            $isMantenimiento = in_array($item->estado, ['mantenimiento', 'revision']);
+            
+            // Calculamos las alertas de fechas
             $isObsoleto = $item->soporte_hasta && $item->soporte_hasta->isPast();
             $mantenimientoCaducado = $item->fecha_mantenimiento && $item->fecha_mantenimiento->isPast();
             
@@ -253,8 +276,10 @@
                     </div>
                     
                     <!-- Nombre y Píldora de Garantía -->
-                    <h3>
-                        {{ $item->nombre }}
+                   <h3>
+                        <a href="{{ route('equipos.show', $item) }}" style="color: inherit; text-decoration: none;" title="Abrir ficha y bitácora">
+                            {{ $item->nombre }}
+                        </a>
                         @if($item->garantia_hasta && $item->garantia_hasta->isFuture())
                             <span style="font-size: 9px; padding: 2px 6px; background: #e2f7ee; color: #08734e; border-radius: 4px; border: 1px solid #b8e6d3; white-space: nowrap;">
                                 <i class="fas fa-shield-alt mr-1"></i> Garantía: {{ $item->garantia_hasta->diffForHumans(['parts' => 2, 'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) }}
@@ -264,12 +289,11 @@
                     @if(in_array($item->estado, ['reparacion', 'mantenimiento']) && $item->dias_estimados_baja)
                         @php
                             $fechaLimiteBaja = \Carbon\Carbon::parse($item->fecha_baja)->addDays($item->dias_estimados_baja);
-                            $retrasoBaja = $item->fecha_baja && now()->gt($fechaLimiteBaja);
-                            $diasRetraso = $retrasoBaja ? $fechaLimiteBaja->diffInDays(now()) : 0;
+                            $retrasoBaja = $item->fecha_baja && now()->gt($fechaLimiteBaja);$diasRetraso = $retrasoBaja ? (int) $fechaLimiteBaja->diffInDays(now()) : 0;
                         @endphp
                         <small style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: {{ $retrasoBaja ? '#c92328' : '#87949b' }}; margin-top: 2px;">
                             <i class="fas fa-hourglass-half"></i>
-                            {{ $retrasoBaja ? 'Retraso de ' . $diasRetraso . ' día' . ($diasRetraso == 1 ? '' : 's') : 'Baja aprox. ' . $item->dias_estimados_baja . ' días' }}
+                            {{ $retrasoBaja ? 'Retraso de ' . $diasRetraso . ' día' . ($diasRetraso == 1 ? '' : 's') : 'Baja aprox. ' .$item->dias_estimados_baja . ' días' }}
                         </small>
                     @endif
                 </div>
@@ -314,7 +338,7 @@
                 </div>
                 <div class="it-data-item">
                     <label>Sitio actual / Guarda</label>
-                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion ?: 'Almacén Central' }}</strong>
+                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion->nombre ?? 'Almacén' }}</strong>
                 </div>
                 
                 <!-- Fecha Mantenimiento (Coordinado con color Ámbar) -->
@@ -371,7 +395,7 @@
 </div>
 
 <div class="it-bottom">
-    <span>Mostrando {{ $items->firstItem() ?: 0 }} - {{ $items->lastItem() ?: 0 }} de {{ $items->total() }} equipos</span>
+    <span>Mostrando {{ $items->firstItem() ?: 0 }} - {{ $items->lastItem() ?: 0 }} de {{$items->total() }} equipos</span>
     {{ $items->links() }}
 </div>
 

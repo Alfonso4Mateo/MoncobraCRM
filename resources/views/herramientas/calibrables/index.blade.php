@@ -176,22 +176,37 @@
 
 <form class="cal-filters" method="GET" action="{{ route('calibrables.index') }}">
     <div class="row">
-        <div class="col-lg-5 mb-2 mb-lg-0">
+        <!-- Buscador reducido a col-lg-3 para hacer hueco -->
+        <div class="col-lg-3 mb-2 mb-lg-0">
             <div class="input-group">
                 <div class="input-group-prepend">
                     <span class="input-group-text"><i class="fas fa-search"></i></span>
                 </div>
-                <input class="form-control" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar por ID, modelo, marca o magnitud">
+                <input class="form-control" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar ID o modelo...">
             </div>
         </div>
-        <div class="col-lg-3 mb-2 mb-lg-0">
+        
+        <div class="col-lg-2 mb-2 mb-lg-0">
             <select name="estado" class="form-control">
-                <option value="">Estado operacional</option>
+                <option value="">Estado (Todos)</option>
                 <option value="operativo" @selected(request('estado') === 'operativo')>Operativo / Vigente</option>
-                <option value="calibracion" @selected(request('estado') === 'calibracion')>En Laboratorio / Calibración</option>
-                <option value="aislado" @selected(request('estado') === 'aislado')>Aislado / Fallo metrológico</option>
+                <option value="calibracion" @selected(request('estado') === 'calibracion')>En Laboratorio</option>
+                <option value="aislado" @selected(request('estado') === 'aislado')>Aislado / Fallo</option>
             </select>
         </div>
+
+        <!-- FILTRO DE UBICACIONES -->
+        <div class="col-lg-3 mb-2 mb-lg-0">
+            <select name="ubicacion_id" class="form-control">
+                <option value="">Ubicación (Todas)</option>
+                @foreach($ubicaciones as $ubicacion)
+                    <option value="{{ $ubicacion->id }}" @selected(request('ubicacion_id') == $ubicacion->id)>
+                        {{ $ubicacion->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
         <div class="col-lg-3 mb-2 mb-lg-0">
             <select name="alerta" class="form-control">
                 <option value="">Estado de certificación</option>
@@ -199,7 +214,29 @@
                 <option value="proximo" @selected(request('alerta') === 'proximo')>Caducan en < 30 días</option>
             </select>
         </div>
-        <div class="col-lg-1">
+    </div>
+    
+    <!-- NUEVA FILA PARA DEPARTAMENTO Y CLASE -->
+    <div class="row mt-2">
+        <div class="col-lg-3 mb-2 mb-lg-0">
+            <select class="form-control" name="departamento_id">
+                <option value="">Departamento (Todos)</option>
+                @foreach($departamentos as $departamento)
+                    <option value="{{ $departamento->id }}" @selected(request('departamento_id') == $departamento->id)>
+                        {{ $departamento->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-lg-2 mb-2 mb-lg-0">
+            <select class="form-control" name="clase">
+                <option value="">Clase (Todas)</option>
+                @foreach($clasesCatalogo as $cls)
+                    <option value="{{ $cls->nombre }}" @selected(request('clase') === $cls->nombre)>{{$cls->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-lg-1 offset-lg-6">
             <button class="cal-btn cal-btn-main w-100" title="Filtrar"><i class="fas fa-filter"></i></button>
         </div>
     </div>
@@ -208,13 +245,16 @@
 <div class="cal-grid">
     @forelse($items as $item)
         @php 
-            // MOTOR LÓGICO DE METROLOGÍA
-            $isAislado = $item->estado === 'aislado';
-            $isLaboratorio = $item->estado === 'calibracion';
+            $image = $item->imagen ? asset('storage/'.$item->imagen) : null; 
+            
+            // MOTOR LÓGICO DE METROLOGÍA (Corrección)
+            $isAislado = in_array($item->estado, ['aislado', 'vencido', 'averiado']);
+            $isLaboratorio = in_array($item->estado, ['calibracion', 'mantenimiento']);
+            
+            // Calculamos caducidades
             $isExpired = $item->proxima_calibracion && $item->proxima_calibracion->isPast();
             $daysLeft = $item->proxima_calibracion ? now()->diffInDays($item->proxima_calibracion, false) : 999;
             $isExpiringSoon = $daysLeft >= 0 && $daysLeft <= 30 && !$isExpired;
-            $image = $item->imagen ? asset('storage/'.$item->imagen) : null; 
             
             // Determinamos el color del borde y punto de la tarjeta
             $cardLevelClass = '';
@@ -261,12 +301,16 @@
                             @endif
                         </div>
                     </div>
-                    <h3>{{ $item->nombre }}</h3>
+                    <h3>
+                        <a href="{{ route('calibrables.show', $item) }}" style="color: inherit; text-decoration: none;" title="Abrir ficha y trazabilidad">
+                            {{ $item->nombre }}
+                        </a>
+                    </h3>
                     @if(in_array($item->estado, ['calibracion', 'aislado']) && $item->dias_estimados_baja)
                         @php
                             $fechaLimiteBaja = \Carbon\Carbon::parse($item->fecha_baja)->addDays($item->dias_estimados_baja);
                             $retrasoBaja = $item->fecha_baja && now()->gt($fechaLimiteBaja);
-                            $diasRetraso = $retrasoBaja ? $fechaLimiteBaja->diffInDays(now()) : 0;
+                            $diasRetraso = $retrasoBaja ? (int) $fechaLimiteBaja->diffInDays(now()) : 0;
                         @endphp
                         <small style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: {{ $retrasoBaja ? 'var(--cal-red)' : '#87949b' }}; margin-top: 2px;">
                             <i class="fas fa-hourglass-half"></i>
@@ -308,7 +352,7 @@
             <div class="cal-data-grid">
                 <div class="cal-data-item">
                     <label>Ubicación / Área</label>
-                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion ?: 'Almacén Central' }}</strong>
+                    <strong><i class="fas fa-map-marker-alt mr-1"></i>{{ $item->ubicacion->nombre ?? 'Almacén' }}</strong>
                 </div>
                 <div class="cal-data-item">
                     <label>Identificador (S/N)</label>

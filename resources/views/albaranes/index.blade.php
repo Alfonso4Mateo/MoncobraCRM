@@ -30,6 +30,13 @@
             </div>
         @endif
 
+        @if (session('warning'))
+            <div class="albaranes-alert-warning" style="background-color: #fffbeb; color: #b45309; border: 1px solid #fcd34d; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                {{ session('warning') }}
+            </div>
+        @endif
+
         <header class="albaranes-toolbar">
             <div class="albaranes-toolbar-actions">
                 @can('albaranes.manage')

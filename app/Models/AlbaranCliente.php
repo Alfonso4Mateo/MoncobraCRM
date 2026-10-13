@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Activity;
 
@@ -81,6 +82,23 @@ class AlbaranCliente extends Model
             'albaran_cliente_id',
             'pedido_cliente_id'
         )->withPivot('importe_imputado')->withTimestamps();
+    }
+
+    /**
+     * Traza técnica de qué líneas (y cuánto) consumió este albarán.
+     */
+    public function consumosLineas(): HasMany
+    {
+        return $this->hasMany(AlbaranPedidoLinea::class, 'albaran_id');
+    }
+
+    /**
+     * Reparto manual: para cada línea consumida, a qué partida(s) se
+     * imputó el importe.
+     */
+    public function repartosLineas(): HasMany
+    {
+        return $this->hasMany(AlbaranLineaPartida::class, 'albaran_id');
     }
 
     public function tapActivity(Activity $activity, string $eventName): void

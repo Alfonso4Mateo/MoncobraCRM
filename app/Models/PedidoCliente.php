@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use App\Models\AlbaranCliente;
 use App\Models\Presupuesto;
 use Spatie\Activitylog\Models\Activity;
@@ -43,6 +44,7 @@ class PedidoCliente extends Model
         'estado',
         'bolsa',
         'bolsa_texto',
+        'bolsa_id',
         'total',
         'lista_articulos',
     ];
@@ -112,12 +114,61 @@ class PedidoCliente extends Model
         )->withPivot('importe_imputado')->withTimestamps();
     }
 
+    public function saldoConsumido(?int $excludeAlbaranId = null): float
+    {
+        $albaranes = collect($this->albaranesPivot ?? [])
+            ->merge($this->albaran?->id ? collect([$this->albaran]) : collect())
+            ->merge($this->albaranes ?? collect())
+            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $this->proyecto_id) === (int) $this->proyecto_id)
+            ->where('estado', '!==', 'cancelado')
+            ->unique('id');
+
+        if ($excludeAlbaranId !== null && $excludeAlbaranId > 0) {
+            $albaranes = $albaranes->reject(
+                fn (AlbaranCliente $albaran) => (int) $albaran->id === $excludeAlbaranId
+            );
+        }
+
+        $albaranesAContar = $this->bolsa
+            ? $albaranes
+            : $albaranes->where('estado', 'facturado');
+
+        $total = $albaranesAContar->sum(
+            fn (AlbaranCliente $albaran): float => (float) $albaran->pivot->importe_imputado
+        );
+
+        return round((float) $total, 4);
+    }
+
     /**
      * Get the manual billings (cuotas) associated with the order.
      */
     public function facturacionesManuales(): HasMany
     {
         return $this->hasMany(FacturacionManual::class, 'pedido_id');
+    }
+
+    /**
+     * La bolsa global de la que esta partida forma parte (si aplica).
+     */
+    public function bolsaGlobal(): BelongsTo
+    {
+        return $this->belongsTo(Bolsa::class, 'bolsa_id');
+    }
+
+    /**
+     * Líneas (entidad propia) que reciben presupuesto de esta partida.
+     * Una línea puede aparecer aquí y también en otras partidas si su
+     * saldo se reparte entre varias.
+     */
+    public function lineasBolsa(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            LineaBolsa::class,
+            'linea_partida',
+            'pedido_id',
+            'linea_id'
+        )->withPivot('importe_asignado')->withTimestamps();
     }
 
     public function tapActivity(Activity $activity, string $eventName): void
@@ -147,5 +198,70 @@ class PedidoCliente extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function albaranesEfectivos(): Collection
+    {
+        $pivot = $this->albaranesPivot()->get();
+
+        $legacy = AlbaranCliente::query()
+            ->where('proyecto_id', $this->proyecto_id)
+            ->whereDoesntHave('pedidosClientes')
+            ->where(function ($q) {
+                $q->where('pedido_cliente', $this->numero_pedido);
+                if ($this->albaran_id) {
+                    $q->orWhere('id', $this->albaran_id);
+                }
+            })
+            ->get();
+
+        return $pivot->concat($legacy)->unique('id')->values();
+    }
+
+    public function importeConsumido(?int $excluirAlbaranId = null): float
+    {
+        $contables = $this->albaranesEfectivos()
+            ->reject(fn ($a) => $a->estado === 'cancelado')
+            ->when($excluirAlbaranId, fn ($c) => $c->reject(fn ($a) => (int) $a->id === $excluirAlbaranId))
+            ->when(! $this->bolsa, fn ($c) => $c->where('estado', 'facturado'));
+
+        return round($contables->sum(function ($a) {
+            $imp = isset($a->pivot) ? (float) $a->pivot->importe_imputado : 0.0;
+            return $imp > 0.001 ? $imp : (float) $a->total;   // escudo legacy
+        }), 2);
+    }
+
+    public function pendienteFacturar(?int $excluirAlbaranId = null): float
+    {
+        return round(max(0, (float) $this->total - $this->importeConsumido($excluirAlbaranId)), 2);
+    }
+
+    public function lineasPendientes(?int $excluirAlbaranId = null): array
+    {
+        $pendientes = collect(is_array($this->lista_articulos) ? $this->lista_articulos : [])
+            ->map(fn ($l) => (array) $l)->values()->all();
+
+        $firma = fn (array $l) => mb_strtolower(trim((string) ($l['descripcion'] ?? '')))
+            . '|' . mb_strtolower(trim((string) ($l['medida'] ?? $l['unidad'] ?? '')));
+
+        $consumos = [];
+        foreach ($this->albaranesEfectivos() as $alb) {
+            if ($alb->estado === 'cancelado' || (int) $alb->id === (int) $excluirAlbaranId) {
+                continue;
+            }
+            foreach ((array) $alb->lista_articulos as $l) {
+                $consumos[$firma((array) $l)] = ($consumos[$firma((array) $l)] ?? 0) + (float) ($l['cantidad'] ?? 0);
+            }
+        }
+
+        foreach ($pendientes as &$l) {
+            $k = $firma($l);
+            $uso = min((float) ($l['cantidad'] ?? 0), $consumos[$k] ?? 0);
+            $l['cantidad'] = round((float) $l['cantidad'] - $uso, 2);
+            $consumos[$k] = ($consumos[$k] ?? 0) - $uso;
+        }
+        unset($l);
+
+        return array_values(array_filter($pendientes, fn ($l) => $l['cantidad'] > 0));
     }
 }

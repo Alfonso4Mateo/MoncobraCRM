@@ -8,7 +8,7 @@ use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PresupuestoController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\ProductoController;
-use App\Http\Controllers\CentroCosteController; // <-- Añadido
+use App\Http\Controllers\CentroCosteController;
 use Illuminate\Support\Facades\Route;
 
 // ---------------------------------------------------------
@@ -33,8 +33,6 @@ Route::get('albaranes/{albaran}/editar', [AlbaranClienteController::class, 'edit
     ->whereNumber('albaran')
     ->name('albaranes.edit');
 Route::put('albaranes/{albaran}', [AlbaranClienteController::class, 'update'])->name('albaranes.update');
-Route::get('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'pantallaRoja'])->name('albaranes.pantalla-roja');
-Route::put('albaranes/{albaran}/pantalla-roja', [AlbaranClienteController::class, 'updatePantallaRoja'])->name('albaranes.pantalla-roja.update');
 Route::patch('albaranes/{albaran}/estado', [AlbaranClienteController::class, 'updateEstado'])->name('albaranes.estado.update');
 Route::patch('albaranes/{albaran}/desvincular', [AlbaranClienteController::class, 'desvincular'])->name('albaranes.desvincular');
 // 3º Resource
@@ -69,7 +67,16 @@ Route::delete('centros-costes/{centroCoste}', [CentroCosteController::class, 'de
 // ---------------------------------------------------------
 // Proveedores, bolsa y pedidos base.
 // ---------------------------------------------------------
-Route::resource('bolsa', BolsaController::class);
+// --- Bolsas globales ---
+Route::get('/bolsas', [BolsaController::class, 'index'])->name('bolsas.index');
+Route::get('/bolsas/crear', [BolsaController::class, 'create'])->name('bolsas.create');
+Route::post('/bolsas', [BolsaController::class, 'store'])->name('bolsas.store');
+Route::get('/bolsas/{bolsa}', [BolsaController::class, 'show'])->name('bolsas.show');
+Route::get('/bolsas-fungibles', [BolsaController::class, 'fungiblesDisponibles'])->name('bolsas.fungibles');
+Route::get('/lineas-bolsa/{linea}/desglose', [BolsaController::class, 'lineaDesglose'])->name('lineas-bolsa.desglose');
+Route::delete('/bolsas/{bolsa}', [BolsaController::class, 'destroy'])->name('bolsas.destroy');
+Route::patch('/bolsas/{bolsa}/quitar-partida/{pedido}', [BolsaController::class, 'quitarPartida'])->name('bolsas.quitar-partida');
+
 Route::resource('proveedores', ProveedorController::class);
 Route::resource('albaranes-proveedores', AlbaranProveedorController::class);
 Route::resource('pedidos', PedidoController::class);
@@ -83,17 +90,23 @@ Route::post('pedidos-clientes', [PedidoController::class, 'storeCliente'])->name
 Route::get('pedidos-clientes', [PedidoController::class, 'indexClientes'])->name('pedidos-clientes.index');
 Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pedidos-clientes.data');
 
-// 2º Rutas dinámicas
+// 2º Rutas dinámicas (Usando siempre {pedidoCliente} para mantener consistencia)
+Route::get('pedidos-clientes/{pedidoCliente}/editar', [PedidoController::class, 'editCliente'])->name('pedidos-clientes.edit');
+Route::put('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'update'])->name('pedidos-clientes.update');
 Route::get('pedidos-clientes/{pedidoCliente}/preview', [PedidoController::class, 'preview'])->name('pedidos-clientes.preview');
 Route::get('pedidos-clientes/{pedidoCliente}/pdf', [PedidoController::class, 'viewPdf'])->name('pedidos-clientes.pdf');
 Route::get('pedidos-clientes/{pedidoCliente}/pdf/download', [PedidoController::class, 'downloadPdf'])->name('pedidos-clientes.pdf.download');
-Route::patch('pedidos-clientes/{pedidoCliente}/estado', [PedidoController::class, 'updateEstado'])->name('pedidos-clientes.estado.update'); // Dejamos solo la versión correcta
+Route::patch('pedidos-clientes/{pedidoCliente}/estado', [PedidoController::class, 'updateEstado'])->name('pedidos-clientes.estado.update'); 
 Route::delete('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'destroyCliente'])->name('pedidos-clientes.destroy');
 Route::get('pedidos-clientes/{pedidoCliente}/albaranes', [PedidoController::class, 'albaranesCliente'])->name('pedidos-clientes.albaranes');
 Route::get('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'showCliente'])->name('pedidos-clientes.show');
-Route::post('pedidos-clientes/{pedidoCliente}/facturar-cuota', [PedidoController::class, 'facturarCuota'])->name('pedidos-clientes.facturar-cuota');
-Route::put('/pedidos-clientes/{pedidoCliente}/actualizar-descripcion', [PedidoController::class, 'actualizarDescripcion'])->name('pedidos-clientes.actualizar-descripcion');
-Route::delete('/facturacion-manual/{id}', [App\Http\Controllers\PedidoController::class, 'destroyFacturacion'])->name('facturacion-manual.destroy');
+Route::put('pedidos-clientes/{pedidoCliente}/actualizar-descripcion', [PedidoController::class, 'actualizarDescripcion'])->name('pedidos-clientes.actualizar-descripcion');
+
+// --- Líneas de bolsa por partida (dentro del pedido) ---
+Route::get('/pedidos-clientes/{pedidoCliente}/lineas-bolsa', [PedidoController::class, 'lineasBolsaDisponibles'])
+    ->name('pedidos-clientes.lineas-bolsa');
+Route::post('/pedidos-clientes/{pedidoCliente}/vincular-linea-bolsa', [PedidoController::class, 'vincularLineaBolsa'])
+    ->name('pedidos-clientes.vincular-linea-bolsa');
 
 // ---------------------------------------------------------
 // Vistas de catálogo y consultas auxiliares.

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\PersonalCursoController;
+use App\Http\Controllers\PersonalController; // 1. IMPORTANTE: Añadimos la llamada al controlador
 use Illuminate\Support\Facades\Route;
 
 // 1. PRIMERO LAS RUTAS ESTÁTICAS Y ESPECÍFICAS
@@ -69,6 +70,19 @@ Route::get('personal/{personal}/cursos/{curso}/historial', [PersonalCursoControl
     ->name('personal.cursos.historial')
     ->middleware('permission:cursos.view');
 
+
+// 2. AQUI VAN LAS NUEVAS RUTAS
+// --- ACCIONES TRABAJADOR <-> PERFILES FORMATIVOS (PUESTOS) ---
+Route::post('/personal/{personal}/puestos/add', [PersonalController::class, 'addPuesto'])
+    ->name('personal.puestos.add')
+    ->middleware('permission:cursos.edit');
+
+Route::delete('/personal/{personal}/puestos/{puestoId}', [PersonalController::class, 'removePuesto'])
+    ->name('personal.puestos.remove')
+    ->middleware('permission:cursos.edit');
+// --------------------------------------------------------------
+
+
 // Módulo de Puestos y Auditorías (Panel de Normas)
 Route::resource('puestos', App\Http\Controllers\PuestoController::class)
     ->middleware('permission:cursos.normas'); 
@@ -94,5 +108,5 @@ Route::resource('epis', App\Http\Controllers\EpiController::class)
     ->middleware('permission:epis.gestion');
 
 Route::patch('epis/{epi}/toggle-activo', [App\Http\Controllers\EpiController::class, 'toggleActivo'])
-->name('epis.toggle-activo')
-->middleware('permission:epis.gestion');
+    ->name('epis.toggle-activo')
+    ->middleware('permission:epis.gestion');

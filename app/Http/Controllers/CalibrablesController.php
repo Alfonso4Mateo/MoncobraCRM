@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AparatoCalibrable;
+use App\Models\Ubicacion;
+use App\Models\Departamento;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -34,8 +36,14 @@ class CalibrablesController extends Controller
             $query->where('estado', (string) $request->string('estado'));
         }
 
-        if ($request->filled('ubicacion')) {
-            $query->where('ubicacion', (string) $request->string('ubicacion'));
+        if ($request->filled('departamento_id')) {
+            $query->where('departamento_id', $request->integer('departamento_id'));
+        }
+        if ($request->filled('clase')) {
+            $query->where('clase', (string) $request->string('clase'));
+        }
+        if ($request->filled('ubicacion_id')) {
+            $query->where('ubicacion_id', $request->integer('ubicacion_id'));
         }
 
         if ($request->filled('alerta')) {
@@ -61,14 +69,20 @@ class CalibrablesController extends Controller
         return view('herramientas.calibrables.index', [
             'items' => $items,
             'stats' => $stats,
-            'ubicaciones' => AparatoCalibrable::whereNotNull('ubicacion')->distinct()->orderBy('ubicacion')->pluck('ubicacion'),
+            'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
             'estados' => AparatoCalibrable::distinct()->orderBy('estado')->pluck('estado'),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
         ]);
     }
 
     public function create()
     {
-        return view('herramientas.calibrables.form');
+        return view('herramientas.calibrables.form', [
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+        ]);
     }
 
     public function store(Request $request)
@@ -91,19 +105,43 @@ class CalibrablesController extends Controller
         $data = $this->eventValidated($request);
         $data['usuario_id'] = auth()->id();
         
-        // NUEVO: Procesar y guardar el PDF/Imagen físicamente si el usuario lo sube
+        // 1. Extraemos la próxima calibración antes de crear el evento
+        // Lo quitamos de $data con unset() para que no de error SQL de "columna desconocida" en la tabla eventos
+        $nuevaCaducidad = $data['proxima_calibracion'] ?? null;
+        unset($data['proxima_calibracion']);
+
         if ($request->hasFile('archivo_adjunto')) {
             $data['archivo_adjunto'] = $request->file('archivo_adjunto')->store('calibrables/eventos', 'public');
         }
 
+        // 2. Guardamos el evento normalmente en la bitácora
         $aparatoCalibrable->eventos()->create($data);
-        return back()->with('success', 'Evento añadido a la bitácora.');
+
+        // 3. LA MAGIA: Si es una calibración nueva, actualizamos el instrumento principal
+        if ($request->tipo === 'calibracion' && $nuevaCaducidad) {
+            $aparatoCalibrable->update([
+                // La fecha de la actuación (evento) es la nueva última calibración
+                'ultima_calibracion' => $request->fecha, 
+                // Renovamos la caducidad
+                'proxima_calibracion' => $nuevaCaducidad,
+                // Lo ponemos Operativo automáticamente, asumiendo que ha pasado la revisión
+                'estado' => 'operativo', 
+                // Limpiamos los datos de baja si venía de un laboratorio
+                'dias_estimados_baja' => null,
+                'fecha_baja' => null
+            ]);
+        }
+
+        return back()->with('success', 'Evento añadido a la bitácora y caducidad actualizada correctamente.');
     }
 
     public function edit(AparatoCalibrable $aparatoCalibrable)
     {
         return view('herramientas.calibrables.form', [
             'item' => $aparatoCalibrable,
+            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'departamentos' => Departamento::orderBy('nombre')->get(),
+            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
         ]);
     }
 
@@ -141,7 +179,7 @@ class CalibrablesController extends Controller
             'marca' => ['nullable', 'string', 'max:100'],
             'modelo' => ['nullable', 'string', 'max:150'],
             'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'asignado', 'calibracion', 'vencido', 'aislado'])],
-            'ubicacion' => ['nullable', 'string', 'max:150'],
+            'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
             'responsable' => ['nullable', 'string', 'max:150'],
             'instrumento' => ['nullable', 'string', 'max:100'],
             'rango_medida' => ['nullable', 'string', 'max:150'],
@@ -155,6 +193,8 @@ class CalibrablesController extends Controller
             'proxima_calibracion' => ['nullable', 'date'],
             'ultima_calibracion' => ['nullable', 'date'],
             'imagen' => ['nullable', 'image', 'max:4096'],
+            'departamento_id' => ['nullable', 'exists:departamentos,id'],
+            'clase' => ['nullable', 'string', 'max:100'],
         ]);
     }
 
@@ -165,8 +205,8 @@ class CalibrablesController extends Controller
             'titulo' => ['required', 'string', 'max:180'], 
             'descripcion' => ['nullable', 'string', 'max:5000'],
             'fecha' => ['required', 'date'],
-            // NUEVO: Permitir que el sistema acepte el archivo de la petición
             'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 
+            'proxima_calibracion' => ['nullable', 'date'], 
         ]);
     }
 

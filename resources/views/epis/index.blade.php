@@ -117,6 +117,10 @@
             </div>
         </header>
 
+        <a href="{{ route('cursos.index') }}" class="erp-primary-btn" style="position: fixed; bottom: 20px; right: 20px; z-index: 1050; box-shadow: 0 8px 25px rgba(3, 105, 161, 0.35);">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+
         <!-- Buscador y filtros -->
         <div class="epi-toolbar">
             <input type="search" id="epi-search" placeholder="Buscar EPI por nombre..." autocomplete="off">

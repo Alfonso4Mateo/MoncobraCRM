@@ -108,9 +108,15 @@
 </style>
 
 @php
+    // Aseguramos que los diccionarios existan por si el controlador falla
+    $diccionarioClientes = $diccionarioClientes ?? [];
+    $diccionarioProyectos = $diccionarioProyectos ?? [];
+
     // Diccionario visual centralizado de Módulos (para filtros y tabla)
     $nombresModulos = [
         'AlbaranCliente' => 'Albaranes de Clientes',
+        'AlbaranPedidoLinea' => 'Consumos de Albarán por Línea',
+        'AlbaranLineaPartida' => 'Repartos de Albarán por Partida',
         'Articulo' => 'Catálogo de Artículos',
         'Cliente' => 'Directorio de Clientes',
         'Documento' => 'Gestor Documental',
@@ -118,6 +124,8 @@
         'Evento' => 'Eventos Transaccionales',
         'HistorialPrl' => 'Registro PRL (Prevención)',
         'PedidoCliente' => 'Pedidos de Clientes',
+        'Bolsa' => 'Bolsas Globales',
+        'LineaBolsa' => 'Líneas de Bolsa',
         'Personal' => 'Expediente de Empleado',
         'PersonalCurso' => 'Formación / Cursos',
         'Presupuesto' => 'Presupuestos',
@@ -248,9 +256,20 @@
                 <tbody>
                 @foreach($activities as $activity)
                     @php
-                        $formatVal = function($val) {
+                        // Función mejorada que recibe el campo y el valor
+                        $formatVal = function($field, $val) use ($diccionarioClientes, $diccionarioProyectos) {
                             if (is_bool($val)) return $val ? '1 (Sí)' : '0 (No)';
-                            return $val === null || $val === '' ? 'Vacío' : (string) $val;
+                            if ($val === null || $val === '') return 'Vacío';
+                            
+                            // Intercepción para traducir IDs a Nombres
+                            if ($field === 'id_cliente' && isset($diccionarioClientes[$val])) {
+                                return $diccionarioClientes[$val] . ' (ID: ' . $val . ')';
+                            }
+                            if ($field === 'proyecto_id' && isset($diccionarioProyectos[$val])) {
+                                return $diccionarioProyectos[$val] . ' (ID: ' . $val . ')';
+                            }
+                            
+                            return (string) $val;
                         };
 
                         $event = $activity->event ?? $activity->description;
@@ -306,7 +325,7 @@
                                         <span class="diff-field">{{ str_replace('_', ' ', $field) }}</span>
                                         @if($event === 'deleted')
                                             <span class="badge badge-danger mb-1">Valor eliminado</span>
-                                            @php $displayValue = is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : $formatVal($value); @endphp
+                                            @php $displayValue = is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : $formatVal($field, $value); @endphp
                                             <details class="diff-value diff-old"><summary>{{ Str::limit($displayValue, 100) }}</summary><div class="full-value">{{ $displayValue }}</div></details>
                                         @else
                                         {{-- Renderizado del valor ANTIGUO --}}
@@ -331,7 +350,7 @@
                                                     </div>
                                                 </div>
                                             @else
-                                                @php $oldValue = $formatVal($old[$field]); @endphp
+                                                @php $oldValue = $formatVal($field, $old[$field]); @endphp
                                                 <details class="diff-value diff-old"><summary>{{ Str::limit($oldValue, 100) }}</summary><div class="full-value">{{ $oldValue }}</div></details>
                                                 <i class="fas fa-long-arrow-alt-right diff-icon"></i>
                                             @endif
@@ -358,7 +377,7 @@
                                                 </div>
                                             </div>
                                         @else
-                                            @php $newValue = $formatVal($value); @endphp
+                                            @php $newValue = $formatVal($field, $value); @endphp
                                             <details class="diff-value diff-new"><summary>{{ Str::limit($newValue, 100) }}</summary><div class="full-value">{{ $newValue }}</div></details>
                                         @endif
                                         @endif

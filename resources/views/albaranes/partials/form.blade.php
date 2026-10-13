@@ -25,7 +25,13 @@
     $pedidoMode = $pedidoContext !== null;
 
     $clienteIdDefault = old('cliente_id', $pedidoDefaults['cliente_id'] ?? $pedidoContext?->id_cliente ?? '');
-    $pedidoClienteDefault = old('pedido_cliente', $pedidoDefaults['pedido_cliente'] ?? $pedidoContext?->numero_pedido ?? '');
+    $pedidosVinculados = old('pedidos_cliente', []);
+    if (empty($pedidosVinculados)) {
+        $defaultNum = old('pedido_cliente', $pedidoDefaults['pedido_cliente'] ?? $pedidoContext?->numero_pedido ?? '');
+        if ($defaultNum !== '') {
+            $pedidosVinculados = [$defaultNum];
+        }
+    }
     $otDefault = old('ot', $pedidoDefaults['ot'] ?? $pedidoContext?->ot ?? '');
 
     $lineasIniciales = [];
@@ -94,6 +100,13 @@
         </div>
     @endif
 
+    @if (session('warning'))
+            <div class="albaranes-alert-warning" style="background-color: #fffbeb; color: #b45309; border: 1px solid #fcd34d; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                {{ session('warning') }}
+            </div>
+        @endif
+
     @if ($errors->any())
         <div class="albaran-alert albaran-alert-error">
             <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
@@ -144,35 +157,47 @@
                         </select>
                     </div>
 
-                    <div class="field-group">
-                        <label for="ot">OT</label>
-                        <input type="text" id="ot" name="ot" value="{{ $otDefault }}">
-                    </div>
+                    <!-- Agrupamos OT y Pedido Cliente en las 2 columnas restantes de la fila -->
+                    <div class="col-span-2" style="display: flex; flex-direction: row; gap: 1rem;">
+                        <!-- Caja de OT (25% del espacio) -->
+                        <div class="field-group" style="flex: 0 0 25%; margin-bottom: 0;">
+                            <label for="ot">OT</label>
+                            <input type="text" id="ot" name="ot" value="{{ $otDefault }}" style="width: 100%;">
+                        </div>
 
-                    <div class="field-group">
-                        <label for="pedido_cliente">Pedido cliente</label>
-                        <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas...">
-                            <option value="">Selecciona pedido...</option>
-                            @foreach ($pedidosClientes as $pedido)
-                                @php
-                                    $pedidoLabel = trim(
-                                        ($pedido->bolsa ? '📦 [BOLSA] ' : '') .
-                                        ($pedido->numero_pedido ?: 'Pedido sin número') . ' | ' .
-                                        ($pedido->cliente?->empresa_nombre ?: 'Sin cliente') .
-                                        ($pedido->ot ? ' | OT ' . $pedido->ot : '')
-                                    );
-                                @endphp
-                                <option
-                                    value="{{ $pedido->numero_pedido }}"
-                                    data-pedido-id="{{ $pedido->id }}"
-                                    data-cliente-id="{{ $pedido->id_cliente }}"
-                                    data-ot="{{ $pedido->ot }}"
-                                    @selected((string) $pedidoClienteDefault === (string) $pedido->numero_pedido)
-                                >
-                                    {{ $pedidoLabel }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <!-- Caja de Pedido Cliente (75% del espacio restante) -->
+                        <div class="field-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="pedido_cliente">Pedido cliente</label>
+                            <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas..." style="width: 100%;">
+                                <option value="">Selecciona pedido...</option>
+                                @foreach ($pedidosClientes as $pedido)
+                                    @php
+                                        $clienteNombre = $pedido->cliente?->empresa_nombre ?: 'Sin cliente';
+                                        $otTexto = $pedido->ot ? ' | OT ' . $pedido->ot : '';
+                                        
+                                        if ($pedido->bolsa) {
+                                            $macroRef = $pedido->bolsaGlobal ? ($pedido->bolsaGlobal->numero ?: $pedido->bolsaGlobal->id) : 'Suelta';
+                                            $partidaRef = $pedido->numero_pedido ?: 'Sin número';
+                                            
+                                            $pedidoLabel = "📦 Bolsa {$macroRef} | Partida {$partidaRef} | {$clienteNombre}{$otTexto}";
+                                        } else {
+                                            $pedidoRef = $pedido->numero_pedido ?: 'Pedido sin número';
+                                            
+                                            $pedidoLabel = "{$pedidoRef} | {$clienteNombre}{$otTexto}";
+                                        }
+                                    @endphp
+                                    <option
+                                        value="{{ $pedido->numero_pedido }}"
+                                        data-pedido-id="{{ $pedido->id }}"
+                                        data-cliente-id="{{ $pedido->id_cliente }}"
+                                        data-ot="{{ $pedido->ot }}"
+                                        @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))
+                                    >
+                                        {{ $pedidoLabel }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
 
                     <div class="field-group col-span-2">

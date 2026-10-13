@@ -25,7 +25,7 @@ class AparatoCalibrable extends Model
         'modelo',
         'categoria',
         'estado',
-        'ubicacion',
+        'ubicacion_id',
         'responsable',
         'proveedor',
         'imagen',
@@ -37,6 +37,8 @@ class AparatoCalibrable extends Model
         'norma_calibracion',
         'laboratorio',
         'certificado',
+        'clase',
+        'departamento_id',
         'fecha_certificado',
         'laboratorio_externo',
         'estado_certificado',
@@ -101,5 +103,45 @@ class AparatoCalibrable extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function ubicacion() 
+    {
+        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
+        return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
+    }
+
+    public function departamento()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
+    }
+
+    public function getDiasEnEstado(string $estadoBuscado): int
+    {
+        // Traemos todos los eventos de esta máquina, ordenados del más antiguo al más nuevo
+        $eventos = $this->eventos()->oldest('fecha')->get();
+        
+        $totalDias = 0;
+        $fechaInicioEstado = null;
+
+        foreach ($eventos as $evento) {
+            // Si el evento es del tipo que buscamos (ej. entra a 'calibracion') y no estábamos ya contando
+            if ($evento->tipo === $estadoBuscado && !$fechaInicioEstado) {
+                $fechaInicioEstado = \Carbon\Carbon::parse($evento->fecha);
+            } 
+            // Si estábamos contando días y ocurre CUALQUIER OTRO evento (ej. vuelve a 'operativo')
+            elseif ($fechaInicioEstado && $evento->tipo !== $estadoBuscado) {
+                $fechaFinEstado = \Carbon\Carbon::parse($evento->fecha);
+                $totalDias += (int) $fechaInicioEstado->diffInDays($fechaFinEstado);
+                $fechaInicioEstado = null; // Detenemos el cronómetro
+            }
+        }
+
+        // Si el bucle termina y la máquina SIGUE en ese estado hoy en día
+        if ($fechaInicioEstado && $this->estado === $estadoBuscado) {
+            $totalDias += (int) $fechaInicioEstado->diffInDays(now());
+        }
+
+        return $totalDias;
     }
 }
