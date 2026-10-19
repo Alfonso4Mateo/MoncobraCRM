@@ -55,8 +55,8 @@ class PedidoCliente extends Model
      *
      * @var array<string, string>
      */
-    protected $casts = [
-        'fecha_pedido' => 'date',
+     protected $casts = [
+        'fecha_pedido' => 'datetime:Y-m-d H:i:s',
         'bolsa' => 'boolean',
         'total' => 'decimal:2',
         'lista_articulos' => 'array',

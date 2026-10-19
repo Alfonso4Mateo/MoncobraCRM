@@ -272,9 +272,15 @@
                     @endphp
                     <tr>
                         <td class="cell-date">
-                            <strong>{{ $activity->created_at->format('d/m/Y') }}</strong>
-                            <span>{{ $activity->created_at->format('H:i:s') }}</span>
+                            @if($activity->created_at)
+                                @php
+                                    $dateObj = \Illuminate\Support\Carbon::parse((string)$activity->created_at)->timezone('Europe/Madrid');
+                                @endphp
+                                <strong>{{ $dateObj->format('d/m/Y') }}</strong>
+                                <span>{{ $dateObj->format('H:i:s') }}</span>
+                            @endif
                         </td>
+
     
                         <td>
                             <div class="cell-user">
@@ -304,37 +310,52 @@
                                     
                                     <div class="diff-row">
                                         <span class="diff-field">{{ \App\Support\ActivityHumanizer::fieldLabel($field) }}</span>
+                                        
+                                        @php
+                                            // Función auxiliar interna para detectar e interceptar fechas ISO Z
+                                            $formatIfIsoDate = function($val) use ($relaciones, $field) {
+                                                if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $val)) {
+                                                    try {
+                                                        return \Illuminate\Support\Carbon::parse($val)->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                                    } catch (\Exception $e) {
+                                                        // Si falla el parseo, volvemos al formateador original
+                                                    }
+                                                }
+                                                return \App\Support\ActivityHumanizer::formatValue($field, $val, $relaciones);
+                                            };
+                                        @endphp
+
                                         @if($event === 'deleted')
                                             <span class="badge badge-danger mb-1">Valor eliminado</span>
                                             @php
                                                 $displayValue = is_array($value)
                                                     ? collect($value)->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n")
-                                                    : \App\Support\ActivityHumanizer::formatValue($field, $value, $relaciones);
+                                                    : $formatIfIsoDate($value);
                                             @endphp
                                             <details class="diff-value diff-old"><summary>{{ Str::limit($displayValue, 100) }}</summary><div class="full-value">{{ $displayValue }}</div></details>
                                         @else
-                                        @if(is_array($old) && array_key_exists($field, $old))
-                                            @if(is_array($old[$field]))
-                                                <div class="diff-old w-100 mt-1">
-                                                    <span class="badge badge-secondary mb-1">Versión Anterior:</span>
-                                                    <div class="diff-json-container">{!! nl2br(e(collect($old[$field])->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
+                                            @if(is_array($old) && array_key_exists($field, $old))
+                                                @if(is_array($old[$field]))
+                                                    <div class="diff-old w-100 mt-1">
+                                                        <span class="badge badge-secondary mb-1">Versión Anterior:</span>
+                                                        <div class="diff-json-container">{!! nl2br(e(collect($old[$field])->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
+                                                    </div>
+                                                @else
+                                                    @php $oldValue = $formatIfIsoDate($old[$field]); @endphp
+                                                    <details class="diff-value diff-old"><summary>{{ Str::limit($oldValue, 100) }}</summary><div class="full-value">{{ $oldValue }}</div></details>
+                                                    <i class="fas fa-long-arrow-alt-right diff-icon"></i>
+                                                @endif
+                                            @endif
+                                            
+                                            @if(is_array($value))
+                                                <div class="diff-new w-100 mt-1">
+                                                    <span class="badge badge-success mb-1">Versión Nueva:</span>
+                                                    <div class="diff-json-container">{!! nl2br(e(collect($value)->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
                                                 </div>
                                             @else
-                                                @php $oldValue = \App\Support\ActivityHumanizer::formatValue($field, $old[$field], $relaciones); @endphp
-                                                <details class="diff-value diff-old"><summary>{{ Str::limit($oldValue, 100) }}</summary><div class="full-value">{{ $oldValue }}</div></details>
-                                                <i class="fas fa-long-arrow-alt-right diff-icon"></i>
+                                                @php $newValue = $formatIfIsoDate($value); @endphp
+                                                <details class="diff-value diff-new"><summary>{{ Str::limit($newValue, 100) }}</summary><div class="full-value">{{ $newValue }}</div></details>
                                             @endif
-                                        @endif
-                                        
-                                        @if(is_array($value))
-                                            <div class="diff-new w-100 mt-1">
-                                                <span class="badge badge-success mb-1">Versión Nueva:</span>
-                                                <div class="diff-json-container">{!! nl2br(e(collect($value)->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
-                                            </div>
-                                        @else
-                                            @php $newValue = \App\Support\ActivityHumanizer::formatValue($field, $value, $relaciones); @endphp
-                                            <details class="diff-value diff-new"><summary>{{ Str::limit($newValue, 100) }}</summary><div class="full-value">{{ $newValue }}</div></details>
-                                        @endif
                                         @endif
                                     </div>
                                 @empty
@@ -342,6 +363,7 @@
                                 @endforelse
                             </div>
                         </td>
+
                     </tr>
                 @endforeach
                 </tbody>

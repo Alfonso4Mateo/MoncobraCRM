@@ -385,6 +385,11 @@ class AlbaranClienteController extends Controller
             $validated['total'] = $totalAlbaran;
             unset($validated['lineas_json']);
 
+            // COMBINAR FECHA SELECCIONADA CON LA HORA EXACTA ACTUAL DE ESPAÑA
+            $validated['fecha'] = \Carbon\Carbon::parse($validated['fecha'])
+                ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+                ->toDateTimeString();
+
             $albaran = AlbaranCliente::create($validated);
 
             if ($manualCorrelativo !== null) {
@@ -450,6 +455,7 @@ class AlbaranClienteController extends Controller
         return redirect()->route('albaranes.index')->with('success', 'Albarán procesado correctamente');
     }
 
+
     public function edit(AlbaranCliente $albaran)
     {
         // --- GUARDIA DE LA MURALLA ---
@@ -487,7 +493,7 @@ class AlbaranClienteController extends Controller
         return view('albaranes.edit', compact('albaran', 'clientes', 'pedidosClientes', 'centrosCoste'));
     }
 
-    public function update(Request $request, AlbaranCliente $albaran)
+        public function update(Request $request, AlbaranCliente $albaran)
     {
         // --- GUARDIA DE LA MURALLA ---
         $this->authorize('albaranes.manage');
@@ -531,7 +537,6 @@ class AlbaranClienteController extends Controller
                     ->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->whereNull('deleted_at'))
                     ->ignore($albaran->id),
             ],
-            // ... (resto de tus validaciones)
             'fecha' => 'required|date',
             'cliente_id' => [
                 'required',
@@ -549,8 +554,6 @@ class AlbaranClienteController extends Controller
             'lineas_json' => 'nullable|json',
             'return_to' => 'nullable|string|max:2048',
         ]);
-
-        // ... (todo el bloque de lógica central y base de datos se mantiene igual)
         
         $lineasRaw = $this->decodeLineasJson($validated['lineas_json'] ?? '[]');
         $this->validateLineasPayload($lineasRaw);
@@ -578,9 +581,7 @@ class AlbaranClienteController extends Controller
 
             // --- QUINTO CANDADO: el tope de la bolsa global también se respeta al facturar ---
             $this->assertLimitesBolsaGlobal($pedidosAVincular, $lineas, (int) $albaran->id);
-            // --- FIN QUINTO CANDADO ---
         }
-        // --- FIN CUARTO CANDADO ---
 
         $excedenteFlotante = 0.0;
 
@@ -595,13 +596,18 @@ class AlbaranClienteController extends Controller
             // Restaurar stock
             $this->adjustArticulosStock($lineasAnteriores, $proyectoId, 1);
             
-            // ¡NUEVO! Limpiamos el rastro anterior PERFECTAMENTE antes de volver a registrar
+            // Limpiamos el rastro anterior perfectamente antes de volver a registrar
             $this->limpiarRastrosBolsa($albaran);
+
+            // MUTACIÓN HORARIA EXACTA DE ESPAÑA ANTES DE GUARDAR
+            $fechaConHora = \Carbon\Carbon::parse($validated['fecha'])
+                ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+                ->toDateTimeString();
             
             $albaran->update([
                 'documento' => $albaran->documento ?? 'Albarán',
                 'numero' => $validated['numero'],
-                'fecha' => $validated['fecha'],
+                'fecha' => $fechaConHora,
                 'cliente_id' => $validated['cliente_id'],
                 'ot' => $validated['ot'] ?? null,
                 'pedido_cliente' => $validated['pedido_cliente'] ?? null,
@@ -618,13 +624,12 @@ class AlbaranClienteController extends Controller
             $excedenteFlotante = $this->registrarConsumosBolsa($albaran, $lineas, $proyectoId, $pedidosSeleccionados);
             $excedenteFlotante += $this->syncPedidoClienteLink($albaran, $proyectoId, $pedidosSeleccionados, $lineas);
 
-            // --- BLOQUEO DURO DE SALDO: Romper la transacción si falta dinero ---
+            // --- BLOQUEO DURO DE SALDO ---
             if ($excedenteFlotante > 0.001) {
                 throw ValidationException::withMessages([
                     'lineas_json' => 'Bloqueo de Seguridad: El importe a facturar supera el saldo disponible. Faltan ' . number_format($excedenteFlotante, 2, ',', '.') . ' € para cubrir este albarán. Reduce las cantidades o vincula más partidas con saldo.'
                 ]);
             }
-            // --- FIN BLOQUEO DURO ---
 
             $pedidoActual = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
 
@@ -668,7 +673,6 @@ class AlbaranClienteController extends Controller
 
         $returnTo = trim((string) ($validated['return_to'] ?? ''));
 
-        // CORRECCIÓN DE SEGURIDAD AQUÍ (2)
         if ($returnTo !== '') {
             $hostRetorno = parse_url($returnTo, PHP_URL_HOST);
             $hostApp = parse_url(config('app.url'), PHP_URL_HOST);
@@ -680,6 +684,7 @@ class AlbaranClienteController extends Controller
 
         return redirect()->route('albaranes.index')->with('success', 'Albarán actualizado correctamente.');
     }
+
 
     public function updateEstado(Request $request, AlbaranCliente $albaran)
     {

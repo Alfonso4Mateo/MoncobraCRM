@@ -247,7 +247,14 @@ class PresupuestoController extends Controller
             $validated['proyecto_id'] = $proyectoId;
             $validated['numero_correlativo'] = $correlativoFinal;
 
+            // Unir la fecha seleccionada con la hora, minutos y segundos actuales del sistema
+            $validated['fecha'] = \Carbon\Carbon::parse($validated['fecha'])
+                ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+                ->toDateTimeString();
+
+            // Una única llamada limpia de creación
             $presupuesto = Presupuesto::create($validated);
+            
             $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
 
             // Avanzar contador global solo si es nuevo
@@ -502,7 +509,7 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
-        // --- PROTECCIÓN BACKEND CONTRA DOBRE CLICK EN ACTUALIZAR ---
+        // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK EN ACTUALIZAR ---
         // Si el usuario hace doble clic, omitimos el segundo para no colapsar la BBDD haciendo el PDF 2 veces.
         if ($presupuesto->updated_at && $presupuesto->updated_at->diffInSeconds(now()) < 5) {
             return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Presupuesto actualizado correctamente');
@@ -522,13 +529,13 @@ class PresupuestoController extends Controller
         // Añadimos validación estricta para todos
         $rules['documento'] = 'required|string|max:50';
         $rules['numero'] = [
-        'nullable',
-        'string',
-        'max:50',
-        Rule::unique('presupuestos', 'numero')
-            ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
-            ->whereNull('deleted_at')
-            ->ignore($presupuesto->id),
+            'nullable',
+            'string',
+            'max:50',
+            Rule::unique('presupuestos', 'numero')
+                ->where(fn ($query) => $query->where('proyecto_id', $proyectoId))
+                ->whereNull('deleted_at')
+                ->ignore($presupuesto->id),
         ];
         $rules['fecha'] = 'required|date';
         $rules['cliente_id'] = [
@@ -537,15 +544,15 @@ class PresupuestoController extends Controller
         ];
         $rules['titulo'] = 'nullable|string|max:255';
         $rules['ot'] = 'nullable|string|max:255';
-    
+
         $validated = $request->validate($rules);
 
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
 
         $lineasFiltradas = array_map(function (array $linea) {
-        $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
-        $linea['medida'] = $medida === '' ? 'und' : $medida;
-        return $linea;
+            $medida = trim((string) ($linea['medida'] ?? $linea['unidad'] ?? ''));
+            $linea['medida'] = $medida === '' ? 'und' : $medida;
+            return $linea;
         }, $lineasFiltradas);
 
         $this->validateLineasPayload($lineasFiltradas);
@@ -556,7 +563,12 @@ class PresupuestoController extends Controller
             return (float) ($item['total'] ?? 0);
         });
 
-        // Preparamos el array de datos básicos
+        // Unir la fecha seleccionada con la hora, minutos y segundos actuales del sistema
+        $validated['fecha'] = \Carbon\Carbon::parse($validated['fecha'])
+            ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+            ->toDateTimeString();
+
+        // Preparamos el array de datos básicos incluyendo la fecha mutada con su hora real
         $updateData = [
             'lista_articulos' => $articulosNormalizados ?: null,
             'total' => round($totalComputed, 2),
@@ -564,15 +576,15 @@ class PresupuestoController extends Controller
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
             'solicitante' => $validated['solicitante'] ?? null, 
             'destinatario' => $validated['destinatario'] ?? null, 
+            'documento' => $validated['documento'],
+            'numero' => $validated['numero'] ?? null,
+            'fecha' => $validated['fecha'], // <--- Ahora sí viaja con la hora incorporada a la base de datos
+            'cliente_id' => $validated['cliente_id'],
+            'titulo' => $validated['titulo'] ?? null,
+            'ot' => $validated['ot'] ?? null,
         ];
 
-        $updateData['documento'] = $validated['documento'];
-        $updateData['numero'] = $validated['numero'] ?? null;
-        $updateData['fecha'] = $validated['fecha'];
-        $updateData['cliente_id'] = $validated['cliente_id'];
-        $updateData['titulo'] = $validated['titulo'] ?? null;
-        $updateData['ot'] = $validated['ot'] ?? null;
-
+        // Lanzamos la actualización del registro
         $presupuesto->update($updateData);
 
         $this->syncArticulosFromLineas($proyectoId, $articulosNormalizados);

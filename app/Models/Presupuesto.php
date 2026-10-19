@@ -56,7 +56,7 @@ class Presupuesto extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'fecha' => 'date',
+        'fecha' => 'datetime:Y-m-d H:i:s', // <--- CORREGIDO: Conserva horas y minutos en la serialización JSON
         'total' => 'decimal:2',
         'lista_articulos' => 'array',
         'numero_correlativo' => 'integer',

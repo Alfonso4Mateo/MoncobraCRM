@@ -116,7 +116,9 @@
                     </div>
                     <div class="clean-field">
                         <span class="clean-label">Fecha</span>
-                        <strong class="clean-value">{{ optional($presupuesto->fecha)->format('d/m/Y') ?: 'N/D' }}</strong>
+                        <strong class="clean-value">
+                            {{ optional($presupuesto->fecha)->format('d/m/Y H:i') ?: 'N/D' }}
+                        </strong>
                     </div>
                     
                     <!-- Fila 2 (2 + 1 = 3) -->

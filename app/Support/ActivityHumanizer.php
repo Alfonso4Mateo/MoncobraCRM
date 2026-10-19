@@ -178,11 +178,23 @@ class ActivityHumanizer
         return $resolved;
     }
 
-    public static function formatValue(string $field, mixed $val, array $relaciones = []): string
+        public static function formatValue(string $field, mixed $val, array $relaciones = []): string
     {
         if ($val === null || $val === '') {
             return 'Vacío';
         }
+        
+        // INTERCEPTOR DE FECHAS ISO (Como 2026-10-18T22:00:00.000000Z)
+        if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $val)) {
+            try {
+                return \Illuminate\Support\Carbon::parse($val)
+                    ->timezone('Europe/Madrid')
+                    ->format('d/m/Y H:i');
+            } catch (\Exception $e) {
+                // Si falla el parseo por lo que sea, continúa el flujo normal
+            }
+        }
+
         if (in_array($field, self::BOOLEAN_FIELDS, true) || is_bool($val)) {
             return (bool) $val ? 'Sí' : 'No';
         }
@@ -205,6 +217,7 @@ class ActivityHumanizer
         return (string) $val;
     }
 
+
     public static function formatLineItem(mixed $item): string
     {
         if (!is_array($item)) {
@@ -218,6 +231,61 @@ class ActivityHumanizer
         $total = number_format((float) ($item['total'] ?? 0), 2, ',', '.');
 
         return '• ' . $description . ' — Cant: ' . $quantity . ' ' . $unit . ' × ' . $price . ' € = ' . $total . ' €';
+    }
+
+    public static function summarizeLineChanges(mixed $oldLines, mixed $newLines): string
+    {
+        $decodeLines = static function (mixed $lines): array {
+            if (is_string($lines)) {
+                $lines = json_decode($lines, true);
+            }
+
+            return is_array($lines) ? $lines : [];
+        };
+        $indexLines = static function (array $lines): array {
+            $indexed = [];
+            foreach ($lines as $index => $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+
+                $key = $line['uid'] ?? $line['descripcion'] ?? $index;
+                $indexed[(string) $key] = $line;
+            }
+
+            return $indexed;
+        };
+
+        $old = $indexLines($decodeLines($oldLines));
+        $new = $indexLines($decodeLines($newLines));
+        $cambios = [];
+
+        foreach (array_diff_key($new, $old) as $item) {
+            $cambios[] = '➕ Añadido: ' . ($item['descripcion'] ?? 'Artículo');
+        }
+        foreach (array_diff_key($old, $new) as $item) {
+            $cambios[] = '❌ Eliminado: ' . ($item['descripcion'] ?? 'Artículo');
+        }
+        foreach (array_intersect_key($new, $old) as $key => $newItem) {
+            $oldItem = $old[$key];
+            $hasChanged = (float) ($oldItem['total'] ?? 0) !== (float) ($newItem['total'] ?? 0)
+                || (float) ($oldItem['cantidad'] ?? 0) !== (float) ($newItem['cantidad'] ?? 0)
+                || (float) ($oldItem['precio_unitario'] ?? 0) !== (float) ($newItem['precio_unitario'] ?? 0);
+
+            if ($hasChanged) {
+                $cambios[] = '✏️ Modificado: ' . ($newItem['descripcion'] ?? '')
+                    . ' (' . number_format((float) ($oldItem['total'] ?? 0), 2, ',', '.')
+                    . ' € &rarr; ' . number_format((float) ($newItem['total'] ?? 0), 2, ',', '.') . ' €)';
+            }
+        }
+
+        if (count($cambios) > 4) {
+            $totalCambios = count($cambios);
+            $cambios = array_slice($cambios, 0, 3);
+            $cambios[] = '... y ' . ($totalCambios - 3) . ' cambios más en líneas';
+        }
+
+        return implode('<br>', $cambios);
     }
 
     public static function resolveSubjectReference(Activity $activity, array $relaciones = []): string

@@ -580,12 +580,16 @@ class PedidoController extends Controller
                     }
                 }
 
+                $fechaConHora = \Carbon\Carbon::parse($validated['fecha_pedido'])
+                    ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+                    ->toDateTimeString();
+
                 $nuevoPedido = PedidoCliente::create([
                     'id_cliente' => $validated['id_cliente'],
                     'proyecto_id' => $proyectoId,
                     'numero_pedido' => $validated['numero_pedido'],
                     'referencia_manual' => $validated['referencia_manual'] ?? null,
-                    'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
+                    'fecha_pedido' => $fechaConHora, 
                     'ot' => $validated['ot'] ?? null,
                     'presupuesto_id' => $presupuestoId,
                     'albaran_id' => null,
@@ -1002,7 +1006,7 @@ class PedidoController extends Controller
         ));
     }
 
-    /**
+        /**
      * Update the specified resource in storage.
      */
     public function update(Request $request, PedidoCliente $pedidoCliente)
@@ -1138,16 +1142,12 @@ class PedidoController extends Controller
              $total = (float) collect($lineas)->sum('total');
         }
 
-        // --- ESCUDO DE SEGURIDAD LÍMITE DE BOLSA (Paso 4 - Edición) ---
         if ($bolsa && $bolsaGlobalId) {
             $bolsaGlobal = Bolsa::find($bolsaGlobalId);
             if ($bolsaGlobal && $bolsaGlobal->total > 0) {
-                // Calculamos el dinero ya comprometido
                 $dineroComprometido = $bolsaGlobal->partidas()->sum('total');
                 $saldoLibreParaPartidas = $bolsaGlobal->total - $dineroComprometido;
 
-                // Si la partida ya pertenecía a esta misma bolsa,
-                // le sumamos su total anterior para calcular el límite real de edición.
                 $limiteReal = ($pedidoCliente->bolsa_id == $bolsaGlobalId)
                     ? $saldoLibreParaPartidas + $pedidoCliente->total
                     : $saldoLibreParaPartidas;
@@ -1159,10 +1159,8 @@ class PedidoController extends Controller
                 }
             }
         }
-        // --- FIN ESCUDO DE SEGURIDAD ---
-        $antiguoPresupuestoId = $pedidoCliente->presupuesto_id;
 
-        // Gestión del adjunto: se guarda justo antes de la transacción; el anterior se borra tras el commit.
+        $antiguoPresupuestoId = $pedidoCliente->presupuesto_id;
         $archivoPdf = $pedidoCliente->archivo_pdf;
         $archivoAnterior = null;
         $archivoNuevo = null;
@@ -1181,12 +1179,10 @@ class PedidoController extends Controller
         try {
             DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $archivoPdf) {
 
-                // Liberar el presupuesto antiguo si se ha cambiado o quitado
                 if ($antiguoPresupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
                     Presupuesto::where('id', $antiguoPresupuestoId)->update(['estado' => 'pendiente']);
                 }
 
-                // Bloquear el nuevo presupuesto si se ha seleccionado uno diferente
                 if ($presupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
                     $pedidoExistente = PedidoCliente::query()
                         ->where('presupuesto_id', $presupuestoId)
@@ -1202,11 +1198,16 @@ class PedidoController extends Controller
                     Presupuesto::where('id', $presupuestoId)->update(['estado' => 'aceptado']);
                 }
 
+                // Generar la fecha combinada con la precisión horaria exacta de España
+                $fechaConHora = \Carbon\Carbon::parse($validated['fecha_pedido'])
+                    ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
+                    ->toDateTimeString();
+
                 $pedidoCliente->update([
                     'id_cliente' => $validated['id_cliente'],
                     'numero_pedido' => $validated['numero_pedido'],
                     'referencia_manual' => $validated['referencia_manual'] ?? null,
-                    'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
+                    'fecha_pedido' => $fechaConHora, 
                     'ot' => $validated['ot'] ?? null,
                     'presupuesto_id' => $presupuestoId,
                     'estado' => $validated['estado'] ?? $pedidoCliente->estado,

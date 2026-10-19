@@ -50,7 +50,7 @@ class AlbaranCliente extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'fecha' => 'date',
+        'fecha' => 'datetime:Y-m-d H:i:s', 
         'lista_articulos' => 'array',
         'total' => 'decimal:2',
     ];

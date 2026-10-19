@@ -132,7 +132,7 @@
                 </div>
                 <div class="albaran-info-item">
                     <span class="albaran-info-label">Fecha del Pedido</span>
-                    <strong class="albaran-info-value">{{ optional($pedidoCliente->fecha_pedido)->format('d/m/Y') ?: '—' }}</strong>
+                    <strong class="albaran-info-value">{{ optional($pedidoCliente->fecha_pedido)->format('d/m/Y H:i') ?: '—' }}</strong>
                 </div>
             </div>
         </article>
