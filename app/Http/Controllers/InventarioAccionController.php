@@ -228,6 +228,7 @@ class InventarioAccionController extends Controller
                 $data = (array) $item;
                 return [
                     'inventario_id' => isset($data['inventario_id']) ? (int) $data['inventario_id'] : null,
+                    'inventario_destino_id' => isset($data['inventario_destino_id']) ? (int) $data['inventario_destino_id'] : null,
                     'cantidad' => isset($data['cantidad']) ? (int) $data['cantidad'] : null,
                     'almacen_origen' => isset($data['almacen_origen']) ? (string) $data['almacen_origen'] : null,
                 ];
@@ -272,19 +273,37 @@ class InventarioAccionController extends Controller
                     }
                 } else {
                     foreach ($items as $item) {
-                        $inv = Inventario::query()
+                        $origen = Inventario::query()
                             ->where('proyecto_id', $proyectoId)
                             ->where('id', $item['inventario_id'])
                             ->lockForUpdate()
                             ->first();
-                        if (!$inv) {
+                        if (!$origen) {
+                            continue;
+                        }
+
+                        $destinoId = $item['inventario_destino_id'];
+                        if ($destinoId && $destinoId !== $item['inventario_id']) {
+                            $destino = Inventario::query()
+                                ->where('proyecto_id', $proyectoId)
+                                ->where('id', $destinoId)
+                                ->lockForUpdate()
+                                ->first();
+                            if (!$destino || (int) $destino->stock_actual < (int) $item['cantidad']) {
+                                throw new \RuntimeException('No se puede cancelar el traslado porque parte del stock trasladado ya ha sido consumido en el almacén de destino.');
+                            }
+
+                            $destino->stock_actual -= (int) $item['cantidad'];
+                            $destino->save();
+                            $origen->stock_actual += (int) $item['cantidad'];
+                            $origen->save();
                             continue;
                         }
 
                         $almacenOrigen = (string) ($item['almacen_origen'] ?? '');
                         if ($almacenOrigen !== '') {
-                            $inv->almacen = $almacenOrigen;
-                            $inv->save();
+                            $origen->almacen = $almacenOrigen;
+                            $origen->save();
                         }
                     }
                 }

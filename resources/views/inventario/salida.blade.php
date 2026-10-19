@@ -96,6 +96,7 @@
                                 <div class="selected-stock">
                                     <small>Stock Actual</small>
                                     <strong><span id="selected-stock-value">0</span> unid</strong>
+                                    <small id="selected-product-warehouse">Almacén: -</small>
                                 </div>
                             </div>
                         </article>
@@ -119,12 +120,22 @@
                         <div class="out-grid out-grid-bottom">
                             <div class="field-group">
                                 <label for="ot">Orden de trabajo (OT)</label>
-                                <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="Buscar OT activa..." class="@error('ot') is-invalid @enderror">
+                                <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="Buscar OT activa..." list="cc_frecuentes" autocomplete="off" class="@error('ot') is-invalid @enderror">
+                                <datalist id="cc_frecuentes">
+                                    @foreach($centrosCoste ?? [] as $cc)
+                                        <option value="{{ $cc->etiqueta_completa }}">
+                                    @endforeach
+                                </datalist>
                             </div>
 
                             <div class="field-group">
                                 <label for="solicitante">Solicitante</label>
                                 <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', $solicitantePrefill ?? (auth()->user()->name ?? '')) }}" placeholder="Nombre del solicitante" list="solicitantes-list" autocomplete="off" class="@error('solicitante') is-invalid @enderror" data-sync="solicitante">
+                                <input type="hidden" name="personal_id" id="personal_id" value="{{ old('personal_id', $personalId ?? request('personal_id', '')) }}">
+                                <div id="tallas-trabajador" class="mt-2 p-2 rounded" style="display: none; background: #f8fafc; border: 1px solid #dbeafe;">
+                                    <strong class="d-block text-primary mb-1"><i class="fas fa-ruler-combined mr-1"></i> Guía de Tallas del Trabajador</strong>
+                                    <div id="tallas-trabajador-body" class="small text-muted"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -197,8 +208,8 @@
                 @endforeach
             </datalist>
             <datalist id="solicitantes-list">
-                @foreach (($solicitantes ?? []) as $solicitanteNombre)
-                    <option value="{{ $solicitanteNombre }}"></option>
+                @foreach (($trabajadores ?? []) as $trabajador)
+                    <option value="{{ trim($trabajador->name . ' ' . $trabajador->apellido) }}" data-personal-id="{{ $trabajador->id }}"></option>
                 @endforeach
             </datalist>
             <input type="hidden" name="codigo" id="codigo" value="{{ old('codigo') }}">
@@ -328,6 +339,50 @@
 
     <script>
         (function () {
+            const trabajadores = @json(($trabajadores ?? collect())->mapWithKeys(fn ($trabajador) => [
+                $trabajador->id => [
+                    'nombre' => trim($trabajador->name . ' ' . $trabajador->apellido),
+                    'camiseta' => $trabajador->camiseta,
+                    'sudadera' => $trabajador->sudadera,
+                    'chaqueta' => $trabajador->chaqueta,
+                    'pantalon' => $trabajador->pantalon,
+                    'calzado' => $trabajador->calzado,
+                    'casco' => $trabajador->casco,
+                    'guantes' => $trabajador->guantes,
+                    'gafas' => $trabajador->gafas,
+                    'bolsa_fod' => $trabajador->bolsa_fod,
+                ],
+            ]));
+            const personalInput = document.getElementById('personal_id');
+            const solicitanteInput = document.getElementById('solicitante');
+            const guide = document.getElementById('tallas-trabajador');
+            const guideBody = document.getElementById('tallas-trabajador-body');
+            const labels = { camiseta: 'Camiseta', sudadera: 'Sudadera', chaqueta: 'Chaqueta', pantalon: 'Pantalón', calzado: 'Calzado', casco: 'Casco', guantes: 'Guantes', gafas: 'Gafas', bolsa_fod: 'Bolsa F.O.D.' };
+
+            function renderGuide() {
+                const selected = trabajadores[personalInput?.value];
+                if (!selected) {
+                    guide.style.display = 'none';
+                    return;
+                }
+                solicitanteInput.value = selected.nombre;
+                guideBody.innerHTML = Object.entries(labels)
+                    .map(([key, label]) => `<span class="d-inline-block mr-3 mb-1"><strong>${label}:</strong> ${selected[key] || '—'}</span>`)
+                    .join('');
+                guide.style.display = 'block';
+            }
+
+            solicitanteInput?.addEventListener('input', function () {
+                const match = Object.entries(trabajadores).find(([, trabajador]) => trabajador.nombre.toLowerCase() === this.value.trim().toLowerCase());
+                personalInput.value = match ? match[0] : '';
+                renderGuide();
+            });
+            renderGuide();
+        })();
+    </script>
+
+    <script>
+        (function () {
             const catalogo = @json($catalogoSalidaJs);
             const productoInput = document.getElementById('producto_busqueda');
             const suggestionsDropdown = document.getElementById('producto-suggestions');
@@ -335,6 +390,7 @@
             const selectedName = document.getElementById('selected-product-name');
             const selectedCode = document.getElementById('selected-product-code');
             const selectedStock = document.getElementById('selected-stock-value');
+            const selectedWarehouse = document.getElementById('selected-product-warehouse');
             const codigoHidden = document.getElementById('codigo');
             const pdfOpenButton = document.querySelector('[data-pdf-open]');
             const pdfModal = document.getElementById('salida-pdf-modal');
@@ -476,7 +532,7 @@
                     .map((item, index) => `
                         <div class="autocomplete-item" data-index="${index}" role="option">
                             <strong>${item.codigo}</strong>
-                            <small>${item.descripcion}</small>
+                            <small>${item.descripcion} · Almacén: ${item.almacen || 'Sin almacén'} · Stock: ${item.stock_actual}</small>
                         </div>
                     `)
                     .join('');
@@ -507,6 +563,7 @@
                     selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
                     selectedCode.textContent = 'SKU: -';
                     selectedStock.textContent = '0';
+                    if (selectedWarehouse) selectedWarehouse.textContent = 'Almacén: -';
                     if (codigoHidden) codigoHidden.value = '';
                     refreshAddItemHint();
                     return;
@@ -516,6 +573,7 @@
                 selectedName.textContent = producto.descripcion;
                 selectedCode.textContent = `SKU: ${producto.codigo}`;
                 selectedStock.textContent = producto.stock_actual;
+                if (selectedWarehouse) selectedWarehouse.textContent = `Almacén: ${producto.almacen || 'Sin almacén'}`;
                 if (codigoHidden) codigoHidden.value = producto.id;
                 refreshAddItemHint();
             };

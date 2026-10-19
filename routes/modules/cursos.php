@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\PersonalCursoController;
-use App\Http\Controllers\PersonalController; // 1. IMPORTANTE: Añadimos la llamada al controlador
 use Illuminate\Support\Facades\Route;
 
 // 1. PRIMERO LAS RUTAS ESTÁTICAS Y ESPECÍFICAS
@@ -71,19 +70,25 @@ Route::get('personal/{personal}/cursos/{curso}/historial', [PersonalCursoControl
     ->middleware('permission:cursos.view');
 
 
-// 2. AQUI VAN LAS NUEVAS RUTAS
 // --- ACCIONES TRABAJADOR <-> PERFILES FORMATIVOS (PUESTOS) ---
-Route::post('/personal/{personal}/puestos/add', [PersonalController::class, 'addPuesto'])
+Route::post('/personal/{personal}/puestos', [CursoController::class, 'syncPuestos'])
+    ->name('personal.puestos.sync')
+    ->middleware('permission:cursos.edit');
+
+Route::post('/personal/{personal}/puestos/add', [CursoController::class, 'addPuesto'])
     ->name('personal.puestos.add')
     ->middleware('permission:cursos.edit');
 
-Route::delete('/personal/{personal}/puestos/{puestoId}', [PersonalController::class, 'removePuesto'])
+Route::delete('/personal/{personal}/puestos/{puesto}', [CursoController::class, 'removePuesto'])
     ->name('personal.puestos.remove')
     ->middleware('permission:cursos.edit');
-// --------------------------------------------------------------
 
 
 // Módulo de Puestos y Auditorías (Panel de Normas)
+Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController::class, 'auditoria'])
+    ->name('puestos.auditoria')
+    ->middleware('permission:cursos.view');
+
 Route::resource('puestos', App\Http\Controllers\PuestoController::class)
     ->middleware('permission:cursos.normas'); 
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Models\Bolsa;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -81,6 +82,11 @@ class Cliente extends Model
     public function pedidosClientes(): HasMany
     {
         return $this->hasMany(PedidoCliente::class, 'id_cliente');
+    }
+
+    public function bolsas(): HasMany
+    {
+        return $this->hasMany(Bolsa::class, 'id_cliente');
     }
 
     public function tapActivity(Activity $activity, string $eventName): void

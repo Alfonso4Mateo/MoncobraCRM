@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity;
 
 class HerramientaPlanta extends Model
@@ -24,8 +25,13 @@ class HerramientaPlanta extends Model
         'almacen', 'stock', 'unidad_medida', 'fecha_registro', 'fecha_adquisicion',
         'fecha_mantenimiento', 'descripcion', 'imagen', 'familia_id', 'familia_energetica',
         'potencia', 'tension', 'combustible', 'criticidad', 'horas_uso', 'bloqueado',
-        'motivo_bloqueo', 'garantia_hasta','fecha_inspeccion' , 'dias_estimados_baja', 'fecha_baja',
+        'motivo_bloqueo',         'garantia_hasta','fecha_inspeccion' , 'dias_estimados_baja', 'fecha_baja', 'personal_id',
     ];
+
+    public function personalAsignado(): BelongsTo
+    {
+        return $this->belongsTo(Personal::class, 'personal_id');
+    }
 
     protected $casts = [
         'stock' => 'decimal:3', 'fecha_registro' => 'date', 'fecha_adquisicion' => 'date',

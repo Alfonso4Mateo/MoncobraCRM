@@ -1,12 +1,10 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\AlbaranClienteController;
-use App\Http\Controllers\AlbaranProveedorController;
 use App\Http\Controllers\BolsaController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PresupuestoController;
-use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\CentroCosteController;
 use Illuminate\Support\Facades\Route;
@@ -71,15 +69,14 @@ Route::delete('centros-costes/{centroCoste}', [CentroCosteController::class, 'de
 Route::get('/bolsas', [BolsaController::class, 'index'])->name('bolsas.index');
 Route::get('/bolsas/crear', [BolsaController::class, 'create'])->name('bolsas.create');
 Route::post('/bolsas', [BolsaController::class, 'store'])->name('bolsas.store');
+Route::get('/bolsas/{bolsa}/editar', [BolsaController::class, 'edit'])->name('bolsas.edit');
+Route::put('/bolsas/{bolsa}', [BolsaController::class, 'update'])->name('bolsas.update');
 Route::get('/bolsas/{bolsa}', [BolsaController::class, 'show'])->name('bolsas.show');
 Route::get('/bolsas-fungibles', [BolsaController::class, 'fungiblesDisponibles'])->name('bolsas.fungibles');
 Route::get('/lineas-bolsa/{linea}/desglose', [BolsaController::class, 'lineaDesglose'])->name('lineas-bolsa.desglose');
 Route::delete('/bolsas/{bolsa}', [BolsaController::class, 'destroy'])->name('bolsas.destroy');
 Route::patch('/bolsas/{bolsa}/quitar-partida/{pedido}', [BolsaController::class, 'quitarPartida'])->name('bolsas.quitar-partida');
 
-Route::resource('proveedores', ProveedorController::class);
-Route::resource('albaranes-proveedores', AlbaranProveedorController::class);
-Route::resource('pedidos', PedidoController::class);
 
 // ---------------------------------------------------------
 // Pedidos de cliente: listado, alta, detalle y PDF.
@@ -94,6 +91,7 @@ Route::get('pedidos-clientes/data', [PedidoController::class, 'data'])->name('pe
 Route::get('pedidos-clientes/{pedidoCliente}/editar', [PedidoController::class, 'editCliente'])->name('pedidos-clientes.edit');
 Route::put('pedidos-clientes/{pedidoCliente}', [PedidoController::class, 'update'])->name('pedidos-clientes.update');
 Route::get('pedidos-clientes/{pedidoCliente}/preview', [PedidoController::class, 'preview'])->name('pedidos-clientes.preview');
+Route::get('pedidos-clientes/{pedidoCliente}/adjunto', [PedidoController::class, 'verAdjunto'])->name('pedidos-clientes.adjunto');
 Route::get('pedidos-clientes/{pedidoCliente}/pdf', [PedidoController::class, 'viewPdf'])->name('pedidos-clientes.pdf');
 Route::get('pedidos-clientes/{pedidoCliente}/pdf/download', [PedidoController::class, 'downloadPdf'])->name('pedidos-clientes.pdf.download');
 Route::patch('pedidos-clientes/{pedidoCliente}/estado', [PedidoController::class, 'updateEstado'])->name('pedidos-clientes.estado.update'); 
@@ -105,10 +103,8 @@ Route::put('pedidos-clientes/{pedidoCliente}/actualizar-descripcion', [PedidoCon
 // --- Líneas de bolsa por partida (dentro del pedido) ---
 Route::get('/pedidos-clientes/{pedidoCliente}/lineas-bolsa', [PedidoController::class, 'lineasBolsaDisponibles'])
     ->name('pedidos-clientes.lineas-bolsa');
-Route::post('/pedidos-clientes/{pedidoCliente}/vincular-linea-bolsa', [PedidoController::class, 'vincularLineaBolsa'])
-    ->name('pedidos-clientes.vincular-linea-bolsa');
 
 // ---------------------------------------------------------
 // Vistas de catálogo y consultas auxiliares.
 // ---------------------------------------------------------
-Route::resource('productos', ProductoController::class)->only(['index']);
+// Route::resource('productos', ProductoController::class)->only(['index']); // Controlador legado sin uso.

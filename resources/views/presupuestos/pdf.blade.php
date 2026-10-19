@@ -239,8 +239,8 @@
                     <td style="white-space: pre-wrap;">{!! nl2br(e($textoLimpio)) !!}</td>
                     <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                     <td align="center">{{ $medida ? e($medida) : '' }}</td>
-                    <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 4, ',', '.') }} €</td>
-                    <td align="right" class="evitar-salto">{{ number_format($line['total'] ?? 0, 4, ',', '.') }} €</td>
+                    <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
+                    <td align="right" class="evitar-salto">{{ number_format($line['total'] ?? 0, 2, ',', '.') }} €</td>
                 </tr>
             @endforeach
         </tbody>
@@ -252,7 +252,7 @@
             <tr>
                 <td align="right">
                     <div class="total-box">
-                        <span class="total-inline">Total: {{ number_format((float) $presupuesto->total ?? 0, 4, ',', '.') }} €</span>
+                        <span class="total-inline">Total: {{ number_format((float) $presupuesto->total ?? 0, 2, ',', '.') }} €</span>
                     </div>
                 </td>
             </tr>

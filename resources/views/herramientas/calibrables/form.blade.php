@@ -183,6 +183,14 @@
             <div class="row">
                 <div class="col-md-6 form-group">
                     <label>Responsable / Área asignada</label>
+                    <select name="personal_id" class="form-control">
+                        <option value="">Asignar mediante texto / sin persona</option>
+                        @foreach(($personalList ?? []) as $trabajador)
+                            <option value="{{ $trabajador->id }}" @selected(old('personal_id', $item->personal_id ?? '') == $trabajador->id)>
+                                {{ trim($trabajador->name . ' ' . $trabajador->apellido) }}{{ $trabajador->id_rrhh ? ' · ' . $trabajador->id_rrhh : '' }}
+                            </option>
+                        @endforeach
+                    </select>
                     <input name="responsable" class="form-control" placeholder="Nombre del trabajador o departamento" value="{{ old('responsable', $item->responsable ?? '') }}">
                 </div>
                 <div class="col-md-6 form-group">

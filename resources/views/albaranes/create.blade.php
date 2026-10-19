@@ -36,7 +36,7 @@
                     
                     // --- NUEVA LÓGICA DE BLOQUEO ---
                     // Buscamos si hay algún input con el borde rojo (que indica que se excedió el límite)
-                    const inputsConError = tableContainer.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
+                    const inputsConError = this.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
                     if (inputsConError.length > 0) {
                         e.preventDefault(); // Detenemos el envío
                         alert("Por favor, corrige los importes o cantidades marcados en rojo antes de guardar. Hay líneas que superan el saldo disponible.");

@@ -72,6 +72,10 @@ class ClaseController extends Controller
     public function show(Clase $clase)
     {
         $this->authorizeAdminOrSuperadmin();
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $clase->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
         
         // Opcional: mostrar detalles de la clase
         $inventarios = $clase->inventarios()->paginate(15);
@@ -85,6 +89,10 @@ class ClaseController extends Controller
     public function edit(Clase $clase)
     {
         $this->authorizeAdminOrSuperadmin();
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $clase->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         return view('clases.edit', compact('clase'));
     }
@@ -95,6 +103,10 @@ class ClaseController extends Controller
     public function update(Request $request, Clase $clase)
     {
         $this->authorizeAdminOrSuperadmin();
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        if ((int) $clase->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         $validated = $request->validate([
             'nombre' => 'required|string|max:255|unique:clases,nombre,' . $clase->id . ',id,proyecto_id,' . $clase->proyecto_id,
@@ -113,6 +125,10 @@ class ClaseController extends Controller
     public function destroy(Clase $clase)
     {
         $this->authorizeAdminOrSuperadmin();
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $clase->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         // Verificar que no hay items asociados
         if ($clase->inventarios()->exists()) {
@@ -140,4 +156,3 @@ class ClaseController extends Controller
         }
     }
 }
-

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cliente;
 use App\Models\PedidoCliente;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ClienteController extends Controller
 {
@@ -103,7 +104,13 @@ class ClienteController extends Controller
 
         $validated = $request->validate([
             'empresa_nombre' => 'required|string|max:255',
-            'cif_nif' => 'required|unique:clientes,cif_nif|max:20',
+            'cif_nif' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('clientes', 'cif_nif')
+                    ->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->whereNull('deleted_at')),
+            ],
             'direccion' => 'required|string|max:255',
             'localidad' => 'required|string|max:100',
             'provincia' => 'required|string|max:100',
@@ -144,20 +151,10 @@ class ClienteController extends Controller
         $fechaDesde = trim((string) request('fecha_desde', ''));
         $fechaHasta = trim((string) request('fecha_hasta', ''));
         $estadoFiltro = (string) request('estado', 'todos');
-        $hoy = now();
-        $limitePendiente = $hoy->copy()->subDays(15)->toDateString();
-        $limiteEntregado = $hoy->copy()->subDays(45)->toDateString();
-
         $pedidosPorNumero = $cliente->pedidosClientes()
             ->whereNotNull('numero_pedido')
             ->get()
             ->keyBy(fn (PedidoCliente $pedido) => trim((string) $pedido->numero_pedido));
-
-        $pedidosPorOt = PedidoCliente::query()
-            ->where('id_cliente', $cliente->id)
-            ->whereNotNull('ot')
-            ->get()
-            ->keyBy(fn (PedidoCliente $pedido) => trim((string) $pedido->ot));
 
         $resolverTotalDesdeArticulos = static function (?array $listaArticulos): ?float {
             if (!is_array($listaArticulos) || $listaArticulos === []) {
@@ -187,7 +184,7 @@ class ClienteController extends Controller
                 }
             }
 
-            return $hayValores ? round($total, 4) : null;
+            return $hayValores ? round($total, 2) : null;
         };
 
         $presupuestos = null;
@@ -217,38 +214,20 @@ class ClienteController extends Controller
                 $presupuestosQuery->whereDate('fecha', '<=', $fechaHasta);
             }
 
-            if ($estadoFiltro === 'pendiente') {
-                $presupuestosQuery->whereDate('fecha', '>=', $limitePendiente);
-            } elseif ($estadoFiltro === 'recibido') {
-                $presupuestosQuery->whereBetween('fecha', [$limiteEntregado, $hoy->copy()->subDays(16)->toDateString()]);
-            } elseif ($estadoFiltro === 'entregado') {
-                $presupuestosQuery->whereDate('fecha', '<', $limiteEntregado);
+            if ($estadoFiltro !== 'todos') {
+                $presupuestosQuery->where('estado', $estadoFiltro);
             }
 
             $presupuestos = $presupuestosQuery->paginate(5)->withQueryString();
 
-            $presupuestos->getCollection()->transform(function ($presupuesto) use ($hoy, $pedidosPorOt, $resolverTotalDesdeArticulos) {
-                $dias = $presupuesto->fecha ? $presupuesto->fecha->diffInDays($hoy) : 999;
-
-                if ($dias <= 15) {
-                    $presupuesto->ui_estado = 'pendiente';
-                    $presupuesto->ui_estado_label = 'PENDIENTE';
-                } elseif ($dias <= 45) {
-                    $presupuesto->ui_estado = 'recibido';
-                    $presupuesto->ui_estado_label = 'RECIBIDO';
-                } else {
-                    $presupuesto->ui_estado = 'entregado';
-                    $presupuesto->ui_estado_label = 'ENTREGADO';
-                }
-
-                $total = null;
-                $ot = trim((string) ($presupuesto->ot ?? ''));
-
-                if ($ot !== '' && $pedidosPorOt->has($ot)) {
-                    $total = $resolverTotalDesdeArticulos($pedidosPorOt->get($ot)?->lista_articulos);
-                }
-
-                $presupuesto->ui_total = $total !== null ? round($total, 4) : null;
+            $presupuestos->getCollection()->transform(function ($presupuesto) use ($resolverTotalDesdeArticulos) {
+                $estado = trim((string) ($presupuesto->estado ?? 'pendiente')) ?: 'pendiente';
+                $presupuesto->ui_estado = $estado;
+                $presupuesto->ui_estado_label = strtoupper(str_replace('_', ' ', $estado));
+                $presupuestoTotal = $presupuesto->total !== null
+                    ? (float) $presupuesto->total
+                    : $resolverTotalDesdeArticulos(is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : null);
+                $presupuesto->ui_total = $presupuestoTotal !== null ? round($presupuestoTotal, 2) : null;
 
                 return $presupuesto;
             });
@@ -305,7 +284,7 @@ class ClienteController extends Controller
                 $pedidoTotal = $pedido->total !== null
                     ? (float) $pedido->total
                     : $resolverTotalDesdeArticulos(is_array($pedido->lista_articulos) ? $pedido->lista_articulos : null);
-                $pedido->ui_total = $pedidoTotal !== null ? round($pedidoTotal, 4) : null;
+                $pedido->ui_total = $pedidoTotal !== null ? round($pedidoTotal, 2) : null;
 
                 return $pedido;
             });
@@ -352,7 +331,7 @@ class ClienteController extends Controller
                 $albaran->ui_pedido_id = $pedidoRelacionado?->id;
                 $albaran->ui_pedido_numero = $pedidoRelacionado?->numero_pedido ?: ($pedidoNumero !== '' ? $pedidoNumero : null);
                 $albaranTotal = $albaran->total !== null ? (float) $albaran->total : null;
-                $albaran->ui_total = $albaranTotal !== null ? round($albaranTotal, 4) : null;
+                $albaran->ui_total = $albaranTotal !== null ? round($albaranTotal, 2) : null;
 
                 return $albaran;
             });
@@ -404,7 +383,14 @@ class ClienteController extends Controller
 
         $validated = $request->validate([
             'empresa_nombre' => 'required|string|max:255',
-            'cif_nif' => 'required|unique:clientes,cif_nif,' . $cliente->id . '|max:20',
+            'cif_nif' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('clientes', 'cif_nif')
+                    ->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->whereNull('deleted_at'))
+                    ->ignore($cliente->id),
+            ],
             'direccion' => 'required|string|max:255',
             'localidad' => 'required|string|max:100',
             'provincia' => 'required|string|max:100',
@@ -436,8 +422,9 @@ class ClienteController extends Controller
         $albaranesCount = $cliente->albaranes()->count();
         $presupuestosCount = $cliente->presupuestos()->count();
         $pedidosCount = $cliente->pedidosClientes()->count();
+        $bolsasCount = $cliente->bolsas()->count();
 
-        if ($albaranesCount > 0 || $presupuestosCount > 0 || $pedidosCount > 0) {
+        if ($albaranesCount > 0 || $presupuestosCount > 0 || $pedidosCount > 0 || $bolsasCount > 0) {
             return back()->with('error', 'Este cliente tiene documentos asociados y no puede ser borrado.');
         }
 

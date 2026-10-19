@@ -47,6 +47,7 @@ class PedidoCliente extends Model
         'bolsa_id',
         'total',
         'lista_articulos',
+        'archivo_pdf',
     ];
 
     /**
@@ -57,9 +58,23 @@ class PedidoCliente extends Model
     protected $casts = [
         'fecha_pedido' => 'date',
         'bolsa' => 'boolean',
-        'total' => 'decimal:4',
+        'total' => 'decimal:2',
         'lista_articulos' => 'array',
     ];
+
+    protected ?Collection $albaranesEfectivosCache = null;
+
+    public function clearAlbaranesCache(): void
+    {
+        $this->albaranesEfectivosCache = null;
+    }
+
+    public function refresh(array $with = []): static
+    {
+        $this->clearAlbaranesCache();
+
+        return parent::refresh($with);
+    }
 
     /**
      * Get the cliente that owns the pedido.
@@ -116,28 +131,7 @@ class PedidoCliente extends Model
 
     public function saldoConsumido(?int $excludeAlbaranId = null): float
     {
-        $albaranes = collect($this->albaranesPivot ?? [])
-            ->merge($this->albaran?->id ? collect([$this->albaran]) : collect())
-            ->merge($this->albaranes ?? collect())
-            ->filter(fn (AlbaranCliente $albaran) => (int) ($albaran->proyecto_id ?? $this->proyecto_id) === (int) $this->proyecto_id)
-            ->where('estado', '!==', 'cancelado')
-            ->unique('id');
-
-        if ($excludeAlbaranId !== null && $excludeAlbaranId > 0) {
-            $albaranes = $albaranes->reject(
-                fn (AlbaranCliente $albaran) => (int) $albaran->id === $excludeAlbaranId
-            );
-        }
-
-        $albaranesAContar = $this->bolsa
-            ? $albaranes
-            : $albaranes->where('estado', 'facturado');
-
-        $total = $albaranesAContar->sum(
-            fn (AlbaranCliente $albaran): float => (float) $albaran->pivot->importe_imputado
-        );
-
-        return round((float) $total, 4);
+        return $this->importeConsumido($excludeAlbaranId);
     }
 
     /**
@@ -202,7 +196,13 @@ class PedidoCliente extends Model
 
     public function albaranesEfectivos(): Collection
     {
-        $pivot = $this->albaranesPivot()->get();
+        if ($this->albaranesEfectivosCache !== null) {
+            return $this->albaranesEfectivosCache;
+        }
+
+        $pivot = $this->relationLoaded('albaranesPivot')
+            ? $this->albaranesPivot
+            : $this->albaranesPivot()->get();
 
         $legacy = AlbaranCliente::query()
             ->where('proyecto_id', $this->proyecto_id)
@@ -215,13 +215,13 @@ class PedidoCliente extends Model
             })
             ->get();
 
-        return $pivot->concat($legacy)->unique('id')->values();
+        return $this->albaranesEfectivosCache = $pivot->concat($legacy)->unique('id')->values();
     }
 
     public function importeConsumido(?int $excluirAlbaranId = null): float
     {
         $contables = $this->albaranesEfectivos()
-            ->reject(fn ($a) => $a->estado === 'cancelado')
+            ->reject(fn ($a) => in_array($a->estado, ['cancelado', 'rechazado'], true))
             ->when($excluirAlbaranId, fn ($c) => $c->reject(fn ($a) => (int) $a->id === $excluirAlbaranId))
             ->when(! $this->bolsa, fn ($c) => $c->where('estado', 'facturado'));
 
@@ -246,7 +246,7 @@ class PedidoCliente extends Model
 
         $consumos = [];
         foreach ($this->albaranesEfectivos() as $alb) {
-            if ($alb->estado === 'cancelado' || (int) $alb->id === (int) $excluirAlbaranId) {
+            if (in_array($alb->estado, ['cancelado', 'rechazado'], true) || (int) $alb->id === (int) $excluirAlbaranId) {
                 continue;
             }
             foreach ((array) $alb->lista_articulos as $l) {

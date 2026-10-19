@@ -40,9 +40,9 @@ class LineaBolsa extends Model
 
     protected $casts = [
         'cantidad' => 'decimal:2',
-        'precio_unitario' => 'decimal:4',
+        'precio_unitario' => 'decimal:2',
         'margen' => 'decimal:2',
-        'importe_objetivo' => 'decimal:4',
+        'importe_objetivo' => 'decimal:2',
     ];
 
     public function cliente(): BelongsTo
@@ -98,12 +98,14 @@ class LineaBolsa extends Model
 
     public function importeConsumidoTotal(): float
     {
-        return (float) $this->repartos()->sum('importe');
+        return round((float) $this->repartos()
+            ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
+            ->sum('importe'), 2);
     }
 
     public function importeDisponible(): float
     {
-        return max(0, round($this->importeAsignadoTotal() - $this->importeConsumidoTotal(), 4));
+        return max(0, round($this->importeAsignadoTotal() - $this->importeConsumidoTotal(), 2));
     }
 
     public function esPorImporte(): bool

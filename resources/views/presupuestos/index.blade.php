@@ -21,10 +21,12 @@
                 </a>
             @endif
 
-            <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
-                <i class="fas fa-plus"></i>
-                Nuevo Presupuesto
-            </a>
+            @can('presupuestos.manage')
+                <a href="{{ route('presupuestos.create') }}" class="presupuestos-create-btn">
+                    <i class="fas fa-plus"></i>
+                    Nuevo Presupuesto
+                </a>
+            @endcan
 
             <a href="{{ route('centros-costes.index') }}" class="presupuestos-create-btn">
                     <i class="fas fa-list"></i> 
@@ -83,7 +85,7 @@
                             <option value="pendiente" {{ ($estado ?? '') === 'pendiente' ? 'selected' : '' }}>Pendiente</option>
                             <option value="aceptado" {{ ($estado ?? '') === 'aceptado' ? 'selected' : '' }}>Aceptado</option>
                             <option value="rechazado" {{ ($estado ?? '') === 'rechazado' ? 'selected' : '' }}>Rechazado</option>
-                            <option value="pendiente pedido" {{ ($estado ?? '') === 'pendiente pedido' ? 'selected' : '' }}>Pendiente pedido</option>
+                            <option value="pedido_pendiente" {{ ($estado ?? '') === 'pedido_pendiente' ? 'selected' : '' }}>Pendiente pedido</option>
                         </select>
                     </div>
 
@@ -158,7 +160,7 @@
                                 </td>
                                 <td data-label="Total">
                                     <span class="presupuesto-total">
-                                        {{ number_format((float) ($presupuesto->total ?? 0), 4, ',', '.') }} EUR
+                                        {{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR
                                     </span>
                                 </td>
                                 <td data-label="Estado">
@@ -167,11 +169,11 @@
                                         $estadoClass = match ($estado) {
                                             'aceptado' => 'estado-pill estado-aceptado',
                                             'rechazado' => 'estado-pill estado-rechazado',
-                                            'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
+                                            'pedido_pendiente' => 'estado-pill estado-pendiente-pedido',
                                             default => 'estado-pill estado-pendiente',
                                         };
                                     @endphp
-                                    <span class="{{ $estadoClass }}">{{ ucfirst($estado) }}</span>
+                                    <span class="{{ $estadoClass }}">{{ ucfirst(str_replace('_', ' ', $estado)) }}</span>
                                 </td>
                                 <td data-label="Acciones" class="text-right">
                                     <div class="presupuesto-action-group">
@@ -204,7 +206,7 @@
                                         @endcan
 
                                         <!-- Crear Pedido (OJO: En el futuro requerirá permiso de pedidos.manage) -->
-                                        @if(in_array($estado, ['pendiente', 'pendiente pedido'], true))
+                                        @if(in_array($estado, ['pendiente', 'pedido_pendiente'], true))
                                             <a href="{{ route('pedidos-clientes.create', ['presupuesto_id' => $presupuesto->id]) }}" class="presupuesto-action-btn presupuesto-action-btn--order" aria-label="Crear pedido" title="Crear pedido">
                                                 <i class="fas fa-cart-plus"></i>
                                             </a>
@@ -240,7 +242,7 @@
                                                         <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
                                                         <button class="dropdown-item" type="submit" name="estado" value="aceptado">Aceptado</button>
                                                         <button class="dropdown-item" type="submit" name="estado" value="rechazado">Rechazado</button>
-                                                        <button class="dropdown-item" type="submit" name="estado" value="pendiente pedido">Pendiente pedido</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="pedido_pendiente">Pendiente pedido</button>
                                                     </form>
                                                 </div>
                                             </div>
@@ -250,7 +252,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="presupuestos-empty-state">
                                         <i class="fas fa-file-invoice-dollar"></i>
                                         <h4>No hay presupuestos para mostrar</h4>

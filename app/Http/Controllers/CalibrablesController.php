@@ -73,6 +73,7 @@ class CalibrablesController extends Controller
             'estados' => AparatoCalibrable::distinct()->orderBy('estado')->pluck('estado'),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
@@ -82,12 +83,14 @@ class CalibrablesController extends Controller
             'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validated($request);
+        $data = $this->resolvePersonalAssignment($data);
         if ($request->hasFile('imagen')) $data['imagen'] = $request->file('imagen')->store('calibrables/fotos', 'public');
         if ($request->hasFile('certificado_pdf')) $data['certificado_pdf'] = $request->file('certificado_pdf')->store('calibrables/certificados', 'public');
         
@@ -97,7 +100,7 @@ class CalibrablesController extends Controller
 
     public function show(AparatoCalibrable $aparatoCalibrable)
     {
-        return view('herramientas.calibrables.show', ['herramienta' => $aparatoCalibrable->load('eventos.usuario')]);
+        return view('herramientas.calibrables.show', ['herramienta' => $aparatoCalibrable->load('eventos.usuario', 'personalAsignado'), 'personalList' => $this->personalList()]);
     }
 
     public function storeEvento(Request $request, AparatoCalibrable $aparatoCalibrable)
@@ -142,12 +145,14 @@ class CalibrablesController extends Controller
             'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
     public function update(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
         $data = $this->validated($request, $aparatoCalibrable);
+        $data = $this->resolvePersonalAssignment($data);
         
         if ($request->hasFile('imagen')) {
             if ($aparatoCalibrable->imagen) Storage::disk('public')->delete($aparatoCalibrable->imagen);
@@ -181,6 +186,7 @@ class CalibrablesController extends Controller
             'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'asignado', 'calibracion', 'vencido', 'aislado'])],
             'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
             'responsable' => ['nullable', 'string', 'max:150'],
+            'personal_id' => ['nullable', 'exists:personal,id'],
             'instrumento' => ['nullable', 'string', 'max:100'],
             'rango_medida' => ['nullable', 'string', 'max:150'],
             'clase_exactitud' => ['nullable', 'string', 'max:80'],
@@ -196,6 +202,24 @@ class CalibrablesController extends Controller
             'departamento_id' => ['nullable', 'exists:departamentos,id'],
             'clase' => ['nullable', 'string', 'max:100'],
         ]);
+    }
+
+    private function personalList()
+    {
+        return \App\Models\Personal::where('activo', true)
+            ->orderBy('name')
+            ->orderBy('apellido')
+            ->get(['id', 'name', 'apellido', 'id_rrhh']);
+    }
+
+    private function resolvePersonalAssignment(array $data): array
+    {
+        if (!empty($data['personal_id'])) {
+            $personal = \App\Models\Personal::findOrFail($data['personal_id']);
+            $data['responsable'] = trim($personal->name . ' ' . $personal->apellido);
+        }
+
+        return $data;
     }
 
     private function eventValidated(Request $request): array
@@ -227,6 +251,8 @@ class CalibrablesController extends Controller
             // Vuelve a estar disponible: limpiamos la previsión de baja
             $dataToUpdate['dias_estimados_baja'] = null;
             $dataToUpdate['fecha_baja'] = null;
+            $dataToUpdate['responsable'] = null;
+            $dataToUpdate['personal_id'] = null;
         } elseif (in_array($request->estado, ['calibracion', 'aislado'])) {
             // Entra en baja (envío a laboratorio o aislamiento): guardamos la aproximación
             $dataToUpdate['dias_estimados_baja'] = $request->dias_estimados_baja;
@@ -258,16 +284,21 @@ class CalibrablesController extends Controller
     public function updateAsignacion(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
         $request->validate([
-            'responsable' => ['required', 'string', 'max:150'],
+            'responsable' => ['nullable', 'string', 'max:150', 'required_without:personal_id'],
+            'personal_id' => ['nullable', 'exists:personal,id'],
             'ubicacion' => ['required', 'string', 'max:150'],
             'titulo_evento' => ['required', 'string', 'max:180'],
             'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ]);
 
+        $personal = $request->filled('personal_id') ? \App\Models\Personal::findOrFail($request->integer('personal_id')) : null;
+        $responsable = $personal ? trim($personal->name . ' ' . $personal->apellido) : trim((string) $request->input('responsable'));
+
         // 1. Asignamos el equipo al área o persona
         $aparatoCalibrable->update([
             'estado' => 'asignado',
-            'responsable' => $request->responsable,
+            'responsable' => $responsable,
+            'personal_id' => $personal?->id,
             'ubicacion' => $request->ubicacion,
         ]);
 
@@ -281,7 +312,7 @@ class CalibrablesController extends Controller
         $aparatoCalibrable->eventos()->create([
             'tipo' => 'responsable',
             'titulo' => $request->titulo_evento,
-            'descripcion' => "Instrumento entregado a: {$request->responsable} | Área/Ubicación: {$request->ubicacion}",
+            'descripcion' => "Instrumento entregado a: {$responsable} | Área/Ubicación: {$request->ubicacion}",
             'fecha' => now(),
             'archivo_adjunto' => $rutaArchivo,
             'usuario_id' => auth()->id(),

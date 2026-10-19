@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity;
 
 class AparatoCalibrable extends Model
@@ -47,7 +48,13 @@ class AparatoCalibrable extends Model
         'certificado_pdf',
         'dias_estimados_baja',
         'fecha_baja',
+        'personal_id',
     ];
+
+    public function personalAsignado(): BelongsTo
+    {
+        return $this->belongsTo(Personal::class, 'personal_id');
+    }
 
     protected $casts = [
         'fecha_certificado' => 'date',

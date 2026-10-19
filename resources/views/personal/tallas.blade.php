@@ -118,7 +118,7 @@
                                 <button type="submit" name="export" value="csv" class="personal-search-submit personal-btn-csv" title="Descargar listado actual en Excel">
                                     <i class="fas fa-file-csv"></i> Exportación simple
                                 </button>
-                                <button type="submit" name="export" value="pdf" class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
+                                <button type="button" disabled class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
                                     <i class="fas fa-file-pdf"></i> PDF (Próximamente)
                                 </button>
                             @endcan
@@ -212,7 +212,7 @@
                                     
                                     <td style="font-weight: 700;">
                                         <!-- CANDADO PARA VER FICHA DEL TRABAJADOR -->
-                                        @can('personal.acciones')
+                                        @canany(['personal.view', 'personal.acciones'])
                                             <a href="{{ route('personal.show', $p->id) }}" style="color: #173e67; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#1d4ed8'; this.style.textDecoration='underline'" onmouseout="this.style.color='#173e67'; this.style.textDecoration='none'">
                                                 {{ $p->name }} {{ $p->apellido }}
                                             </a>

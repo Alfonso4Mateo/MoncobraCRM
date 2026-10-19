@@ -6,6 +6,7 @@ use App\Models\Almacen;
 use App\Models\Clase;
 use App\Models\EntradaStock;
 use App\Models\Inventario;
+use App\Models\InventarioVariante;
 use App\Models\Personal;
 use App\Models\Proyecto;
 use App\Models\SalidaStock;
@@ -20,6 +21,20 @@ class InventarioController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware('permission:inventario.view')->only(['index', 'show']);
+        $this->middleware('permission:inventario.manage')->only([
+            'create',
+            'store',
+            'createItem',
+            'edit',
+            'update',
+            'destroy',
+            'createSalida',
+            'storeSalida',
+            'createTraslado',
+            'storeTraslado',
+            'storeEntrada',
+        ]);
     }
 
     public function index()
@@ -190,31 +205,36 @@ class InventarioController extends Controller
 
         $almacenes = $almacenesRegistrados->count();
 
-        $movimientosRecientes = (clone $baseQuery)
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->limit(3)
-            ->get()
-            ->values()
-            ->map(function (Inventario $producto, int $index) {
-                $tipos = [
-                    ['etiqueta' => 'Entrada', 'icono' => 'fa-arrow-down', 'tono' => 'positive'],
-                    ['etiqueta' => 'Salida', 'icono' => 'fa-arrow-up', 'tono' => 'negative'],
-                    ['etiqueta' => 'Transferencia', 'icono' => 'fa-exchange-alt', 'tono' => 'neutral'],
-                ];
+        $normalizarMovimiento = function ($movimiento, string $etiqueta, string $icono, string $tono, string $numeroCampo) {
+            $items = is_array($movimiento->items) ? $movimiento->items : [];
+            $unidades = collect($items)->sum(fn ($item) => (int) ($item['cantidad'] ?? 0));
+            $numero = trim((string) ($movimiento->{$numeroCampo} ?? ''));
 
-                $tipo = $tipos[$index % count($tipos)];
-                $unidades = max(1, (int) round(max(1, (int) $producto->stock_actual) * 0.08));
+            return (object) [
+                'etiqueta' => $etiqueta,
+                'icono' => $icono,
+                'tono' => $tono,
+                'titulo' => sprintf('%s: %s (%s uds.)', $etiqueta, $numero ?: 'Sin número', number_format($unidades, 0, ',', '.')),
+                'subtitulo' => trim((string) ($movimiento->solicitante ?? '')) ?: 'Sin solicitante',
+                'tiempo' => $movimiento->fecha?->diffForHumans() ?? 'Reciente',
+                '_fecha' => $movimiento->fecha?->timestamp ?? 0,
+            ];
+        };
 
-                return (object) [
-                    'etiqueta' => $tipo['etiqueta'],
-                    'icono' => $tipo['icono'],
-                    'tono' => $tipo['tono'],
-                    'titulo' => sprintf('%s: %s (%s uds.)', $tipo['etiqueta'], $producto->codigo, number_format($unidades, 0, ',', '.')),
-                    'subtitulo' => trim(sprintf('%s - %s', $producto->descripcion, $producto->almacen ?: 'Sin almacén')),
-                    'tiempo' => $producto->updated_at?->diffForHumans() ?? 'Reciente',
-                ];
-            });
+        $movimientosRecientes = collect()
+            ->concat(EntradaStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
+                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Entrada', 'fa-arrow-down', 'positive', 'numero_entrada')))
+            ->concat(SalidaStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
+                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Salida', 'fa-arrow-up', 'negative', 'numero_salida')))
+            ->concat(TrasladoStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
+                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Transferencia', 'fa-exchange-alt', 'neutral', 'numero_traslado')))
+            ->sortByDesc('_fecha')
+            ->take(3)
+            ->map(function ($movimiento) {
+                unset($movimiento->_fecha);
+                return $movimiento;
+            })
+            ->values();
 
         $inventarioPorAlmacen = (clone $baseQuery)
             ->selectRaw('almacen, COUNT(*) as total_productos, SUM(stock_actual) as stock_total')
@@ -380,9 +400,24 @@ class InventarioController extends Controller
     public function createSalida()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
+        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
         $delegacionPrefill = Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '';
         $solicitantePrefill = null;
         $personalId = (int) request()->query('personal_id', 0);
+        $trabajadoresQuery = Personal::query()
+            ->where('activo', true)
+            ->orderBy('name')
+            ->orderBy('apellido');
+
+        if (auth()->user()?->role !== 'superadmin') {
+            $proyectoIds = auth()->user()?->proyectos()->pluck('proyectos.id') ?? collect();
+            $trabajadoresQuery->whereHas('proyectos', fn ($query) => $query->whereIn('proyectos.id', $proyectoIds));
+        }
+
+        $trabajadores = $trabajadoresQuery->get([
+            'id', 'name', 'apellido', 'id_rrhh', 'puesto', 'camiseta', 'sudadera',
+            'chaqueta', 'pantalon', 'calzado', 'casco', 'guantes', 'gafas', 'bolsa_fod', 'sin_tallas',
+        ]);
 
         if ($personalId > 0) {
             $persona = Personal::query()->find($personalId);
@@ -400,7 +435,7 @@ class InventarioController extends Controller
             ->where('proyecto_id', $proyectoId)
             ->orderBy('descripcion')
             ->orderBy('codigo')
-            ->get(['codigo', 'descripcion', 'almacen', 'stock_actual']);
+            ->get(['id', 'codigo', 'descripcion', 'almacen', 'stock_actual']);
 
         $salidasRecientes = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -420,7 +455,10 @@ class InventarioController extends Controller
             ->unique()
             ->values();
 
-        return view('inventario.salida', compact('catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill', 'delegacionPrefill'));
+        return view('inventario.salida', compact(
+            'catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill',
+            'delegacionPrefill', 'centrosCoste', 'trabajadores', 'personalId'
+        ));
     }
 
     public function storeSalida(Request $request)
@@ -436,12 +474,32 @@ class InventarioController extends Controller
             'items.*.cantidad' => 'nullable|integer|min:1',
             'ot' => 'nullable|string|max:255',
             'solicitante' => 'nullable|string|max:255',
+            'personal_id' => 'nullable|integer|exists:personal,id',
             'pdf_delegacion' => 'nullable|string|max:255',
             'pdf_fecha' => 'nullable|string|max:30',
             'pdf_trabajador' => 'nullable|string|max:255',
             'pdf_ficha' => 'nullable|string|max:255',
             'pdf_observaciones' => 'nullable|string|max:2000',
         ]);
+
+        $personalId = (int) ($validated['personal_id'] ?? 0);
+        $solicitanteNombre = trim((string) ($validated['solicitante'] ?? ''));
+        $persona = $personalId > 0 ? Personal::find($personalId) : null;
+
+        if ($persona) {
+            $solicitanteNombre = trim((string) $persona->name . ' ' . (string) $persona->apellido);
+        } elseif ($solicitanteNombre !== '') {
+            $normalizado = mb_strtolower(preg_replace('/\s+/', ' ', $solicitanteNombre));
+            $persona = Personal::query()
+                ->get(['id', 'name', 'apellido'])
+                ->first(function (Personal $trabajador) use ($normalizado) {
+                    return mb_strtolower(trim(preg_replace('/\s+/', ' ', $trabajador->name . ' ' . $trabajador->apellido))) === $normalizado;
+                });
+            $personalId = (int) ($persona?->id ?? 0);
+            if ($persona) {
+                $solicitanteNombre = trim((string) $persona->name . ' ' . (string) $persona->apellido);
+            }
+        }
 
         $itemsToProcess = [];
 
@@ -533,7 +591,7 @@ class InventarioController extends Controller
         $salida = null;
 
         try {
-            DB::transaction(function () use ($proyectoId, $resolved, $validated, $numeroSalida, $documentoMeta, &$salida) {
+            DB::transaction(function () use ($proyectoId, $resolved, $validated, $numeroSalida, $documentoMeta, $personalId, $solicitanteNombre, &$salida) {
                 $itemsForSalida = [];
 
                 foreach ($resolved as $entry) {
@@ -567,7 +625,8 @@ class InventarioController extends Controller
                     'proyecto_id' => $proyectoId,
                     'numero_salida' => $numeroSalida,
                     'fecha' => now(),
-                    'solicitante' => $validated['solicitante'] ?? null,
+                    'personal_id' => $personalId > 0 ? $personalId : null,
+                    'solicitante' => $solicitanteNombre !== '' ? $solicitanteNombre : null,
                     'ot' => $validated['ot'] ?? null,
                     'almacen_origen' => count($itemsForSalida) === 1 ? $itemsForSalida[0]['almacen_origen'] : 'Varios',
                     'items' => $itemsForSalida,
@@ -624,6 +683,7 @@ class InventarioController extends Controller
     public function createTraslado()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
+        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
 
         $catalogo = Inventario::query()
             ->where('proyecto_id', $proyectoId)
@@ -642,7 +702,7 @@ class InventarioController extends Controller
 
         $transaccionId = 'TRF-' . now()->format('Ymd-His');
 
-        return view('inventario.traslado', compact('catalogo', 'destinos', 'transaccionId'));
+        return view('inventario.traslado', compact('catalogo', 'destinos', 'transaccionId', 'centrosCoste'));
     }
 
     public function storeTraslado(Request $request)
@@ -661,75 +721,62 @@ class InventarioController extends Controller
 
         $itemIds = collect($validated['item_ids'])->map(fn ($value) => (int) $value)->values();
         $cantidades = collect($validated['cantidades'])->map(fn ($value) => (int) $value)->values();
-
-        $productos = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->whereIn('id', $itemIds)
-            ->get()
-            ->keyBy('id');
-
-        if ($productos->count() !== $itemIds->count()) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'item_ids' => 'Uno o mas productos del traslado ya no estan disponibles.',
-                ]);
-        }
-
+        $destinoGlobal = trim((string) $validated['destino_global']);
         $itemsMovimiento = [];
         $almacenesOrigen = [];
 
-        foreach ($itemIds as $index => $itemId) {
-            $producto = $productos->get($itemId);
-            $cantidad = (int) ($cantidades[$index] ?? 0);
+        DB::transaction(function () use ($proyectoId, $validated, $itemIds, $cantidades, $destinoGlobal, &$itemsMovimiento, &$almacenesOrigen) {
+            foreach ($itemIds as $index => $itemId) {
+                $cantidad = (int) ($cantidades[$index] ?? 0);
+                $productoOrigen = Inventario::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->lockForUpdate()
+                    ->find($itemId);
 
-            if (!$producto || $cantidad < 1) {
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'cantidades' => 'Se detectaron cantidades invalidas en el traslado.',
-                    ]);
-            }
-
-            if ($cantidad > (int) $producto->stock_actual) {
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'cantidades' => 'La cantidad a trasladar no puede superar el stock disponible.',
-                    ]);
-            }
-
-            $almacenOrigenItem = (string) ($producto->almacen ?? '');
-            if (trim($almacenOrigenItem) !== '') {
-                $almacenesOrigen[] = $almacenOrigenItem;
-            }
-
-            $itemsMovimiento[] = [
-                'inventario_id' => (int) $producto->id,
-                'codigo' => (string) $producto->codigo,
-                'descripcion' => (string) $producto->descripcion,
-                'cantidad' => (int) $cantidad,
-                'almacen_origen' => $almacenOrigenItem,
-                'almacen_actual' => (string) $validated['destino_global'],
-            ];
-        }
-
-        $almacenesUnicos = collect($almacenesOrigen)
-            ->map(fn ($value) => trim((string) $value))
-            ->filter()
-            ->unique()
-            ->values();
-
-        DB::transaction(function () use ($proyectoId, $validated, $itemIds, $productos, $almacenesUnicos, $itemsMovimiento) {
-            foreach ($itemIds as $itemId) {
-                $producto = $productos->get($itemId);
-                if (!$producto) {
-                    continue;
+                if (!$productoOrigen || $cantidad < 1) {
+                    throw new \RuntimeException('Se detectaron cantidades invalidas en el traslado.');
                 }
 
-                // El modelo actual no separa stock por lote/ubicacion parcial; se actualiza la ubicacion global del item.
-                $producto->almacen = $validated['destino_global'];
-                $producto->save();
+                $stockOrigen = (int) $productoOrigen->stock_actual;
+                if ($cantidad > $stockOrigen) {
+                    throw new \RuntimeException('La cantidad a trasladar no puede superar el stock disponible.');
+                }
+
+                $almacenOrigenItem = trim((string) ($productoOrigen->almacen ?? ''));
+                if ($almacenOrigenItem !== '' && mb_strtolower($almacenOrigenItem) === mb_strtolower($destinoGlobal)) {
+                    throw new \RuntimeException('El almacén de destino debe ser distinto al almacén de origen.');
+                }
+                if ($almacenOrigenItem !== '') {
+                    $almacenesOrigen[] = $almacenOrigenItem;
+                }
+
+                $productoDestino = $this->findStockInAlmacen($productoOrigen, $destinoGlobal);
+                if ($productoDestino) {
+                    $productoOrigen->stock_actual = $stockOrigen - $cantidad;
+                    $productoOrigen->save();
+                    $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
+                    $productoDestino->save();
+                } elseif ($cantidad === $stockOrigen) {
+                    $productoOrigen->almacen = $destinoGlobal;
+                    $productoOrigen->save();
+                    $productoDestino = $productoOrigen;
+                } else {
+                    $productoOrigen->stock_actual = $stockOrigen - $cantidad;
+                    $productoOrigen->save();
+                    $productoDestino = $this->resolveOrCreateStockInAlmacen($productoOrigen, $destinoGlobal);
+                    $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
+                    $productoDestino->save();
+                }
+
+                $itemsMovimiento[] = [
+                    'inventario_id' => (int) $productoOrigen->id,
+                    'inventario_destino_id' => (int) $productoDestino->id,
+                    'codigo' => (string) $productoOrigen->codigo,
+                    'descripcion' => (string) $productoOrigen->descripcion,
+                    'cantidad' => $cantidad,
+                    'almacen_origen' => $almacenOrigenItem,
+                    'almacen_actual' => $destinoGlobal,
+                ];
             }
 
             TrasladoStock::create([
@@ -738,8 +785,8 @@ class InventarioController extends Controller
                 'fecha' => now(),
                 'solicitante' => $validated['solicitante'] ?? null,
                 'ot' => $validated['ot'] ?? null,
-                'almacen_origen' => $almacenesUnicos->count() === 1 ? $almacenesUnicos->first() : 'Varios',
-                'almacen_actual' => $validated['destino_global'],
+                'almacen_origen' => count(array_unique($almacenesOrigen)) === 1 ? $almacenesOrigen[0] : 'Varios',
+                'almacen_actual' => $destinoGlobal,
                 'items' => $itemsMovimiento,
                 'estado' => 'aceptado',
             ]);
@@ -769,22 +816,19 @@ class InventarioController extends Controller
             // 2. Procesamos cada artículo del "carrito"
             foreach ($validated['items'] as $itemData) {
                 // Buscamos el artículo y bloqueamos la fila para evitar errores de concurrencia
-                $producto = Inventario::query()
+                $productoSeleccionado = Inventario::query()
                     ->where('proyecto_id', $proyectoId)
                     ->lockForUpdate()
                     ->findOrFail($itemData['inventario_id']);
 
                 $cantidad = (int) $itemData['cantidad'];
-
-                // Le sumamos el stock
-                $producto->stock_actual = (int) $producto->stock_actual + $cantidad;
-                // Le asignamos el nuevo almacén global donde lo hemos guardado
-                $producto->almacen = $validated['almacen_global'];
-                $producto->save();
+                $productoDestino = $this->resolveOrCreateStockInAlmacen($productoSeleccionado, $validated['almacen_global']);
+                $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
+                $productoDestino->save();
 
                 // Preparamos el array de historial para guardarlo en EntradaStock
                 $itemsForEntrada[] = [
-                    'inventario_id' => (int) $producto->id,
+                    'inventario_id' => (int) $productoDestino->id,
                     'codigo' => (string) $producto->codigo,
                     'descripcion' => (string) $producto->descripcion,
                     'cantidad' => $cantidad,
@@ -1252,6 +1296,76 @@ class InventarioController extends Controller
         return $variantes;
     }
 
+    private function findStockInAlmacen(Inventario $origen, string $almacenDestino): ?Inventario
+    {
+        $atributosOrigen = json_encode($origen->atributos_variante);
+
+        return Inventario::query()
+            ->where('proyecto_id', $origen->proyecto_id)
+            ->where(function ($query) use ($origen) {
+                if ($origen->inventario_variante_id) {
+                    $query->where('inventario_variante_id', $origen->inventario_variante_id);
+                } else {
+                    $query->where('codigo', $origen->codigo);
+                }
+            })
+            ->lockForUpdate()
+            ->get()
+            ->first(function (Inventario $item) use ($atributosOrigen, $almacenDestino) {
+                return json_encode($item->atributos_variante) === $atributosOrigen
+                    && mb_strtolower(trim((string) $item->almacen)) === mb_strtolower(trim($almacenDestino));
+            });
+    }
+
+    private function resolveOrCreateStockInAlmacen(Inventario $origen, string $almacenDestino): Inventario
+    {
+        $almacenDestino = trim($almacenDestino);
+        $almacenOrigen = mb_strtolower(trim((string) $origen->almacen));
+
+        if ($almacenOrigen === mb_strtolower($almacenDestino)
+            || ((int) $origen->stock_actual === 0 && trim((string) $origen->almacen) === '')) {
+            $origen->almacen = $almacenDestino;
+            $origen->save();
+            return $origen;
+        }
+
+        if (!$origen->inventario_variante_id) {
+            $variante = InventarioVariante::firstOrCreate(
+                ['proyecto_id' => $origen->proyecto_id, 'codigo' => $origen->codigo],
+                [
+                    'nombre' => $origen->nombre,
+                    'descripcion' => $origen->descripcion,
+                    'referencia_proveedor' => $origen->referencia_proveedor,
+                    'clase_id' => $origen->clase_id,
+                    'stock_minimo' => $origen->stock_minimo,
+                    'nivel_critico' => $origen->nivel_critico,
+                ]
+            );
+            $origen->inventario_variante_id = $variante->id;
+            $origen->save();
+        }
+
+        $existente = $this->findStockInAlmacen($origen, $almacenDestino);
+        if ($existente) {
+            return $existente;
+        }
+
+        return Inventario::create([
+            'proyecto_id' => $origen->proyecto_id,
+            'inventario_variante_id' => $origen->inventario_variante_id,
+            'nombre' => $origen->nombre,
+            'codigo' => $origen->codigo,
+            'descripcion' => $origen->descripcion,
+            'referencia_proveedor' => $origen->referencia_proveedor,
+            'clase_id' => $origen->clase_id,
+            'stock_minimo' => $origen->stock_minimo,
+            'nivel_critico' => $origen->nivel_critico,
+            'atributos_variante' => $origen->atributos_variante,
+            'almacen' => $almacenDestino,
+            'stock_actual' => 0,
+        ]);
+    }
+
     protected function buildVariantCode(string $baseCode, array $atributos, int $index, ?int $ignoreId = null): string
     {
         $segmentos = [];
@@ -1272,6 +1386,7 @@ class InventarioController extends Controller
 
         while (Inventario::query()
             ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
+            ->where('proyecto_id', $this->resolveActiveProyectoId(request()))
             ->where('codigo', $candidato)
             ->exists()) {
             $candidato = $codigo . '-' . $contador;

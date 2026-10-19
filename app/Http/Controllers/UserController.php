@@ -174,6 +174,11 @@ class UserController extends Controller
             return back()->withErrors(['role' => 'No puedes cambiar tu propio rol.']);
         }
 
+        if (auth()->user()->role === 'admin' && ($user->role === 'superadmin' || $validated['role'] === 'superadmin')) {
+            return back()->withErrors(['role' => 'No tienes permisos para editar o asignar el rol de Super Admin.'])->withInput();
+        }
+
+        $validated['activo'] = $request->boolean('activo', $user->activo);
         $user->update($validated);
 
         // Sincronizar proyectos
@@ -226,8 +231,14 @@ class UserController extends Controller
      */
     public function toggleActive(Request $request, User $user)
     {
+        $this->authorize('edit-user', $user);
+
         if (auth()->id() === $user->id) {
             return response()->json(['error' => 'No puedes cambiar tu propio estado.'], 403);
+        }
+
+        if (auth()->user()->role === 'admin' && $user->role === 'superadmin') {
+            return response()->json(['error' => 'No tienes permisos para desactivar a un Super Admin.'], 403);
         }
 
         $user->update(['activo' => !$user->activo]);

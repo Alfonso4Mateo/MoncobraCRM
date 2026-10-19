@@ -11,6 +11,9 @@
         </div>
         <div class="plant-actions">
             <a class="plant-btn plant-btn-soft" href="#"><i class="fas fa-file-signature"></i> Exportar datos</a>
+            <button type="button" class="plant-btn plant-btn-soft" data-toggle="modal" data-target="#modalImportarPlanta">
+                <i class="fas fa-file-upload"></i> Importar CSV
+            </button>
             <a class="plant-btn plant-btn-main" href="{{ route('herramientas.create') }}"><i class="fas fa-plus"></i> Nueva herramienta</a>
         </div>
     </div>
@@ -443,6 +446,38 @@
     {{ $items->links() }}
 </div>
 
+<div class="modal fade" id="modalImportarPlanta" tabindex="-1" role="dialog" aria-labelledby="modalImportarPlantaLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalImportarPlantaLabel">Importar maquinaria desde CSV</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Usa la plantilla compatible con Excel en español. Se aceptan archivos CSV separados por punto y coma o coma.
+                </p>
+                <a class="btn btn-outline-primary btn-sm mb-3" href="{{ route('herramientas.planta.plantilla') }}">
+                    <i class="fas fa-download"></i> Descargar plantilla Excel/CSV
+                </a>
+                <form method="POST" action="{{ route('herramientas.planta.importar') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="form-group">
+                        <label for="archivo_csv">Archivo CSV</label>
+                        <input type="file" id="archivo_csv" name="archivo_csv" class="form-control-file" accept=".csv,.txt" required>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Importar máquinas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Global para previsualización de imágenes -->
 <div id="photo-modal" onclick="closePhotoModal()">
     <div class="photo-dialog" onclick="event.stopPropagation()">
@@ -503,7 +538,13 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Operario / Cuadrilla *</label>
-                    <input required type="text" name="responsable" class="form-control" placeholder="A quién se entrega" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                    <select name="personal_id" class="form-control mb-2" style="width: 100%;">
+                        <option value="">Seleccionar trabajador (opcional)</option>
+                        @foreach(($personalList ?? []) as $trabajador)
+                            <option value="{{ $trabajador->id }}">{{ trim($trabajador->name . ' ' . $trabajador->apellido) }}</option>
+                        @endforeach
+                    </select>
+                    <input type="text" name="responsable" class="form-control" placeholder="A quién se entrega (texto libre)" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
                 </div>
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Ubicación / Obra *</label>

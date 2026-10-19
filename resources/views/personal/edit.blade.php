@@ -314,6 +314,23 @@
                                     </select>
                                 </div>
 
+                                @if(auth()->user()?->role === 'superadmin' || auth()->user()?->proyectos?->count() > 1)
+                                    @php
+                                        $proyectosSeleccionados = old('proyecto_ids', isset($personal) ? $personal->proyectos->pluck('id')->toArray() : []);
+                                    @endphp
+                                    <div class="profile-edit-form-group">
+                                        <label for="proyecto_ids">Sedes / Proyectos</label>
+                                        <select id="proyecto_ids" name="proyecto_ids[]" multiple>
+                                            @foreach($proyectos as $proyecto)
+                                                <option value="{{ $proyecto->id }}" @selected(in_array($proyecto->id, $proyectosSeleccionados ?: []))>
+                                                    {{ $proyecto->nombre }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <small class="text-muted">Selecciona las sedes a las que pertenece este trabajador.</small>
+                                    </div>
+                                @endif
+
                                 <!-- 1. PUESTO LABORAL (Línea completa independiente) -->
                                 <div class="profile-edit-form-group">
                                     <label for="puesto_trabajo_id">Puesto Laboral (PRL)</label>
@@ -827,7 +844,7 @@
 
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 try {
-                    const response = await fetch(`/departamentos/${val}`, {
+                    const response = await fetch('/departamentos/' + encodeURIComponent(val), {
                         method: 'DELETE',
                         headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
                     });

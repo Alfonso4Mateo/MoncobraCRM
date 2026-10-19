@@ -98,7 +98,7 @@
                         <div class="personal-actions">
                             
                             <!-- CANDADO PARA VER FICHA DETALLADA -->
-                            @can('personal.acciones')
+                            @canany(['personal.view', 'personal.acciones'])
                                 <a href="{{ route('personal.show', $personal->id) }}" class="personal-action-icon" title="Ver detalle e historial">
                                     <i class="far fa-eye"></i>
                                 </a>

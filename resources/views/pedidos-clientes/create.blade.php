@@ -27,6 +27,9 @@
     @php
         $clienteSeleccionadoId = (string) old('id_cliente',$clienteSeleccionadoId ?? '');
         $presupuestoSeleccionadoId = (string) old('presupuesto_id',$presupuestoSeleccionadoId ?? '');
+        // Defensa: un "0" nunca debe interpretarse como presupuesto seleccionado.
+        if ($presupuestoSeleccionadoId === '0') { $presupuestoSeleccionadoId = ''; }
+        if ($clienteSeleccionadoId === '0') { $clienteSeleccionadoId = ''; }
         $estadoActual = (string) old('estado', 'pendiente');
         $pedidoBolsa = (bool) old('bolsa', $bolsaPreseleccionada ?? false);
         $bolsaSeleccionadaId = (string) old('bolsa_id', $bolsaIdPreseleccionada ?? '');;$numeroPedido = old('numero_pedido', '');
@@ -39,14 +42,14 @@
         $presupuestosParaPedidoJs =$presupuestosParaPedido ?? [];
         $baseImponible = (float) ($baseImponible ?? 0);
         $totalPedido = (float) ($totalPedido ?? 0);
-        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 4, '.', ''));
+        $totalPedidoManual = old('total', $pedidoBolsa ? '' : number_format($totalPedido, 2, '.', ''));
     @endphp
 
-    <form id="pedido-cliente-form" action="{{ route('pedidos-clientes.store') }}" method="POST" class="pedido-create-layout" novalidate>
+    <form id="pedido-cliente-form" action="{{ route('pedidos-clientes.store') }}" method="POST" enctype="multipart/form-data" class="pedido-create-layout" novalidate>
         @csrf
         <input type="hidden" name="bolsa" value="0">
         <input type="hidden" name="estado" id="pedido_estado" value="{{ $estadoActual }}">
-        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 4, '.', '') }}">
+        <input type="hidden" name="total" id="pedido_total" value="{{ $pedidoBolsa ? $totalPedidoManual : number_format($totalPedido, 2, '.', '') }}">
         <input type="hidden" name="lista_articulos" id="pedido_lista_articulos" value="{{ $lineasJson }}">
 
         <section class="pedido-create-main">
@@ -144,7 +147,12 @@
 
                     <div class="pedido-field">
                         <label for="ot">CC (Centro de Coste)</label>
-                        <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo">
+                        <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo" list="cc_frecuentes" autocomplete="off">
+                        <datalist id="cc_frecuentes">
+                            @foreach($centrosCoste ?? [] as $cc)
+                                <option value="{{ $cc->etiqueta_completa }}">
+                            @endforeach
+                        </datalist>
                     </div>
 
                     <div class="pedido-field">
@@ -154,6 +162,11 @@
                             <span>Activar modo bolsa</span>
                         </label>
                         <small class="pedido-help">La bolsa permite a los albaranes consumir saldos de las líneas de forma fraccionada.</small>
+                    </div>
+
+                    <div class="pedido-field pedido-field--wide">
+                        <label>Documento del cliente</label>
+                        @include('pedidos-clientes.partials.archivo-adjunto')
                     </div>
                 </div>
             </article>
@@ -258,11 +271,11 @@
                 <div class="pedido-summary-list">
                     <div class="pedido-summary-row">
                         <span>Base imponible</span>
-                            <strong id="summary-base">{{ number_format($baseImponible, 4, ',', '.') }} €</strong>
+                            <strong id="summary-base">{{ number_format($baseImponible, 2, ',', '.') }} €</strong>
                     </div>
                     <div class="pedido-summary-row pedido-summary-row--total">
                         <span>Total pedido</span>
-                            <strong id="summary-total">{{ number_format($totalPedido, 4, ',', '.') }} €</strong>
+                            <strong id="summary-total">{{ number_format($totalPedido, 2, ',', '.') }} €</strong>
                     </div>
                 </div>
 
@@ -329,9 +342,11 @@
             let bolsaMode = bolsaCheckbox.checked;
 
             const moneyFormatter = new Intl.NumberFormat('es-ES', {
-                minimumFractionDigits: 4,
-                maximumFractionDigits: 4,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
             });
+            let editingLineUid = null;
+            let editingLineArticulo = '';
 
             const parseValue = (value) => {
                 const numeric = Number.parseFloat(String(value).replace(',', '.'));
@@ -366,7 +381,7 @@
                 const qty = Math.max(0, parseValue(cantidad));
                 const unit = Math.max(0, parseValue(precioUnitario));
                 const pct = Math.max(0, parseValue(margen));
-                return Number((qty * unit * (1 + (pct / 100))).toFixed(4));
+                return Number((qty * unit * (1 + (pct / 100))).toFixed(2));
             };
 
             const normalizeLines = (lines) => Array.isArray(lines)
@@ -375,7 +390,7 @@
                     .map((line) => {
                         const modoConsumo = line.modo_consumo === 'importe' ? 'importe' : 'cantidad';
                         const cantidad = modoConsumo === 'importe' ? 1 : Number(parseValue(line.cantidad).toFixed(2));
-                        const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(4));
+                        const precioUnitario = Number(parseValue(line.precio_unitario ?? line.precio).toFixed(2));
                         const margen = Number(parseValue(line.margen).toFixed(2));
 
                         return {
@@ -399,14 +414,31 @@
                 clienteLockedInput.value = value;
             };
 
+            // TomSelect mantiene su propio estado: hay que bloquear/desbloquear a través de él.
+            const clienteTs = () => clienteSelect.tomselect;
+
             const lockCliente = (clienteId) => {
-                syncClienteHidden(clienteId);
+                const value = String(clienteId ?? '');
+                if (clienteTs()) {
+                    clienteTs().setValue(value, true);
+                } else {
+                    clienteSelect.value = value;
+                }
+                syncClienteHidden(value);
                 clienteLockedInput.disabled = false;
-                clienteSelect.disabled = true;
+                if (clienteTs()) {
+                    clienteTs().disable();
+                } else {
+                    clienteSelect.disabled = true;
+                }
             };
 
             const unlockCliente = () => {
-                clienteSelect.disabled = false;
+                if (clienteTs()) {
+                    clienteTs().enable();
+                } else {
+                    clienteSelect.disabled = false;
+                }
                 clienteLockedInput.disabled = true;
                 clienteLockedInput.value = '';
             };
@@ -472,7 +504,7 @@
                 renderRows();
             };
 
-            document.querySelectorAll('.pedido-select, .select2').forEach((select) => {
+            document.querySelectorAll('.pedido-select:not(#pedido_bolsa_id), .select2:not(#pedido_bolsa_id)').forEach((select) => {
                 if (!select.tomselect) {
                     new TomSelect(select, {
                         create: false,
@@ -493,7 +525,7 @@
             const renderTotals = () => {
                 // 1. Calcula totales normales
                 const total = items.reduce((carry, item) => carry + parseValue(item.total), 0);
-                hiddenTotal.value = total.toFixed(4);
+                hiddenTotal.value = total.toFixed(2);
                 summaryBase.textContent = formatMoney(total);
                 summaryTotal.textContent = formatMoney(total);
                 
@@ -559,6 +591,8 @@
             };
 
             const resetLineForm = () => {
+                editingLineUid = null;
+                editingLineArticulo = '';
                 descripcionInput.value = '';
                 cantidadInput.value = '1';
                 cantidadInput.disabled = false;
@@ -593,7 +627,6 @@
                 syncBolsaUi();
 
                 if (presupuesto.cliente_id) {
-                    clienteSelect.value = String(presupuesto.cliente_id);
                     lockCliente(presupuesto.cliente_id);
                 } else {
                     unlockCliente();
@@ -631,11 +664,12 @@
                 const total = computeTotal(cantidad, precioUnitario, margen);
 
                 items.push({
-                    articulo: '',
+                    uid: editingLineUid || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+                    articulo: editingLineArticulo,
                     descripcion,
                     cantidad: Number(cantidad.toFixed(2)),
                     medida,
-                    precio_unitario: Number(precioUnitario.toFixed(4)),
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
                     margen: Number(margen.toFixed(2)),
                     modo_consumo: modoConsumo,
                     total,
@@ -721,6 +755,8 @@
                     const index = Number.parseInt(editButton.dataset.index || '-1', 10);
                     if (index >= 0 && index < items.length) {
                         const itemToEdit = items[index];
+                        editingLineUid = itemToEdit.uid || null;
+                        editingLineArticulo = itemToEdit.articulo || '';
                         
                         // 1. Cargar los datos de la línea en el formulario superior
                         descripcionInput.value = itemToEdit.descripcion;

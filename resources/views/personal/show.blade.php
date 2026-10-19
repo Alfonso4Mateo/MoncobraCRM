@@ -661,6 +661,38 @@
 
                         <!-- PANEL 4: INVENTARIO -->
                         <div id="tab-inventario" class="profile-tab-panel">
+                            <article class="profile-card profile-card--table mb-4">
+                                <div class="profile-card__header">
+                                    <div>
+                                        <h3>Equipos y Herramientas a su cargo</h3>
+                                        <p>Activos asignados actualmente y pendientes de devolución.</p>
+                                    </div>
+                                </div>
+                                <div class="table-responsive profile-table-wrap">
+                                    <table class="table profile-table">
+                                        <thead><tr><th>Tipo</th><th>Activo</th><th>Estado</th><th>Responsable registrado</th><th>Ficha</th></tr></thead>
+                                        <tbody>
+                                            @forelse(($activosAsignados ?? collect())->flatMap(fn ($items, $tipo) => $items->map(fn ($item) => compact('tipo', 'item'))) as $asignado)
+                                                @php
+                                                    $item = $asignado['item'];
+                                                    $tipo = $asignado['tipo'];
+                                                    $url = $tipo === 'Equipos IT' ? route('equipos.show', $item) : ($tipo === 'Maquinaria de planta' ? route('herramientas.planta.show', $item) : route('calibrables.show', $item));
+                                                @endphp
+                                                <tr>
+                                                    <td>{{ $tipo }}</td>
+                                                    <td><strong>{{ $item->nombre }}</strong><br><small class="text-muted">{{ $item->codigo ?: ($item->numero_serie ?? 'Sin código') }}</small></td>
+                                                    <td><span class="profile-chip profile-chip--ok">{{ $item->estado_label ?? ucfirst((string) ($item->estado ?? 'asignado')) }}</span></td>
+                                                    <td>{{ $item->responsable ?: '—' }}</td>
+                                                    <td><a href="{{ $url }}" class="profile-icon-link" title="Abrir ficha"><i class="fas fa-arrow-up-right-from-square"></i></a></td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="5"><div class="profile-empty-state"><i class="fas fa-toolbox"></i><strong>No hay activos asignados</strong><span>Los equipos y herramientas vinculados aparecerán aquí.</span></div></td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </article>
+
                             <article class="profile-card profile-card--table">
                                 <div class="profile-card__header">
                                     <div>
@@ -756,9 +788,8 @@
         </a>
     </section>
 
-    @if(auth()->user() && auth()->user()->role === 'superadmin')
+    @can('personal.delete')
         <div class="profile-modal" id="delete-personal-modal" aria-hidden="true" role="dialog" aria-modal="true">
-        @can('personal.delete')
             <div class="profile-modal__panel">
                 <h2 class="profile-modal__title">Seguro que deseas eliminar</h2>
                 <p class="profile-modal__text">
@@ -773,8 +804,7 @@
                 </form>
             </div>
         </div>
-        @endcan
-    @endif
+    @endcan
 
     <!-- MODAL DE HISTORIAL DE RENOVACIONES -->
     <div class="profile-modal" id="history-modal" aria-hidden="true" role="dialog" aria-modal="true" style="z-index: 1060;">

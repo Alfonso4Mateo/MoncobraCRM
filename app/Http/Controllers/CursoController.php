@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Personal;
 use App\Models\Curso;
+use App\Models\Proyecto;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -157,11 +158,11 @@ class CursoController extends Controller
 
         // --- AUTO-ASIGNACIÓN DE SEDE PARA CURSOS ---
         $user = auth()->user();
-        if ($user && $user->role !== 'superadmin') {
-            $misProyectosIds = $user->proyectos->pluck('id')->toArray();
-            if (!empty($misProyectosIds)) {
-                $curso->proyectos()->sync($misProyectosIds);
-            }
+        $proyectoIds = $user && $user->role === 'superadmin'
+            ? Proyecto::pluck('id')->toArray()
+            : ($user?->proyectos->pluck('id')->toArray() ?? []);
+        if (!empty($proyectoIds)) {
+            $curso->proyectos()->sync($proyectoIds);
         }
 
         return redirect()
@@ -187,6 +188,10 @@ class CursoController extends Controller
         
         // Cargamos los trabajadores asociados en una sola consulta, ordenados alfabéticamente
         $curso->load(['personal' => function ($query) {
+            if (auth()->user()->role !== 'superadmin') {
+                $misProyectosIds = auth()->user()->proyectos->pluck('id')->toArray();
+                $query->whereHas('proyectos', fn ($proyectoQuery) => $proyectoQuery->whereIn('proyectos.id', $misProyectosIds));
+            }
             $query->orderBy('name')->orderBy('apellido');
         }]);
 
@@ -316,6 +321,10 @@ class CursoController extends Controller
 
         // 1. Recuperamos el curso y sus trabajadores con los datos de la tabla pivote
         $curso = \App\Models\Curso::with(['personal' => function($query) {
+            if (auth()->user()->role !== 'superadmin') {
+                $misProyectosIds = auth()->user()->proyectos->pluck('id')->toArray();
+                $query->whereHas('proyectos', fn ($proyectoQuery) => $proyectoQuery->whereIn('proyectos.id', $misProyectosIds));
+            }
             $query->withPivot('fecha_realizacion', 'apto'); 
         }])->findOrFail($id);
 

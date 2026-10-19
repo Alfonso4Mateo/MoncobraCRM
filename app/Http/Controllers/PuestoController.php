@@ -16,6 +16,7 @@ class PuestoController extends Controller
 
     public function index(): View
     {
+        $this->authorize('cursos.view');
         // Cargamos los puestos contando cuántos cursos obligatorios y personal tienen
         $puestos = Puesto::withCount(['cursos', 'personal'])
             ->orderBy('nombre')
@@ -26,6 +27,7 @@ class PuestoController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('cursos.edit');
         $request->validate([
             'nombre' => 'required|string|max:255|unique:puestos,nombre',
         ]);
@@ -40,6 +42,7 @@ class PuestoController extends Controller
 
     public function edit(Puesto $puesto): View
     {
+        $this->authorize('cursos.edit');
         // Recuperamos todos los cursos agrupados por categoría para pintar el "Panel de Normas"
         $cursos = Curso::orderBy('categoria')->orderBy('nombre')->get();
         $cursosPorCategoria = $cursos->groupBy(function($curso) {
@@ -60,6 +63,7 @@ class PuestoController extends Controller
 
     public function syncEpis(Request $request, Puesto $puesto)
     {
+        $this->authorize('cursos.edit');
         $request->validate([
             'epis' => 'nullable|array',
             'epis.*' => 'exists:epis,id',
@@ -84,6 +88,7 @@ class PuestoController extends Controller
 
     public function update(Request $request, Puesto $puesto)
     {
+        $this->authorize('cursos.edit');
         $request->validate([
             'nombre' => 'required|string|max:255|unique:puestos,nombre,' . $puesto->id,
         ]);
@@ -97,6 +102,7 @@ class PuestoController extends Controller
 
     public function syncCursos(Request $request, Puesto $puesto)
     {
+        $this->authorize('cursos.edit');
         // Validamos que lo que nos llega es un array de IDs que existen en la tabla cursos
         $request->validate([
             'cursos' => 'nullable|array',
@@ -119,12 +125,31 @@ class PuestoController extends Controller
          * Si está en ambos, no hace nada. Eficiencia pura.
          */
         $puesto->cursos()->sync($syncData);
+        $cursosObligatorios = array_keys($syncData);
+        if ($cursosObligatorios !== []) {
+            $puesto->personal()->with('cursos')->get()->each(function ($personal) use ($cursosObligatorios, $puesto) {
+                $cursosActuales = $personal->cursos->pluck('id')->all();
+                $cursosNuevos = array_diff($cursosObligatorios, $cursosActuales);
+                if ($cursosNuevos !== []) {
+                    $pivot = [];
+                    foreach ($cursosNuevos as $cursoId) {
+                        $pivot[$cursoId] = [
+                            'apto' => false,
+                            'fecha_realizacion' => null,
+                            'descripcion_aptitud' => 'Asignado automáticamente por perfil formativo: ' . $puesto->nombre,
+                        ];
+                    }
+                    $personal->cursos()->syncWithoutDetaching($pivot);
+                }
+            });
+        }
 
         return redirect()->route('puestos.edit', $puesto->id)->with('success', 'Matriz de formación actualizada correctamente.');
     }
 
     public function destroy(Puesto $puesto)
     {
+        $this->authorize('cursos.edit');
         // Medida de seguridad: No dejamos borrar un puesto si hay gente usándolo
         if ($puesto->personal()->exists()) {
             return redirect()->route('puestos.index')->with('error', 'No se puede eliminar: Hay trabajadores con este puesto asignado.');
@@ -139,7 +164,14 @@ class PuestoController extends Controller
      */
     public function auditoria(Puesto $puesto)
     {
-        $puesto->load(['cursos', 'personal.cursos']);
+        $this->authorize('cursos.view');
+        $personalRelation = function ($query) {
+            if (auth()->user()->role !== 'superadmin') {
+                $misProyectosIds = auth()->user()->proyectos->pluck('id')->all();
+                $query->whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $misProyectosIds));
+            }
+        };
+        $puesto->load(['cursos', 'personal' => $personalRelation, 'personal.cursos']);
         $cursosExigidos = $puesto->cursos;
         $trabajadores = $puesto->personal;
 
@@ -228,7 +260,14 @@ class PuestoController extends Controller
      */
     public function exportAuditoria(Puesto $puesto)
     {
-        $puesto->load(['cursos', 'personal.cursos']);
+        $this->authorize('cursos.view');
+        $personalRelation = function ($query) {
+            if (auth()->user()->role !== 'superadmin') {
+                $misProyectosIds = auth()->user()->proyectos->pluck('id')->all();
+                $query->whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $misProyectosIds));
+            }
+        };
+        $puesto->load(['cursos', 'personal' => $personalRelation, 'personal.cursos']);
         $cursosExigidos = $puesto->cursos;
 
         $fileName = 'matriz_auditoria_' . \Illuminate\Support\Str::slug($puesto->nombre) . '_' . date('Y-m-d') . '.csv';
@@ -307,6 +346,7 @@ class PuestoController extends Controller
      */
     public function exportEpisPdf(Puesto $puesto)
     {
+        $this->authorize('cursos.view');
         // Cargamos los EPIs asignados al puesto y su cantidad desde la tabla pivote
         $puesto->load('epis');
 

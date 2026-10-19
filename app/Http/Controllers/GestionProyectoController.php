@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Proyecto;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -72,7 +73,10 @@ class GestionProyectoController extends Controller
             $data['imagen'] = $request->file('imagen')->store('proyectos', 'public');
         }
 
-        Proyecto::create($data);
+        $proyecto = Proyecto::create($data);
+        User::where('role', 'superadmin')->each(
+            fn (User $user) => $user->proyectos()->syncWithoutDetaching([$proyecto->id])
+        );
 
         return redirect()
             ->route('herramientas.proyectos.index')

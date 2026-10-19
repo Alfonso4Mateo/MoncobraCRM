@@ -199,11 +199,11 @@
                         <div class="presupuesto-totals-box" aria-live="polite">
                             <div class="total-row">
                                 <span>Subtotal</span>
-                                <strong id="items_subtotal">0,0000 EUR</strong>
+                                <strong id="items_subtotal">0,00 EUR</strong>
                             </div>
                             <div class="total-row total-final">
                                 <span>Total presupuesto</span>
-                                <strong id="items_total">0,0000 EUR</strong>
+                                <strong id="items_total">0,00 EUR</strong>
                             </div>
                         </div>
                     </footer>
@@ -233,8 +233,8 @@
             const deleteButton = document.getElementById('btn_eliminar_item');
 
             const eur = new Intl.NumberFormat('es-ES', {
-                minimumFractionDigits: 4,
-                maximumFractionDigits: 4,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
             });
 
             const MAX_CANTIDAD = 1000000;
@@ -274,7 +274,30 @@
                 }
             };
 
-            const items = parseItems();
+            const normalizeItem = (item) => {
+                const cantidad = Math.max(0, safeNumber(item?.cantidad));
+                const precioUnitario = Math.max(0, safeNumber(item?.precio_unitario));
+                const margen = Math.max(0, safeNumber(item?.margen));
+                const precioConMargen = precioUnitario * (1 + (margen / 100));
+                const total = cantidad * precioConMargen;
+
+                return {
+                    articulo: String(item?.articulo ?? '').trim(),
+                    descripcion: String(item?.descripcion ?? '').trim(),
+                    cantidad: Number(cantidad.toFixed(2)),
+                    medida: String(item?.medida ?? item?.unidad ?? '').trim(),
+                    unidad: String(item?.unidad ?? item?.medida ?? '').trim(),
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
+                    margen: Number(margen.toFixed(2)),
+                    precio_con_margen: Number(precioConMargen.toFixed(2)),
+                    total: Number(total.toFixed(2)),
+                };
+            };
+
+            const items = parseItems()
+                .filter((item) => item && typeof item === 'object')
+                .map(normalizeItem)
+                .filter((item) => item.descripcion !== '');
             let selectedIndex = -1;
             let editingIndex = null;
 
@@ -302,7 +325,7 @@
 
                 descripcionInput.value = item.descripcion || '';
                 cantidadInput.value = String(item.cantidad ?? 1);
-                unidadInput.value = String(item.unidad ?? '');
+                unidadInput.value = String(item.medida ?? item.unidad ?? '');
                 precioInput.value = String(item.precio_unitario ?? 0);
                 margenInput.value = String(item.margen ?? 0);
                 editingIndex = index;
@@ -357,7 +380,7 @@
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
                         <td style="white-space: pre-wrap">${esc(item.descripcion)}</td>
-                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${item.unidad ? ' ' + esc(item.unidad) : ''}</td>
+                        <td style="text-align:right">${qtyFmt.format(Number(item.cantidad))}${(item.medida ?? item.unidad) ? ' ' + esc(item.medida ?? item.unidad) : ''}</td>
                         <td>${eur.format(safeNumber(item.precio_con_margen || item.precio_unitario))} EUR</td>
                         <td>${eur.format(safeNumber(item.total))} EUR</td>
                         <td class="actions-col">
@@ -379,30 +402,38 @@
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
                 const cantidadRaw = safeNumber(cantidadInput.value);
-                // CAMBIO 3: Se permite decimales y valores mayores o iguales a 0, sin forzar a entero
-                const cantidad = Math.max(0, cantidadRaw); 
-                const unidad = String(unidadInput.value || '').trim();
+                const cantidad = Math.max(0, cantidadRaw);
+                const unidad = String(unidadInput.value || '').trim() || 'und';
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
                 const margen = Math.max(0, safeNumber(margenInput.value));
 
-                // CAMBIO 4: Actualizar mensaje de error si se introduce un valor menor o igual a 0
                 if (!descripcion || cantidad <= 0) {
-                    window.alert('Complete al menos la descripcion y una cantidad mayor que cero.');
+                    window.alert('Complete al menos la descripción y una cantidad mayor que cero.');
+                    return;
+                }
+
+                if (!validateLineValues(cantidad, precioUnitario, margen)) {
                     return;
                 }
 
                 const precioConMargen = precioUnitario * (1 + (margen / 100));
-                const precioConMargenRounded = Number(precioConMargen.toFixed(4));
+                const precioConMargenRounded = Number(precioConMargen.toFixed(2));
                 const total = cantidad * precioConMargenRounded;
 
+                const articuloPrevio = (editingIndex !== null && items[editingIndex])
+                    ? String(items[editingIndex].articulo ?? '').trim()
+                    : '';
+
                 const payload = {
+                    articulo: articuloPrevio,
                     descripcion,
-                    cantidad: Number(cantidad),
+                    cantidad: Number(cantidad.toFixed(2)),
+                    medida: unidad,
                     unidad: unidad,
-                    precio_unitario: Number(precioUnitario.toFixed(4)),
+                    precio_unitario: Number(precioUnitario.toFixed(2)),
                     margen: Number(margen.toFixed(2)),
                     precio_con_margen: precioConMargenRounded,
-                    total: Number(total.toFixed(4)),
+                    total: Number(total.toFixed(2)),
                 };
 
                 if (editingIndex !== null && editingIndex >= 0 && editingIndex < items.length) {

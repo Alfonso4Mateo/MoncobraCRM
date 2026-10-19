@@ -7,7 +7,7 @@
     $estadoClass = match (strtolower($estado)) {
         'aceptado' => 'estado-pill estado-aceptado',
         'rechazado' => 'estado-pill estado-rechazado',
-        'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
+        'pedido_pendiente', 'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
         default => 'estado-pill estado-pendiente',
     };
     $items = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
@@ -126,7 +126,7 @@
                     </div>
                     <div class="clean-field">
                         <span class="clean-label">Estado</span>
-                        <div class="mt-1"><span class="{{ $estadoClass }}">{{ ucfirst($estado) }}</span></div>
+                        <div class="mt-1"><span class="{{ $estadoClass }}">{{ ucfirst(str_replace('_', ' ', $estado)) }}</span></div>
                     </div>
                     
                     <!-- Fila 3 (2 + 1 = 3) -->
@@ -153,7 +153,7 @@
                 <!-- Total movido visualmente a la derecha -->
                 <div class="clean-total-row">
                     <span class="clean-label text-uppercase">Total Presupuesto</span>
-                    <strong class="clean-total-value">{{ number_format((float) ($presupuesto->total ?? 0), 4, ',', '.') }} EUR</strong>
+                    <strong class="clean-total-value">{{ number_format((float) ($presupuesto->total ?? 0), 2, ',', '.') }} EUR</strong>
                 </div>
             </div>
         </article>
@@ -205,9 +205,9 @@
                                             <td class="font-weight-bold text-dark">{{ $item['articulo'] ?? '-' }}</td>
                                             <td class="text-dark">{{ $item['descripcion'] ?? '-' }}</td>
                                             <td class="text-right">{{ number_format((float) ($item['cantidad'] ?? 0), 2, ',', '.') }}</td>
-                                            <td class="text-right">{{ number_format((float) ($item['precio_unitario'] ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right">{{ number_format((float) ($item['precio_unitario'] ?? 0), 2, ',', '.') }} €</td>
                                             <td class="text-right text-muted">{{ number_format((float) ($item['margen'] ?? 0), 2, ',', '.') }}%</td>
-                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($item['total'] ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($item['total'] ?? 0), 2, ',', '.') }} €</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -265,7 +265,7 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($pedido->total ?? 0), 4, ',', '.') }} €</td>
+                                            <td class="text-right font-weight-bold text-dark">{{ number_format((float) ($pedido->total ?? 0), 2, ',', '.') }} €</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -298,17 +298,17 @@
                                         </td>
                                         <td class="text-dark">{{ optional($revision->fecha)->format('d/m/Y') }}</td>
                                         <td class="text-dark">{{ $revision->titulo ?: 'Sin título' }}</td>
-                                        <td class="text-dark">{{ number_format((float) ($revision->total ?? 0), 4, ',', '.') }} €</td>
+                                        <td class="text-dark">{{ number_format((float) ($revision->total ?? 0), 2, ',', '.') }} €</td>
                                         <td>
                                             @php
                                                 $revEstadoClass = match (strtolower($revision->estado)) {
                                                     'aceptado' => 'estado-pill estado-aceptado',
                                                     'rechazado' => 'estado-pill estado-rechazado',
-                                                    'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
+                                                    'pedido_pendiente', 'pendiente pedido' => 'estado-pill estado-pendiente-pedido',
                                                     default => 'estado-pill estado-pendiente',
                                                 };
                                             @endphp
-                                            <span class="{{ $revEstadoClass }}">{{ ucfirst($revision->estado) }}</span>
+                                            <span class="{{ $revEstadoClass }}">{{ ucfirst(str_replace('_', ' ', $revision->estado)) }}</span>
                                         </td>
                                         <td class="text-right">
                                             @if($revision->id !== $presupuesto->id)
@@ -327,4 +327,5 @@
             </div>
         </div>
     </section>
+    @include('partials.document-activity-chatter', ['activities' => $activities ?? collect()])
 @endsection

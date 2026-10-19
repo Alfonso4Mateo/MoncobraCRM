@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity;
 
 class SalidaStock extends Model
@@ -18,12 +19,18 @@ class SalidaStock extends Model
         'numero_salida',
         'fecha',
         'solicitante',
+        'personal_id',
         'ot',
         'almacen_origen',
         'items',
         'documento_meta',
         'estado',
     ];
+
+    public function personalAsignado(): BelongsTo
+    {
+        return $this->belongsTo(Personal::class, 'personal_id');
+    }
 
     protected $casts = [
         'fecha' => 'datetime',

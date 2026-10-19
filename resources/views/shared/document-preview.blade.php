@@ -141,7 +141,18 @@
         ></iframe>
     </section>
 
+    @if (isset($activities))
+        @include('partials.document-activity-chatter', ['activities' => $activities])
+    @endif
+
     {!! $afterContent !!}
+
+    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('dashboard') }}"
+       class="btn btn-primary shadow"
+       style="position: fixed; right: 24px; bottom: 24px; z-index: 1050;"
+       onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+        <i class="fas fa-arrow-left mr-1"></i> Volver
+    </a>
 
     <script>
         function printPreviewPdf() {

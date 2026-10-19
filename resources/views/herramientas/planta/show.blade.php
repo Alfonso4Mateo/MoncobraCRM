@@ -16,6 +16,9 @@
             <a href="{{ route('herramientas.planta.edit', $herramienta) }}" class="detail-btn detail-btn-soft">
                 <i class="fas fa-edit"></i> Editar ficha
             </a>
+            <a href="{{ route('activos.qr.download', ['tipo' => 'planta', 'id' => $herramienta->id]) }}" class="detail-btn detail-btn-soft">
+                <i class="fas fa-qrcode"></i> Descargar QR
+            </a>
             <button type="button" class="detail-btn detail-btn-main" data-toggle="modal" data-target="#event-modal">
                 <i class="fas fa-plus"></i> Registrar Parte / Incidencia
             </button>

@@ -26,9 +26,19 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'apellido',
         'email',
         'password',
         'role',
+        'dni_nie',
+        'tipo_personal',
+        'camiseta',
+        'chaqueta',
+        'sudadera',
+        'pantalon',
+        'calzado',
+        'casco',
+        'guantes',
         'departamento', // Este es el que ahora usamos como "Cargo / Función"
         'descripcion',
         'telefono',

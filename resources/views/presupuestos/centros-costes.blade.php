@@ -24,6 +24,7 @@
                     <h3 class="card-title"><i class="fas fa-plus-circle mr-1"></i> Añadir Nuevo CC</h3>
                 </div>
                 
+                @can('presupuestos.manage')
                 <form action="{{ route('centros-costes.store') }}" method="POST">
                     @csrf
                     <div class="card-body">
@@ -54,6 +55,7 @@
                         <button type="submit" class="btn btn-primary">Guardar Centro de Coste</button>
                     </div>
                 </form>
+                @endcan
             </div>
         </div>
 
@@ -79,7 +81,7 @@
                                     <td class="font-weight-bold">{{ $cc->codigo }}</td>
                                     <td>{{ $cc->descripcion }}</td>
                                     <td class="text-center">
-                                        <!-- Formulario para eliminar -->
+                                        @can('presupuestos.manage')
                                         <form action="{{ route('centros-costes.destroy', $cc) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este Centro de Coste? Esta acción no afectará a los presupuestos antiguos.');">
                                             @csrf
                                             @method('DELETE')
@@ -87,6 +89,7 @@
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty

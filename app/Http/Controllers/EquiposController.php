@@ -36,6 +36,7 @@ class EquiposController extends Controller
             'estados' => EquipoInformatico::where('activo', true)->distinct()->orderBy('estado')->pluck('estado'),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
@@ -45,12 +46,14 @@ class EquiposController extends Controller
             'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validated($request);
+        $data = $this->resolvePersonalAssignment($data);
         if ($request->hasFile('imagen')) $data['imagen'] = $request->file('imagen')->store('equipos', 'public');
         $item = EquipoInformatico::create($data);
         return redirect()->route('equipos.show', $item)->with('success', 'Equipo registrado correctamente.');
@@ -58,7 +61,7 @@ class EquiposController extends Controller
 
     public function show(EquipoInformatico $equipo)
     {
-        return view('herramientas.equipos.show', ['equipo' => $equipo->load('eventos.usuario')]);
+        return view('herramientas.equipos.show', ['equipo' => $equipo->load('eventos.usuario', 'personalAsignado'), 'personalList' => $this->personalList()]);
     }
 
     public function storeEvento(Request $request, EquipoInformatico $equipo)
@@ -98,12 +101,14 @@ class EquiposController extends Controller
             'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
             'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList(),
         ]);
     }
 
     public function update(Request $request, EquipoInformatico $equipo)
     {
         $data = $this->validated($request, $equipo);
+        $data = $this->resolvePersonalAssignment($data);
         if ($request->hasFile('imagen')) {
             if ($equipo->imagen) Storage::disk('public')->delete($equipo->imagen);
             $data['imagen'] = $request->file('imagen')->store('equipos', 'public');
@@ -155,6 +160,7 @@ class EquiposController extends Controller
             'modelo' => ['nullable', 'string', 'max:150'], 'categoria' => ['nullable', 'string', 'max:150'],
             'estado' => ['required', Rule::in(['operativo', 'asignado', 'mantenimiento', 'reparacion'])],
             'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'], 'responsable' => ['nullable', 'string', 'max:150'],
+            'personal_id' => ['nullable', 'exists:personal,id'],
             'proveedor' => ['nullable', 'string', 'max:150'], 'fecha_adquisicion' => ['nullable', 'date'],
             'fecha_mantenimiento' => ['nullable', 'date'], 'descripcion' => ['nullable', 'string'],
             'imagen' => ['nullable', 'image', 'max:4096'], 'tipo_equipo' => ['nullable', 'string', 'max:100'],
@@ -166,6 +172,24 @@ class EquiposController extends Controller
             'departamento_id' => ['nullable', 'exists:departamentos,id'],
             'clase' => ['nullable', 'string', 'max:100'],
         ]);
+    }
+
+    private function personalList()
+    {
+        return \App\Models\Personal::where('activo', true)
+            ->orderBy('name')
+            ->orderBy('apellido')
+            ->get(['id', 'name', 'apellido', 'id_rrhh']);
+    }
+
+    private function resolvePersonalAssignment(array $data): array
+    {
+        if (!empty($data['personal_id'])) {
+            $personal = \App\Models\Personal::findOrFail($data['personal_id']);
+            $data['responsable'] = trim($personal->name . ' ' . $personal->apellido);
+        }
+
+        return $data;
     }
 
     private function eventValidated(Request $request): array
@@ -183,16 +207,17 @@ class EquiposController extends Controller
     public function updateEstado(Request $request, EquipoInformatico $equipo)
     {
         $request->validate([
-        'responsable' => ['required', 'string', 'max:150'],
-        'ubicacion_id' => ['required', 'exists:ubicaciones,id'], 
-        'titulo_evento' => ['required', 'string', 'max:180'],
-        'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
-    ]);
+            'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'mantenimiento', 'reparacion'])],
+            'titulo_evento' => ['required', 'string', 'max:180'],
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'dias_estimados_baja' => ['nullable', 'integer', 'min:1', 'max:365'],
+        ]);
 
         $dataToUpdate = ['estado' => $request->estado];
         
         if ($request->estado === 'operativo') {
             $dataToUpdate['responsable'] = null;
+            $dataToUpdate['personal_id'] = null;
             $dataToUpdate['dias_estimados_baja'] = null;
             $dataToUpdate['fecha_baja'] = null;
         } elseif (in_array($request->estado, ['reparacion', 'mantenimiento'])) {
@@ -224,18 +249,24 @@ class EquiposController extends Controller
     public function updateAsignacion(Request $request, EquipoInformatico $equipo)
     {
         $request->validate([
-            'responsable' => ['required', 'string', 'max:150'],
-            'ubicacion' => ['required', 'string', 'max:150'],
+            'responsable' => ['nullable', 'string', 'max:150', 'required_without:personal_id'],
+            'personal_id' => ['nullable', 'exists:personal,id'],
+            'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
+            'ubicacion' => ['nullable', 'string', 'max:150'],
             'titulo_evento' => ['required', 'string', 'max:180'],
             'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
+        $personal = $request->filled('personal_id') ? \App\Models\Personal::findOrFail($request->integer('personal_id')) : null;
+        $responsable = $personal ? trim($personal->name . ' ' . $personal->apellido) : trim((string) $request->input('responsable'));
+
         // 1. Asignamos el equipo
         $equipo->update([
         'estado' => 'asignado',
-        'responsable' => $request->responsable,
-        'ubicacion_id' => $request->ubicacion_id, 
-    ]);
+        'responsable' => $responsable,
+            'personal_id' => $personal?->id,
+            'ubicacion_id' => $request->filled('ubicacion_id') ? $request->ubicacion_id : null,
+        ]);
 
         // 2. Procesamos el archivo adjunto si existe (ej. albarán de entrega firmado)
         $rutaArchivo = null;
@@ -244,12 +275,14 @@ class EquiposController extends Controller
         }
 
         // 3. Registramos el movimiento en la bitácora
-        $nombreSitio = \App\Models\Ubicacion::find($request->ubicacion_id)?->nombre ?? 'S/C';
+        $nombreSitio = $request->filled('ubicacion_id')
+            ? (\App\Models\Ubicacion::find($request->ubicacion_id)?->nombre ?? 'S/C')
+            : (trim((string) $request->input('ubicacion')) ?: 'S/C');
 
         $equipo->eventos()->create([
             'tipo' => 'responsable',
             'titulo' => $request->titulo_evento,
-            'descripcion' => "Equipo entregado a: {$request->responsable} | Puesto: {$nombreSitio}", 
+            'descripcion' => "Equipo entregado a: {$responsable} | Puesto: {$nombreSitio}",
             'fecha' => now(),
             'archivo_adjunto' => $rutaArchivo,
             'usuario_id' => auth()->id(),

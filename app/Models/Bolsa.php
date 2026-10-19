@@ -3,13 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-use App\Models\AlbaranLineaPartida;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 
 class Bolsa extends Model
 {
@@ -28,8 +26,22 @@ class Bolsa extends Model
 
     protected $casts = [
         'fecha' => 'date',
-        'total' => 'decimal:4',
+        'total' => 'decimal:2',
     ];
+
+    protected ?float $totalAcumuladoCache = null;
+
+    public function clearAcumuladoCache(): void
+    {
+        $this->totalAcumuladoCache = null;
+    }
+
+    public function refresh(array $with = []): static
+    {
+        $this->clearAcumuladoCache();
+
+        return parent::refresh($with);
+    }
 
     public function cliente(): BelongsTo
     {
@@ -66,7 +78,8 @@ class Bolsa extends Model
     {
         return static::query()
             ->where('id_cliente', $this->id_cliente)
-            ->where('tipo_bolsa', $this->tipo_bolsa)
+            ->where('proyecto_id', $this->proyecto_id)
+            ->whereRaw('UPPER(TRIM(tipo_bolsa)) = ?', [mb_strtoupper(trim((string) $this->tipo_bolsa), 'UTF-8')])
             ->where('id', '!=', $this->id);
     }
 
@@ -82,16 +95,15 @@ class Bolsa extends Model
      */
     public function totalAcumulado(): float
     {
-        $partidaIds = $this->partidas()->pluck('id');
-        if ($partidaIds->isEmpty()) {
-            return 0.0;
+        if ($this->totalAcumuladoCache !== null) {
+            return $this->totalAcumuladoCache;
         }
 
-        return round(
-            (float) AlbaranLineaPartida::whereIn('pedido_id', $partidaIds)
-                ->whereHas('albaran', fn ($query) => $query->where('estado', '!=', 'cancelado'))
-                ->sum('importe'),
-            4
+        $partidas = $this->partidas;
+
+        return $this->totalAcumuladoCache = round(
+            $partidas->sum(fn ($partida) => $partida->importeConsumido()),
+            2
         );
     }
 
@@ -107,6 +119,6 @@ class Bolsa extends Model
             return 0.0; 
         }
 
-        return max(0, round($tope - $this->totalAcumulado(), 4));
+        return max(0, round($tope - $this->totalAcumulado(), 2));
     }
 }

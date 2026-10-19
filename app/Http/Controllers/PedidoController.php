@@ -13,6 +13,7 @@ use App\Services\LineaBolsaService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -32,10 +33,10 @@ class PedidoController extends Controller
         'pendiente' => 'Pendiente',
         'facturado' => 'Facturado',
         'facturado_parcial' => 'Facturado parcial',
-    ];  
+    ];
 
     private const PRESUPUESTO_ESTADOS_PEDIDO = ['pendiente', 'pedido_pendiente'];
-    
+
     /**
      * Create a new controller instance.
      */
@@ -66,7 +67,7 @@ class PedidoController extends Controller
         $bolsa = $request->boolean('bolsa');
 
         $pedidosQuery = PedidoCliente::query()
-           ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot'])
+           ->with(['cliente', 'presupuesto', 'albaran', 'albaranesPivot', 'bolsaGlobal'])
             ->withCount('albaranes as ui_albaranes_count')
             ->withCount('facturacionesManuales as facturaciones_manuales_count')
             ->withSum('facturacionesManuales as facturaciones_sum', 'importe')
@@ -74,7 +75,7 @@ class PedidoController extends Controller
 
         if ($search !== '') {
             $like = '%' . $search . '%';
-            
+
             // CONTEXTO: Convertimos la coma española a punto decimal para que la Base de Datos lo entienda
             $searchNumeric = str_replace(',', '.', $search);
 
@@ -315,6 +316,7 @@ class PedidoController extends Controller
 
         $bolsaPreseleccionada = $request->boolean('bolsa', false);
         $bolsaIdPreseleccionada = (int) $request->query('bolsa_id', 0);
+        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
 
         $lineasInicialesRaw = is_array($presupuestoSeleccionado?->lista_articulos)
             ? $presupuestoSeleccionado->lista_articulos
@@ -322,9 +324,9 @@ class PedidoController extends Controller
 
         $lineasIniciales = $this->normalizePedidoLineas($lineasInicialesRaw);
 
-        $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 4);
+        $baseImponible = round((float) ($presupuestoSeleccionado?->total ?? 0), 2);
         $totalPedido = $baseImponible;
-        
+
         $presupuestosParaPedido = $presupuestos->map(function (Presupuesto $presupuesto) {
             $lineas = is_array($presupuesto->lista_articulos) ? $presupuesto->lista_articulos : [];
 
@@ -347,16 +349,16 @@ class PedidoController extends Controller
             ->get(['id', 'id_cliente', 'numero', 'tipo_bolsa', 'total'])
             ->map(function (Bolsa $bolsa) use ($pedidoCliente) {
                 $esAbierta = (float) $bolsa->total <= 0;
-                
+
                 $dineroComprometido = $bolsa->partidas->sum('total');
                 $saldoDisponible = max(0, $bolsa->total - $dineroComprometido);
-                
+
                 if (isset($pedidoCliente) && $bolsa->id === $pedidoCliente->bolsa_id) {
                     $saldoDisponible += (float) $pedidoCliente->total;
                 }
 
-                $saldoTexto = $esAbierta 
-                    ? 'Bolsa Abierta' 
+                $saldoTexto = $esAbierta
+                    ? 'Bolsa Abierta'
                     : number_format($saldoDisponible, 2, ',', '.') . ' € libres (Límite)';
 
                 return [
@@ -366,11 +368,15 @@ class PedidoController extends Controller
                     'tipo_bolsa' => $bolsa->tipo_bolsa,
                     'saldo_texto' => $saldoTexto,
                     'es_abierta' => $esAbierta,
-                    'saldo_disponible' => round($saldoDisponible, 4), 
+                    'saldo_disponible' => round($saldoDisponible, 2),
                 ];
             })
             ->values()
             ->all();
+
+        // Evita que "0" (int) llegue a la vista y se interprete como "hay presupuesto".
+        $presupuestoSeleccionadoId = $presupuestoSeleccionado?->id;
+        $clienteSeleccionadoId = $clienteSeleccionadoId > 0 ? $clienteSeleccionadoId : null;
 
         return view('pedidos-clientes.create', compact(
             'clientes',
@@ -386,7 +392,8 @@ class PedidoController extends Controller
             'baseImponible',
             'totalPedido',
             'bolsaPreseleccionada',
-            'bolsaIdPreseleccionada'
+            'bolsaIdPreseleccionada',
+            'centrosCoste'
         ) + [
             'titulo' => 'Crear Nuevo Pedido',
             'breadcrumb' => 'Nuevo Pedido',
@@ -397,6 +404,14 @@ class PedidoController extends Controller
     {
         // --- GUARDIA DE LA MURALLA ---
         $this->authorize('pedidos.manage');
+
+        if (isset($_FILES['archivo_documento'])
+            && ($_FILES['archivo_documento']['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK
+            && ($_FILES['archivo_documento']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            throw ValidationException::withMessages([
+                'archivo_documento' => 'El archivo no pudo subirse al servidor (código PHP: ' . $_FILES['archivo_documento']['error'] . '). Es posible que supere el límite upload_max_filesize (' . ini_get('upload_max_filesize') . ') de tu php.ini en XAMPP.',
+            ]);
+        }
 
         $proyectoId = $this->resolveActiveProyectoId($request);
 
@@ -444,6 +459,7 @@ class PedidoController extends Controller
             ],
             'total' => 'nullable|numeric|min:0|max:' . self::MAX_TOTAL,
             'lista_articulos' => 'nullable|json',
+            'archivo_documento' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
         ]);
 
         $bolsa = (bool) ($validated['bolsa'] ?? false);
@@ -480,20 +496,20 @@ class PedidoController extends Controller
 
         $lineasRaw = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
         $lineasRaw = is_array($lineasRaw) ? $lineasRaw : [];
-        
+
         $lineasFiltradas = collect($lineasRaw)
             ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
             ->values()
             ->all();
 
         if ($bolsa && empty($lineasFiltradas)) {
-             $total = round((float) ($validated['total'] ?? 0), 4);
+             $total = round((float) ($validated['total'] ?? 0), 2);
         } else {
              $this->validateLineasPayload($lineasFiltradas);
 
              // CAMBIO: Normalización limpia, sin ensuciar la base de datos de artículos
              $normalizer = new \App\Services\DocumentLineNormalizer();
-             
+
              $lineas = array_map(function (array $l) {
                  $l['medida'] = $l['medida'] ?: 'und';
                  $l['unidad'] = $l['medida'];
@@ -509,13 +525,20 @@ class PedidoController extends Controller
             if ($bolsaGlobal && $bolsaGlobal->total > 0) {
                 $dineroComprometido = $bolsaGlobal->partidas()->sum('total');
                 $saldoLibreParaPartidas = $bolsaGlobal->total - $dineroComprometido;
-                
+
                 if ($total > $saldoLibreParaPartidas) {
                     throw ValidationException::withMessages([
                         'bolsa_id' => 'No hay capacidad suficiente. Límite restante para nuevas partidas: ' . number_format($saldoLibreParaPartidas, 2, ',', '.') . ' €'
                     ]);
                 }
             }
+        }
+
+        $file = $request->file('archivo_documento');
+        $archivoPdf = null;
+        if ($file && $file->isValid()) {
+            Storage::disk('public')->makeDirectory('pedidos-clientes');
+            $archivoPdf = $file->store('pedidos-clientes', 'public');
         }
 
         // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK ---
@@ -525,71 +548,79 @@ class PedidoController extends Controller
             ->where('created_at', '>=', Carbon::now()->subSeconds(10))
             ->first();
 
-        if ($dobleEnvio) {
+        if ($dobleEnvio && !$file) {
             return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente creado correctamente');
         }
 
-        DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas) {
-            if ($presupuestoId !== null) {
-                $presupuestoBloqueado = Presupuesto::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('id', $presupuestoId)
-                    ->lockForUpdate()
-                    ->first();
+        try {
+            DB::transaction(function () use ($validated, $proyectoId, $presupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $archivoPdf) {
+                if ($presupuestoId !== null) {
+                    $presupuestoBloqueado = Presupuesto::query()
+                        ->where('proyecto_id', $proyectoId)
+                        ->where('id', $presupuestoId)
+                        ->lockForUpdate()
+                        ->first();
 
-                if (!$presupuestoBloqueado) {
-                    throw ValidationException::withMessages([
-                        'presupuesto_id' => 'El presupuesto seleccionado no está disponible.',
-                    ]);
+                    if (!$presupuestoBloqueado) {
+                        throw ValidationException::withMessages([
+                            'presupuesto_id' => 'El presupuesto seleccionado no está disponible.',
+                        ]);
+                    }
+
+                    $pedidoExistente = PedidoCliente::query()
+                        ->where('proyecto_id', $proyectoId)
+                        ->where('presupuesto_id', $presupuestoId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($pedidoExistente) {
+                        throw ValidationException::withMessages([
+                            'presupuesto_id' => 'Este presupuesto ya tiene un pedido asignado.',
+                        ]);
+                    }
                 }
 
-                $pedidoExistente = PedidoCliente::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('presupuesto_id', $presupuestoId)
-                    ->lockForUpdate()
-                    ->first();
+                $nuevoPedido = PedidoCliente::create([
+                    'id_cliente' => $validated['id_cliente'],
+                    'proyecto_id' => $proyectoId,
+                    'numero_pedido' => $validated['numero_pedido'],
+                    'referencia_manual' => $validated['referencia_manual'] ?? null,
+                    'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
+                    'ot' => $validated['ot'] ?? null,
+                    'presupuesto_id' => $presupuestoId,
+                    'albaran_id' => null,
+                    'estado' => $validated['estado'] ?? 'pendiente',
+                    'bolsa' => $bolsa,
+                    'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
+                    'bolsa_id' => $bolsaGlobalId,
+                    'total' => round($total, 2),
+                    'lista_articulos' => empty($lineas) ? null : $lineas,
+                    'archivo_pdf' => $archivoPdf,
+                ]);
 
-                if ($pedidoExistente) {
-                    throw ValidationException::withMessages([
-                        'presupuesto_id' => 'Este presupuesto ya tiene un pedido asignado.',
-                    ]);
+                if ($bolsa && !empty($lineasFiltradas)) {
+                    (new LineaBolsaService())->sincronizarLineasDePartida($nuevoPedido, $lineas);
                 }
-            }
 
-            $nuevoPedido = PedidoCliente::create([
-                'id_cliente' => $validated['id_cliente'],
-                'proyecto_id' => $proyectoId,
-                'numero_pedido' => $validated['numero_pedido'],
-                'referencia_manual' => $validated['referencia_manual'] ?? null,
-                'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
-                'ot' => $validated['ot'] ?? null,
-                'presupuesto_id' => $presupuestoId,
-                'albaran_id' => null,
-                'estado' => $validated['estado'] ?? 'pendiente',
-                'bolsa' => $bolsa,
-                'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
-                'bolsa_id' => $bolsaGlobalId,
-                'total' => round($total, 4),
-                'lista_articulos' => empty($lineas) ? null : $lineas,
-            ]);
+                if ($presupuestoId !== null) {
+                    Presupuesto::query()
+                        ->where('proyecto_id', $proyectoId)
+                        ->where('id', $presupuestoId)
+                        ->update([
+                            'estado' => 'aceptado',
+                        ]);
+                }
 
-            if ($bolsa && !empty($lineasFiltradas)) {
-                (new LineaBolsaService())->sincronizarLineasDePartida($nuevoPedido, $lineas);
+                if (!$bolsa && !empty($lineas)) {
+                    $this->syncArticulosFromLineas($proyectoId, $lineas);
+                }
+            });
+        } catch (\Throwable $e) {
+            if ($archivoPdf) {
+                Storage::disk('public')->delete($archivoPdf);
             }
-
-            if ($presupuestoId !== null) {
-                Presupuesto::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('id', $presupuestoId)
-                    ->update([
-                        'estado' => 'aceptado',
-                    ]);
-            }
-
-            if (!$bolsa && !empty($lineas)) {
-                $this->syncArticulosFromLineas($proyectoId, $lineas);
-            }
-        });
+            throw $e;
+        }
 
         return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente creado correctamente');
     }
@@ -639,7 +670,7 @@ class PedidoController extends Controller
             abort(404);
         }
 
-        // En lugar de cargar la vista inútil, redirigimos al instante 
+        // En lugar de cargar la vista inútil, redirigimos al instante
         // al panel de control real del pedido (el del progreso y totales)
         return redirect()->route('pedidos-clientes.albaranes', $pedidoCliente);
     }
@@ -766,63 +797,6 @@ class PedidoController extends Controller
         ]);
     }
 
-    /**
-     * Vincula una línea de bolsa YA EXISTENTE (nacida en otra partida, incluso
-     * de otra bolsa) a esta partida, asignándole un importe adicional.
-     * Es el mecanismo de "reutilizar el sobrante de una bolsa en otra".
-     */
-    public function vincularLineaBolsa(Request $request, PedidoCliente $pedidoCliente)
-    {
-        $this->authorize('pedidos.manage');
-
-        $proyectoId = $this->resolveActiveProyectoId($request);
-        if ((int) $pedidoCliente->proyecto_id !== $proyectoId || !(bool) ($pedidoCliente->bolsa ?? false)) {
-            abort(404);
-        }
-
-        $validated = $request->validate([
-            'linea_id' => [
-                'required',
-                'integer',
-                Rule::exists('lineas_bolsa', 'id')->where(fn ($query) => $query->where('id_cliente', $pedidoCliente->id_cliente)),
-            ],
-            'importe' => 'required|numeric|min:0.01|max:' . self::MAX_TOTAL,
-        ]);
-
-        $linea = LineaBolsa::findOrFail($validated['linea_id']);
-
-        // Si ambas partidas cuelgan de una bolsa global, exigimos que compartan
-        // tipo_bolsa (grupo de fungibilidad) antes de dejar cruzar el importe.
-        $bolsaOrigen = $linea->bolsaOrigen;
-        $bolsaDestino = $pedidoCliente->bolsaGlobal;
-        if ($bolsaOrigen && $bolsaDestino && $bolsaOrigen->tipo_bolsa !== $bolsaDestino->tipo_bolsa) {
-            throw ValidationException::withMessages([
-                'linea_id' => 'Esta línea pertenece a una bolsa de tipo "' . $bolsaOrigen->tipo_bolsa . '" y no puede vincularse a una partida de tipo "' . $bolsaDestino->tipo_bolsa . '".',
-            ]);
-        }
-
-        $importeAVincular = round((float) $validated['importe'], 4);
-
-        // --- ESCUDO DE SEGURIDAD LÍMITE DE BOLSA (vincular línea existente) ---
-        // Esta es la única vía por la que se puede mover dinero entre partidas sin
-        // pasar por storeCliente()/update(), así que necesita el mismo candado: no
-        // dejar asignar a una línea más de lo que la bolsa destino tiene libre.
-        if ($bolsaDestino && (float) $bolsaDestino->total > 0) {
-            $saldoLibre = $bolsaDestino->saldoDisponible();
-            if ($importeAVincular > $saldoLibre) {
-                throw ValidationException::withMessages([
-                    'importe' => 'No hay suficiente saldo en la bolsa global de destino. (Máximo disponible: '
-                        . number_format($saldoLibre, 2, ',', '.') . ' €)',
-                ]);
-            }
-        }
-        // --- FIN ESCUDO DE SEGURIDAD ---
-
-        (new LineaBolsaService())->asignarImporteAPartida($linea, $pedidoCliente, $importeAVincular);
-
-        return response()->json(['success' => true]);
-    }
-
     private function validateLineasPayload(array $lineas): void
     {
         Validator::make(['lineas' => $lineas], [
@@ -863,6 +837,11 @@ class PedidoController extends Controller
         $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
         $totalFacturado = $pedidoCliente->importeConsumido();
         $pendienteFacturar = $pedidoCliente->pendienteFacturar();
+        $activities = \Spatie\Activitylog\Models\Activity::with('causer')
+            ->forSubject($pedidoCliente)
+            ->latest()
+            ->limit(8)
+            ->get();
 
         $perPage = 10;
         $currentPage = max(1, (int) request()->query('page', 1));
@@ -912,6 +891,7 @@ class PedidoController extends Controller
             'totalFacturado' => $totalFacturado, // Cambio clave aquí
             'pendienteFacturar' => $pendienteFacturar,
             'resumenBolsasCliente' => $resumenBolsasCliente,
+            'activities' => $activities,
             'titulo' => 'Albaranes del pedido',
             'breadcrumb' => 'Albaranes del pedido',
         ]);
@@ -931,6 +911,7 @@ class PedidoController extends Controller
         }
 
         $presupuestoEstadosPermitidos = ['pendiente' , 'aceptado' , 'parcial' , 'pendiente pedido'];
+        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
 
         $clientes = Cliente::query()
             ->where('proyecto_id', $proyectoId)
@@ -954,7 +935,7 @@ class PedidoController extends Controller
             $presupuestoOriginal = Presupuesto::with('cliente')
                 ->where('proyecto_id', $proyectoId)
                 ->find($pedidoCliente->presupuesto_id);
-                
+
             if ($presupuestoOriginal) {
                 $presupuestos->prepend($presupuestoOriginal);
             }
@@ -983,19 +964,19 @@ class PedidoController extends Controller
             ->get(['id', 'id_cliente', 'numero', 'tipo_bolsa', 'total'])
             ->map(function (Bolsa $bolsa) use ($pedidoCliente) {
                 $esAbierta = (float) $bolsa->total <= 0;
-                
+
                 // CAMBIO: Calculamos en base al dinero comprometido por las partidas
                 $dineroComprometido = $bolsa->partidas->sum('total');
                 $saldoDisponible = max(0, $bolsa->total - $dineroComprometido);
-                
-                // Ajuste inteligente para la edición: Le sumamos el total de este mismo pedido 
+
+                // Ajuste inteligente para la edición: Le sumamos el total de este mismo pedido
                 // para calcular el límite real disponible para modificarlo.
                 if (isset($pedidoCliente) && $bolsa->id === $pedidoCliente->bolsa_id) {
                     $saldoDisponible += (float) $pedidoCliente->total;
                 }
 
-                $saldoTexto = $esAbierta 
-                    ? 'Bolsa Abierta' 
+                $saldoTexto = $esAbierta
+                    ? 'Bolsa Abierta'
                     : number_format($saldoDisponible, 2, ',', '.') . ' € libres (Límite)';
 
                 return [
@@ -1005,7 +986,7 @@ class PedidoController extends Controller
                     'tipo_bolsa' => $bolsa->tipo_bolsa,
                     'saldo_texto' => $saldoTexto,
                     'es_abierta' => $esAbierta,
-                    'saldo_disponible' => round($saldoDisponible, 4), 
+                    'saldo_disponible' => round($saldoDisponible, 2),
                 ];
             })
             ->values()
@@ -1016,7 +997,8 @@ class PedidoController extends Controller
             'clientes',
             'presupuestos',
             'presupuestosParaPedido',
-            'bolsasParaPedido'
+            'bolsasParaPedido',
+            'centrosCoste'
         ));
     }
 
@@ -1026,6 +1008,14 @@ class PedidoController extends Controller
     public function update(Request $request, PedidoCliente $pedidoCliente)
     {
         $this->authorize('pedidos.manage');
+
+        if (isset($_FILES['archivo_documento'])
+            && ($_FILES['archivo_documento']['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK
+            && ($_FILES['archivo_documento']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            throw ValidationException::withMessages([
+                'archivo_documento' => 'El archivo no pudo subirse al servidor (código PHP: ' . $_FILES['archivo_documento']['error'] . '). Es posible que supere el límite upload_max_filesize (' . ini_get('upload_max_filesize') . ') de tu php.ini en XAMPP.',
+            ]);
+        }
 
         $proyectoId = $this->resolveActiveProyectoId($request);
 
@@ -1073,6 +1063,8 @@ class PedidoController extends Controller
             ],
             'total' => 'nullable|numeric|min:0|max:' . self::MAX_TOTAL,
             'lista_articulos' => 'nullable|json',
+            'archivo_documento' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'eliminar_archivo' => ['nullable', 'boolean'],
         ]);
 
         $bolsa = (bool) ($validated['bolsa'] ?? false);
@@ -1104,14 +1096,14 @@ class PedidoController extends Controller
 
         $lineasRaw = json_decode((string) ($validated['lista_articulos'] ?? '[]'), true);
         $lineasRaw = is_array($lineasRaw) ? $lineasRaw : [];
-        
+
         $lineasFiltradas = collect($lineasRaw)
             ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
             ->values()
             ->all();
 
         if ($bolsa && empty($lineasFiltradas)) {
-             $total = round((float) ($validated['total'] ?? 0), 4);
+             $total = round((float) ($validated['total'] ?? 0), 2);
         } else {
              $this->validateLineasPayload($lineasFiltradas);
 
@@ -1135,9 +1127,9 @@ class PedidoController extends Controller
                      'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
                      'cantidad' => round($cantidad, 2),
                      'medida' => $medida,
-                     'precio_unitario' => round($precioUnitario, 4),
+                     'precio_unitario' => round($precioUnitario, 2),
                      'margen' => round($margen, 2),
-                     'total' => round($totalLinea, 4),
+                     'total' => round($totalLinea, 2),
                  ];
              })
              ->values()
@@ -1153,13 +1145,13 @@ class PedidoController extends Controller
                 // Calculamos el dinero ya comprometido
                 $dineroComprometido = $bolsaGlobal->partidas()->sum('total');
                 $saldoLibreParaPartidas = $bolsaGlobal->total - $dineroComprometido;
-                
-                // Si la partida ya pertenecía a esta misma bolsa, 
+
+                // Si la partida ya pertenecía a esta misma bolsa,
                 // le sumamos su total anterior para calcular el límite real de edición.
-                $limiteReal = ($pedidoCliente->bolsa_id == $bolsaGlobalId) 
-                    ? $saldoLibreParaPartidas + $pedidoCliente->total 
+                $limiteReal = ($pedidoCliente->bolsa_id == $bolsaGlobalId)
+                    ? $saldoLibreParaPartidas + $pedidoCliente->total
                     : $saldoLibreParaPartidas;
-                    
+
                 if ($total > $limiteReal) {
                     throw ValidationException::withMessages([
                         'bolsa_id' => 'No hay capacidad suficiente. Límite restante para modificar esta partida: ' . number_format($limiteReal, 2, ',', '.') . ' €'
@@ -1170,48 +1162,76 @@ class PedidoController extends Controller
         // --- FIN ESCUDO DE SEGURIDAD ---
         $antiguoPresupuestoId = $pedidoCliente->presupuesto_id;
 
-        DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas) {
-            
-            // Liberar el presupuesto antiguo si se ha cambiado o quitado
-            if ($antiguoPresupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
-                Presupuesto::where('id', $antiguoPresupuestoId)->update(['estado' => 'pendiente']);
-            }
+        // Gestión del adjunto: se guarda justo antes de la transacción; el anterior se borra tras el commit.
+        $archivoPdf = $pedidoCliente->archivo_pdf;
+        $archivoAnterior = null;
+        $archivoNuevo = null;
 
-            // Bloquear el nuevo presupuesto si se ha seleccionado uno diferente
-            if ($presupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
-                $pedidoExistente = PedidoCliente::query()
-                    ->where('presupuesto_id', $presupuestoId)
-                    ->where('id', '!=', $pedidoCliente->id)
-                    ->first();
+        $file = $request->file('archivo_documento');
+        if ($file && $file->isValid()) {
+            $archivoAnterior = $pedidoCliente->archivo_pdf;
+            Storage::disk('public')->makeDirectory('pedidos-clientes');
+            $archivoNuevo = $file->store('pedidos-clientes', 'public');
+            $archivoPdf = $archivoNuevo;
+        } elseif ($request->boolean('eliminar_archivo')) {
+            $archivoAnterior = $pedidoCliente->archivo_pdf;
+            $archivoPdf = null;
+        }
 
-                if ($pedidoExistente) {
-                    throw ValidationException::withMessages([
-                        'presupuesto_id' => 'Este presupuesto ya está asignado a otro pedido.',
-                    ]);
+        try {
+            DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $archivoPdf) {
+
+                // Liberar el presupuesto antiguo si se ha cambiado o quitado
+                if ($antiguoPresupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
+                    Presupuesto::where('id', $antiguoPresupuestoId)->update(['estado' => 'pendiente']);
                 }
-                
-                Presupuesto::where('id', $presupuestoId)->update(['estado' => 'aceptado']);
-            }
 
-            $pedidoCliente->update([
-                'id_cliente' => $validated['id_cliente'],
-                'numero_pedido' => $validated['numero_pedido'],
-                'referencia_manual' => $validated['referencia_manual'] ?? null,
-                'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
-                'ot' => $validated['ot'] ?? null,
-                'presupuesto_id' => $presupuestoId,
-                'estado' => $validated['estado'] ?? $pedidoCliente->estado,
-                'bolsa' => $bolsa,
-                'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
-                'bolsa_id' => $bolsaGlobalId,
-                'total' => round($total, 4),
-                'lista_articulos' => empty($lineas) ? null : $lineas,
-            ]);
+                // Bloquear el nuevo presupuesto si se ha seleccionado uno diferente
+                if ($presupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
+                    $pedidoExistente = PedidoCliente::query()
+                        ->where('presupuesto_id', $presupuestoId)
+                        ->where('id', '!=', $pedidoCliente->id)
+                        ->first();
 
-            if ($bolsa && !empty($lineasFiltradas)) {
-                (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, $lineas);
+                    if ($pedidoExistente) {
+                        throw ValidationException::withMessages([
+                            'presupuesto_id' => 'Este presupuesto ya está asignado a otro pedido.',
+                        ]);
+                    }
+
+                    Presupuesto::where('id', $presupuestoId)->update(['estado' => 'aceptado']);
+                }
+
+                $pedidoCliente->update([
+                    'id_cliente' => $validated['id_cliente'],
+                    'numero_pedido' => $validated['numero_pedido'],
+                    'referencia_manual' => $validated['referencia_manual'] ?? null,
+                    'fecha_pedido' => Carbon::parse($validated['fecha_pedido'])->toDateString(),
+                    'ot' => $validated['ot'] ?? null,
+                    'presupuesto_id' => $presupuestoId,
+                    'estado' => $validated['estado'] ?? $pedidoCliente->estado,
+                    'bolsa' => $bolsa,
+                    'bolsa_texto' => $bolsa ? ($validated['bolsa_texto'] ?? null) : null,
+                    'bolsa_id' => $bolsaGlobalId,
+                    'total' => round($total, 2),
+                    'lista_articulos' => empty($lineas) ? null : $lineas,
+                    'archivo_pdf' => $archivoPdf,
+                ]);
+
+                if ($bolsa && !empty($lineasFiltradas)) {
+                    (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, $lineas);
+                }
+            });
+        } catch (\Throwable $e) {
+            if ($archivoNuevo) {
+                Storage::disk('public')->delete($archivoNuevo);
             }
-        });
+            throw $e;
+        }
+
+        if ($archivoAnterior && $archivoAnterior !== $archivoPdf) {
+            Storage::disk('public')->delete($archivoAnterior);
+        }
 
         return redirect()->route('pedidos-clientes.index')->with('success', 'Pedido de cliente actualizado correctamente');
     }
@@ -1279,9 +1299,43 @@ class PedidoController extends Controller
             }
         }
 
+        if ($pedidoCliente->bolsa) {
+            $tieneConsumosActivos = \App\Models\AlbaranLineaPartida::query()
+                ->where('pedido_id', $pedidoCliente->id)
+                ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
+                ->exists()
+                || \App\Models\AlbaranPedidoLinea::query()
+                    ->where('pedido_id', $pedidoCliente->id)
+                    ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
+                    ->exists();
+
+            if ($tieneConsumosActivos) {
+                return back()->with('error', 'Este pedido bolsa tiene consumos activos y no puede ser borrado.');
+            }
+        }
+
         DB::transaction(function () use ($pedidoCliente) {
+            $lineaIds = DB::table('linea_partida')
+                ->where('pedido_id', $pedidoCliente->id)
+                ->pluck('linea_id');
+
             if ($pedidoCliente->bolsa) {
                 $pedidoCliente->albaranesPivot()->detach();
+            }
+
+            DB::table('linea_partida')
+                ->where('pedido_id', $pedidoCliente->id)
+                ->delete();
+
+            foreach (LineaBolsa::whereIn('id', $lineaIds)->get() as $linea) {
+                $objetivo = round((float) $linea->partidas()->sum('linea_partida.importe_asignado'), 2);
+                $disponible = round(max(0, $objetivo - $linea->importeConsumidoTotal()), 2);
+                $linea->update([
+                    'importe_objetivo' => $objetivo,
+                    'estado' => $disponible > 0.001
+                        ? LineaBolsa::ESTADO_ACTIVA
+                        : LineaBolsa::ESTADO_AGOTADA,
+                ]);
             }
 
             $presupuestoId = $pedidoCliente->presupuesto_id;
@@ -1307,18 +1361,6 @@ class PedidoController extends Controller
 
     private function renderPdfResponse(PedidoCliente $pedido, bool $download)
     {
-        $disk = \Illuminate\Support\Facades\Storage::disk('public');
-
-        if ($pedido->archivo_pdf && $disk->exists($pedido->archivo_pdf)) {
-            $path = $disk->path($pedido->archivo_pdf);
-            $fileName = basename((string) $pedido->archivo_pdf);
-
-            return response()->file($path, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
-            ]);
-        }
-
         $pdfContent = null;
         $fileName = ($pedido->numero_pedido ?: 'pedido-' . $pedido->id) . '.pdf';
 
@@ -1338,13 +1380,90 @@ class PedidoController extends Controller
             abort(404);
         }
 
-        if ($pedido->archivo_pdf) {
-            $disk->put($pedido->archivo_pdf, $pdfContent);
-        }
-
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+        ]);
+    }
+
+    public function verAdjunto(Request $request, PedidoCliente $pedidoCliente)
+    {
+        $this->authorize('pedidos.view');
+
+        $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
+        if ($sessionProyectoId > 0 && (int) $pedidoCliente->proyecto_id !== $sessionProyectoId) {
+            abort(404);
+        }
+
+        // 1. Limpiamos la ruta guardada en la base de datos
+        $relativePath = ltrim((string) $pedidoCliente->archivo_pdf, '/\\');
+        $relativePath = preg_replace('#^(public/|storage/)#i', '', $relativePath);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+
+        // 2. Comprobamos si el archivo existe en la carpeta storage/app/public
+        if (!$relativePath || !$disk->exists($relativePath)) {
+            abort(404, 'El archivo físico no existe en la carpeta de almacenamiento.');
+        }
+
+        // 3. ¡Mucha atención a esto! Validamos que el archivo no esté vacío (0 bytes)
+        if ($disk->size($relativePath) === 0) {
+            abort(500, 'Error: El archivo guardado en el servidor está vacío (pesa 0 bytes). Volver a subir.');
+        }
+
+        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+        $mime = match ($extension) {
+            'pdf' => 'application/pdf',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => $disk->mimeType($relativePath) ?: 'application/octet-stream',
+        };
+        $content = $disk->get($relativePath);
+
+        $filename = basename($relativePath);
+        $payload = [
+            'ok' => true,
+            'mime' => $mime,
+            'type' => str_starts_with($mime, 'image/') ? 'image' : 'pdf',
+            'filename' => $filename,
+            'base64' => base64_encode($content),
+        ];
+
+        if ($request->wantsJson() || $request->boolean('json')) {
+            return response()->json($payload);
+        }
+
+        $payloadJson = json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $html = '<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>' . e($filename) . '</title>
+<style>html,body{height:100%;margin:0;background:#202124}img,embed{display:block;width:100%;height:100%;border:0;object-fit:contain}</style>
+</head>
+<body><div id="visor"></div>
+<script>
+(function () {
+    const data = ' . $payloadJson . ';
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: data.mime }));
+    const visor = document.getElementById("visor");
+    if (data.type === "image") {
+        visor.innerHTML = "<img alt=\"Documento adjunto\">";
+        visor.firstElementChild.src = blobUrl;
+    } else {
+        visor.innerHTML = "<embed type=\"application/pdf\">";
+        visor.firstElementChild.src = blobUrl;
+    }
+    window.addEventListener("unload", function () { URL.revokeObjectURL(blobUrl); });
+}());
+</script>
+</body></html>';
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
         ]);
     }
 
@@ -1363,7 +1482,7 @@ class PedidoController extends Controller
             }
 
             // Usamos firstOrCreate en lugar de updateOrCreate.
-            // Esto añadirá el artículo al catálogo general SOLO si no existe. 
+            // Esto añadirá el artículo al catálogo general SOLO si no existe.
             // Si ya existe (ej. ID 1 o ID 2), lo dejará intacto y no aplastará tus datos globales.
             Articulo::firstOrCreate(
                 [
@@ -1374,9 +1493,9 @@ class PedidoController extends Controller
                     'descripcion' => $descripcion,
                     'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
                     'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
-                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 4),
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
                     'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
-                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 4),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
                     'facturado' => false,
                 ]
             );
@@ -1398,9 +1517,16 @@ class PedidoController extends Controller
 
         // 2. Comprobamos que el array existe y que esa posición concreta es real
         if (is_array($lineas) && isset($lineas[$index])) {
-            $lineas[$index]['descripcion'] = $request->descripcion; 
+            $lineas[$index]['descripcion'] = $request->descripcion;
+            $uid = trim((string) ($lineas[$index]['uid'] ?? ''));
             $pedidoCliente->lista_articulos = $lineas;
             $pedidoCliente->save();
+
+            if ($uid !== '') {
+                LineaBolsa::where('uid', $uid)
+                    ->where('proyecto_id', $pedidoCliente->proyecto_id)
+                    ->update(['descripcion' => $request->descripcion]);
+            }
         }
 
         return redirect()->back()->with('success', 'Descripción actualizada correctamente.');
@@ -1410,7 +1536,7 @@ class PedidoController extends Controller
     {
         $this->authorize('pedidos.view');
         $proyectoId = $this->resolveActiveProyectoId($request);
-        
+
         $ids = $request->input('pedido_ids', []);
         if (empty($ids)) {
             return response()->json([]);

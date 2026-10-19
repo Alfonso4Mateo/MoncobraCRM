@@ -2,37 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ActivityHumanizer;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
-use Carbon\Carbon; // 1. IMPORTANTE: Importar Carbon para manejar las horas
 
 class ActivityLogController extends Controller
 {
     public function index(Request $request)
     {
-        $validated = $request->validate([
-            'q' => ['nullable', 'string', 'max:100'],
-            'model' => ['nullable', 'string', 'max:255'],
-            'event' => ['nullable', 'in:created,updated,deleted,restored'],
-            'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date'],
-        ]);
-
         $activities = Activity::query()
-            ->with('causer')
-            ->when($validated['q'] ?? null, function ($query, string $search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('description', 'like', "%{$search}%")
-                        ->orWhere('subject_type', 'like', "%{$search}%")
-                        ->orWhere('log_name', 'like', "%{$search}%")
-                        ->orWhere('properties', 'like', "%{$search}%"); // <-- Añade esta línea
+            ->with(['causer', 'subject'])
+            ->whereNotNull('subject_type')
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $term = '%' . $request->string('q')->trim() . '%';
+                $query->where(function ($query) use ($term) {
+                    $query->where('description', 'like', $term)
+                        ->orWhere('subject_id', 'like', $term)
+                        ->orWhereHas('causer', fn ($causer) => $causer->where('name', 'like', $term));
                 });
             })
-            ->when($validated['model'] ?? null, fn ($query, string $model) => $query->where('subject_type', $model))
-            ->when($validated['event'] ?? null, fn ($query, string $event) => $query->where('description', $event))
-            // 3. MODIFICADO: Cambiamos whereDate por where y formateamos con Carbon para respetar las horas y minutos
-            ->when($validated['from'] ?? null, fn ($query, string $from) => $query->where('created_at', '>=', Carbon::parse($from)->format('Y-m-d H:i:s')))
-            ->when($validated['to'] ?? null, fn ($query, string $to) => $query->where('created_at', '<=', Carbon::parse($to)->format('Y-m-d H:i:s')))
+            ->when($request->filled('model'), fn ($query) => $query->where('subject_type', $request->string('model')))
+            ->when($request->filled('event'), fn ($query) => $query->where('event', $request->string('event')))
+            ->when($request->filled('from'), fn ($query) => $query->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($query) => $query->where('created_at', '<=', $request->date('to')))
             ->latest()
             ->paginate(25)
             ->withQueryString();
@@ -43,9 +35,8 @@ class ActivityLogController extends Controller
             ->orderBy('subject_type')
             ->pluck('subject_type');
 
-        $diccionarioClientes = \App\Models\Cliente::withTrashed()->pluck('empresa_nombre', 'id')->toArray();
-        $diccionarioProyectos = \App\Models\Proyecto::withTrashed()->pluck('nombre', 'id')->toArray();
+        $relaciones = ActivityHumanizer::resolveRelationsForActivities($activities);
 
-        return view('activity-log.index', compact('activities', 'models'));
+        return view('activity-log.index', compact('activities', 'models', 'relaciones'));
     }
 }

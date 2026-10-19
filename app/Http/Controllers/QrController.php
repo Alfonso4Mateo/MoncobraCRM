@@ -11,6 +11,11 @@ use Illuminate\Support\Str;
 
 class QrController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
     public function index(Request $request)
     {
         $carpetas = QrCarpeta::whereNull('parent_id')->with('subcarpetasRecursivas')->get();
@@ -39,6 +44,20 @@ class QrController extends Controller
         return back()->with('error', 'El archivo físico no existe en el servidor.');
     }
 
+    public function descargarQrActivo(string $tipo, int $id)
+    {
+        $url = route('activos.qr.show', ['tipo' => $tipo, 'id' => $id]);
+        $svg = QrCode::format('svg')
+            ->size(350)
+            ->errorCorrection('H')
+            ->margin(2)
+            ->generate($url);
+
+        return response($svg)
+            ->header('Content-Type', 'image/svg+xml')
+            ->header('Content-Disposition', 'attachment; filename="qr_' . $tipo . '_' . $id . '.svg"');
+    }
+
     public function destroy($id)
     {
         $qr = EtiquetaQr::findOrFail($id);
@@ -58,7 +77,7 @@ class QrController extends Controller
             'titulo'          => 'required|string|max:255',
             'contenido_datos' => 'required|url',
             'carpeta_id'      => 'required|exists:qr_carpetas,id',
-            'color_qr'        => 'nullable|string',
+            'color_qr'        => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         // Cambiamos la extensión a .svg para evitar cualquier dependencia de Imagick
@@ -72,8 +91,8 @@ class QrController extends Controller
 
         $enlaceFinal = $this->limpiarEnlaceDrive($request->contenido_datos);
 
-        $hex = $request->color_qr ?? '#000000';
-        list($r, $g, $b) = sscanf($hex, "#%02x%02x%02x");
+        $hex = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $request->color_qr) ? $request->color_qr : '#000000';
+        [$r, $g, $b] = sscanf($hex, "#%02x%02x%02x");
 
         // Generamos el QR en formato SVG nativo
         QrCode::format('svg')
@@ -110,6 +129,9 @@ class QrController extends Controller
             'nombre'    => 'required|string|max:255',
             'parent_id' => 'nullable|exists:qr_carpetas,id',
         ]);
+        if ($request->filled('parent_id') && (int) $request->parent_id === (int) $request->input('id')) {
+            return back()->withErrors(['parent_id' => 'Una carpeta no puede ser su propia padre.'])->withInput();
+        }
 
         QrCarpeta::create([
             'nombre'    => $request->nombre,
@@ -124,6 +146,9 @@ class QrController extends Controller
         $request->validate([
             'carpeta_id' => 'required|exists:qr_carpetas,id',
         ]);
+        if ((int) $request->carpeta_id === (int) $id) {
+            return back()->withErrors(['carpeta_id' => 'Una carpeta no puede ser su propia padre.'])->withInput();
+        }
 
         $qr = EtiquetaQr::findOrFail($id);
         $qr->update([

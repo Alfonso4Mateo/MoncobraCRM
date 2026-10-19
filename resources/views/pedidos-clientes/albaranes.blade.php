@@ -103,9 +103,9 @@
                                 {{ $bolsa['numero_pedido'] ?: 'Sin número' }}{{ $bolsa['ot'] ? ' · OT ' . $bolsa['ot'] : '' }}
                             </span>
                             <strong style="display: block; font-size: 1.25rem; color: #92400e; line-height: 1.3;">
-                                {{ number_format($bolsa['saldo_disponible'], 4, ',', '.') }} € libres
+                                {{ number_format($bolsa['saldo_disponible'], 2, ',', '.') }} € libres
                             </strong>
-                            <span style="font-size: 0.78rem; color: #92400e;">de {{ number_format($bolsa['total'], 4, ',', '.') }} € totales</span>
+                            <span style="font-size: 0.78rem; color: #92400e;">de {{ number_format($bolsa['total'], 2, ',', '.') }} € totales</span>
                         </div>
                     @endforeach
                 </div>
@@ -146,19 +146,19 @@
                 <div class="albaran-pago-item">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Total del Pedido</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalPedido, 4, ',', '.') }}</strong>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalPedido, 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--paid">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Total Facturado (Albaranes)</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalAlbaranes, 4, ',', '.') }}</strong>
+                       <strong class="albaran-pago-amount">€{{ number_format((float) $totalFacturado, 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--pending">
                     <div class="albaran-pago-info">
                         <span class="albaran-pago-label">Pendiente de Facturar</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) ($pendienteFacturar ?? 0), 4, ',', '.') }}</strong>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) ($pendienteFacturar ?? 0), 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--count">
@@ -172,7 +172,7 @@
             <!-- Barra de Progreso de Pago -->
             <div class="albaran-pago-progress">
                 @php
-                    $porcentajePagado = $totalPedido > 0 ? ($totalAlbaranes / $totalPedido) * 100 : 0;
+                    $porcentajePagado = $totalPedido > 0 ? ($totalFacturado / $totalPedido) * 100 : 0;
                 @endphp
                 <div class="progress-bar-container">
                     <div class="progress-bar-fill" style="width: {{ $porcentajePagado }}%"></div>
@@ -185,10 +185,10 @@
         <!-- DESGLOSE DE CONSUMO CON DRILL-DOWN (BOLSA) -->
         <!-- ========================================== -->
         @php
-            $esBolsaV2 = (bool) ($pedidoCliente->bolsa ?? false);
+            $esBolsa = (bool) ($pedidoCliente->bolsa ?? false);
             $lineasBolsa = [];
 
-            if ($esBolsaV2) {
+            if ($esBolsa) {
                 try {
                     if (!$pedidoCliente->lineasBolsa()->exists() && !empty($pedidoCliente->lista_articulos)) {
                         (new \App\Services\LineaBolsaService())->sincronizarLineasDePartida(
@@ -207,7 +207,7 @@
                         $margen = (float) $linea->margen;
                         $unitPriceConMargen = $precioUnitario * (1 + ($margen / 100));
 
-                        $totalOriginal = round((float) $linea->pivot->importe_asignado, 4);
+                        $totalOriginal = round((float) $linea->pivot->importe_asignado, 2);
 
                         $cantOriginal = $modoConsumo === 'importe'
                             ? 1.0
@@ -217,6 +217,8 @@
                             ->join('albaranes_clientes', 'albaran_linea_partida.albaran_id', '=', 'albaranes_clientes.id')
                             ->where('albaran_linea_partida.linea_id', $linea->id)
                             ->where('albaran_linea_partida.pedido_id', $pedidoCliente->id)
+                            ->whereNull('albaranes_clientes.deleted_at')
+                            ->whereNotIn('albaranes_clientes.estado', ['cancelado', 'rechazado'])
                             ->select(
                                 'albaran_linea_partida.importe',
                                 'albaranes_clientes.id as albaran_id',
@@ -225,17 +227,17 @@
                             )
                             ->get();
 
-                        $totalConsumido = round((float) $consumosPartida->sum('importe'), 4);
+                        $totalConsumido = round((float) $consumosPartida->sum('importe'), 2);
 
                         $cantConsumida = $modoConsumo === 'importe'
-                            ? ($totalOriginal > 0 ? round($cantOriginal * ($totalConsumido / $totalOriginal), 4) : 0.0)
+                            ? ($totalOriginal > 0 ? round($cantOriginal * ($totalConsumido / $totalOriginal), 2) : 0.0)
                             : ($unitPriceConMargen > 0 ? round($totalConsumido / $unitPriceConMargen, 2) : 0.0);
 
                         $detallesConsumo = [];
                         foreach ($consumosPartida as $consumo) {
                             $importeConsumo = (float) $consumo->importe;
                             $cantFisica = $modoConsumo === 'importe'
-                                ? ($totalOriginal > 0 ? round($cantOriginal * ($importeConsumo / $totalOriginal), 4) : 0.0)
+                                ? ($totalOriginal > 0 ? round($cantOriginal * ($importeConsumo / $totalOriginal), 2) : 0.0)
                                 : ($unitPriceConMargen > 0 ? round($importeConsumo / $unitPriceConMargen, 2) : 0.0);
 
                             $detallesConsumo[] = [
@@ -266,7 +268,7 @@
             }
         @endphp
 
-        @if($esBolsaV2 && count($lineasBolsa) > 0)
+        @if($esBolsa && count($lineasBolsa) > 0)
         <article class="pedidos-clientes-card" style="border-top: 4px solid #3b82f6;">
             <header class="pedidos-clientes-card__header">
                 <div>
@@ -294,7 +296,7 @@
                             @foreach($lineasBolsa as $lb)
                                 <tr>
                                     <td>{{ $lb['descripcion'] }}</td>
-                                    <td class="text-right">€{{ number_format($lb['precio_unitario'], 4, ',', '.') }}</td>
+                                    <td class="text-right">€{{ number_format($lb['precio_unitario'], 2, ',', '.') }}</td>
                                     
                                     <!-- Cantidades -->
                                     <td class="text-right">{{ number_format($lb['cant_original'], 2, ',', '.') }} {{ $lb['medida'] }}</td>
@@ -316,22 +318,22 @@
                                     </td>
 
                                     <!-- Importes -->
-                                    <td class="text-right">€{{ number_format($lb['total_original'], 4, ',', '.') }}</td>
+                                    <td class="text-right">€{{ number_format($lb['total_original'], 2, ',', '.') }}</td>
                                     
                                     <td class="text-right">
                                         @if($lb['total_consumido'] > 0)
                                             <span class="drilldown-link" data-detalles="{{ $lb['detalles_json'] }}" data-descripcion="{{ $lb['descripcion'] }}" data-medida="{{ $lb['medida'] }}" title="Ver albaranes imputados">
-                                                €{{ number_format($lb['total_consumido'], 4, ',', '.') }}
+                                                €{{ number_format($lb['total_consumido'], 2, ',', '.') }}
                                             </span>
                                         @else
                                             <span style="color: #16a34a; font-weight: bold;">
-                                                €{{ number_format($lb['total_consumido'], 4, ',', '.') }}
+                                                €{{ number_format($lb['total_consumido'], 2, ',', '.') }}
                                             </span>
                                         @endif
                                     </td>
 
                                     <td class="text-right" style="color: #ea580c; font-weight: bold;">
-                                        €{{ number_format($lb['total_pendiente'], 4, ',', '.') }}
+                                        €{{ number_format($lb['total_pendiente'], 2, ',', '.') }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -403,12 +405,12 @@
                                             }
                                         @endphp
                                         
-                                        <strong class="pedido-total">€{{ number_format($importeImputado, 4, ',', '.') }}</strong>
+                                        <strong class="pedido-total">€{{ number_format($importeImputado, 2, ',', '.') }}</strong>
                                         
                                         @if($importeImputado < $totalRealAlbaran)
                                             <br>
-                                            <small style="color: #64748b; font-size: 0.8em;" title="Total real del albarán: €{{ number_format($totalRealAlbaran, 4, ',', '.') }}">
-                                                (de €{{ number_format($totalRealAlbaran, 4, ',', '.') }})
+                                            <small style="color: #64748b; font-size: 0.8em;" title="Total real del albarán: €{{ number_format($totalRealAlbaran, 2, ',', '.') }}">
+                                                (de €{{ number_format($totalRealAlbaran, 2, ',', '.') }})
                                             </small>
                                         @endif
                                     </td>
@@ -512,6 +514,7 @@
         <!-- FIN MODAL -->
 
     </section>
+    @include('partials.document-activity-chatter', ['activities' => $activities ?? collect()])
 @endsection
 
 @section('js')
@@ -519,7 +522,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             // Formateadores locales para pintar el desglose en el JS
             const numFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const moneyFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+            const moneyFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             // Capturar clics en los enlaces de Drill-down
             document.querySelectorAll('.drilldown-link').forEach(link => {

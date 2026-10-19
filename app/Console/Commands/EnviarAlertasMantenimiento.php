@@ -68,7 +68,12 @@ class EnviarAlertasMantenimiento extends Command
 
     private function recopilarDatos($tipos, $hoy)
     {
-        $datos = ['caducidades' => collect(), 'proximos' => collect(), 'averias' => collect()];
+        $datos = [
+            'caducidades' => collect(),
+            'proximos' => collect(),
+            'preventivos' => collect(),
+            'averias' => collect(),
+        ];
         $hoySoloDia = $hoy->copy()->startOfDay();
         
         // REPORTE DE CADUCIDADES (Incluye Planta, IT y Metrología)
@@ -88,8 +93,11 @@ class EnviarAlertasMantenimiento extends Command
                 });
 
             // IT
-            EquipoInformatico::where('soporte_hasta', '<', $hoySoloDia)
-                ->orWhere('fecha_mantenimiento', '<', $hoySoloDia)
+            EquipoInformatico::where('activo', true)
+                ->where(function ($q) use ($hoySoloDia) {
+                    $q->where('soporte_hasta', '<', $hoySoloDia)
+                        ->orWhere('fecha_mantenimiento', '<', $hoySoloDia);
+                })
                 ->get()->each(function($item) use ($criticas, $hoySoloDia) {
                     if ($item->soporte_hasta && $item->soporte_hasta < $hoySoloDia) {
                         $criticas->push((object)['nombre' => $item->nombre, 'codigo' => $item->numero_serie, 'fecha_inspeccion' => $item->soporte_hasta]);
@@ -126,13 +134,16 @@ class EnviarAlertasMantenimiento extends Command
                 });
 
             // IT
-            EquipoInformatico::whereBetween('soporte_hasta', [$hoySoloDia, $en30Dias])
-                ->orWhereBetween('fecha_mantenimiento', [$hoySoloDia, $en30Dias])
+            EquipoInformatico::where('activo', true)
+                ->where(function ($q) use ($hoySoloDia, $en30Dias) {
+                    $q->whereBetween('soporte_hasta', [$hoySoloDia, $en30Dias])
+                        ->orWhereBetween('fecha_mantenimiento', [$hoySoloDia, $en30Dias]);
+                })
                 ->get()->each(function($item) use ($prev, $hoySoloDia, $en30Dias) {
-                    if ($item->soporte_hasta >= $hoySoloDia && $item->soporte_hasta <= $en30Dias) {
+                    if ($item->soporte_hasta && $item->soporte_hasta >= $hoySoloDia && $item->soporte_hasta <= $en30Dias) {
                         $prev->push((object)['nombre' => $item->nombre, 'codigo' => $item->numero_serie, 'fecha_inspeccion' => $item->soporte_hasta]);
                     }
-                    if ($item->fecha_mantenimiento >= $hoySoloDia && $item->fecha_mantenimiento <= $en30Dias) {
+                    if ($item->fecha_mantenimiento && $item->fecha_mantenimiento >= $hoySoloDia && $item->fecha_mantenimiento <= $en30Dias) {
                         $prev->push((object)['nombre' => $item->nombre, 'codigo' => $item->numero_serie, 'fecha_inspeccion' => $item->fecha_mantenimiento]);
                     }
                 });
@@ -144,6 +155,7 @@ class EnviarAlertasMantenimiento extends Command
                 });
 
             $datos['preventivos'] = $prev->sortBy('fecha_inspeccion')->values();
+            $datos['proximos'] = $datos['preventivos'];
         }
 
         // REPORTE DE AVERÍAS Y TALLER (Últimos 7 días)

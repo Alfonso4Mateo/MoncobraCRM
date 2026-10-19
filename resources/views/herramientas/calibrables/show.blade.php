@@ -16,6 +16,9 @@
             <a href="{{ route('calibrables.edit', $herramienta) }}" class="cal-btn cal-btn-soft">
                 <i class="fas fa-edit"></i> Editar ficha
             </a>
+            <a href="{{ route('activos.qr.download', ['tipo' => 'calibrable', 'id' => $herramienta->id]) }}" class="cal-btn cal-btn-soft">
+                <i class="fas fa-qrcode"></i> Descargar QR
+            </a>
             <!-- Botón para añadir a la bitácora -->
             <button type="button" class="cal-btn cal-btn-main" data-toggle="modal" data-target="#event-modal">
                 <i class="fas fa-plus"></i> Añadir Registro / Certificado

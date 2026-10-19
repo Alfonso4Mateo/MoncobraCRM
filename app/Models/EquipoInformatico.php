@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity;
 
 class EquipoInformatico extends Model
@@ -23,8 +24,13 @@ class EquipoInformatico extends Model
         'responsable', 'proveedor', 'fecha_adquisicion', 'fecha_mantenimiento',
         'descripcion', 'imagen', 'activo', 'tipo_equipo', 'sistema_operativo', 'procesador',
         'memoria_ram', 'almacenamiento', 'mac_address', 'ip_address', 'garantia_hasta',
-        'soporte_hasta', 'condicion_fisica', 'etiqueta_color', 'dias_estimados_baja', 'fecha_baja',
+        'soporte_hasta', 'condicion_fisica', 'etiqueta_color', 'dias_estimados_baja', 'fecha_baja', 'personal_id',
     ];
+
+    public function personalAsignado(): BelongsTo
+    {
+        return $this->belongsTo(Personal::class, 'personal_id');
+    }
 
     protected $casts = [
         'fecha_adquisicion' => 'date', 'fecha_mantenimiento' => 'date',

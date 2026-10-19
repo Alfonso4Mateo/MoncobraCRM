@@ -27,11 +27,19 @@
             <p class="text-muted mb-0" style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">{{ $breadcrumb ?? 'Inicio / Bolsas' }}</p>
             <h1 class="m-0 text-dark font-weight-bold"><i class="fas fa-briefcase text-warning mr-2"></i> {{ $titulo ?? 'Gestión de Bolsas Globales' }}</h1>
         </div>
+        @can('pedidos.manage')
         <a href="{{ route('bolsas.create') }}" class="btn btn-primary font-weight-bold shadow-sm" style="border-radius: 8px;"><i class="fas fa-plus mr-1"></i> Nueva Bolsa Global</a>
+        @endcan
     </div>
 @endsection
 
 @section('content')
+    @if (session('success'))
+        <div class="alert alert-success shadow-sm">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger shadow-sm">{{ session('error') }}</div>
+    @endif
     <div class="row">
         @forelse($bolsas as $bolsa)
             @php
@@ -97,9 +105,15 @@
                         <a href="{{ route('bolsas.show', $bolsa) }}" class="btn font-weight-bold m-0" style="background-color: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 8px; flex: 1;">
                             <i class="fas fa-eye text-primary mr-1"></i> Ver Partidas
                         </a>
+                        @can('pedidos.manage')
+                        <a href="{{ route('bolsas.edit', $bolsa) }}" class="btn btn-outline-primary font-weight-bold" title="Editar bolsa">
+                            <i class="fas fa-pen"></i>
+                        </a>
+                        @endcan
                         
                         {{-- Solo permitimos borrar si la bolsa no tiene partidas vinculadas --}}
                         @if($bolsa->partidas_count === 0)
+                            @can('pedidos.delete')
                             <form action="{{ route('bolsas.destroy', $bolsa) }}" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar esta bolsa global? Esta acción no se puede deshacer.');">
                                 @csrf
                                 @method('DELETE')
@@ -107,6 +121,7 @@
                                     <i class="fas fa-trash-alt"></i>
                                 </button>
                             </form>
+                            @endcan
                         @endif
                     </div>
                 </div>

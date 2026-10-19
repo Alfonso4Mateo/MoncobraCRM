@@ -16,6 +16,9 @@
             <a href="{{ route('equipos.edit', $equipo) }}" class="detail-btn detail-btn-soft">
                 <i class="fas fa-edit"></i> Editar ficha
             </a>
+            <a href="{{ route('activos.qr.download', ['tipo' => 'equipo', 'id' => $equipo->id]) }}" class="detail-btn detail-btn-soft">
+                <i class="fas fa-qrcode"></i> Descargar QR
+            </a>
             <button type="button" class="detail-btn detail-btn-main" data-toggle="modal" data-target="#event-modal">
                 <i class="fas fa-plus"></i> Añadir registro / Parte
             </button>

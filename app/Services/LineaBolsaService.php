@@ -52,11 +52,11 @@ class LineaBolsaService
                 : LineaBolsa::MODO_CANTIDAD;
 
             $cantidad = round(max(0, (float) ($lineaPayload['cantidad'] ?? 0)), 2);
-            $precioUnitario = round(max(0, (float) ($lineaPayload['precio_unitario'] ?? ($lineaPayload['precio'] ?? 0))), 4);
+            $precioUnitario = round(max(0, (float) ($lineaPayload['precio_unitario'] ?? ($lineaPayload['precio'] ?? 0))), 2);
             $margen = round(max(0, (float) ($lineaPayload['margen'] ?? 0)), 2);
             $total = round(
                 (float) ($lineaPayload['total'] ?? ($cantidad * $precioUnitario * (1 + $margen / 100))),
-                4
+                2
             );
 
             // En modo importe la unidad siempre es 1: lo que varía es el importe, no la cantidad.
@@ -73,14 +73,15 @@ class LineaBolsaService
             if ($lineaExistente) {
                 $yaConsumidoDeEstaPartida = (float) AlbaranLineaPartida::where('linea_id', $lineaExistente->id)
                     ->where('pedido_id', $partida->id)
+                    ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
                     ->sum('importe');
 
-                if ($total < $yaConsumidoDeEstaPartida - 0.0001) {
+                if ($total < $yaConsumidoDeEstaPartida - 0.001) {
                     throw ValidationException::withMessages([
                         'lista_articulos' => sprintf(
                             'La línea "%s" ya tiene %s € facturados desde este pedido y no se puede reducir por debajo de esa cifra.',
                             \Illuminate\Support\Str::limit($descripcion, 60),
-                            number_format($yaConsumidoDeEstaPartida, 4, ',', '.')
+                            number_format($yaConsumidoDeEstaPartida, 2, ',', '.')
                         ),
                     ]);
                 }
@@ -100,7 +101,6 @@ class LineaBolsaService
                     'precio_unitario' => $precioUnitario,
                     'margen' => $margen,
                     'importe_objetivo' => $total,
-                    'estado' => LineaBolsa::ESTADO_ACTIVA,
                 ]
             );
 
@@ -110,6 +110,8 @@ class LineaBolsaService
                 ['linea_id' => $linea->id, 'pedido_id' => $partida->id],
                 ['importe_asignado' => $total, 'updated_at' => now(), 'created_at' => now()]
             );
+
+            $this->recalcularLinea($linea);
         }
 
         // Limpieza de huérfanas: líneas que esta partida alimentaba antes y que ya no
@@ -119,9 +121,10 @@ class LineaBolsaService
         foreach ($idsAEliminar as $lineaId) {
             $yaConsumidoDeEstaPartida = (float) AlbaranLineaPartida::where('linea_id', $lineaId)
                 ->where('pedido_id', $partida->id)
+                ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
                 ->sum('importe');
 
-            if ($yaConsumidoDeEstaPartida > 0.0001) {
+            if ($yaConsumidoDeEstaPartida > 0.001) {
                 // Ya se ha facturado algo de esta partida contra esta línea: no se puede
                 // desvincular en silencio porque se perdería a qué pedido correspondía ese
                 // consumo. Se deja tal cual y se avisa, en vez de borrar historial real.
@@ -140,48 +143,9 @@ class LineaBolsaService
                 // Sin ninguna otra partida que la nutra y sin consumo histórico: no sirve
                 // para nada dejarla viva. Soft delete, no hard delete (conserva auditoría).
                 $linea->delete();
+            } elseif ($linea) {
+                $this->recalcularLinea($linea);
             }
-        }
-    }
-
-    /**
-     * Vincula una línea que YA EXISTE (nacida en otra partida, incluso de
-     * otra bolsa) a una partida nueva, sumando el importe indicado a lo
-     * que esa partida ya le tuviera asignado. Esto es lo que permite
-     * "reutilizar el sobrante" de una bolsa en la línea de otra.
-     */
-    public function asignarImporteAPartida(LineaBolsa $linea, PedidoCliente $partida, float $importeAdicional): void
-    {
-        if ($importeAdicional <= 0) {
-            return;
-        }
-
-        $existente = DB::table('linea_partida')
-            ->where('linea_id', $linea->id)
-            ->where('pedido_id', $partida->id)
-            ->first();
-
-        if ($existente) {
-            DB::table('linea_partida')
-                ->where('id', $existente->id)
-                ->update([
-                    'importe_asignado' => (float) $existente->importe_asignado + $importeAdicional,
-                    'updated_at' => now(),
-                ]);
-        } else {
-            DB::table('linea_partida')->insert([
-                'linea_id' => $linea->id,
-                'pedido_id' => $partida->id,
-                'importe_asignado' => $importeAdicional,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        $linea->increment('importe_objetivo', $importeAdicional);
-
-        if ($linea->estado === LineaBolsa::ESTADO_AGOTADA && $linea->fresh()->importeDisponible() > 0) {
-            $linea->update(['estado' => LineaBolsa::ESTADO_ACTIVA]);
         }
     }
 
@@ -193,8 +157,19 @@ class LineaBolsaService
     public function lineasDisponiblesPorPartida(PedidoCliente $partida): array
     {
         return $partida->lineasBolsa()
+            ->withCount('partidas')
+            ->withSum('partidas as total_asignado', 'linea_partida.importe_asignado')
+            ->withSum([
+                'repartos as total_consumido' => fn ($query) => $query->whereHas(
+                    'albaran',
+                    fn ($albaranQuery) => $albaranQuery->whereNotIn('estado', ['cancelado', 'rechazado'])
+                ),
+            ], 'importe')
             ->get()
-            ->map(function (LineaBolsa $linea) use ($partida) {
+            ->map(function (LineaBolsa $linea) {
+                $asignadoTotal = round((float) ($linea->total_asignado ?? 0), 2);
+                $consumidoTotal = round((float) ($linea->total_consumido ?? 0), 2);
+
                 return [
                     'uid' => $linea->uid,
                     'linea_id' => $linea->id,
@@ -205,12 +180,11 @@ class LineaBolsaService
                     'cantidad' => (float) $linea->cantidad,
                     'precio_unitario' => (float) $linea->precio_unitario,
                     'margen' => (float) $linea->margen,
-                    'importe_asignado_partida' => (float) $partida->lineasBolsa()
-                        ->where('linea_id', $linea->id)->first()?->pivot?->importe_asignado,
-                    'importe_asignado_total' => $linea->importeAsignadoTotal(),
-                    'importe_consumido_total' => $linea->importeConsumidoTotal(),
-                    'num_partidas' => $linea->partidas()->count(),
-                    'importe_disponible' => $linea->importeDisponible(),
+                    'importe_asignado_partida' => round((float) ($linea->pivot->importe_asignado ?? 0), 2),
+                    'importe_asignado_total' => $asignadoTotal,
+                    'importe_consumido_total' => $consumidoTotal,
+                    'num_partidas' => (int) ($linea->partidas_count ?? 0),
+                    'importe_disponible' => max(0, round($asignadoTotal - $consumidoTotal, 2)),
                     'estado' => $linea->estado,
                 ];
             })
@@ -232,13 +206,14 @@ class LineaBolsaService
                 $asignado = (float) $partida->pivot->importe_asignado;
                 $consumido = (float) AlbaranLineaPartida::where('linea_id', $linea->id)
                     ->where('pedido_id', $partida->id)
+                    ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
                     ->sum('importe');
 
                 return [
                     'pedido_id' => $partida->id,
                     'numero_pedido' => $partida->numero_pedido,
-                    'importe_asignado' => round($asignado, 4),
-                    'importe_disponible' => round(max(0, $asignado - $consumido), 4),
+                    'importe_asignado' => round($asignado, 2),
+                    'importe_disponible' => round(max(0, $asignado - $consumido), 2),
                 ];
             })
             ->values()
@@ -264,9 +239,9 @@ class LineaBolsaService
                 'linea_uid' => $linea->uid,
                 'cantidad' => $linea->esPorImporte()
                     ? 1
-                    : round($importeTotal / max(0.0001, (float) $linea->precio_unitario * (1 + $linea->margen / 100)), 2),
+                    : round($importeTotal / max(0.001, (float) $linea->precio_unitario * (1 + $linea->margen / 100)), 2),
                 'precio_unitario' => (float) $linea->precio_unitario,
-                'total' => round($importeTotal, 4),
+                'total' => round($importeTotal, 2),
             ]
         );
 
@@ -277,7 +252,7 @@ class LineaBolsaService
             ? $this->normalizarRepartoManual($repartoManual)
             : $this->repartoAutomatico($linea);
 
-        $restante = round($importeTotal, 4);
+        $restante = round($importeTotal, 2);
 
         foreach ($tramos as $tramo) {
             if ($restante <= 0.001) {
@@ -293,10 +268,10 @@ class LineaBolsaService
                 'albaran_id' => $albaran->id,
                 'linea_id' => $linea->id,
                 'pedido_id' => $tramo['pedido_id'],
-                'importe' => round($importeTramo, 4),
+                'importe' => round($importeTramo, 2),
             ]);
 
-            $restante = round($restante - $importeTramo, 4);
+            $restante = round($restante - $importeTramo, 2);
         }
 
         $excedente = 0.0;
@@ -335,9 +310,10 @@ class LineaBolsaService
             $asignado = (float) $partida->pivot->importe_asignado;
             $consumidoPartida = (float) AlbaranLineaPartida::where('linea_id', $linea->id)
                 ->where('pedido_id', $partida->id)
+                ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
                 ->sum('importe');
 
-            $disponible = round(max(0, $asignado - $consumidoPartida), 4);
+            $disponible = round(max(0, $asignado - $consumidoPartida), 2);
 
             if ($disponible > 0) {
                 $tramos[] = ['pedido_id' => $partida->id, 'importe' => $disponible];
@@ -352,10 +328,23 @@ class LineaBolsaService
         return collect($reparto)
             ->map(fn ($item) => [
                 'pedido_id' => (int) ($item['pedido_id'] ?? 0),
-                'importe' => round(max(0, (float) ($item['importe'] ?? 0)), 4),
+                'importe' => round(max(0, (float) ($item['importe'] ?? 0)), 2),
             ])
             ->filter(fn ($item) => $item['pedido_id'] > 0 && $item['importe'] > 0)
             ->values()
             ->all();
+    }
+
+    private function recalcularLinea(LineaBolsa $linea): void
+    {
+        $linea->refresh();
+        $objetivo = round((float) $linea->partidas()->sum('linea_partida.importe_asignado'), 2);
+        $disponible = round(max(0, $objetivo - $linea->importeConsumidoTotal()), 2);
+        $linea->update([
+            'importe_objetivo' => $objetivo,
+            'estado' => $disponible > 0.001
+                ? LineaBolsa::ESTADO_ACTIVA
+                : LineaBolsa::ESTADO_AGOTADA,
+        ]);
     }
 }

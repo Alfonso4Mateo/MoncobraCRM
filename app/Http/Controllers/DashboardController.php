@@ -130,13 +130,20 @@ class DashboardController extends Controller
      */
     private function collectDashboardMetrics(Carbon $today): array
     {
-        $countFromFirstAvailableTable = function (array $tables, ?callable $constraint = null): int {
+        $proyectoId = (int) session('active_proyecto_id');
+        $countFromFirstAvailableTable = function (array $tables, ?callable $constraint = null) use ($proyectoId): int {
             foreach ($tables as $table) {
                 if (!Schema::hasTable($table)) {
                     continue;
                 }
 
                 $query = DB::table($table);
+                if (Schema::hasColumn($table, 'deleted_at')) {
+                    $query->whereNull('deleted_at');
+                }
+                if ($proyectoId > 0 && Schema::hasColumn($table, 'proyecto_id')) {
+                    $query->where('proyecto_id', $proyectoId);
+                }
                 if ($constraint) {
                     $query = $constraint($query, $table);
                 }
@@ -159,19 +166,21 @@ class DashboardController extends Controller
             return $query->whereRaw('1 = 0');
         };
 
+        $projectFilter = fn ($query) => $proyectoId > 0 ? $query->where('proyecto_id', $proyectoId) : $query;
+
         return [
-            'totalClientes' => Cliente::count(),
-            'clientesUltimos30Dias' => Cliente::where('created_at', '>=', now()->subDays(30))->count(),
-            'totalPresupuestos' => Presupuesto::count(),
-            'presupuestosUltimos30Dias' => Presupuesto::where('created_at', '>=', now()->subDays(30))->count(),
-            'albaranesHoy' => AlbaranCliente::whereDate('created_at', $today)->count(),
-            'albaranesMes' => AlbaranCliente::whereMonth('created_at', $today->month)
+            'totalClientes' => $projectFilter(Cliente::query())->count(),
+            'clientesUltimos30Dias' => $projectFilter(Cliente::where('created_at', '>=', now()->subDays(30)))->count(),
+            'totalPresupuestos' => $projectFilter(Presupuesto::query())->count(),
+            'presupuestosUltimos30Dias' => $projectFilter(Presupuesto::where('created_at', '>=', now()->subDays(30)))->count(),
+            'albaranesHoy' => $projectFilter(AlbaranCliente::whereDate('created_at', $today))->count(),
+            'albaranesMes' => $projectFilter(AlbaranCliente::whereMonth('created_at', $today->month)
                 ->whereYear('created_at', $today->year)
-                ->count(),
-            'totalInventario' => Inventario::count(),
-            'stockBajo' => Inventario::whereColumn('stock_actual', '<=', 'stock_minimo')->count(),
-            'totalClases' => Clase::count(),
-            'totalAlmacenes' => Almacen::count(),
+                )->count(),
+            'totalInventario' => $projectFilter(Inventario::query())->count(),
+            'stockBajo' => $projectFilter(Inventario::whereColumn('stock_actual', '<=', 'stock_minimo'))->count(),
+            'totalClases' => $projectFilter(Clase::query())->count(),
+            'totalAlmacenes' => $projectFilter(Almacen::query())->count(),
             'totalPersonal' => Personal::count(),
             'personalActivos' => Personal::where('activo', true)->count(),
             'totalPedidos' => $countFromFirstAvailableTable(['pedidos_clientes', 'pedidos']),
@@ -299,6 +308,22 @@ class DashboardController extends Controller
             'metrics' => [
                 ['label' => 'Registros', 'value' => $metrics['totalDocumentos']],
                 ['label' => 'Actualizados hoy', 'value' => $metrics['documentosHoy']],
+            ],
+        ];
+
+        $dashboardPanels[] = [
+            'id' => 'bolsa',
+            'category' => 'VENTAS',
+            'title' => 'Bolsas Globales',
+            'icon' => 'fas fa-layer-group',
+            'tone' => 'presupuestos',
+            'description' => 'Gestiona bolsas globales y sus partidas asociadas.',
+            'route' => route('bolsas.index'),
+            'cta' => 'Ver bolsas',
+            'secondary_route' => route('bolsas.create'),
+            'secondary_text' => 'Nueva bolsa',
+            'metrics' => [
+                ['label' => 'Acceso', 'value' => '—'],
             ],
         ];
 

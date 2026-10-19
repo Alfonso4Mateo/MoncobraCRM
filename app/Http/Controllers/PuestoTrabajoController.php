@@ -66,7 +66,10 @@ class PuestoTrabajoController extends Controller
         if ($mesesNuevos && $mesesNuevos !== $mesesAnteriores) {
             $trabajadores = $puestoTrabajo->personal()
                 ->whereNotNull('ultima_revision_medica')
-                ->where('revision_medica_manual', false)
+                ->where(function ($q) {
+                    $q->where('revision_medica_manual', false)
+                        ->orWhereNull('revision_medica_manual');
+                })
                 ->get();
 
             foreach ($trabajadores as $trabajador) {

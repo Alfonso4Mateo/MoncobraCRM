@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Personal;
 use App\Models\SalidaStock;
+use App\Models\EquipoInformatico;
+use App\Models\HerramientaPlanta;
+use App\Models\AparatoCalibrable;
 use App\Models\Proyecto;
 use App\Models\Departamento;
 use App\Models\Puesto;
@@ -12,6 +15,7 @@ use App\Models\PuestoTrabajo;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 
 class PersonalController extends Controller
 {
@@ -98,7 +102,7 @@ class PersonalController extends Controller
             return response()->streamDownload(function () use ($rows) {
                 $handle = fopen('php://output', 'w');
                 fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-                fputcsv($handle, ['ID', 'Nombre', 'Apellido', 'DNI/NIE', 'Telefono', 'Departamento', 'Estado', 'Proyectos']);
+                fputcsv($handle, ['ID', 'Nombre', 'Apellido', 'DNI/NIE', 'Telefono', 'Departamento', 'Estado', 'Sin Tallas', 'Proyectos'], ';');
 
                 foreach ($rows as $row) {
                     fputcsv($handle, [
@@ -111,7 +115,7 @@ class PersonalController extends Controller
                         $row->activo ? 'Activo' : 'Inactivo',
                         $row->sin_tallas ? 'Sí' : 'No',
                         $row->proyectos->pluck('nombre')->join(' | '),
-                    ]);
+                    ], ';');
                 }
 
                 fclose($handle);
@@ -269,13 +273,8 @@ class PersonalController extends Controller
             $proyectoIds = $user->proyectos->pluck('id')->toArray();
         }
 
-        if ($request->has('departamento')) {
-            $validated['departamento'] = is_array($request->input('departamento')) 
-                ? implode(',', $request->input('departamento')) 
-                : $request->input('departamento');
-        } else {
-            $validated['departamento'] = null;
-        }
+        $departamentos = array_values(array_filter((array) $request->input('departamento', [])));
+        $validated['departamento'] = $departamentos ?: null;
 
         $validated['activo'] = $request->boolean('activo', true);
         
@@ -296,7 +295,9 @@ class PersonalController extends Controller
 
     public function show(Personal $personal, Request $request)
     {
-        $this->authorize('personal.acciones');
+        abort_unless(auth()->user()->canAny(['personal.view', 'personal.acciones']), 403);
+        $this->authorize('view', $personal);
+        $this->authorizePersonalProyecto($personal);
         
         $personal->load([
             'proyectos',
@@ -308,33 +309,28 @@ class PersonalController extends Controller
         $nombreNormalizado = mb_strtolower($nombreCompleto);
         $personal->load(['proyectos', 'historialPrl']);
 
-        $salidasQuery = SalidaStock::query()
+        $nombreBusqueda = trim((string) $personal->name);
+        $salidasQuery = SalidaStock::query();
+        if (Schema::hasColumn((new SalidaStock())->getTable(), 'personal_id')) {
+            $salidasQuery->where(function ($query) use ($personal, $nombreNormalizado) {
+                $query->where('personal_id', $personal->id)
+                    ->orWhere(function ($legacyQuery) use ($nombreNormalizado) {
+                        $legacyQuery->whereNull('personal_id')
+                            ->whereRaw('LOWER(TRIM(solicitante)) = ?', [$nombreNormalizado]);
+                    });
+            });
+        } else {
+            $salidasQuery->whereRaw('LOWER(TRIM(solicitante)) = ?', [$nombreNormalizado]);
+        }
+        $salidasQuery
+            ->when($request->input('fecha_desde'), fn ($query, $fecha) => $query->whereDate('fecha', '>=', $fecha))
+            ->when($request->input('fecha_hasta'), fn ($query, $fecha) => $query->whereDate('fecha', '<=', $fecha))
             ->orderByDesc('fecha')
             ->orderByDesc('id');
 
         $salidas = $salidasQuery
             ->get()
-            ->filter(function (SalidaStock $salida) use ($nombreNormalizado) {
-                $solicitante = trim((string) ($salida->solicitante ?? ''));
-
-                if ($solicitante === '') {
-                    return false;
-                }
-
-                return mb_strtolower(preg_replace('/\s+/', ' ', $solicitante)) === $nombreNormalizado;
-            })
             ->filter(function (SalidaStock $salida) use ($request) {
-                $fechaDesde = $request->input('fecha_desde');
-                $fechaHasta = $request->input('fecha_hasta');
-
-                if ($fechaDesde && $salida->fecha < \Carbon\Carbon::parse($fechaDesde)->startOfDay()) {
-                    return false;
-                }
-
-                if ($fechaHasta && $salida->fecha > \Carbon\Carbon::parse($fechaHasta)->endOfDay()) {
-                    return false;
-                }
-
                 $articuloBuscar = trim((string) $request->input('articulo'));
                 if ($articuloBuscar !== '') {
                     $articulos = collect((array) $salida->items)
@@ -351,6 +347,12 @@ class PersonalController extends Controller
             })
             ->take(8)
             ->values();
+
+        $activosAsignados = collect([
+            'Equipos IT' => $this->assignedAssetsQuery(new EquipoInformatico(), 'responsable', $personal, $nombreNormalizado)->get(),
+            'Maquinaria de planta' => $this->assignedAssetsQuery(new HerramientaPlanta(), 'responsable', $personal, $nombreNormalizado)->get(),
+            'Aparatos calibrables' => $this->assignedAssetsQuery(new AparatoCalibrable(), 'responsable', $personal, $nombreNormalizado)->get(),
+        ]);
 
         $historicoSalidas = $salidas->flatMap(function (SalidaStock $salida) {
             $items = collect((array) $salida->items)
@@ -401,12 +403,26 @@ class PersonalController extends Controller
             ['label' => 'Bolsa F.O.D.', 'value' => $personal->bolsa_fod ?: '—', 'icon' => 'fa-bag-shopping'],
         ];
 
-        return view('personal.show', compact('personal', 'historicoSalidas', 'tallas', 'cursosCatalogo'));
+        return view('personal.show', compact('personal', 'historicoSalidas', 'tallas', 'cursosCatalogo', 'activosAsignados'));
+    }
+
+    private function assignedAssetsQuery($model, string $legacyColumn, Personal $personal, string $nombreNormalizado)
+    {
+        $query = $model::query();
+        if (Schema::hasColumn($model->getTable(), 'personal_id')) {
+            return $query->where(function ($builder) use ($personal, $legacyColumn, $nombreNormalizado) {
+                $builder->where('personal_id', $personal->id)
+                    ->orWhere(fn ($legacy) => $legacy->whereNull('personal_id')->whereRaw("LOWER(TRIM({$legacyColumn})) = ?", [$nombreNormalizado]));
+            });
+        }
+
+        return $query->whereRaw("LOWER(TRIM({$legacyColumn})) = ?", [$nombreNormalizado]);
     }
 
     public function edit(Personal $personal)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
 
         $departamentos = Departamento::orderBy('nombre')->get();
         $puestosTrabajoCatalogo = PuestoTrabajo::where('activo', true)->orderBy('nombre')->get();
@@ -423,6 +439,7 @@ class PersonalController extends Controller
     public function update(Request $request, Personal $personal)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
 
         $validated = $this->validatePersonal($request, $personal->id);
 
@@ -452,13 +469,8 @@ class PersonalController extends Controller
         $proyectoIds = $validated['proyecto_ids'] ?? null;
         unset($validated['proyecto_ids']);
 
-        if ($request->has('departamento')) {
-            $validated['departamento'] = is_array($request->input('departamento')) 
-                ? implode(',', $request->input('departamento')) 
-                : $request->input('departamento');
-        } else {
-            $validated['departamento'] = null;
-        }
+        $departamentos = array_values(array_filter((array) $request->input('departamento', [])));
+        $validated['departamento'] = $departamentos ?: null;
 
         if ($request->has('activo')) {
             $validated['activo'] = $request->boolean('activo');
@@ -484,6 +496,7 @@ class PersonalController extends Controller
     public function destroy(Personal $personal)
     {
         $this->authorize('personal.delete');
+        $this->authorizePersonalProyecto($personal);
 
         $personal->delete();
 
@@ -493,6 +506,7 @@ class PersonalController extends Controller
     public function toggleStatus(Personal $personal)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
         
         $estabaInactivo = !$personal->activo;
         $personal->activo = !$personal->activo; 
@@ -513,6 +527,7 @@ class PersonalController extends Controller
     public function uploadDocumentosPrl(Request $request, Personal $personal)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
 
         $request->validate([
             'tipo_documento' => 'required|in:riesgos,epi',
@@ -542,6 +557,7 @@ class PersonalController extends Controller
     public function destroyDocumentosPrl(Personal $personal, $tipo)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
 
         if (!in_array($tipo, ['riesgos', 'epi'])) {
             return redirect()->back()->with('error', 'Tipo de documento no válido.');
@@ -564,6 +580,7 @@ class PersonalController extends Controller
     public function destroyHistorialPrl(Personal $personal, \App\Models\HistorialPrl $historial)
     {
         $this->authorize('personal.edit');
+        $this->authorizePersonalProyecto($personal);
 
         // Validamos de forma estricta que el historial pertenezca a este trabajador
         if ($historial->personal_id !== $personal->id) {
@@ -818,6 +835,7 @@ class PersonalController extends Controller
                     $deptosStr,
                     $row->puesto ?: '—',
                     $row->activo ? 'Activo' : 'Inactivo',
+                    $row->proyectos->pluck('nombre')->join(' | '),
                 ], ';');
             }
 
@@ -864,16 +882,13 @@ class PersonalController extends Controller
             ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento) 
             : (array) $personal->departamento;
             
-        if (empty($deptosActuales)) {
-            return; 
-        }
-
         $nombresNormalizados = array_map(function($d) { return mb_strtoupper(trim($d)); }, $deptosActuales);
         
         $puestos = \App\Models\Puesto::with('cursos')
             ->whereIn('nombre', $nombresNormalizados)
             ->where('activo', true)
             ->get();
+        $puestos = $puestos->merge($personal->puestos()->with('cursos')->get());
 
         $cursosObligatoriosIds = [];
 
@@ -920,63 +935,17 @@ class PersonalController extends Controller
         return view('personal.puestos', compact('puestos'));
     }
 
-    public function addPuesto(Request $request, Personal $personal)
+    private function authorizePersonalProyecto(Personal $personal): void
     {
-        $this->authorize('cursos.edit');
-
-        $request->validate([
-            'puesto_id' => 'required|exists:puestos,id'
-        ]);
-
-        try {
-            // Asignar el perfil al trabajador sin duplicarlo
-            $personal->puestos()->syncWithoutDetaching([$request->puesto_id]);
-
-            // MACRO AUTOMÁTICA: Inyectar cursos obligatorios del perfil
-            $puesto = \App\Models\Puesto::with('cursos')->find($request->puesto_id);
-            
-            if ($puesto && $puesto->cursos->count() > 0) {
-                $cursosActualesIds = $personal->cursos()->pluck('cursos.id')->toArray();
-                $cursosObligatoriosIds = $puesto->cursos->pluck('id')->toArray();
-                
-                // Extraer solo los cursos que el trabajador no tenga ya asignados
-                $cursosNuevos = array_diff($cursosObligatoriosIds, $cursosActualesIds);
-
-                if (!empty($cursosNuevos)) {
-                    $syncData = [];
-                    foreach ($cursosNuevos as $cursoId) {
-                        $syncData[$cursoId] = [
-                            'apto' => false,
-                            'fecha_realizacion' => null,
-                            'descripcion_aptitud' => 'Asignado automáticamente por perfil formativo: ' . $puesto->nombre
-                        ];
-                    }
-                    $personal->cursos()->attach($syncData);
-                }
-            }
-
-            return response()->json(['success' => true]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Error en el servidor: ' . $e->getMessage()
-            ], 500);
+        $user = auth()->user();
+        if ($user?->role === 'superadmin') {
+            return;
         }
-    }
 
-    public function removePuesto(Personal $personal, $puestoId)
-    {
-        $this->authorize('cursos.edit');
-
-        try {
-            $personal->puestos()->detach($puestoId);
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Error en el servidor: ' . $e->getMessage()
-            ], 500);
+        $misProyectos = $user?->proyectos->pluck('id')->all() ?? [];
+        $personalProyectos = $personal->proyectos()->pluck('proyectos.id')->all();
+        if ($misProyectos === [] || $personalProyectos === [] || empty(array_intersect($misProyectos, $personalProyectos))) {
+            abort(403);
         }
     }
 }

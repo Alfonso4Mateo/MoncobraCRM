@@ -17,6 +17,7 @@
                 <i class="fas fa-arrow-left mr-1"></i> Volver
             </a>
             
+            @can('pedidos.delete')
             @if($bolsa->partidas->isEmpty())
                 <form action="{{ route('bolsas.destroy', $bolsa) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que quieres borrar esta bolsa global vacía?');">
                     @csrf
@@ -26,10 +27,16 @@
                     </button>
                 </form>
             @endif
+            @endcan
 
+            @can('pedidos.manage')
+            <a href="{{ route('bolsas.edit', $bolsa) }}" class="btn btn-outline-primary font-weight-bold mr-2">
+                <i class="fas fa-pen mr-1"></i> Editar
+            </a>
             <a href="{{ route('pedidos-clientes.create', ['cliente_id' => $bolsa->id_cliente, 'bolsa_id' => $bolsa->id, 'bolsa' => 1]) }}" class="btn btn-primary font-weight-bold">
                 <i class="fas fa-plus mr-1"></i> Nueva Partida
             </a>
+            @endcan
         </div>
     </div>
 @endsection
@@ -38,6 +45,11 @@
     @if (session('success'))
         <div class="alert alert-success shadow-sm" style="border-radius: 8px; font-weight: bold;">
             <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger shadow-sm" style="border-radius: 8px; font-weight: bold;">
+            <i class="fas fa-exclamation-circle mr-2"></i> {{ session('error') }}
         </div>
     @endif
 
@@ -51,7 +63,7 @@
         <div class="col-md-4">
             <div class="small-box bg-white shadow-sm" style="border-radius: 12px; border-bottom: 4px solid #1f74dd;">
                 <div class="inner">
-                    <h3 style="color: #17385d;">{{ number_format($acumulado, 4, ',', '.') }} €</h3>
+                    <h3 style="color: #17385d;">{{ number_format($acumulado, 2, ',', '.') }} €</h3>
                     <p class="text-muted font-weight-bold mb-0">TOTAL ACUMULADO</p>
                 </div>
                 <div class="icon"><i class="fas fa-layer-group text-primary" style="opacity: 0.15;"></i></div>
@@ -72,7 +84,7 @@
             <div class="col-md-4">
                 <div class="small-box bg-white shadow-sm" style="border-radius: 12px; border-bottom: 4px solid #64748b;">
                     <div class="inner">
-                        <h3 style="color: #475569;">{{ number_format($bolsa->total, 4, ',', '.') }} €</h3>
+                        <h3 style="color: #475569;">{{ number_format($bolsa->total, 2, ',', '.') }} €</h3>
                         <p class="text-muted font-weight-bold mb-0">TOPE INICIAL (LÍMITE)</p>
                     </div>
                     <div class="icon"><i class="fas fa-file-contract text-secondary" style="opacity: 0.15;"></i></div>
@@ -81,7 +93,7 @@
             <div class="col-md-4">
                 <div class="small-box bg-white shadow-sm" style="border-radius: 12px; border-bottom: 4px solid #10b981;">
                     <div class="inner">
-                        <h3 style="color: #059669;">{{ number_format($bolsa->saldoDisponible(), 4, ',', '.') }} €</h3>
+                        <h3 style="color: #059669;">{{ number_format($bolsa->saldoDisponible(), 2, ',', '.') }} €</h3>
                         <p class="text-muted font-weight-bold mb-0">SALDO DISPONIBLE</p>
                     </div>
                     <div class="icon"><i class="fas fa-piggy-bank text-success" style="opacity: 0.15;"></i></div>
@@ -115,7 +127,7 @@
                         </li>
                     </ul>
                     
-                    @if(isset($bolsasFungibles) && $bolsasFungibles->count() > 1)
+                    @if(isset($bolsasFungibles) && $bolsasFungibles->isNotEmpty())
                         <div class="mt-4 p-3 rounded" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
                             <strong style="color: #475569; font-size: 0.85rem; text-transform: uppercase;">Otras bolsas de tipo "{{ $bolsa->tipo_bolsa }}"</strong>
                             <p class="text-muted mb-2" style="font-size: 0.8rem;">Estas bolsas comparten el mismo grupo y cliente. Puedes reutilizar sus saldos sobrantes entre ellas.</p>
@@ -123,7 +135,7 @@
                                 @foreach($bolsasFungibles as $fungible)
                                     @if($fungible->id !== $bolsa->id)
                                         <a href="{{ route('bolsas.show', $fungible->id) }}" class="badge badge-secondary mr-1 mb-1 p-2" style="font-size: 0.8rem; text-decoration: none;">
-                                            {{ $fungible->numero ?: '#'.$fungible->id }} ({{ number_format($fungible->total, 0, ',', '.') }}€)
+                                            {{ $fungible->numero ?: '#'.$fungible->id }} ({{ number_format($fungible->saldoDisponible(), 2, ',', '.') }} € disponibles)
                                         </a>
                                     @endif
                                 @endforeach
@@ -159,16 +171,17 @@
                             <tbody>
                                 @forelse($bolsa->partidas as $partida)
                                     @php
-                                        // Albaranes de esta partida con lo que REALMENTE se le ha
-                                        // imputado (Bolsa V3: AlbaranLineaPartida), no el pivote V1.
-                                        $albaranesPartida = \App\Models\AlbaranLineaPartida::where('pedido_id', $partida->id)
-                                            ->selectRaw('albaran_id, SUM(importe) as importe_total')
-                                            ->groupBy('albaran_id')
-                                            ->with('albaran:id,numero,fecha,estado,total')
-                                            ->get()
-                                            ->filter(fn ($fila) => $fila->albaran !== null)
-                                            ->sortByDesc(fn ($fila) => optional($fila->albaran->fecha)->timestamp)
-                                            ->values();
+                                        // Obtenemos los albaranes limpios y validados mediante la función de tu modelo
+                                        $albaranesEfectivos = $partida->albaranesEfectivos();
+
+                                        // Lo mapeamos al formato exacto que espera la tabla HTML que tienes más abajo
+                                        $albaranesPartida = $albaranesEfectivos->map(function ($albaran) {
+                                            return (object) [
+                                                'albaran_id' => $albaran->id,
+                                                'albaran' => $albaran,
+                                                'importe_total' => $albaran->pivot->importe_imputado ?? $albaran->pivot->importe ?? $albaran->total ?? 0
+                                            ];
+                                        })->sortByDesc(fn ($fila) => optional($fila->albaran->fecha)->timestamp)->values();
                                     @endphp
                                     <tr style="cursor: pointer;" data-toggle="collapse" data-target="#partida-albaranes-{{ $partida->id }}" aria-expanded="false">
                                         <td class="align-middle font-weight-bold" style="color: #1f74dd;">
@@ -215,11 +228,13 @@
                                                     </button>
                                                 </form>
                                                 @endcan
+                                                @can('pedidos.manage')
                                                 <form action="{{ route('pedidos-clientes.edit', $partida->id) }}" method="GET">
                                                     <button type="submit" class="btn btn-sm btn-light text-secondary border" title="Editar esta partida">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
                                                 </form>
+                                                @endcan
                                             </div>
                                         </td>
                                     </tr>
@@ -246,7 +261,7 @@
                                                                 <tr>
                                                                     <td class="font-weight-bold" style="color: #1f74dd;">{{ $fila->albaran->numero }}</td>
                                                                     <td class="text-muted">{{ optional($fila->albaran->fecha)->format('d/m/Y') ?: '-' }}</td>
-                                                                    <td class="text-right font-weight-bold">{{ number_format((float) $fila->importe_total, 4, ',', '.') }} €</td>
+                                                                    <td class="text-right font-weight-bold">{{ number_format((float) $fila->importe_total, 2, ',', '.') }} €</td>
                                                                     <td class="text-center">
                                                                         @php
                                                                             $estadoAlbClass = match($fila->albaran->estado) {
@@ -286,4 +301,5 @@
             </div>
         </div>
     </div>
+    @include('partials.document-activity-chatter', ['activities' => $activities ?? collect()])
 @endsection

@@ -149,6 +149,7 @@
                 <table class="table pedidos-clientes-table">
                     <thead>
                         <tr>
+                            <th>Doc.</th>
                             <th>Pedido-cliente</th>
                             <th>Nº-Ref-Interna</th>
                             <th>Presupuesto origen</th>
@@ -171,6 +172,32 @@
                             @endphp
                             
                             <tr class="{{ $pedido->bolsa ? 'bg-pedido-bolsa' : '' }}">
+                                <td data-label="Doc.">
+                                    @php
+                                        $archivoPedido = $pedido->archivo_pdf;
+                                    @endphp
+                                    @if ($archivoPedido)
+                                        @php
+                                            $extensionPedido = strtolower(pathinfo($archivoPedido, PATHINFO_EXTENSION));
+                                            $tipoDocumentoPedido = in_array($extensionPedido, ['jpg', 'jpeg', 'png', 'webp'], true) ? 'image' : 'pdf';
+                                        @endphp
+                                        <button type="button" class="presupuesto-action-btn presupuesto-action-btn--view js-pedido-doc"
+                                                data-toggle="modal" data-target="#pedidoDocModal"
+                                                data-document-url="{{ route('pedidos-clientes.adjunto', $pedido) }}"
+                                                data-document-type="{{ $tipoDocumentoPedido }}"
+                                                title="Ver documento adjunto">
+                                            <i class="fas {{ $tipoDocumentoPedido === 'image' ? 'fa-image' : 'fa-file-pdf' }}"></i>
+                                        </button>
+                                    @else
+                                        @can('pedidos.manage')
+                                            <a href="{{ route('pedidos-clientes.edit', $pedido) }}" class="pedido-muted" title="Sin documento: adjuntar desde editar">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @else
+                                            <span class="pedido-muted" title="Sin documento adjunto">—</span>
+                                        @endcan
+                                    @endif
+                                </td>
                                 <td data-label="Pedido-cliente" style="max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
                                     @can('pedidos.view')
                                     <a href="{{ route('pedidos-clientes.show', $pedido) }}" class="pedido-code-link" style="display:inline-block; max-width: 160px; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
@@ -261,11 +288,11 @@
                                     <div class="pedido-facturacion-cell">
                                         <div class="pedido-facturacion-line">
                                             <span class="pedido-facturacion-label">Total:</span>
-                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 4, ',', '.') }}€</strong>
+                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 2, ',', '.') }}€</strong>
                                         </div>
                                         <div class="pedido-facturacion-line pedido-facturacion-line--pending">
                                             <span class="pedido-facturacion-label">Pendiente a facturar:</span>
-                                            <strong>{{ number_format($pedido->ui_pendiente, 4, ',', '.') }}€</strong>
+                                            <strong>{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}€</strong>
                                         </div>
                                     </div>
                                 </td>
@@ -335,7 +362,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10">
+                                <td colspan="12">
                                     <div class="pedido-empty-state">
                                         <i class="fas fa-truck"></i>
                                         <h4>No hay pedidos de cliente para mostrar</h4>
@@ -357,6 +384,23 @@
             @csrf
             @method('DELETE')
         </form>
+
+        <div class="modal fade" id="pedidoDocModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-file-alt mr-2"></i>Documento del pedido</h5>
+                        <a id="pedidoDocModalOpen" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary ml-auto mr-3">
+                            <i class="fas fa-external-link-alt mr-1"></i>Abrir en pestaña nueva
+                        </a>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body text-center" id="pedidoDocModalBody"></div>
+                </div>
+            </div>
+        </div>
 
         <div class="modal fade pedido-delete-modal pedido-delete-modal--blocked" id="pedidoDeleteBlockedModal" tabindex="-1" role="dialog" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered pedido-delete-modal__dialog" role="document">
@@ -424,6 +468,73 @@
             const confirmMessage = document.getElementById('pedidoDeleteConfirmMessage');
             const blockedMessage = document.getElementById('pedidoDeleteBlockedMessage');
             const confirmButton = document.getElementById('pedidoDeleteConfirmButton');
+            const pedidoDocModalBody = document.getElementById('pedidoDocModalBody');
+            const pedidoDocModalOpen = document.getElementById('pedidoDocModalOpen');
+            let pedidoDocBlobUrl = null;
+
+            document.querySelectorAll('.js-pedido-doc').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    const url = button.dataset.documentUrl;
+
+                    if (pedidoDocModalOpen) {
+                        pedidoDocModalOpen.href = url;
+                    }
+
+                    pedidoDocModalBody.innerHTML = '<div class="py-5 text-muted"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando documento...</div>';
+
+                    if (pedidoDocBlobUrl) {
+                        URL.revokeObjectURL(pedidoDocBlobUrl);
+                        pedidoDocBlobUrl = null;
+                    }
+
+                    const jsonUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 'json=1';
+                    fetch(jsonUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    })
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error('Error ' + response.status);
+                            }
+                            return response.json();
+                        })
+                        .then(function (data) {
+                            if (!data.ok || !data.base64 || !data.mime) {
+                                throw new Error('Respuesta de documento no válida');
+                            }
+
+                            const binary = atob(data.base64);
+                            const bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) {
+                                bytes[i] = binary.charCodeAt(i);
+                            }
+                            const blob = new Blob([bytes], { type: data.mime });
+                            pedidoDocBlobUrl = URL.createObjectURL(blob);
+                            if (pedidoDocModalOpen) {
+                                pedidoDocModalOpen.href = pedidoDocBlobUrl;
+                            }
+                            pedidoDocModalBody.innerHTML = data.type === 'image'
+                                ? '<img src="' + pedidoDocBlobUrl + '" class="img-fluid rounded" alt="Documento del pedido">'
+                                : '<iframe src="' + pedidoDocBlobUrl + '" style="width:100%; height:75vh; border:none;" title="PDF del pedido"></iframe>';
+                        })
+                        .catch(function (error) {
+                            pedidoDocModalBody.innerHTML = '<div class="alert alert-danger mb-0">No se pudo cargar el documento: ' + error.message + '</div>';
+                        });
+                });
+            });
+
+            if (window.$) {
+                window.$('#pedidoDocModal').on('hidden.bs.modal', function () {
+                    if (pedidoDocBlobUrl) {
+                        URL.revokeObjectURL(pedidoDocBlobUrl);
+                        pedidoDocBlobUrl = null;
+                    }
+                    pedidoDocModalBody.innerHTML = '';
+                });
+            }
 
             let currentDeleteUrl = '';
 

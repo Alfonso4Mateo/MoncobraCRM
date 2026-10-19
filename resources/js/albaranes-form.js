@@ -1,8 +1,8 @@
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 
 const moneyFormatter = new Intl.NumberFormat("es-ES", {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
 });
 
 const numberFormatter = new Intl.NumberFormat("es-ES", {
@@ -22,9 +22,7 @@ const round2 = (value) => {
     return Math.round(clampNumber(value) * 100) / 100;
 };
 
-const round4 = (value) => {
-    return Math.round(clampNumber(value) * 10000) / 10000;
-};
+const round4 = (value) => Math.round(clampNumber(value) * 100) / 100;
 
 document.addEventListener("DOMContentLoaded", () => {
     const root = document.querySelector("[data-albaran-form]");
@@ -74,11 +72,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     const cantidadMax = Math.max(cantidad, round4(linea.cantidad_max ?? linea.cantidad));
                     const precioUnitario = round4(linea.precio_unitario ?? linea.precio);
                     const margen = round2(linea.margen);
-                    const total = round4(cantidad * precioUnitario * (1 + margen / 100));
+                    const total = linea.modo_consumo === "importe"
+                        && linea.total !== undefined
+                        && linea.total !== null
+                        ? round2(linea.total)
+                        : round2(cantidad * precioUnitario * (1 + margen / 100));
 
                     return {
                         uid: linea.uid ?? null,
                         linea_id: linea.linea_id ?? null,
+                        pedido_id: linea.pedido_id ?? null,
                         numero_pedido: linea.numero_pedido ?? null,
                         modo_consumo: linea.modo_consumo === "importe" ? "importe" : "cantidad",
                         articulo_id: linea.articulo_id ?? null,
@@ -177,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const input = createElement("input");
                 input.type = "number";
                 input.min = "0";
-                input.step = "0.0001";
+                input.step = "0.01";
                 input.max = String(p.importe_disponible);
                 input.dataset.repartoPedido = String(p.pedido_id);
                 input.value = String(valorActual);
@@ -284,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }));
     };
 
-    const formatLineasBolsaV3 = (lineasV3, numeroPedido) => {
+    const formatLineasBolsaV3 = (lineasV3, numeroPedido, pedidoId = null) => {
         return lineasV3
             .map((l) => {
                 const modoImporte = l.modo_consumo === "importe";
@@ -300,6 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return {
                     uid: l.uid,
                     linea_id: l.linea_id,
+                    pedido_id: pedidoId ? Number(pedidoId) : null,
                     numero_pedido: numeroPedido,
                     modo_consumo: modoImporte ? "importe" : "cantidad",
                     articulo_id: null,
@@ -497,7 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     totalInput.dataset.action = "edit-total";
                     totalInput.dataset.index = String(originalIndex);
                     totalInput.min = "0";
-                    totalInput.step = "0.0001";
+                    totalInput.step = "0.01";
                     totalInput.max = String(maxTotal);
                     totalInput.value = String(totalLinea);
                     totalInput.disabled = !(checked && !locked);
@@ -684,11 +688,62 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (isInitialEditLoad) {
-            lineas = editBaseLineas.map(linea => ({ ...linea }));
             isInitialEditLoad = false;
             pedidoBolsaMode = true;
             setPedidoMode(true);
-            renderRows();
+            const fetchPromises = pedidos.map(pedido => {
+                if (!pedido.id) return Promise.resolve([]);
+
+                return fetch(`/pedidos-clientes/${encodeURIComponent(pedido.id)}/lineas-bolsa`, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                })
+                    .then(resp => resp.ok ? resp.json() : null)
+                    .then(data => data && Array.isArray(data.lineas)
+                        ? formatLineasBolsaV3(data.lineas, data.numero_pedido || pedido.numero, pedido.id)
+                        : [])
+                    .catch(() => []);
+            });
+
+            Promise.all(fetchPromises).then(resultados => {
+                const disponibles = dedupeLineasPorUid(resultados.flat());
+                const actuales = editBaseLineas.map(linea => ({ ...linea }));
+
+                lineas = disponibles.length === 0
+                    ? actuales
+                    : disponibles.map(disponible => {
+                        const actual = actuales.find(linea =>
+                            (disponible.uid && linea.uid === disponible.uid)
+                            || (disponible.linea_id && Number(linea.linea_id) === Number(disponible.linea_id))
+                        );
+
+                        if (!actual) return disponible;
+
+                        const importeActual = round2(actual.total ?? 0);
+                        const importeDisponible = round2(
+                            Number(disponible.importe_disponible ?? 0) + importeActual
+                        );
+                        const unitPriceWithMargin = round2(
+                            Number(disponible.precio_unitario ?? 0)
+                            * (1 + Number(disponible.margen ?? 0) / 100)
+                        );
+
+                        return {
+                            ...actual,
+                            uid: disponible.uid ?? actual.uid,
+                            linea_id: disponible.linea_id ?? actual.linea_id,
+                            pedido_id: disponible.pedido_id ?? actual.pedido_id,
+                            importe_disponible: importeDisponible,
+                            cantidad_max: disponible.modo_consumo === "importe"
+                                ? 1
+                                : (unitPriceWithMargin > 0
+                                    ? round2(importeDisponible / unitPriceWithMargin)
+                                    : round2(actual.cantidad ?? 0)),
+                        };
+                    });
+
+                renderRows();
+            });
             return;
         }
 
@@ -706,7 +761,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(resp => resp.ok ? resp.json() : null)
             .then(data => {
                 if (data && Array.isArray(data.lineas)) {
-                    return formatLineasBolsaV3(data.lineas, data.numero_pedido || pedido.numero);
+                    return formatLineasBolsaV3(data.lineas, data.numero_pedido || pedido.numero, pedido.id);
                 }
                 return [];
             })
@@ -876,7 +931,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const maxTotal = getMaxTotal(linea);
             const aviso = tableContainer.querySelector(`[data-aviso-for="${index}"]`);
-            const excede = Number.isFinite(maxTotal) && round4(target.value) > maxTotal + 0.00001;
+            const excede = Number.isFinite(maxTotal) && round4(target.value) > maxTotal + 0.001;
             
             target.style.borderColor = excede ? "#c0392b" : "";
             if (aviso) {
@@ -891,7 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const maxCantidad = linea.cantidad_max;
             const aviso = tableContainer.querySelector(`[data-aviso-for="${index}"]`);
-            const excede = Number.isFinite(maxCantidad) && round4(target.value) > maxCantidad + 0.00001;
+            const excede = Number.isFinite(maxCantidad) && round4(target.value) > maxCantidad + 0.001;
             
             target.style.borderColor = excede ? "#c0392b" : "";
             if (aviso) {
@@ -922,7 +977,7 @@ document.addEventListener("DOMContentLoaded", () => {
             linea.aviso = null;
             
             // --- CAMBIO: Solo mostramos el aviso, pero NO sobreescribimos newQty = maxCantidad ---
-            if (Number.isFinite(maxCantidad) && newQty > maxCantidad + 0.00001) {
+            if (Number.isFinite(maxCantidad) && newQty > maxCantidad + 0.001) {
                 linea.aviso = `Has escrito ${newQty} ${linea.medida}, pero solo quedan ${maxCantidad} disponibles. Ajusta el valor antes de guardar.`;
             }
 
@@ -953,7 +1008,7 @@ document.addEventListener("DOMContentLoaded", () => {
             linea.aviso = null;
             
             // --- CAMBIO: Solo mostramos el aviso, pero NO sobreescribimos newTotal = maxTotal ---
-            if (Number.isFinite(maxTotal) && newTotal > maxTotal + 0.00001) {
+            if (Number.isFinite(maxTotal) && newTotal > maxTotal + 0.001) {
                 linea.aviso = `Has escrito ${moneyFormatter.format(newTotal)} €, pero solo quedan ${moneyFormatter.format(maxTotal)} € disponibles. Ajusta el valor antes de guardar.`;
             }
 

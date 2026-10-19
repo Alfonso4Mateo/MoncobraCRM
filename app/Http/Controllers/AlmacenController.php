@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Almacen;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AlmacenController extends Controller
 {
@@ -26,7 +27,12 @@ class AlmacenController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $validated = $request->validate([
-            'nombre_almacen' => 'required|string|max:255',
+            'nombre_almacen' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('almacenes', 'nombre')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)),
+            ],
             'descripcion_almacen' => 'nullable|string|max:2000',
         ]);
 

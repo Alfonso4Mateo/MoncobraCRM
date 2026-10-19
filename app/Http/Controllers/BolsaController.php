@@ -24,7 +24,7 @@ class BolsaController extends Controller
         $proyectoId = $this->resolveActiveProyectoId($request);
 
         $bolsas = Bolsa::query()
-            ->with('cliente')
+            ->with(['cliente', 'partidas.albaranesPivot'])
             ->withCount('partidas') // <-- NUEVO: Contamos las partidas para permitir borrar
             ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
@@ -85,12 +85,79 @@ class BolsaController extends Controller
             'id_cliente' => $validated['id_cliente'],
             'proyecto_id' => $proyectoId,
             'numero' => $validated['numero'] ?? null,
-            'tipo_bolsa' => trim((string) ($validated['tipo_bolsa'] ?? '')) ?: (string) date('Y'),
-            'total' => round((float) $validated['total'], 4),
+            'tipo_bolsa' => mb_strtoupper(trim((string) ($validated['tipo_bolsa'] ?? '')), 'UTF-8') ?: (string) date('Y'),
+            'total' => round((float) $validated['total'], 2),
             'fecha' => $validated['fecha'] ?? now()->toDateString(),
         ]);
 
         return redirect()->route('bolsas.show', $bolsa)->with('success', 'Bolsa creada correctamente');
+    }
+
+    public function edit(Request $request, Bolsa $bolsa)
+    {
+        $this->authorize('pedidos.manage');
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        if ((int) $bolsa->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        $minimoPartidas = round((float) $bolsa->partidas()->sum('total'), 2);
+        $clientes = Cliente::query()
+            ->where('proyecto_id', $proyectoId)
+            ->orderBy('empresa_nombre')
+            ->get(['id', 'empresa_nombre']);
+
+        return view('bolsas.edit', compact('bolsa', 'clientes', 'minimoPartidas') + [
+            'titulo' => 'Editar bolsa',
+            'breadcrumb' => 'Editar bolsa',
+        ]);
+    }
+
+    public function update(Request $request, Bolsa $bolsa)
+    {
+        $this->authorize('pedidos.manage');
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        if ((int) $bolsa->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'id_cliente' => [
+                'required',
+                'integer',
+                Rule::exists('clientes', 'id')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+            ],
+            'numero' => 'nullable|string|max:80',
+            'tipo_bolsa' => 'nullable|string|max:60',
+            'total' => 'required|numeric|min:0|max:1000000000',
+            'fecha' => 'nullable|date',
+        ]);
+
+        $sumaPartidas = round((float) $bolsa->partidas()->sum('total'), 2);
+        $nuevoTotal = (float) $validated['total'];
+        if ($sumaPartidas > 0 && $nuevoTotal > 0 && $nuevoTotal < $sumaPartidas - 0.001) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'total' => 'El tope de la bolsa no puede ser inferior a la suma de las partidas que ya tiene dentro (' . number_format($sumaPartidas, 2, ',', '.') . ' €). Puedes aumentarlo sin límite, pero no bajarlo de ese importe.',
+            ]);
+        }
+
+        if ($bolsa->partidas()->exists() && (int) $validated['id_cliente'] !== (int) $bolsa->id_cliente) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'id_cliente' => 'No puedes cambiar el cliente de una bolsa que ya tiene partidas vinculadas.',
+            ]);
+        }
+
+        $bolsa->update([
+            'id_cliente' => $validated['id_cliente'],
+            'numero' => $validated['numero'] ?? null,
+            'tipo_bolsa' => mb_strtoupper(trim((string) ($validated['tipo_bolsa'] ?? '')), 'UTF-8') ?: (string) date('Y'),
+            'total' => round($nuevoTotal, 2),
+            'fecha' => $validated['fecha'] ?? now()->toDateString(),
+        ]);
+
+        return redirect()->route('bolsas.show', $bolsa)->with('success', 'Bolsa global actualizada correctamente.');
     }
 
     public function show(Bolsa $bolsa)
@@ -102,14 +169,20 @@ class BolsaController extends Controller
             abort(404);
         }
 
-        $bolsa->loadMissing(['cliente', 'partidas']);
+        $bolsa->loadMissing(['cliente', 'partidas.albaranesPivot']);
 
-        $fungibles = $bolsa->bolsasFungibles()->get(['id', 'numero', 'tipo_bolsa', 'total']);
+        $fungibles = $bolsa->bolsasFungibles()->with(['partidas.albaranesPivot'])->get(['id', 'numero', 'tipo_bolsa', 'total']);
+        $activities = \Spatie\Activitylog\Models\Activity::with('causer')
+            ->forSubject($bolsa)
+            ->latest()
+            ->limit(8)
+            ->get();
 
         return view('bolsas.show', [
             'bolsa' => $bolsa,
             'saldoDisponible' => $bolsa->saldoDisponible(),
             'bolsasFungibles' => $fungibles,
+            'activities' => $activities,
             'titulo' => 'Bolsa ' . ($bolsa->numero ?: '#' . $bolsa->id),
             'breadcrumb' => 'Detalle de bolsa',
         ]);
@@ -129,7 +202,10 @@ class BolsaController extends Controller
             return redirect()->back()->with('error', 'No se puede borrar la bolsa porque tiene partidas vinculadas. Desvincúlalas primero.');
         }
 
-        $bolsa->delete();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($bolsa) {
+            $bolsa->lineasOrigen()->update(['bolsa_origen_id' => null]);
+            $bolsa->delete();
+        });
 
         return redirect()->route('bolsas.index')->with('success', 'Bolsa global eliminada correctamente.');
     }
@@ -144,7 +220,7 @@ class BolsaController extends Controller
             abort(404);
         }
 
-        if ($pedido->bolsa_id === $bolsa->id) {
+        if ((int) $pedido->bolsa_id === (int) $bolsa->id) {
             $pedido->update(['bolsa_id' => null]);
             return redirect()->back()->with('success', 'Partida desvinculada. Ahora operará como una "Bolsa Suelta".');
         }
@@ -167,8 +243,9 @@ class BolsaController extends Controller
         $bolsas = Bolsa::query()
             ->where('proyecto_id', $proyectoId)
             ->where('id_cliente', $idCliente)
-            ->where('tipo_bolsa', $tipoBolsa)
+            ->whereRaw('UPPER(TRIM(tipo_bolsa)) = ?', [mb_strtoupper($tipoBolsa, 'UTF-8')])
             ->when($excluirBolsaId > 0, fn ($query) => $query->where('id', '!=', $excluirBolsaId))
+            ->with(['partidas.albaranesPivot'])
             ->get(['id', 'numero', 'tipo_bolsa', 'total']);
 
         $bolsas->each(fn (Bolsa $bolsa) => $bolsa->setAttribute('saldo_disponible', $bolsa->saldoDisponible()));

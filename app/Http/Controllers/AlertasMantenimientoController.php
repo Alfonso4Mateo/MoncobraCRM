@@ -37,8 +37,11 @@ class AlertasMantenimientoController extends Controller
             });
 
         // -> IT (EOL o Mantenimiento vencido)
-        EquipoInformatico::where('soporte_hasta', '<', $hoy)
-            ->orWhere('fecha_mantenimiento', '<', $hoy)
+        EquipoInformatico::where('activo', true)
+            ->where(function ($q) use ($hoy) {
+                $q->where('soporte_hasta', '<', $hoy)
+                    ->orWhere('fecha_mantenimiento', '<', $hoy);
+            })
             ->get()->each(function($item) use ($criticas, $hoy) {
                 if ($item->soporte_hasta && $item->soporte_hasta < $hoy) {
                     $criticas->push((object)['modulo' => 'IT', 'icono' => 'fa-desktop', 'nombre' => $item->nombre, 'alerta' => 'Ciclo de vida agotado (EOL)', 'fecha' => $item->soporte_hasta, 'url' => route('equipos.show', $item)]);
@@ -68,8 +71,18 @@ class AlertasMantenimientoController extends Controller
                 }
             });
 
-        EquipoInformatico::whereBetween('soporte_hasta', [$hoy, $en30Dias])->get()->each(function($item) use ($proximos) {
-            $proximos->push((object)['modulo' => 'IT', 'icono' => 'fa-desktop', 'nombre' => $item->nombre, 'alerta' => 'Renovación IT Cercana', 'fecha' => $item->soporte_hasta, 'url' => route('equipos.show', $item)]);
+        EquipoInformatico::where('activo', true)
+            ->where(function ($q) use ($hoy, $en30Dias) {
+                $q->whereBetween('soporte_hasta', [$hoy, $en30Dias])
+                    ->orWhereBetween('fecha_mantenimiento', [$hoy, $en30Dias]);
+            })
+            ->get()->each(function($item) use ($proximos, $hoy, $en30Dias) {
+            if ($item->soporte_hasta && $item->soporte_hasta >= $hoy && $item->soporte_hasta <= $en30Dias) {
+                $proximos->push((object)['modulo' => 'IT', 'icono' => 'fa-desktop', 'nombre' => $item->nombre, 'alerta' => 'Renovación IT Cercana', 'fecha' => $item->soporte_hasta, 'url' => route('equipos.show', $item)]);
+            }
+            if ($item->fecha_mantenimiento && $item->fecha_mantenimiento >= $hoy && $item->fecha_mantenimiento <= $en30Dias) {
+                $proximos->push((object)['modulo' => 'IT', 'icono' => 'fa-wrench', 'nombre' => $item->nombre, 'alerta' => 'Mantenimiento IT Próximo', 'fecha' => $item->fecha_mantenimiento, 'url' => route('equipos.show', $item)]);
+            }
         });
 
         AparatoCalibrable::whereBetween('proxima_calibracion', [$hoy, $en30Dias])->get()->each(function($item) use ($proximos) {

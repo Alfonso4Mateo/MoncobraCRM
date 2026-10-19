@@ -21,10 +21,19 @@ class NotificarCaducidades extends Command
 
     public function handle()
     {
+        $enviar = Setting::where('key', 'alertas_prl_enviar_caducidades')->value('value');
+        if ($enviar !== null && $enviar === '0') {
+            $this->info('El envío de alertas de caducidades está desactivado en la configuración.');
+            return 0;
+        }
+
         $this->info('--- INICIANDO ESCANEO DE CURSOS ---');
 
         $emailSetting = Setting::where('key', 'alertas_prl_email')->value('value');
-        $emails = json_decode($emailSetting, true) ?? [];
+        $decodedEmails = json_decode((string) $emailSetting, true);
+        $emails = is_array($decodedEmails)
+            ? $decodedEmails
+            : (is_string($emailSetting) && trim($emailSetting) !== '' ? [trim($emailSetting)] : []);
 
         if (empty($emails)) {
             $this->warn('❌ ABORTADO: No hay correos configurados en el panel de ajustes.');
@@ -80,7 +89,9 @@ class NotificarCaducidades extends Command
 
         $this->info('📧 Enviando correo a: ' . implode(', ', $emails) . '...');
         
-        Mail::to($emails)->send(new AlertaCursosMail($caducados, $enAviso));
+        foreach ($emails as $email) {
+            Mail::to($email)->send(new AlertaCursosMail($caducados, $enAviso));
+        }
 
         $this->info('🚀 ¡Correo enviado con éxito!');
         return 0;

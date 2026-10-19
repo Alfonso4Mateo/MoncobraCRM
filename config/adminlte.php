@@ -342,18 +342,18 @@ return [
                     'can' => 'presupuestos.view', // Candado específico
                 ],
                 [
+                    'text' => 'Gestión de Bolsas',
+                    'url' => 'bolsas',
+                    'icon' => 'fa-solid fa-sack-dollar',
+                    'active' => ['bolsas', 'bolsas/*'],
+                    'can' => 'bolsas.view', // Candado específico
+                ],
+                [
                     'text' => 'Pedidos Clientes',
                     'url' => 'pedidos-clientes',
                     'icon' => 'fas fa-fw fa-briefcase',
                     'active' => ['pedidos-clientes*'],
                     'can' => 'pedidos.view', // Candado específico
-                ],
-                [
-                    'text' => 'Gestión de Bolsas',
-                    'url' => 'bolsas',
-                    'icon' => 'fas fa-fw fa-briefcase',
-                    'active' => ['bolsas', 'bolsas/*'],
-                    'can' => 'bolsas.view', // Candado específico
                 ],
                 [
                     'text' => 'Albaranes Clientes',

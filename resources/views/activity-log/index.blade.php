@@ -109,8 +109,7 @@
 
 @php
     // Aseguramos que los diccionarios existan por si el controlador falla
-    $diccionarioClientes = $diccionarioClientes ?? [];
-    $diccionarioProyectos = $diccionarioProyectos ?? [];
+    $relaciones = $relaciones ?? [];
 
     // Diccionario visual centralizado de Módulos (para filtros y tabla)
     $nombresModulos = [
@@ -249,37 +248,20 @@
                         <th style="width: 5%;">Registro Horario</th>
                         <th style="width: 10%;">Responsable</th>
                         <th style="width: 10%;">Acción</th>
-                        <th style="width: 15%;">Módulo / ID</th>
+                        <th style="width: 15%;">Módulo / Registro</th>
                         <th style="width: 60%;">Detalle de Modificaciones</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach($activities as $activity)
                     @php
-                        // Función mejorada que recibe el campo y el valor
-                        $formatVal = function($field, $val) use ($diccionarioClientes, $diccionarioProyectos) {
-                            if (is_bool($val)) return $val ? '1 (Sí)' : '0 (No)';
-                            if ($val === null || $val === '') return 'Vacío';
-                            
-                            // Intercepción para traducir IDs a Nombres
-                            if ($field === 'id_cliente' && isset($diccionarioClientes[$val])) {
-                                return $diccionarioClientes[$val] . ' (ID: ' . $val . ')';
-                            }
-                            if ($field === 'proyecto_id' && isset($diccionarioProyectos[$val])) {
-                                return $diccionarioProyectos[$val] . ' (ID: ' . $val . ')';
-                            }
-                            
-                            return (string) $val;
-                        };
-
                         $event = $activity->event ?? $activity->description;
                         $properties = $activity->properties?->toArray() ?? [];
                         $attributes = $properties['attributes'] ?? [];
                         $old = $properties['old'] ?? [];
                         $displayFields = $event === 'deleted' && !empty($old) ? $old : $attributes;
-                        $referenceName = $properties['reference_name'] ?? 'Sin referencia';
-                        
-                        $hiddenFields = ['password', 'remember_token', 'created_at', 'updated_at', 'deleted_at'];
+                        $referenceName = \App\Support\ActivityHumanizer::resolveSubjectReference($activity, $relaciones);
+                        $hiddenFields = ['id', 'uid', 'password', 'remember_token', 'created_at', 'updated_at', 'deleted_at'];
                         
                         $eventMap = ['created' => ['Creación', 'plus-circle'], 'updated' => ['Modificación', 'edit'], 'deleted' => ['Eliminación', 'trash-alt'], 'restored' => ['Restauración', 'undo']];
                         $eventLabel = $eventMap[$event][0] ?? ucfirst($event);
@@ -313,71 +295,44 @@
                         </td>
                         <td class="cell-model">
                             <strong>{{ $moduloLegible }}</strong>
-                            <small class="d-block text-muted" title="{{ $referenceName }}">{{ Str::limit($referenceName, 80) }}</small>
-                            <span>ID: {{ $activity->subject_id ?? 'N/A' }}</span>
+                            <span title="{{ $referenceName }}">{{ Str::limit($referenceName, 80) }}</span>
                         </td>
                         <td>
                             <div class="diff-box">
                                 @forelse($displayFields as $field => $value)
-                                    @if(in_array($field, $hiddenFields)) @continue @endif
+                                    @if(in_array($field, $hiddenFields, true)) @continue @endif
                                     
                                     <div class="diff-row">
-                                        <span class="diff-field">{{ str_replace('_', ' ', $field) }}</span>
+                                        <span class="diff-field">{{ \App\Support\ActivityHumanizer::fieldLabel($field) }}</span>
                                         @if($event === 'deleted')
                                             <span class="badge badge-danger mb-1">Valor eliminado</span>
-                                            @php $displayValue = is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : $formatVal($field, $value); @endphp
+                                            @php
+                                                $displayValue = is_array($value)
+                                                    ? collect($value)->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n")
+                                                    : \App\Support\ActivityHumanizer::formatValue($field, $value, $relaciones);
+                                            @endphp
                                             <details class="diff-value diff-old"><summary>{{ Str::limit($displayValue, 100) }}</summary><div class="full-value">{{ $displayValue }}</div></details>
                                         @else
-                                        {{-- Renderizado del valor ANTIGUO --}}
                                         @if(is_array($old) && array_key_exists($field, $old))
                                             @if(is_array($old[$field]))
                                                 <div class="diff-old w-100 mt-1">
                                                     <span class="badge badge-secondary mb-1">Versión Anterior:</span>
-                                                    <div class="diff-json-container">
-                                                        @foreach($old[$field] as $item)
-                                                            <div class="diff-json-item">
-                                                                @php
-                                                                    $textoImprimir = $item;
-                                                                    if ($field === 'permissions' && is_string($item)) {
-                                                                        $textoImprimir = $nombresPermisos[$item] ?? $item;
-                                                                    } else {
-                                                                        $textoImprimir = is_array($item) ? collect($item)->except(['created_at', 'updated_at'])->toJson(JSON_UNESCAPED_UNICODE) : json_encode($item, JSON_UNESCAPED_UNICODE);
-                                                                    }
-                                                                @endphp
-                                                                {{ $textoImprimir }}
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
+                                                    <div class="diff-json-container">{!! nl2br(e(collect($old[$field])->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
                                                 </div>
                                             @else
-                                                @php $oldValue = $formatVal($field, $old[$field]); @endphp
+                                                @php $oldValue = \App\Support\ActivityHumanizer::formatValue($field, $old[$field], $relaciones); @endphp
                                                 <details class="diff-value diff-old"><summary>{{ Str::limit($oldValue, 100) }}</summary><div class="full-value">{{ $oldValue }}</div></details>
                                                 <i class="fas fa-long-arrow-alt-right diff-icon"></i>
                                             @endif
                                         @endif
                                         
-                                        {{-- Renderizado del valor NUEVO --}}
                                         @if(is_array($value))
                                             <div class="diff-new w-100 mt-1">
                                                 <span class="badge badge-success mb-1">Versión Nueva:</span>
-                                                <div class="diff-json-container">
-                                                    @foreach($value as $item)
-                                                        <div class="diff-json-item">
-                                                            @php
-                                                                $textoImprimir = $item;
-                                                                if ($field === 'permissions' && is_string($item)) {
-                                                                    $textoImprimir = $nombresPermisos[$item] ?? $item;
-                                                                } else {
-                                                                    $textoImprimir = is_array($item) ? collect($item)->except(['created_at', 'updated_at'])->toJson(JSON_UNESCAPED_UNICODE) : json_encode($item, JSON_UNESCAPED_UNICODE);
-                                                                }
-                                                            @endphp
-                                                            {{ $textoImprimir }}
-                                                        </div>
-                                                    @endforeach
-                                                </div>
+                                                <div class="diff-json-container">{!! nl2br(e(collect($value)->map(fn ($item) => \App\Support\ActivityHumanizer::formatLineItem($item))->implode("\n"))) !!}</div>
                                             </div>
                                         @else
-                                            @php $newValue = $formatVal($field, $value); @endphp
+                                            @php $newValue = \App\Support\ActivityHumanizer::formatValue($field, $value, $relaciones); @endphp
                                             <details class="diff-value diff-new"><summary>{{ Str::limit($newValue, 100) }}</summary><div class="full-value">{{ $newValue }}</div></details>
                                         @endif
                                         @endif

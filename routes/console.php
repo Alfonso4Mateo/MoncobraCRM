@@ -24,11 +24,15 @@ if (Schema::hasTable('settings')) {
     
     $dia = Setting::where('key', 'alertas_prl_dia')->value('value') ?? '1';
     $hora = Setting::where('key', 'alertas_prl_hora')->value('value') ?? '08:00';
-    $diaSemana = ($dia == 7) ? 0 : $dia;
+    $diaSemana = ((int) $dia === 7) ? 0 : (int) $dia;
 
     Schedule::command('cursos:notificar-caducidades')
             ->weeklyOn($diaSemana, $hora)
             ->withoutOverlapping(); 
+
+    Schedule::command('cursos:notificar-pendientes')
+            ->weeklyOn($diaSemana, $hora)
+            ->withoutOverlapping();
 }
 
 // ==========================================

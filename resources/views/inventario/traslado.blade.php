@@ -62,7 +62,12 @@
 
                     <div class="field-group">
                         <label for="ot">Orden de trabajo (OT)</label>
-                        <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="OT-XXXX" class="@error('ot') is-invalid @enderror">
+                        <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="OT-XXXX" list="cc_frecuentes" autocomplete="off" class="@error('ot') is-invalid @enderror">
+                        <datalist id="cc_frecuentes">
+                            @foreach($centrosCoste ?? [] as $cc)
+                                <option value="{{ $cc->etiqueta_completa }}">
+                            @endforeach
+                        </datalist>
                     </div>
 
                     <div class="field-group">
@@ -103,8 +108,7 @@
 
         <datalist id="inventario-catalogo-traslado">
             @foreach ($catalogo as $producto)
-                <option value="{{ $producto->descripcion }}" data-codigo="{{ $producto->codigo }}"></option>
-                <option value="{{ $producto->codigo }}" data-codigo="{{ $producto->codigo }}"></option>
+                <option value="{{ $producto->codigo }} - {{ $producto->descripcion }} (Almacén: {{ $producto->almacen ?: 'Sin almacén' }} | Stock: {{ $producto->stock_actual }})" data-codigo="{{ $producto->codigo }}"></option>
             @endforeach
         </datalist>
 
@@ -142,6 +146,7 @@
                     'referencia_proveedor' => (string) ($item->referencia_proveedor ?? ''),
                     'almacen' => (string) ($item->almacen ?? 'Sin almacen'),
                     'stock_actual' => (int) ($item->stock_actual ?? 0),
+                    'etiqueta' => (string) ($item->codigo . ' - ' . $item->descripcion . ' (Almacén: ' . ($item->almacen ?: 'Sin almacén') . ' | Stock: ' . ($item->stock_actual ?? 0) . ')'),
                 ];
             })
             ->values();
@@ -185,7 +190,7 @@
                 }
 
                 return catalogo.find((item) => {
-                    return normalize(item.codigo).includes(term) || normalize(item.descripcion).includes(term);
+                    return normalize(item.codigo).includes(term) || normalize(item.descripcion).includes(term) || normalize(item.etiqueta).includes(term);
                 }) || null;
             };
 
@@ -196,7 +201,7 @@
                 }
 
                 return catalogo.find((item) => {
-                    return normalize(item.codigo) === term || normalize(item.descripcion) === term;
+                    return normalize(item.codigo) === term || normalize(item.descripcion) === term || normalize(item.etiqueta) === term;
                 }) || null;
             };
 

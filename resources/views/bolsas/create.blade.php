@@ -84,11 +84,12 @@
                             <div class="col-md-6 form-group">
                                 <label for="total" class="text-secondary">Total Inicial (€) <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="number" name="total" id="total" class="form-control" step="0.0001" min="0" value="{{ old('total') }}" placeholder="0.0000" required>
+                                    <input type="number" name="total" id="total" class="form-control" step="0.01" min="0" value="{{ old('total') }}" placeholder="0.00" required>
                                     <div class="input-group-append">
                                         <span class="input-group-text font-weight-bold">€</span>
                                     </div>
                                 </div>
+                                <small class="text-muted">Introducir 0 creará una Bolsa Abierta (sin límite inicial).</small>
                             </div>
                         </div>
 

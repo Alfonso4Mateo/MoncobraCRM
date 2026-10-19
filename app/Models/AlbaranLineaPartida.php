@@ -21,7 +21,7 @@ class AlbaranLineaPartida extends Model
     ];
 
     protected $casts = [
-        'importe' => 'decimal:4',
+        'importe' => 'decimal:2',
     ];
 
     public function albaran(): BelongsTo

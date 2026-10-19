@@ -162,7 +162,12 @@
                         <!-- Caja de OT (25% del espacio) -->
                         <div class="field-group" style="flex: 0 0 25%; margin-bottom: 0;">
                             <label for="ot">OT</label>
-                            <input type="text" id="ot" name="ot" value="{{ $otDefault }}" style="width: 100%;">
+                            <input type="text" id="ot" name="ot" value="{{ $otDefault }}" list="cc_frecuentes" autocomplete="off" style="width: 100%;">
+                            <datalist id="cc_frecuentes">
+                                @foreach($centrosCoste ?? [] as $cc)
+                                    <option value="{{ $cc->etiqueta_completa }}">
+                                @endforeach
+                            </datalist>
                         </div>
 
                         <!-- Caja de Pedido Cliente (75% del espacio restante) -->

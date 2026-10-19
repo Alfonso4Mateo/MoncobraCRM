@@ -41,10 +41,6 @@ class DocumentosController extends Controller
         $counts = $this->documentCounts();
         $documentosAll = $this->buildDocumentos($tipoActual);
 
-        if ($documentosAll->isEmpty()) {
-            $documentosAll = collect($this->fallbackDocuments($tipoActual));
-        }
-
         $search = trim((string) $request->query('q', ''));
         if ($search !== '') {
             $documentosAll = $this->filterDocuments($documentosAll, $search);
@@ -180,6 +176,10 @@ class DocumentosController extends Controller
     public function download(Documento $documento)
     {
         $this->authorize('documentos.download');
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $documento->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         abort_unless(Storage::disk('public')->exists($documento->path), 404);
 
@@ -189,6 +189,10 @@ class DocumentosController extends Controller
     public function preview(Documento $documento)
     {
         $this->authorize('documentos.download');
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $documento->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         abort_unless(Storage::disk('public')->exists($documento->path), 404);
 
@@ -204,6 +208,14 @@ class DocumentosController extends Controller
     public function destroy(Documento $documento)
     {
         $this->authorize('documentos.delete');
+        $proyectoId = $this->resolveActiveProyectoId(request());
+        if ((int) $documento->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
+        if ($documento->path && Storage::disk('public')->exists($documento->path)) {
+            Storage::disk('public')->delete($documento->path);
+        }
 
         $documento->delete();
 
@@ -295,13 +307,13 @@ class DocumentosController extends Controller
         
         $proyectoId = $this->resolveActiveProyectoId(request());
 
-        if ($user->can('albaranes.view')) $counts['albaranes'] = AlbaranCliente::count();
-        if ($user->can('presupuestos.view')) $counts['presupuestos'] = Presupuesto::count();
-        if ($user->can('pedidos.view')) $counts['pedidos'] = PedidoCliente::count();
+        if ($user->can('albaranes.view')) $counts['albaranes'] = AlbaranCliente::where('proyecto_id', $proyectoId)->count();
+        if ($user->can('presupuestos.view')) $counts['presupuestos'] = Presupuesto::where('proyecto_id', $proyectoId)->count();
+        if ($user->can('pedidos.view')) $counts['pedidos'] = PedidoCliente::where('proyecto_id', $proyectoId)->count();
         if ($user->can('inventario.view')) {
-            $counts['entradas'] = EntradaStock::count();
-            $counts['salidas'] = SalidaStock::count();
-            $counts['traslados'] = TrasladoStock::count();
+            $counts['entradas'] = EntradaStock::where('proyecto_id', $proyectoId)->count();
+            $counts['salidas'] = SalidaStock::where('proyecto_id', $proyectoId)->count();
+            $counts['traslados'] = TrasladoStock::where('proyecto_id', $proyectoId)->count();
         }
         if ($user->can('cursos.view')) {
             $counts['certificados'] = Documento::where('proyecto_id', $proyectoId)->where('tipo', 'certificados')->count();

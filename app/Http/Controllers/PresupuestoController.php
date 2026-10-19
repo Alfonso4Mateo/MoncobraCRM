@@ -46,7 +46,7 @@ class PresupuestoController extends Controller
         $fechaHasta = trim((string) $request->input('fecha_hasta', ''));
         $estado = trim((string) $request->input('estado', 'todos'));
 
-        if (!in_array($estado, ['todos', 'pendiente', 'aceptado', 'rechazado', 'pendiente pedido'], true)) {
+        if (!in_array($estado, ['todos', 'pendiente', 'aceptado', 'rechazado', 'pedido_pendiente'], true)) {
             $estado = 'todos';
         }
 
@@ -142,7 +142,11 @@ class PresupuestoController extends Controller
         $archivoPdfRule = $modo === 'carga' ? 'required' : 'nullable';
 
         $validated = $request->validate([
-            'parent_id' => 'nullable|exists:presupuestos,id',
+            'parent_id' => [
+                'nullable',
+                Rule::exists('presupuestos', 'id')
+                    ->where(fn ($query) => $query->where('proyecto_id', $proyectoId)),
+            ],
             'documento' => 'required|string|max:50',
             'numero' => [
                 'nullable',
@@ -183,9 +187,8 @@ class PresupuestoController extends Controller
             $validated['lista_articulos'] = null;
         }
 
-        $validated['total'] = collect($validated['lista_articulos'] ?? [])->sum(function (array $item) {
-            return (float) ($item['total'] ?? 0);
-        });
+        $validated['total'] = round((float) collect($validated['lista_articulos'] ?? [])
+            ->sum(fn (array $item) => (float) ($item['total'] ?? 0)), 2);
         $validated['estado'] = 'pendiente';
 
         // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK (Double Submit) ---
@@ -316,8 +319,13 @@ class PresupuestoController extends Controller
         })
         ->orderBy('id', 'asc')
         ->get();
+        $activities = \Spatie\Activitylog\Models\Activity::with('causer')
+            ->forSubject($presupuesto)
+            ->latest()
+            ->limit(8)
+            ->get();
 
-        return view('presupuestos.show', compact('presupuesto', 'historialRevisiones'));
+        return view('presupuestos.show', compact('presupuesto', 'historialRevisiones', 'activities'));
     }
 
     public function viewPdf(Presupuesto $presupuesto)
@@ -466,6 +474,12 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
+        $estado = (string) ($presupuesto->estado ?: 'pendiente');
+        if (in_array($estado, ['aceptado', 'rechazado'], true)) {
+            return redirect()->route('presupuestos.show', $presupuesto)
+                ->with('error', 'No se pueden editar presupuestos ' . $estado . 's.');
+        }
+
         $validated = $request->validate([
             'estado' => ['required', Rule::in(['pendiente', 'aceptado', 'rechazado', 'pedido_pendiente'])],
         ]);
@@ -536,7 +550,7 @@ class PresupuestoController extends Controller
 
         $this->validateLineasPayload($lineasFiltradas);
 
-        $articulosNormalizados = $this->lineNormalizer->normalize($lineasFiltradas, true);
+        $articulosNormalizados = $this->lineNormalizer->normalize($lineasFiltradas);
 
         $totalComputed = collect($articulosNormalizados)->sum(function (array $item) {
             return (float) ($item['total'] ?? 0);
@@ -545,7 +559,7 @@ class PresupuestoController extends Controller
         // Preparamos el array de datos básicos
         $updateData = [
             'lista_articulos' => $articulosNormalizados ?: null,
-            'total' => round($totalComputed, 4),
+            'total' => round($totalComputed, 2),
             'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
             'solicitante' => $validated['solicitante'] ?? null, 
@@ -692,64 +706,6 @@ class PresupuestoController extends Controller
             'lineas.*.precio' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PRECIO],
             'lineas.*.margen' => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_MARGEN],
         ])->validate();
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function filterLineasPresupuesto(string|array $listaArticulos): array
-    {
-        $lineas = is_string($listaArticulos)
-            ? json_decode($listaArticulos, true)
-            : $listaArticulos;
-
-        $lineas = is_array($lineas) ? $lineas : [];
-
-        return collect($lineas)
-            ->filter(fn ($item) => is_array($item) && !empty(trim((string) ($item['descripcion'] ?? ''))))
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $lineas
-     * @return array<int, array<string, mixed>>
-     */
-    private function normalizePresupuestoLineas(array $lineas, bool $cantidadEntera = false): array
-    {
-        return collect($lineas)
-            ->map(function (array $item) use ($cantidadEntera) {
-                $cantidad = max(0, (float) ($item['cantidad'] ?? 0));
-                $precioUnitario = max(0, (float) ($item['precio_unitario'] ?? ($item['precio'] ?? 0)));
-                $margen = max(0, (float) ($item['margen'] ?? 0));
-
-                $cantidadNormalizada = $cantidadEntera ? (int) max(0, round($cantidad, 0)) : round($cantidad, 2);
-                $precioUnitarioRounded = round($precioUnitario, 4);
-                $margenRounded = round($margen, 2);
-
-                // Apply margin to unit price on server-side (only once).
-                $precioConMargen = $precioUnitarioRounded * (1 + ($margenRounded / 100));
-                $precioConMargenRounded = round($precioConMargen, 4);
-                $totalComputed = round($precioConMargenRounded * $cantidadNormalizada, 4);
-
-                $medida = trim((string) ($item['medida'] ?? ($item['unidad'] ?? '')));
-                $medida = $medida !== '' ? $medida : null;
-
-                return [
-                    'articulo' => trim((string) ($item['articulo'] ?? '')),
-                    'descripcion' => trim((string) ($item['descripcion'] ?? '')),
-                    'cantidad' => $cantidadNormalizada,
-                    'medida' => $medida,
-                    // compatibilidad con formatos antiguos.
-                    'unidad' => $medida,
-                    'precio_unitario' => $precioUnitarioRounded,
-                    'margen' => $margenRounded,
-                    'precio_con_margen' => $precioConMargenRounded,
-                    'total' => $totalComputed,
-                ];
-            })
-            ->values()
-            ->all();
     }
 
     private function maxCorrelativoForFormato(int $proyectoId, string $formato): int
@@ -935,9 +891,9 @@ class PresupuestoController extends Controller
                     'descripcion' => $descripcion,
                     'cantidad' => round(max(0, (float) ($linea['cantidad'] ?? 0)), 2),
                     'medida' => trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))) ?: null,
-                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 4),
+                    'precio_unitario' => round(max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0))), 2),
                     'margen' => round(max(0, (float) ($linea['margen'] ?? 0)), 2),
-                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 4),
+                    'total' => round(max(0, (float) ($linea['total'] ?? 0)), 2),
                     'facturado' => false,
                 ]
             );
@@ -949,11 +905,14 @@ class PresupuestoController extends Controller
         $this->authorize('presupuestos.manage');
 
         $proyectoId = $this->resolveProyectoForCorrelativo($request);
+        if ((int) $presupuesto->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
 
         // 1. Encontrar al Padre Original de esta familia
         $raizId = $presupuesto->parent_id ?? $presupuesto->id;
-        $padreOriginal = Presupuesto::find($raizId);
+        $padreOriginal = Presupuesto::where('proyecto_id', $proyectoId)->find($raizId);
 
         // 2. Extraer la raíz del número (ej: Aibus28-0002)
         // CAMBIO EXPERTO: Usamos preg_split para que corte la raíz tanto si el padre 
@@ -961,7 +920,8 @@ class PresupuestoController extends Controller
         $numeroBase = preg_split('/(-Revision-| Rev-)/', $padreOriginal->numero)[0];
 
         // 3. Traer TODOS los números de esta familia (Padre + Hijos)
-        $numerosFamilia = Presupuesto::where(function ($query) use ($raizId) {
+        $numerosFamilia = Presupuesto::where('proyecto_id', $proyectoId)
+            ->where(function ($query) use ($raizId) {
             $query->where('id', $raizId)
                   ->orWhere('parent_id', $raizId);
         })->pluck('numero');

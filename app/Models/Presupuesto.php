@@ -57,7 +57,7 @@ class Presupuesto extends Model
      */
     protected $casts = [
         'fecha' => 'date',
-        'total' => 'decimal:4',
+        'total' => 'decimal:2',
         'lista_articulos' => 'array',
         'numero_correlativo' => 'integer',
     ];

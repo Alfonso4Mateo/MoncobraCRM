@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 
 class ProfileController extends Controller
@@ -54,8 +55,8 @@ class ProfileController extends Controller
         // Manejar upload de avatar
         if ($request->hasFile('avatar')) {
             // Eliminar avatar anterior si existe
-            if ($user->avatar && \Storage::exists('public/' . $user->avatar)) {
-                \Storage::delete('public/' . $user->avatar);
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
             }
             
             // Guardar nuevo avatar

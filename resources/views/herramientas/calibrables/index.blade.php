@@ -459,7 +459,13 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Responsable / Área *</label>
-                    <input required type="text" name="responsable" class="form-control" placeholder="A quién se entrega" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                    <select name="personal_id" class="form-control mb-2" style="width: 100%;">
+                        <option value="">Seleccionar trabajador (opcional)</option>
+                        @foreach(($personalList ?? []) as $trabajador)
+                            <option value="{{ $trabajador->id }}">{{ trim($trabajador->name . ' ' . $trabajador->apellido) }}</option>
+                        @endforeach
+                    </select>
+                    <input type="text" name="responsable" class="form-control" placeholder="A quién se entrega (texto libre)" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
                 </div>
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Ubicación *</label>

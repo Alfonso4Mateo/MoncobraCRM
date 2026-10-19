@@ -162,7 +162,15 @@
             <section class="personal-footer-grid">
                 @php
                     $tallasFaltantes = 0;
-                    $personalNecesitaEpi = \App\Models\Personal::where('sin_tallas', false)->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod']);
+                    $personalNecesitaEpi = \App\Models\Personal::query()
+                        ->where('activo', true)
+                        ->when(auth()->user()?->role !== 'superadmin', function ($query) {
+                            $query->whereHas('proyectos', function ($projectQuery) {
+                                $projectQuery->whereIn('proyectos.id', auth()->user()->proyectos->pluck('id'));
+                            });
+                        })
+                        ->where('sin_tallas', false)
+                        ->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod']);
                                         
                     $columnas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod'];
                     

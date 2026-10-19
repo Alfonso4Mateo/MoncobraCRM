@@ -43,6 +43,8 @@ Route::patch('equipos/{equipo}/asignar', [EquiposController::class, 'updateAsign
 Route::get('herramientas', [HerramientasPlantaController::class, 'index'])->name('herramientas.index');
 Route::get('herramientas/nuevo', [HerramientasPlantaController::class, 'create'])->name('herramientas.create');
 Route::post('herramientas', [HerramientasPlantaController::class, 'store'])->name('herramientas.store');
+Route::get('herramientas/importar/plantilla', [HerramientasPlantaController::class, 'descargarPlantillaCsv'])->name('herramientas.planta.plantilla');
+Route::post('herramientas/importar', [HerramientasPlantaController::class, 'importarCsv'])->name('herramientas.planta.importar');
 Route::get('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'show'])->name('herramientas.planta.show');
 Route::get('herramientas/{herramientaPlanta}/editar', [HerramientasPlantaController::class, 'edit'])->name('herramientas.planta.edit');
 Route::put('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'update'])->name('herramientas.planta.update');
@@ -73,6 +75,19 @@ Route::get('alertas-mantenimiento/configuracion', [AlertasMantenimientoControlle
 Route::post('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'storeConfiguracion'])->name('alertas.configuracion.store');
 
 // ENLACES CORTOS / QR (Redirecciones dinámicas)
+Route::get('activos/{tipo}/{id}', function (string $tipo, int $id) {
+    return match ($tipo) {
+        'equipo' => redirect()->route('equipos.show', $id),
+        'planta' => redirect()->route('herramientas.planta.show', $id),
+        'calibrable' => redirect()->route('calibrables.show', $id),
+        default => abort(404),
+    };
+})->where('tipo', 'equipo|planta|calibrable')->name('activos.qr.show');
+
+Route::get('activos/{tipo}/{id}/qr', [QrController::class, 'descargarQrActivo'])
+    ->where('tipo', 'equipo|planta|calibrable')
+    ->name('activos.qr.download');
+
 Route::get('activos/{id}/editar', function (int $id) {
     if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.edit', $id);
     return redirect()->route('herramientas.planta.edit', $id);
@@ -265,36 +280,22 @@ Route::delete('/departamentos/{nombre}', [DepartamentoController::class, 'destro
     ->name('departamentos.destroy')
     ->middleware('permission:personal.edit');
 
-Route::post('personal/{personal}/puestos', [App\Http\Controllers\CursoController::class, 'syncPuestos'])
-    ->name('personal.puestos.sync')
-    ->middleware('permission:cursos.edit'); 
-
-Route::post('personal/{personal}/puestos/add', [App\Http\Controllers\CursoController::class, 'addPuesto'])
-    ->name('personal.puestos.add')
-    ->middleware('permission:cursos.edit'); 
-
-Route::delete('personal/{personal}/puestos/{puesto}', [App\Http\Controllers\CursoController::class, 'removePuesto'])
-    ->name('personal.puestos.remove')
-    ->middleware('permission:cursos.edit'); 
-
-Route::get('puestos/{puesto}/auditoria', [App\Http\Controllers\PuestoController::class, 'auditoria'])
-    ->name('puestos.auditoria')
-    ->middleware('permission:cursos.view');
-
 // ==========================================
 // 8. GESTOR DE CÓDIGOS QR 
 // ==========================================
- Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
-    ->name('qrs.index');
-Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])
-    ->name('qrs.store');
-Route::post('/admin/qrs/carpetas', [App\Http\Controllers\QrController::class, 'storeCarpeta'])
-    ->name('qrs.carpeta.store');
-Route::get('/admin/qrs/{id}/download', [App\Http\Controllers\QrController::class, 'download'])                  
-    ->name('qrs.download');
-Route::delete('/admin/qrs/{id}', [App\Http\Controllers\QrController::class, 'destroy'])
-    ->name('qrs.destroy');
-Route::put('/admin/qrs/{id}/mover', [App\Http\Controllers\QrController::class, 'moverCarpeta'])
-    ->name('qrs.mover');
-Route::delete('/admin/qrs/carpetas/{id}', [App\Http\Controllers\QrController::class, 'destroyCarpeta'])
-    ->name('qrs.carpeta.destroy');
+Route::middleware(['permission:activos.manage'])->group(function () {
+    Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
+        ->name('qrs.index');
+    Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])
+        ->name('qrs.store');
+    Route::post('/admin/qrs/carpetas', [App\Http\Controllers\QrController::class, 'storeCarpeta'])
+        ->name('qrs.carpeta.store');
+    Route::get('/admin/qrs/{id}/download', [App\Http\Controllers\QrController::class, 'download'])
+        ->name('qrs.download');
+    Route::delete('/admin/qrs/{id}', [App\Http\Controllers\QrController::class, 'destroy'])
+        ->name('qrs.destroy');
+    Route::put('/admin/qrs/{id}/mover', [App\Http\Controllers\QrController::class, 'moverCarpeta'])
+        ->name('qrs.mover');
+    Route::delete('/admin/qrs/carpetas/{id}', [App\Http\Controllers\QrController::class, 'destroyCarpeta'])
+        ->name('qrs.carpeta.destroy');
+});

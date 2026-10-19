@@ -37,8 +37,11 @@ class NotificarPendientesPRL extends Command
 
         // 3. Buscar a los trabajadores: Solo Activos y NO revisados.
         $pendientes = Personal::where('activo', true)
-                              ->where('prl_revisado', false)
-                              ->get();
+            ->where(function ($q) {
+                $q->where('prl_revisado', false)
+                    ->orWhereNull('prl_revisado');
+            })
+            ->get();
 
         if ($pendientes->isEmpty()) {
             $this->info('Todo en orden. No hay trabajadores pendientes de revisión. No se enviará correo.');

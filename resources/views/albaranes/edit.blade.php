@@ -97,7 +97,12 @@
                                 <!-- Caja de OT (25% del espacio) -->
                                 <div class="field" style="flex: 0 0 25%; margin-bottom: 0;">
                                     <label for="ot">CC (Centro de Coste)</label>
-                                    <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}" style="width: 100%;">
+                                    <input type="text" id="ot" name="ot" value="{{ old('ot', $albaran->ot ?? '') }}" list="cc_frecuentes" autocomplete="off" style="width: 100%;">
+                                    <datalist id="cc_frecuentes">
+                                        @foreach($centrosCoste ?? [] as $cc)
+                                            <option value="{{ $cc->etiqueta_completa }}">
+                                        @endforeach
+                                    </datalist>
                                 </div>
 
                                 @php
@@ -222,7 +227,7 @@
 
                         <div class="total-box">
                             <span>TOTAL ALBARÁN</span>
-                            <strong id="albaranTotalValue">{{ number_format((float) ($albaran->total ?? 0), 4, ',', '.') }} €</strong>
+                            <strong id="albaranTotalValue">{{ number_format((float) ($albaran->total ?? 0), 2, ',', '.') }} €</strong>
                         </div>
                     </section>
                 </main>
@@ -286,7 +291,7 @@
                     
                     // --- NUEVA LÓGICA DE BLOQUEO ---
                     // Buscamos si hay algún input con el borde rojo (que indica que se excedió el límite)
-                    const inputsConError = tableContainer.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
+                    const inputsConError = this.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
                     if (inputsConError.length > 0) {
                         e.preventDefault(); // Detenemos el envío
                         alert("Por favor, corrige los importes o cantidades marcados en rojo antes de guardar. Hay líneas que superan el saldo disponible.");

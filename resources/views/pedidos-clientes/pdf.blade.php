@@ -249,8 +249,8 @@
                         <td align="right" class="evitar-salto">{{ number_format($cantidad, 2, ',', '.') }}</td>
                         <td align="center">{{ $medida ? e($medida) : '' }}</td>
                         <!-- Imprimimos el precio final calculado con el margen -->
-                        <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 4, ',', '.') }} €</td>
-                        <td align="right" class="evitar-salto">{{ number_format($totalLinea, 4, ',', '.') }} €</td>
+                        <td align="right" class="evitar-salto">{{ number_format($precioConMargen, 2, ',', '.') }} €</td>
+                        <td align="right" class="evitar-salto">{{ number_format($totalLinea, 2, ',', '.') }} €</td>
                     </tr>
                 @endforeach
             @elseif ($bolsaTexto !== '')
@@ -278,7 +278,7 @@
                 <td align="right">
                     <div class="total-box">
                         <span class="total-box__label">Total:</span>
-                        <span class="total-box__value">{{ number_format((float) $pedido->total ?? 0, 4, ',', '.') }} €</span>
+                        <span class="total-box__value">{{ number_format((float) $pedido->total ?? 0, 2, ',', '.') }} €</span>
                     </div>
                 </td>
             </tr>

@@ -46,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
             return $user->role === 'superadmin';
         });
 
+        Gate::define('manage-users', function (User $user) {
+            return in_array($user->role, ['admin', 'superadmin'], true)
+                || $user->hasAnyPermission(['users.manage', 'users.permissions']);
+        });
+
         // 3. Personalización del correo de creación/restablecimiento de contraseña
         ResetPassword::toMailUsing(function (object $notifiable, string $token) {
             // Generamos la URL segura con el token y el email del trabajador
@@ -65,4 +70,3 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 }
-

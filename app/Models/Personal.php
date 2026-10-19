@@ -84,6 +84,26 @@ class Personal extends Model
         return $this->hasMany(\App\Models\EntregaEpi::class, 'personal_id');
     }
 
+    public function salidasStock()
+    {
+        return $this->hasMany(SalidaStock::class, 'personal_id');
+    }
+
+    public function equiposInformaticos()
+    {
+        return $this->hasMany(EquipoInformatico::class, 'personal_id');
+    }
+
+    public function herramientasPlanta()
+    {
+        return $this->hasMany(HerramientaPlanta::class, 'personal_id');
+    }
+
+    public function aparatosCalibrables()
+    {
+        return $this->hasMany(AparatoCalibrable::class, 'personal_id');
+    }
+
     public function historialPrl()
     {
         return $this->hasMany(\App\Models\HistorialPrl::class)->orderByDesc('created_at');
