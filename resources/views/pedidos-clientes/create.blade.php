@@ -149,7 +149,7 @@
                         <label for="ot">CC (Centro de Coste)</label>
                         <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo" list="cc_frecuentes" autocomplete="off">
                         <datalist id="cc_frecuentes">
-                            @foreach($centrosCoste ?? [] as $cc)
+                            @foreach($centrosCoste as $cc)
                                 <option value="{{ $cc->etiqueta_completa }}">
                             @endforeach
                         </datalist>
@@ -164,12 +164,28 @@
                         <small class="pedido-help">La bolsa permite a los albaranes consumir saldos de las líneas de forma fraccionada.</small>
                     </div>
 
-                    <div class="pedido-field pedido-field--wide">
+                   <div class="pedido-field pedido-field--wide">
                         <label>Documento del cliente</label>
                         @include('pedidos-clientes.partials.archivo-adjunto')
                     </div>
                 </div>
             </article>
+
+            <!-- INTERRUPTOR Y CAMPO DE DESCRIPCIÓN GENERAL -->
+            <div class="pedido-card mt-3 mb-3">
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="switchDescripcionGeneral" {{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') ? 'checked' : '' }}>
+                    <label class="custom-control-label font-weight-bold" style="color: var(--pedido-primary); cursor: pointer;" for="switchDescripcionGeneral">
+                        <i class="fas fa-align-left mr-1"></i> Añadir Descripción General al documento
+                    </label>
+                </div>
+                
+                <div class="pedido-field pedido-field--wide mt-3" id="contenedorDescripcionGeneral" style="{{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') ? 'display: block;' : 'display: none;' }}">
+                    <label for="descripcion_general">Descripción / Condiciones del pedido</label>
+                    <textarea name="descripcion_general" id="descripcion_general" class="pedido-textarea form-control" rows="3" placeholder="Escribe aquí la descripción general. Este texto ocupará todo el ancho de la hoja en el PDF generado...">{{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') }}</textarea>
+                    <span class="pedido-help text-muted"><i class="fas fa-info-circle"></i> Puedes usar saltos de línea. El texto se adaptará automáticamente en el documento final.</span>
+                </div>
+            </div>
 
             <article class="pedido-card">
                 <div class="pedido-card__head pedido-card__head--stacked">
@@ -336,6 +352,12 @@
             const summaryTotal = document.getElementById('summary-total');
             const lineFormGrid = document.querySelector('.pedido-form-grid--line');
             const lineTableWrap = document.querySelector('.pedido-table-wrap');
+            
+            // --- NUEVOS ELEMENTOS DESCRIPCIÓN GENERAL ---
+            const switchDesc = document.getElementById('switchDescripcionGeneral');
+            const containerDesc = document.getElementById('contenedorDescripcionGeneral');
+            const inputDesc = document.getElementById('descripcion_general');
+
             const initialLines = @json($lineasInicialesJs ?? []);
             const presupuestos = @json($presupuestosParaPedidoJs ?? []);
             const bolsasData = @json($bolsasParaPedido ?? []);
@@ -367,8 +389,6 @@
 
                 const esImporte = bolsaMode && modoConsumoSelect.value === 'importe';
 
-                // En modo importe la unidad de la línea es siempre 1 (no sabes
-                // cuántos "trabajos" vas a hacer, pero sí el importe límite).
                 if (esImporte) {
                     cantidadInput.value = '1';
                     cantidadInput.disabled = true;
@@ -414,7 +434,6 @@
                 clienteLockedInput.value = value;
             };
 
-            // TomSelect mantiene su propio estado: hay que bloquear/desbloquear a través de él.
             const clienteTs = () => clienteSelect.tomselect;
 
             const lockCliente = (clienteId) => {
@@ -474,7 +493,6 @@
             const syncBolsaUi = () => {
                 bolsaMode = bolsaCheckbox.checked;
                 
-                // NUEVO COMPORTAMIENTO: La bolsa V2 siempre usa líneas
                 bolsaTotalWrap.hidden = true; 
                 lineFormGrid.hidden = false; 
                 lineTableWrap.hidden = false; 
@@ -523,31 +541,26 @@
             };
 
             const renderTotals = () => {
-                // 1. Calcula totales normales
                 const total = items.reduce((carry, item) => carry + parseValue(item.total), 0);
                 hiddenTotal.value = total.toFixed(2);
                 summaryBase.textContent = formatMoney(total);
                 summaryTotal.textContent = formatMoney(total);
                 
-                // 2. NUEVA LÓGICA DE BLOQUEO
                 const warningEl = document.getElementById('bolsa-limit-warning');
                 const amountSpan = document.getElementById('bolsa-limit-amount');
                 const submitBtns = document.querySelectorAll('.pedido-summary-actions button[type="submit"]');
                 
                 let exceedsLimit = false;
 
-                // Solo validamos si estamos en modo bolsa y hay una bolsa global seleccionada
                 if (bolsaMode && bolsaIdSelect && bolsaIdSelect.value) {
                     const bolsa = bolsasData.find(b => String(b.id) === bolsaIdSelect.value);
                     
-                    // Si la bolsa no es infinita (abierta) y nos pasamos del límite
                     if (bolsa && !bolsa.es_abierta && total > bolsa.saldo_disponible) {
                         exceedsLimit = true;
                         if(amountSpan) amountSpan.textContent = formatMoney(bolsa.saldo_disponible);
                     }
                 }
 
-                // Aplicamos los cambios visuales y bloqueos
                 if (exceedsLimit) {
                     if(warningEl) warningEl.style.display = 'block';
                     submitBtns.forEach(btn => btn.disabled = true);
@@ -734,6 +747,26 @@
             presupuestoSelect.addEventListener('input', refreshFromBudgetSelectionDeferred);
 
             addLineButton.addEventListener('click', addLine);
+            
+            // --- EVENTO INTERRUPTOR DESCRIPCIÓN GENERAL ---
+            if (switchDesc && containerDesc && inputDesc) {
+                switchDesc.addEventListener('change', function () {
+                    if (this.checked) {
+                        containerDesc.style.opacity = '0';
+                        containerDesc.style.display = 'block';
+                        setTimeout(() => {
+                            containerDesc.style.transition = 'opacity 0.3s ease';
+                            containerDesc.style.opacity = '1';
+                            inputDesc.focus();
+                        }, 10);
+                    } else {
+                        containerDesc.style.opacity = '0';
+                        setTimeout(() => {
+                            containerDesc.style.display = 'none';
+                        }, 300);
+                    }
+                });
+            }
 
             body.addEventListener('click', (event) => {
                 const target = event.target instanceof HTMLElement ? event.target : null;
@@ -758,7 +791,6 @@
                         editingLineUid = itemToEdit.uid || null;
                         editingLineArticulo = itemToEdit.articulo || '';
                         
-                        // 1. Cargar los datos de la línea en el formulario superior
                         descripcionInput.value = itemToEdit.descripcion;
                         cantidadInput.value = itemToEdit.cantidad;
                         medidaInput.value = itemToEdit.medida;
@@ -767,16 +799,14 @@
                         
                         if (modoConsumoSelect && itemToEdit.modo_consumo) {
                             modoConsumoSelect.value = itemToEdit.modo_consumo;
-                            syncModoConsumoUi(); // Para bloquear la cantidad si es 'importe'
+                            syncModoConsumoUi(); 
                         }
                         
                         autoResizeDescripcion();
                         
-                        // 2. Eliminar la línea original de la tabla
                         items.splice(index, 1);
                         renderRows();
                         
-                        // 3. Hacer scroll hacia el formulario y dar foco a la descripción
                         descripcionInput.focus();
                         descripcionInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
@@ -797,12 +827,10 @@
             }
 
             form.addEventListener('submit', () => {
-                // 1. Validar primero con HTML5
                 if (!form.checkValidity()) {
                     return;
                 }
 
-                // 2. Sincronizar datos ocultos
                 const button = document.activeElement;
                 if (button && button.dataset && button.dataset.estado) {
                     hiddenState.value = button.dataset.estado;
@@ -819,7 +847,6 @@
                 syncHidden();
                 renderTotals();
 
-                // 3. PROTECCIÓN FRONTEND CONTRA DOBLE ENVÍO
                 setTimeout(() => {
                     const btns = form.querySelectorAll('button[type="submit"]');
                     btns.forEach(btn => {

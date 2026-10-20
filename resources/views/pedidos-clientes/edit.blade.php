@@ -166,7 +166,7 @@
                         <label for="ot">CC (Centro de Coste)</label>
                         <input type="text" id="ot" name="ot" class="pedido-input" value="{{ $otPedido }}" placeholder="Orden de trabajo" list="cc_frecuentes" autocomplete="off">
                         <datalist id="cc_frecuentes">
-                            @foreach($centrosCoste ?? [] as $cc)
+                            @foreach($centrosCoste as $cc)
                                 <option value="{{ $cc->etiqueta_completa }}">
                             @endforeach
                         </datalist>
@@ -188,6 +188,22 @@
                     </div>
                 </div>
             </article>
+
+            <!-- INTERRUPTOR Y CAMPO DE DESCRIPCIÓN GENERAL -->
+            <div class="pedido-card mt-3 mb-3">
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="switchDescripcionGeneral" {{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') ? 'checked' : '' }}>
+                    <label class="custom-control-label font-weight-bold" style="color: var(--pedido-primary); cursor: pointer;" for="switchDescripcionGeneral">
+                        <i class="fas fa-align-left mr-1"></i> Añadir Descripción General al documento
+                    </label>
+                </div>
+                
+                <div class="pedido-field pedido-field--wide mt-3" id="contenedorDescripcionGeneral" style="{{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') ? 'display: block;' : 'display: none;' }}">
+                    <label for="descripcion_general">Descripción / Condiciones del pedido</label>
+                    <textarea name="descripcion_general" id="descripcion_general" class="pedido-textarea form-control" rows="3" placeholder="Escribe aquí la descripción general. Este texto ocupará todo el ancho de la hoja en el PDF generado...">{{ old('descripcion_general', $pedidoCliente->descripcion_general ?? '') }}</textarea>
+                    <span class="pedido-help text-muted"><i class="fas fa-info-circle"></i> Puedes usar saltos de línea. El texto se adaptará automáticamente en el documento final.</span>
+                </div>
+            </div>
 
             <article class="pedido-card">
                 <div class="pedido-card__head pedido-card__head--stacked">
@@ -243,9 +259,9 @@
                     <div class="pedido-field pedido-field--wide" id="pedido_bolsa_global_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
                         <label for="pedido_bolsa_id">Bolsa global</label>
                         <select id="pedido_bolsa_id" name="bolsa_id" class="pedido-select">
-                            <option value="">Bolsa suelta (sin bolsa global)</option>
-                            @foreach ($bolsasParaPedido ?? [] as $bolsaOption)
-                                <option value="{{ $bolsaOption['id'] }}"
+                        <option value="">Bolsa suelta (sin bolsa global)</option>
+                        @foreach ($bolsasParaPedido as $bolsaOption)
+                            <option value="{{ $bolsaOption['id'] }}"
                                         data-cliente-id="{{ $bolsaOption['id_cliente'] }}"
                                         {{ $bolsaIdSeleccionada === (string)$bolsaOption['id'] ? 'selected' : '' }}>
                                     {{ $bolsaOption['numero'] ?: ('Bolsa #' . $bolsaOption['id']) }} ({{ $bolsaOption['tipo_bolsa'] }}) — {{$bolsaOption['saldo_texto'] ?? '' }}
@@ -366,6 +382,11 @@
             const summaryTotal = document.getElementById('summary-total');
             const lineFormGrid = document.querySelector('.pedido-form-grid--line');
             const lineTableWrap = document.querySelector('.pedido-table-wrap');
+
+            // --- NUEVOS ELEMENTOS DESCRIPCIÓN GENERAL ---
+            const switchDesc = document.getElementById('switchDescripcionGeneral');
+            const containerDesc = document.getElementById('contenedorDescripcionGeneral');
+            const inputDesc = document.getElementById('descripcion_general');
             
             // Inyectamos las líneas actuales que vienen de la base de datos o de validation fail (old)
             const initialLines = @json($lineasActuales ?? []);
@@ -599,6 +620,26 @@
             if (bolsaIdSelect) bolsaIdSelect.addEventListener('change', renderTotals);
 
             addLineButton.addEventListener('click', addLine);
+            
+            // --- EVENTO INTERRUPTOR DESCRIPCIÓN GENERAL ---
+            if (switchDesc && containerDesc && inputDesc) {
+                switchDesc.addEventListener('change', function () {
+                    if (this.checked) {
+                        containerDesc.style.opacity = '0';
+                        containerDesc.style.display = 'block';
+                        setTimeout(() => {
+                            containerDesc.style.transition = 'opacity 0.3s ease';
+                            containerDesc.style.opacity = '1';
+                            inputDesc.focus();
+                        }, 10);
+                    } else {
+                        containerDesc.style.opacity = '0';
+                        setTimeout(() => {
+                            containerDesc.style.display = 'none';
+                        }, 300);
+                    }
+                });
+            }
 
             body.addEventListener('click', (event) => {
                 const target = event.target instanceof HTMLElement ? event.target : null;

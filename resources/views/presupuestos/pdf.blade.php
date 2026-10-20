@@ -169,6 +169,21 @@
             </td>
         </tr>
     </table>
+    
+    @if(!empty($presupuesto->descripcion_general))
+    <table style="width: 100%; margin-top: 15px; margin-bottom: 15px; border-collapse: collapse;">
+        <tr>
+            <td style="background-color: #3273b5; color: white; padding: 5px 10px; font-weight: bold; font-size: 12px; border: 1px solid #3273b5;">
+                DESCRIPCIÓN GENERAL / CONDICIONES
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border: 1px solid #3273b5; font-size: 11px; text-align: justify; vertical-align: top;">
+                {!! nl2br(e($presupuesto->descripcion_general)) !!}
+            </td>
+        </tr>
+    </table>
+    @endif
 
     @php
         $lineasValidas = collect((array) $presupuesto->lista_articulos)->filter(function ($line) {
@@ -184,6 +199,12 @@
         // --- LÓGICA DE COMPRESIÓN DINÁMICA ---
         $usarFormatoCompacto = false;
         $totalLineasVisuales = 0;
+
+        // Contabilizamos también el espacio ocupado por la descripción general si existe
+        $descGeneral = trim((string) ($presupuesto->descripcion_general ?? ''));
+        if ($descGeneral !== '') {
+            $totalLineasVisuales += substr_count($descGeneral, "\n") + ceil(strlen($descGeneral) / 95) + 2;
+        }
 
         foreach($lineasValidas as $line) {
             $texto = trim((string) ($line['descripcion'] ?? $line['articulo'] ?? ''));

@@ -169,6 +169,7 @@ class PresupuestoController extends Controller
             'exclusiones' => 'nullable|string|max:2000',
             'archivo_pdf' => [$archivoPdfRule, 'file', 'mimes:pdf', 'max:10240'],
             'lista_articulos' => 'nullable|json',
+            'descripcion_general' => 'nullable|string|max:5000',
         ]);
 
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
@@ -252,7 +253,7 @@ class PresupuestoController extends Controller
                 ->setTimeFrom(\Carbon\Carbon::now('Europe/Madrid'))
                 ->toDateTimeString();
 
-            // Una única llamada limpia de creación
+            // Una única llamada limpia de creación (Laravel automáticamente coge descripcion_general de $validated)
             $presupuesto = Presupuesto::create($validated);
             
             $this->syncArticulosFromLineas($proyectoId, $validated['lista_articulos'] ?? []);
@@ -272,25 +273,27 @@ class PresupuestoController extends Controller
         });
         // --- FIN DE LA TRANSACCIÓN ---
 
-        // Attempt to generate and store a PDF copy of the presupuesto
-        try {
-            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
-                $filePath = "presupuestos/{$presupuesto->numero}.pdf";
-                Storage::disk('public')->put($filePath, $pdf->output());
-                $presupuesto->update(['archivo_pdf' => $filePath]);
-            } elseif (class_exists(\Dompdf\Dompdf::class)) {
-                $html = view('presupuestos.pdf', compact('presupuesto'))->render();
-                $dompdf = new \Dompdf\Dompdf();
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->loadHtml($html);
-                $dompdf->render();
-                $filePath = "presupuestos/{$presupuesto->numero}.pdf";
-                Storage::disk('public')->put($filePath, $dompdf->output());
-                $presupuesto->update(['archivo_pdf' => $filePath]);
+        // Generar y guardar copia en PDF (solo si no subió uno manual en modo carga)
+        if (!$request->hasFile('archivo_pdf')) {
+            try {
+                if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
+                    $filePath = "presupuestos/{$presupuesto->numero}.pdf";
+                    Storage::disk('public')->put($filePath, $pdf->output());
+                    $presupuesto->updateQuietly(['archivo_pdf' => $filePath]);
+                } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                    $html = view('presupuestos.pdf', compact('presupuesto'))->render();
+                    $dompdf = new \Dompdf\Dompdf();
+                    $dompdf->setPaper('A4', 'portrait');
+                    $dompdf->loadHtml($html);
+                    $dompdf->render();
+                    $filePath = "presupuestos/{$presupuesto->numero}.pdf";
+                    Storage::disk('public')->put($filePath, $dompdf->output());
+                    $presupuesto->updateQuietly(['archivo_pdf' => $filePath]);
+                }
+            } catch (\Throwable $e) {
+                report($e);
             }
-        } catch (\Throwable $e) {
-            report($e);
         }
 
         if ($redirectClienteId > 0 && $redirectClienteId === (int) $validated['cliente_id']) {
@@ -522,6 +525,7 @@ class PresupuestoController extends Controller
             'lista_articulos' => 'nullable|json',
             'validez_oferta' => 'nullable|string|max:255',
             'exclusiones' => 'nullable|string|max:2000',
+            'descripcion_general' => 'nullable|string|max:5000', // <--- NUEVO CAMPO AÑADIDO
             'solicitante' => 'nullable|string|max:255', 
             'destinatario' => 'nullable|string|max:255', 
         ];
@@ -574,6 +578,7 @@ class PresupuestoController extends Controller
             'total' => round($totalComputed, 2),
             'validez_oferta' => $validated['validez_oferta'] ?? $presupuesto->validez_oferta ?? null,
             'exclusiones' => $validated['exclusiones'] ?? $presupuesto->exclusiones ?? null,
+            'descripcion_general' => $validated['descripcion_general'] ?? null, // <--- NUEVO CAMPO AÑADIDO
             'solicitante' => $validated['solicitante'] ?? null, 
             'destinatario' => $validated['destinatario'] ?? null, 
             'documento' => $validated['documento'],
@@ -596,7 +601,7 @@ class PresupuestoController extends Controller
                 $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
                 $filePath = "presupuestos/{$presupuesto->numero}.pdf";
                 Storage::disk('public')->put($filePath, $pdf->output());
-                $presupuesto->update(['archivo_pdf' => $filePath]);
+                $presupuesto->updateQuietly(['archivo_pdf' => $filePath]);
             } elseif (class_exists(\Dompdf\Dompdf::class)) {
                 $html = view('presupuestos.pdf', compact('presupuesto'))->render();
                 $dompdf = new \Dompdf\Dompdf();
@@ -605,7 +610,7 @@ class PresupuestoController extends Controller
                 $dompdf->render();
                 $filePath = "presupuestos/{$presupuesto->numero}.pdf";
                 Storage::disk('public')->put($filePath, $dompdf->output());
-                $presupuesto->update(['archivo_pdf' => $filePath]);
+                $presupuesto->updateQuietly(['archivo_pdf' => $filePath]);
             }
         } catch (\Throwable $e) {
             report($e);
@@ -840,43 +845,83 @@ class PresupuestoController extends Controller
     private function renderPdfResponse(Presupuesto $presupuesto, bool $download)
     {
         $disk = Storage::disk('public');
-
-        if ($presupuesto->archivo_pdf && $disk->exists($presupuesto->archivo_pdf)) {
-            $path = $disk->path($presupuesto->archivo_pdf);
-            $fileName = basename((string) $presupuesto->archivo_pdf);
-
-            return response()->file($path, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
-            ]);
-        }
-
         $pdfContent = null;
         $fileName = ($presupuesto->numero ?: 'presupuesto-' . $presupuesto->id) . '.pdf';
 
-        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
-            $pdfContent = $pdf->output();
-        } elseif (class_exists(\Dompdf\Dompdf::class)) {
-            $html = view('presupuestos.pdf', compact('presupuesto'))->render();
-            $dompdf = new \Dompdf\Dompdf();
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->loadHtml($html);
-            $dompdf->render();
-            $pdfContent = $dompdf->output();
+        // 1. Si el PDF ya existe en disco y no está vacío, lo leemos en memoria (evitando response()->file())
+        if ($presupuesto->archivo_pdf && $disk->exists($presupuesto->archivo_pdf) && $disk->size($presupuesto->archivo_pdf) > 0) {
+            $pdfContent = $disk->get($presupuesto->archivo_pdf);
+            $fileName = basename((string) $presupuesto->archivo_pdf);
+        } else {
+            // 2. Si no existe en disco, lo generamos al vuelo con DomPDF
+            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('presupuestos.pdf', compact('presupuesto'));
+                $pdfContent = $pdf->output();
+            } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                $html = view('presupuestos.pdf', compact('presupuesto'))->render();
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+                $pdfContent = $dompdf->output();
+            }
+
+            if ($pdfContent !== null) {
+                $filePath = $presupuesto->archivo_pdf ?: "presupuestos/{$fileName}";
+                $disk->put($filePath, $pdfContent);
+                if (!$presupuesto->archivo_pdf) {
+                    $presupuesto->updateQuietly(['archivo_pdf' => $filePath]);
+                }
+            }
         }
 
         if ($pdfContent === null) {
             abort(404);
         }
 
-        if ($presupuesto->archivo_pdf) {
-            $disk->put($presupuesto->archivo_pdf, $pdfContent);
+        // 3. Si es descarga directa, enviamos el bloque entero sin Accept-Ranges
+        if ($download) {
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Length' => strlen($pdfContent),
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Accept-Ranges' => 'none',
+                'Cache-Control' => 'private, max-age=0, must-revalidate',
+            ]);
         }
 
-        return response($pdfContent, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . $fileName . '"',
+        // 4. Si es visualización en navegador/iframe, entregamos HTML + Blob en cliente
+        // para evitar que el visor PDF de Chrome lance peticiones Range que reseteen el socket en Windows
+        $payloadJson = json_encode([
+            'mime' => 'application/pdf',
+            'filename' => $fileName,
+            'base64' => base64_encode($pdfContent),
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        $html = '<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>' . e($fileName) . '</title>
+<style>html,body{height:100%;margin:0;background:#202124}embed{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body><div id="visor" style="height:100%"></div>
+<script>
+(function () {
+    const data = ' . $payloadJson . ';
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: data.mime }));
+    const visor = document.getElementById("visor");
+    visor.innerHTML = "<embed type=\"application/pdf\">";
+    visor.firstElementChild.src = blobUrl;
+    window.addEventListener("unload", function () { URL.revokeObjectURL(blobUrl); });
+}());
+</script>
+</body></html>';
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
         ]);
     }
 

@@ -429,6 +429,7 @@ class PedidoController extends Controller
                 Rule::unique('pedidos_clientes', 'numero_pedido')->where(fn ($query) => $query->where('proyecto_id', $proyectoId)->whereNull('deleted_at')),
             ],
             'referencia_manual' => 'nullable|string|max:120',
+            'descripcion_general' => 'nullable|string|max:5000',
             'bolsa_texto' => 'nullable|string|max:2000',
             'fecha_pedido' => 'required|date',
             'id_cliente' => [
@@ -589,6 +590,7 @@ class PedidoController extends Controller
                     'proyecto_id' => $proyectoId,
                     'numero_pedido' => $validated['numero_pedido'],
                     'referencia_manual' => $validated['referencia_manual'] ?? null,
+                    'descripcion_general' => $validated['descripcion_general'] ?? null,
                     'fecha_pedido' => $fechaConHora, 
                     'ot' => $validated['ot'] ?? null,
                     'presupuesto_id' => $presupuestoId,
@@ -1043,6 +1045,7 @@ class PedidoController extends Controller
                     ->ignore($pedidoCliente->id),
             ],
             'referencia_manual' => 'nullable|string|max:120',
+            'descripcion_general' => 'nullable|string|max:5000',
             'bolsa_texto' => 'nullable|string|max:2000',
             'fecha_pedido' => 'required|date',
             'id_cliente' => [
@@ -1207,6 +1210,7 @@ class PedidoController extends Controller
                     'id_cliente' => $validated['id_cliente'],
                     'numero_pedido' => $validated['numero_pedido'],
                     'referencia_manual' => $validated['referencia_manual'] ?? null,
+                    'descripcion_general' => $validated['descripcion_general'] ?? null,
                     'fecha_pedido' => $fechaConHora, 
                     'ot' => $validated['ot'] ?? null,
                     'presupuesto_id' => $presupuestoId,

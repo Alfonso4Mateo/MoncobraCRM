@@ -48,6 +48,7 @@ class Presupuesto extends Model
         'estado',
         'archivo_pdf',
         'lista_articulos',
+        'descripcion_general',
     ];
 
     /**

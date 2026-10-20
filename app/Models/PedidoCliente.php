@@ -48,6 +48,7 @@ class PedidoCliente extends Model
         'total',
         'lista_articulos',
         'archivo_pdf',
+        'descripcion_general',
     ];
 
     /**

@@ -4,8 +4,7 @@
 
 @section('content')
     @php
-        $isCarga = $modo === 'carga';
-        $volverUrl = $volverACliente && $clienteSeleccionadoId
+        $isCarga = $modo === 'carga';$volverUrl = $volverACliente && $clienteSeleccionadoId
             ? route('clientes.show', $clienteSeleccionadoId)
             : route('presupuestos.index');
     @endphp
@@ -109,6 +108,24 @@
                     <div class="field-group field-full">
                         <label for="exclusiones">Exclusiones</label>
                         <textarea id="exclusiones" name="exclusiones" rows="3" placeholder="Describa exclusiones relevantes" class="@error('exclusiones') is-invalid @enderror">{{ old('exclusiones', $presupuesto->exclusiones ?? 'Cualquier concepto no descrito en la oferta') }}</textarea>
+                    </div>
+                </div>
+
+                <!-- INTERRUPTOR Y CAMPO DE DESCRIPCIÓN GENERAL -->
+                <div class="card shadow-sm mt-3 mb-4" style="border-radius: 12px; border: 1px solid #e2e8f0; border-top: 4px solid #1f4f82;">
+                    <div class="card-body pb-3 pt-3">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="switchDescripcionGeneral" {{ old('descripcion_general', $presupuesto->descripcion_general ?? '') ? 'checked' : '' }}>
+                            <label class="custom-control-label font-weight-bold" style="color: #1f4f82; cursor: pointer;" for="switchDescripcionGeneral">
+                                <i class="fas fa-align-left mr-1"></i> Añadir Descripción General al documento
+                            </label>
+                        </div>
+                        
+                        <div class="mt-3" id="contenedorDescripcionGeneral" style="{{ old('descripcion_general', $presupuesto->descripcion_general ?? '') ? 'display: block;' : 'display: none;' }}">
+                            <label for="descripcion_general" class="font-weight-bold" style="font-size: 0.85rem; color: #5b6f87; text-transform: uppercase;">Descripción / Condiciones del presupuesto</label>
+                            <textarea name="descripcion_general" id="descripcion_general" class="form-control" rows="4" style="border-radius: 8px;" placeholder="Escribe aquí la descripción general. Este texto ocupará todo el ancho de la hoja en el PDF generado...">{{ old('descripcion_general', $presupuesto->descripcion_general ?? '') }}</textarea>
+                            <span class="text-muted mt-2 d-block" style="font-size: 0.75rem;"><i class="fas fa-info-circle"></i> Puedes usar saltos de línea. El texto se adaptará automáticamente en el documento final antes de la tabla de artículos.</span>
+                        </div>
                     </div>
                 </div>
 
@@ -227,6 +244,11 @@
             const editButton = document.getElementById('btn_editar_item');
             const deleteButton = document.getElementById('btn_eliminar_item');
 
+            // --- NUEVOS ELEMENTOS DESCRIPCIÓN GENERAL ---
+            const switchDesc = document.getElementById('switchDescripcionGeneral');
+            const containerDesc = document.getElementById('contenedorDescripcionGeneral');
+            const inputDesc = document.getElementById('descripcion_general');
+
             const eur = new Intl.NumberFormat('es-ES', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -236,7 +258,6 @@
             const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
-            // CAMBIO 2: Formateador permite hasta 2 decimales para la tabla visual
             const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
             const safeNumber = (value) => {
@@ -270,7 +291,6 @@
             };
 
             const normalizeItem = (item) => {
-                // CAMBIO 3: Se quita Math.round() para permitir decimales en la cantidad
                 const cantidad = Math.max(0, safeNumber(item?.cantidad));
                 const precioUnitario = Math.max(0, safeNumber(item?.precio_unitario));
                 const margen = Math.max(0, safeNumber(item?.margen));
@@ -372,7 +392,6 @@
 
                 emptyState.hidden = true;
 
-                // CAMBIO 5: Se utiliza qtyFmt para renderizar la cantidad en la tabla
                 tbody.innerHTML = items.map((item, index) => `
                     <tr class="${selectedIndex === index ? 'item-selected' : ''}" data-index="${index}">
                         <td>${String(index + 1).padStart(2, '0')}</td>
@@ -400,7 +419,6 @@
 
             addButton.addEventListener('click', function () {
                 const descripcion = descripcionInput.value.trim();
-                // CAMBIO 4: Se permite decimales y valores mayores o iguales a 0, sin forzar a entero
                 const cantidad = Math.max(0, safeNumber(cantidadInput.value));
                 const medida = String(medidaInput.value || '').trim() || 'und';
                 const precioUnitario = Math.max(0, safeNumber(precioInput.value));
@@ -464,6 +482,26 @@
                 deleteItemAt(selectedIndex);
             });
 
+            // --- LÓGICA EVENTO INTERRUPTOR DESCRIPCIÓN GENERAL ---
+            if (switchDesc && containerDesc && inputDesc) {
+                switchDesc.addEventListener('change', function () {
+                    if (this.checked) {
+                        containerDesc.style.opacity = '0';
+                        containerDesc.style.display = 'block';
+                        setTimeout(() => {
+                            containerDesc.style.transition = 'opacity 0.3s ease';
+                            containerDesc.style.opacity = '1';
+                            inputDesc.focus();
+                        }, 10);
+                    } else {
+                        containerDesc.style.opacity = '0';
+                        setTimeout(() => {
+                            containerDesc.style.display = 'none';
+                        }, 300);
+                    }
+                });
+            }
+
             tbody.addEventListener('click', function (event) {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) {
@@ -492,20 +530,15 @@
                 if (row instanceof HTMLElement) {
                     const index = Number.parseInt(row.dataset.index || '-1', 10);
                     if (index >= 0 && index < items.length) {
-                        // Solo realizamos cambios si seleccionamos una fila diferente
                         if (selectedIndex !== index) {
                             selectedIndex = index;
                             
-                            // 1. Buscamos si hay una fila previamente seleccionada y le quitamos la clase
                             const filaSeleccionadaPrevia = tbody.querySelector('.item-selected');
                             if (filaSeleccionadaPrevia) {
                                 filaSeleccionadaPrevia.classList.remove('item-selected');
                             }
                             
-                            // 2. Le añadimos la clase de selección a la fila donde acabamos de hacer clic
                             row.classList.add('item-selected');
-                            
-                            // 3. Actualizamos los botones de "Editar" y "Eliminar" para que se activen
                             setButtonsState();
                         }
                     }
@@ -514,20 +547,20 @@
 
             renderRows();
 
-            // --- PROTECCIÓN CONTRA DOBLE ENVÍO (Double Submit Guard) ---
+            // --- PROTECCIÓN CONTRA DOBLE ENVÍO ---
             const form = document.getElementById('form-crear-presupuesto');
             if (form) {
                 form.addEventListener('submit', function (e) {
                     const btnSubmit = document.getElementById('btn-submit-form');
                     if (btnSubmit) {
                         if (!form.checkValidity()) {
-                            return; // Deja que HTML5 maneje los errores visuales
+                            return; 
                         }
                         
                         btnSubmit.disabled = true;
                         btnSubmit.style.pointerEvents = 'none';
                         const anchoOriginal = btnSubmit.offsetWidth;
-                        btnSubmit.style.width = anchoOriginal + 'px'; // Mantiene el botón estable
+                        btnSubmit.style.width = anchoOriginal + 'px'; 
                         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Procesando';
                     }
                 });

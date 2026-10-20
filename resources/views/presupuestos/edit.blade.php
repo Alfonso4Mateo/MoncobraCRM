@@ -104,6 +104,24 @@
                 </div>
             </article>
 
+            <!-- INTERRUPTOR Y CAMPO DE DESCRIPCIÓN GENERAL -->
+            <div class="card shadow-sm mt-3 mb-4" style="border-radius: 12px; border: 1px solid #e2e8f0; border-top: 4px solid #1f4f82;">
+                <div class="card-body pb-3 pt-3">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="switchDescripcionGeneral" {{ old('descripcion_general', $presupuesto->descripcion_general ?? '') ? 'checked' : '' }}>
+                        <label class="custom-control-label font-weight-bold" style="color: #1f4f82; cursor: pointer;" for="switchDescripcionGeneral">
+                            <i class="fas fa-align-left mr-1"></i> Añadir Descripción General al documento
+                        </label>
+                    </div>
+                    
+                    <div class="mt-3" id="contenedorDescripcionGeneral" style="{{ old('descripcion_general', $presupuesto->descripcion_general ?? '') ? 'display: block;' : 'display: none;' }}">
+                        <label for="descripcion_general" class="font-weight-bold" style="font-size: 0.85rem; color: #5b6f87; text-transform: uppercase;">Descripción / Condiciones del presupuesto</label>
+                        <textarea name="descripcion_general" id="descripcion_general" class="form-control" rows="4" style="border-radius: 8px;" placeholder="Escribe aquí la descripción general. Este texto ocupará todo el ancho de la hoja en el PDF generado...">{{ old('descripcion_general', $presupuesto->descripcion_general ?? '') }}</textarea>
+                        <span class="text-muted mt-2 d-block" style="font-size: 0.75rem;"><i class="fas fa-info-circle"></i> Puedes usar saltos de línea. El texto se adaptará automáticamente en el documento final antes de la tabla de artículos.</span>
+                    </div>
+                </div>
+            </div>
+
             <article class="presupuesto-detail-card">
                 <header class="presupuesto-detail-card__head">
                     <h2>Editar artículos</h2>
@@ -232,6 +250,11 @@
             const editButton = document.getElementById('btn_editar_item');
             const deleteButton = document.getElementById('btn_eliminar_item');
 
+            // --- NUEVOS ELEMENTOS DESCRIPCIÓN GENERAL ---
+            const switchDesc = document.getElementById('switchDescripcionGeneral');
+            const containerDesc = document.getElementById('contenedorDescripcionGeneral');
+            const inputDesc = document.getElementById('descripcion_general');
+
             const eur = new Intl.NumberFormat('es-ES', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -241,7 +264,6 @@
             const MAX_PRECIO = 10000000;
             const MAX_MARGEN = 1000;
 
-            // CAMBIO 2: Formateador permite hasta 2 decimales para la tabla visual
             const qtyFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
             const safeNumber = (value) => {
@@ -471,6 +493,26 @@
 
                 deleteItemAt(selectedIndex);
             });
+
+            // --- LÓGICA EVENTO INTERRUPTOR DESCRIPCIÓN GENERAL ---
+            if (switchDesc && containerDesc && inputDesc) {
+                switchDesc.addEventListener('change', function () {
+                    if (this.checked) {
+                        containerDesc.style.opacity = '0';
+                        containerDesc.style.display = 'block';
+                        setTimeout(() => {
+                            containerDesc.style.transition = 'opacity 0.3s ease';
+                            containerDesc.style.opacity = '1';
+                            inputDesc.focus();
+                        }, 10);
+                    } else {
+                        containerDesc.style.opacity = '0';
+                        setTimeout(() => {
+                            containerDesc.style.display = 'none';
+                        }, 300);
+                    }
+                });
+            }
 
             tbody.addEventListener('click', function (event) {
                 const target = event.target;
