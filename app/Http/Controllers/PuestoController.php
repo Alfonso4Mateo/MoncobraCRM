@@ -17,8 +17,8 @@ class PuestoController extends Controller
     public function index(): View
     {
         $this->authorize('cursos.view');
-        // Cargamos los puestos contando cuántos cursos obligatorios y personal tienen
-        $puestos = Puesto::withCount(['cursos', 'personal'])
+        // Cargamos los puestos contando cuántos cursos obligatorios, EPIs y personal tienen
+        $puestos = Puesto::withCount(['cursos', 'personal', 'epis'])
             ->orderBy('nombre')
             ->get();
 
@@ -45,7 +45,7 @@ class PuestoController extends Controller
         $this->authorize('cursos.edit');
         // Recuperamos todos los cursos agrupados por categoría para pintar el "Panel de Normas"
         $cursos = Curso::orderBy('categoria')->orderBy('nombre')->get();
-        $cursosPorCategoria = $cursos->groupBy(function($curso) {
+        $cursosPorCategoria = $cursos->groupBy(function ($curso) {
             return $curso->categoria ?: 'Sin categoría';
         });
 
@@ -68,15 +68,15 @@ class PuestoController extends Controller
             'epis' => 'nullable|array',
             'epis.*' => 'exists:epis,id',
             'cantidades' => 'nullable|array',
-            'cantidades.*' => 'integer|min:1'
+            'cantidades.*' => 'integer|min:1',
         ]);
 
         $syncData = [];
         if ($request->has('epis')) {
             foreach ($request->epis as $epiId) {
                 // Recuperamos la cantidad introducida; si no viene por seguridad, ponemos 1
-                $cantidad = $request->input("cantidades.{$epiId}", 1);
-                $syncData[$epiId] = ['cantidad' => $cantidad];
+                $cantidad = (int) $request->input("cantidades.{$epiId}", 1);
+                $syncData[$epiId] = ['cantidad' => max(1, $cantidad)];
             }
         }
 
@@ -106,7 +106,7 @@ class PuestoController extends Controller
         // Validamos que lo que nos llega es un array de IDs que existen en la tabla cursos
         $request->validate([
             'cursos' => 'nullable|array',
-            'cursos.*' => 'exists:cursos,id'
+            'cursos.*' => 'exists:cursos,id',
         ]);
 
         // Preparamos el array con los datos adicionales para la tabla pivote (es_obligatorio)
@@ -117,13 +117,6 @@ class PuestoController extends Controller
             }
         }
 
-        /* 
-         * AQUI ESTÁ LA MAGIA DE LARAVEL: 
-         * El método sync() compara lo que hay en la BD con el array $syncData.
-         * Si un curso estaba en la BD pero no en el array, lo desvincula.
-         * Si está en el array pero no en la BD, lo vincula.
-         * Si está en ambos, no hace nada. Eficiencia pura.
-         */
         $puesto->cursos()->sync($syncData);
         $cursosObligatorios = array_keys($syncData);
         if ($cursosObligatorios !== []) {
@@ -212,10 +205,10 @@ class PuestoController extends Controller
                             if ($diasRestantes < 0) {
                                 $estado = 'caducado';
                                 $tooltip = 'Caducó el ' . $fechaVencimientoStr;
-                                $diasRestantesStr = abs((int)$diasRestantes) . ' días caducado';
+                                $diasRestantesStr = abs((int) $diasRestantes) . ' días caducado';
                                 $alertas++;
                             } else {
-                                $diasRestantesStr = (int)$diasRestantes . ' días restantes';
+                                $diasRestantesStr = (int) $diasRestantes . ' días restantes';
                                 if ($hoy->gte($fAviso)) {
                                     $estado = 'aviso';
                                     $tooltip = 'Caduca pronto: ' . $fechaVencimientoStr;
@@ -243,7 +236,7 @@ class PuestoController extends Controller
                     'fecha_realizacion' => $fechaRealizacionStr,
                     'fecha_vencimiento' => $fechaVencimientoStr,
                     'dias_restantes' => $diasRestantesStr,
-                    'curso_nombre' => $cursoNorma->nombre
+                    'curso_nombre' => $cursoNorma->nombre,
                 ];
             }
             
@@ -277,10 +270,10 @@ class PuestoController extends Controller
             "Content-Disposition" => "attachment; filename=$fileName",
             "Pragma"              => "no-cache",
             "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            "Expires"             => "0",
         ];
 
-        $callback = function() use ($puesto, $cursosExigidos) {
+        $callback = function () use ($puesto, $cursosExigidos) {
             $file = fopen('php://output', 'w');
             fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
 
@@ -303,7 +296,7 @@ class PuestoController extends Controller
                     $trabajador->id_rrhh ?: '—',
                     trim($trabajador->name . ' ' . $trabajador->apellido),
                     !empty($deptos) ? strtoupper(implode(', ', $deptos)) : 'SIN DEPARTAMENTO',
-                    optional($trabajador->puestoTrabajo)->nombre ?: '—'
+                    optional($trabajador->puestoTrabajo)->nombre ?: '—',
                 ];
 
                 foreach ($cursosExigidos as $cursoNorma) {
@@ -341,17 +334,95 @@ class PuestoController extends Controller
     }
 
     /**
-     * Genera el documento PDF con la dotación de EPIs de un puesto.
-     * (Versión provisional en HTML hasta tener la plantilla definitiva)
+     * Genera el documento PDF oficial con la dotación de EPIs de un puesto (Norma SST-0840-002-1-2 Rev.4).
      */
-    public function exportEpisPdf(Puesto $puesto)
+    /**
+     * Genera el documento PDF oficial con la dotación de EPIs de un puesto.
+     */
+    public function exportEpisPdf(Request $request, Puesto $puesto)
     {
         $this->authorize('cursos.view');
-        // Cargamos los EPIs asignados al puesto y su cantidad desde la tabla pivote
-        $puesto->load('epis');
 
-        // RETORNO PROVISIONAL: Te devolverá una vista HTML simple.
-        // Cuando tu compañero traiga el PDF, aquí usaremos la librería correspondiente (ej: Barryvdh\DomPDF).
-        return view('puestos.pdf-epis-placeholder', compact('puesto'));
+        $puesto->load(['epis' => function ($query) {
+            $query->orderBy('id');
+        }]);
+
+        $download = $request->input('download', 0) == 1; // Leemos si pulsó "Descargar" o "Visualizar"
+        $slug = \Illuminate\Support\Str::slug($puesto->nombre ?: 'puesto-' . $puesto->id);
+        $fileName = 'ficha_epis_' . $slug . '.pdf';
+        $pdfContent = null;
+
+        // 1. ATRAMPAMOS LOS DATOS DEL MODAL (Con los valores oficiales por defecto)
+        $configPdf = [
+            'codigo'           => $request->input('codigo_iso', 'SST-0840-002-1-2'),
+            'revision'         => $request->input('revision_iso', 'Rev. 4'),
+            'fecha_emision'    => $request->input('fecha_emision', now()->format('d/m/Y')),
+            'marco_prl'        => $request->input('marco_prl', 'RD 773/1997'),
+            'sello_prevencion' => $request->input('sello_prevencion', 'FIRMADO / HOMOLOGADO'),
+            'sello_delegacion' => $request->input('sello_delegacion', 'CONFORME / VALIDADO'),
+            'dpto_prevencion'  => $request->input('dpto_prevencion', 'Dpto. SST Moncobra, S.A.'), // <--- NUEVO
+            'dpto_delegacion'  => $request->input('dpto_delegacion', 'Jefatura de Producción / Planta'), // <--- NUEVO
+        ];
+
+        // 2. SE LOS INYECTAMOS A LA VISTA BLADE
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('puestos.pdf-epis-placeholder', compact('puesto', 'configPdf'))
+                ->setPaper('a4', 'portrait');
+            $pdfContent = $pdf->output();
+        } elseif (class_exists(\Dompdf\Dompdf::class)) {
+            $html = view('puestos.pdf-epis-placeholder', compact('puesto', 'configPdf'))->render();
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->loadHtml($html);
+            $dompdf->render();
+            $pdfContent = $dompdf->output();
+        }
+
+        if ($pdfContent === null) {
+            return view('puestos.pdf-epis-placeholder', compact('puesto', 'configPdf'));
+        }
+
+        if ($download) {
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Length' => strlen($pdfContent),
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Accept-Ranges' => 'none',
+                'Cache-Control' => 'private, max-age=0, must-revalidate',
+            ]);
+        }
+
+        // Visor HTML + Blob en cliente para evitar net::ERR_CONNECTION_RESET en 127.0.0.1:8000
+        $payloadJson = json_encode([
+            'mime' => 'application/pdf',
+            'filename' => $fileName,
+            'base64' => base64_encode($pdfContent),
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        $html = '<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>' . e($fileName) . '</title>
+<style>html,body{height:100%;margin:0;background:#202124}embed{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body><div id="visor" style="height:100%"></div>
+<script>
+(function () {
+    const data = ' . $payloadJson . ';
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: data.mime }));
+    const visor = document.getElementById("visor");
+    visor.innerHTML = "<embed type=\"application/pdf\">";
+    visor.firstElementChild.src = blobUrl;
+    window.addEventListener("unload", function () { URL.revokeObjectURL(blobUrl); });
+}());
+</script>
+</body></html>';
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
+        ]);
     }
 }
