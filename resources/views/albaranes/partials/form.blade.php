@@ -173,22 +173,27 @@
                         <!-- Caja de Pedido Cliente (75% del espacio restante) -->
                         <div class="field-group" style="flex: 1; margin-bottom: 0;">
                             <label for="pedido_cliente">Pedido cliente</label>
-                            <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias bolsas..." style="width: 100%;">
-                                <option value="">Selecciona pedido...</option>
+                            <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias partidas / pedidos..." style="width: 100%;">
                                 @foreach ($pedidosClientes as $pedido)
                                     @php
                                         $clienteNombre = $pedido->cliente?->empresa_nombre ?: 'Sin cliente';
                                         $otTexto = $pedido->ot ? ' | OT ' . $pedido->ot : '';
-                                        
+                                        $comprometido = $pedido->importeConsumido(isset($albaran) ? $albaran->id : null);
+                                        $esAbierta = $pedido->esPartidaAbierta();
+                                        $pendiente = $pedido->pendienteFacturar(isset($albaran) ? $albaran->id : null);
+                                        $estadoTag = strtoupper(str_replace('_', ' ', $pedido->estado ?: 'pendiente'));
+
                                         if ($pedido->bolsa) {
-                                            $macroRef = $pedido->bolsaGlobal ? ($pedido->bolsaGlobal->numero ?: $pedido->bolsaGlobal->id) : 'Suelta';
+                                            $macroRef = $pedido->bolsaGlobal ? ($pedido->bolsaGlobal->numero ?: '#' . $pedido->bolsaGlobal->id) : 'Suelta';
                                             $partidaRef = $pedido->numero_pedido ?: 'Sin número';
-                                            
-                                            $pedidoLabel = "📦 Bolsa {$macroRef} | Partida {$partidaRef} | {$clienteNombre}{$otTexto}";
+                                            $infoSaldo = $esAbierta
+                                                ? "🔓 ABIERTA · Comprometido: " . number_format($comprometido, 2, ',', '.') . " €"
+                                                : "Comprometido: " . number_format($comprometido, 2, ',', '.') . " € · Disp: " . number_format($pendiente, 2, ',', '.') . " €";
+
+                                            $pedidoLabel = "📦 Bolsa {$macroRef} | Partida {$partidaRef} ({$infoSaldo}) [{$estadoTag}] | {$clienteNombre}{$otTexto}";
                                         } else {
                                             $pedidoRef = $pedido->numero_pedido ?: 'Pedido sin número';
-                                            
-                                            $pedidoLabel = "{$pedidoRef} | {$clienteNombre}{$otTexto}";
+                                            $pedidoLabel = "{$pedidoRef} (Comprometido: " . number_format($comprometido, 2, ',', '.') . " €) [{$estadoTag}] | {$clienteNombre}{$otTexto}";
                                         }
                                     @endphp
                                     <option
@@ -196,6 +201,10 @@
                                         data-pedido-id="{{ $pedido->id }}"
                                         data-cliente-id="{{ $pedido->id_cliente }}"
                                         data-ot="{{ $pedido->ot }}"
+                                        data-bolsa="{{ $pedido->bolsa ? '1' : '0' }}"
+                                        data-es-abierta="{{ $esAbierta ? '1' : '0' }}"
+                                        data-comprometido="{{ $comprometido }}"
+                                        data-disponible="{{ $pendiente }}"
                                         @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))
                                     >
                                         {{ $pedidoLabel }}

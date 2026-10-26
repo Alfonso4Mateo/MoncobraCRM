@@ -22,11 +22,91 @@ class BolsaController extends Controller
         $this->authorize('pedidos.view');
 
         $proyectoId = $this->resolveActiveProyectoId($request);
+        $sessionKey = "bolsas_filter_pref_{$proyectoId}";
 
-        $bolsas = Bolsa::query()
+        // 1. GESTIÓN DE PERSISTENCIA DE FILTROS (Abiertas / Con Tope)
+        if ($request->boolean('reset_filters')) {
+            $request->session()->forget($sessionKey);
+            return redirect()->route('bolsas.index');
+        }
+
+        if ($request->has('filter_applied')) {
+            $verAbiertas = $request->boolean('ver_abiertas');
+            $verCerradas = $request->boolean('ver_cerradas');
+
+            // Si desmarca ambos por error, activamos ambos para no dejar una pantalla vacía confusa
+            if (!$verAbiertas && !$verCerradas) {
+                $verAbiertas = true;
+                $verCerradas = true;
+            }
+
+            $request->session()->put($sessionKey, [
+                'ver_abiertas' => $verAbiertas,
+                'ver_cerradas' => $verCerradas,
+            ]);
+        } else {
+            $prefs = $request->session()->get($sessionKey, [
+                'ver_abiertas' => true,
+                'ver_cerradas' => true,
+            ]);
+            $verAbiertas = (bool) ($prefs['ver_abiertas'] ?? true);
+            $verCerradas = (bool) ($prefs['ver_cerradas'] ?? true);
+        }
+
+        $buscar = trim((string) $request->query('buscar', ''));
+
+        $bolsasQuery = Bolsa::query()
             ->with(['cliente', 'partidas.albaranesPivot'])
-            ->withCount('partidas') // <-- NUEVO: Contamos las partidas para permitir borrar
-            ->where('proyecto_id', $proyectoId)
+            ->withCount('partidas')
+            ->where('proyecto_id', $proyectoId);
+
+        // 2. FILTRO POR MODALIDAD (Abiertas [total <= 0] vs Con Tope/Cerradas [total > 0])
+        if ($verAbiertas && !$verCerradas) {
+            $bolsasQuery->where('total', '<=', 0);
+        } elseif (!$verAbiertas && $verCerradas) {
+            $bolsasQuery->where('total', '>', 0);
+        }
+
+        // 3. BUSCADOR MULTI-CAMPO (Tipo, Cantidad, Número, Cliente y Fecha)
+        if ($buscar !== '') {
+            $like = '%' . $buscar . '%';
+            // Normalizamos formato moneda español (ej. "1.200,50" -> "1200.50")
+            $buscarNormalizado = str_replace(['.', ','], ['', '.'], $buscar);
+            $buscarSimple = str_replace(',', '.', $buscar);
+
+            $bolsasQuery->where(function ($query) use ($like, $buscar, $buscarNormalizado, $buscarSimple) {
+                $query->where('numero', 'like', $like)
+                    ->orWhere('tipo_bolsa', 'like', $like)
+                    ->orWhere('fecha', 'like', $like)
+                    ->orWhereHas('cliente', function ($qCliente) use ($like) {
+                        $qCliente->where('empresa_nombre', 'like', $like);
+                    });
+
+                // Búsqueda por cantidad/importe
+                if (is_numeric($buscarSimple)) {
+                    $query->orWhere('total', '=', (float) $buscarSimple)
+                          ->orWhere('total', 'like', '%' . $buscarSimple . '%');
+                } elseif (is_numeric($buscarNormalizado)) {
+                    $query->orWhere('total', '=', (float) $buscarNormalizado)
+                          ->orWhere('total', 'like', '%' . $buscarNormalizado . '%');
+                }
+
+                // Búsqueda por fecha en formato español (dd/mm/yyyy o dd-mm-yyyy)
+                if (preg_match('#^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$#', $buscar, $matches)) {
+                    $fechaSql = sprintf('%04d-%02d-%02d', (int) $matches[3], (int) $matches[2], (int) $matches[1]);
+                    $query->orWhereDate('fecha', $fechaSql);
+                } else {
+                    try {
+                        $fechaParsed = \Carbon\Carbon::parse($buscar)->toDateString();
+                        $query->orWhereDate('fecha', $fechaParsed);
+                    } catch (\Throwable $e) {
+                        // No es una fecha válida, se ignora silenciosamente
+                    }
+                }
+            });
+        }
+
+        $bolsas = $bolsasQuery
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->paginate(15)
@@ -39,6 +119,9 @@ class BolsaController extends Controller
 
         return view('bolsas.index', [
             'bolsas' => $bolsas,
+            'buscar' => $buscar,
+            'verAbiertas' => $verAbiertas,
+            'verCerradas' => $verCerradas,
             'titulo' => 'Bolsas',
             'breadcrumb' => 'Gestión de bolsas',
         ]);

@@ -32,8 +32,13 @@
                                     'created' => ['Creado', 'badge-success'],
                                     'updated' => ['Actualizado', 'badge-info'],
                                     'deleted' => ['Eliminado', 'badge-danger'],
+                                    'albaran_vinculado' => ['Albarán vinculado', 'badge-primary'],
+                                    'albaran_actualizado' => ['Imputación actualizada', 'badge-info'],
+                                    'albaran_desvinculado' => ['Albarán desvinculado', 'badge-warning'],
+                                    'estado_partida' => ['Estado de partida', 'badge-dark'],
                                     default => [$activity->description ?: 'Movimiento', 'badge-secondary'],
                                 };
+                                $customMessage = data_get($activity->properties, 'custom_message');
                                 $attributes = data_get($activity->properties, 'attributes', []);
                                 $old = collect(data_get($activity->properties, 'old', []));
                                 $changes = collect($attributes)
@@ -59,6 +64,10 @@
                                     })
                                     ->filter()
                                     ->take(5);
+
+                                if ($customMessage) {
+                                    $changes->prepend('<strong>' . e($customMessage) . '</strong>');
+                                }
                             @endphp
                             <tr>
                                 <td class="pl-3 text-muted text-nowrap">

@@ -11,7 +11,7 @@
 
 @section('content')
     @php
-        $esAbierta = $bolsa->total <= 0;
+        $esAbierta = (float) $bolsa->total <= 0;
         $acumulado = $bolsa->totalAcumulado();
     @endphp
 
@@ -63,8 +63,8 @@
 
         {{-- KPIs --}}
         <div class="bolsa-kpis">
-            <article class="bolsa-kpi" style="--kpi: #1f74dd;">
-                <span class="bolsa-kpi__label">Total acumulado</span>
+            <article class="bolsa-kpi" style="--kpi: #ef4444;">
+                <span class="bolsa-kpi__label">Total usado (Albaranes)</span>
                 <p class="bolsa-kpi__value">{{ number_format($acumulado, 2, ',', '.') }} €</p>
             </article>
 
@@ -73,7 +73,7 @@
                     <i class="fas fa-unlock-alt" aria-hidden="true"></i>
                     <div>
                         <h4>Bolsa Abierta (facturación continua)</h4>
-                        <p>Esta bolsa no tiene tope inicial. Puedes seguir vinculando partidas hasta que decidas cerrarla.</p>
+                        <p>Esta bolsa no tiene tope inicial. Usado (facturado): <strong>{{ number_format($bolsa->totalFacturado(), 2, ',', '.') }} €</strong> · Comprometido: <strong>{{ number_format($bolsa->totalComprometido(), 2, ',', '.') }} €</strong>.</p>
                     </div>
                 </article>
             @else
@@ -122,7 +122,7 @@
                 <div class="bolsa-panel__head">
                     <div>
                         <h2><i class="fas fa-list mr-1" aria-hidden="true"></i> Partidas (pedidos) vinculadas</h2>
-                        <p>{{ $bolsa->partidas->count() }} {{ \Illuminate\Support\Str::plural('partida', $bolsa->partidas->count()) }} · pulsa una fila para ver sus albaranes.</p>
+                        <p>{{ $bolsa->partidas->count() }} {{ $bolsa->partidas->count() === 1 ? 'partida' : 'partidas' }} · pulsa una fila para ver sus albaranes.</p>
                     </div>
                 </div>
 
@@ -133,7 +133,8 @@
                                 <th>Nº Pedido</th>
                                 <th>Fecha</th>
                                 <th>CC / OT</th>
-                                <th class="is-right">Total pedido</th>
+                                <th class="is-right">Total partida</th>
+                                <th class="is-right">Total usado</th>
                                 <th class="is-center">Estado</th>
                                 <th class="is-center">Albaranes</th>
                                 <th class="is-center">Acciones</th>
@@ -150,26 +151,78 @@
                                         ];
                                     })->sortByDesc(fn ($fila) => optional($fila->albaran->fecha)->timestamp)->values();
 
-                                    $estadoClass = match($partida->estado) {
+                                    $esPartidaAbierta = (bool) ($partida->esPartidaAbierta() || (float) $partida->total <= 0);
+                                    
+                                    // Total original con el que se creó la partida/pedido
+                                    $totalPartida = round((float) ($partida->total ?? 0), 2);
+                                    
+                                    // Total usado real por los albaranes de esta partida
+                                    $totalUsadoPartida = $partida->importeConsumido();
+                                    
+                                    // Lo que falta por facturar de esa partida con techo
+                                    $pendienteDeFacturar = max(0, round($totalPartida - $totalUsadoPartida, 2));
+
+                                    $estadoVisual = $partida->estado ?: 'pendiente';
+                                    if (!$esPartidaAbierta && $estadoVisual === 'comprometido') {
+                                        $estadoVisual = $totalUsadoPartida > 0 ? 'facturado_parcial' : 'pendiente';
+                                    }
+
+                                    $estadoClass = match($estadoVisual) {
                                         'facturado' => 'bolsa-chip--ok',
                                         'facturado_parcial' => 'bolsa-chip--warn',
+                                        'comprometido' => 'bolsa-chip--info',
                                         default => 'bolsa-chip--muted',
                                     };
-                                    $estadoLabel = str_replace('_', ' ', $partida->estado ?: 'pendiente');
+                                    $estadoLabel = str_replace('_', ' ', $estadoVisual);
+                                    $numAlbaranes = $albaranesPartida->count();
                                 @endphp
 
                                 <tr class="bolsa-row-toggle" data-toggle="collapse" data-target="#partida-albaranes-{{ $partida->id }}" aria-expanded="false">
                                     <td class="bolsa-code">{{ $partida->numero_pedido }}</td>
                                     <td>{{ optional(\Carbon\Carbon::parse($partida->fecha_pedido))->format('d/m/Y') }}</td>
                                     <td><span class="bolsa-chip bolsa-chip--muted">{{ $partida->ot ?: 'Sin CC' }}</span></td>
-                                    <td class="is-right"><strong>{{ number_format((float) $partida->total, 2, ',', '.') }} €</strong></td>
-                                    <td class="is-center"><span class="bolsa-chip {{ $estadoClass }}">{{ $estadoLabel }}</span></td>
+
+                                    {{-- COLUMNA 4: TOTAL PARTIDA (Muestra el importe asignado original o "Abierta") --}}
+                                    <td class="is-right">
+                                        @if($esPartidaAbierta)
+                                            <span class="bolsa-chip bolsa-chip--open" title="Partida Abierta sin límite prefijado">
+                                                <i class="fas fa-unlock-alt mr-1"></i> Abierta
+                                            </span>
+                                        @else
+                                            <strong>{{ number_format($totalPartida, 2, ',', '.') }} €</strong>
+                                        @endif
+                                    </td>
+
+                                    {{-- COLUMNA 5: TOTAL USADO + SUBTEXTO (Pendiente de facturar vs Comprometido) --}}
+                                    <td class="is-right">
+                                        <strong style="color: {{ $totalUsadoPartida > 0 ? '#dc2626' : '#0f172a' }};">
+                                            {{ number_format($totalUsadoPartida, 2, ',', '.') }} €
+                                        </strong>
+                                        @if($esAbierta || $esPartidaAbierta)
+                                            <div style="font-size: 0.78rem; color: #d97706; font-weight: 700;">
+                                                Comprometido: {{ number_format($comprometidoPartida, 2, ',', '.') }} €
+                                            </div>
+                                        @else
+                                            <div style="font-size: 0.78rem; color: #64748b;">
+                                                Pendiente de facturar: {{ number_format($pendienteDeFacturar, 2, ',', '.') }} €
+                                            </div>
+                                        @endif
+                                    </td>
+
+                                    {{-- COLUMNA 6: ESTADO --}}
+                                    <td class="is-center">
+                                        <span class="bolsa-chip {{ $estadoClass }}">{{ $estadoLabel }}</span>
+                                    </td>
+
+                                    {{-- COLUMNA 7: BOTÓN DESPLEGABLE DE ALBARANES (EN SU CELDA CORRECTA) --}}
                                     <td class="is-center">
                                         <span class="bolsa-btn bolsa-btn--ghost bolsa-btn--sm">
                                             <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                                            {{ $albaranesPartida->count() }} {{ \Illuminate\Support\Str::plural('albarán', $albaranesPartida->count()) }}
+                                            {{ $numAlbaranes }} {{ $numAlbaranes === 1 ? 'albarán' : 'albaranes' }}
                                         </span>
                                     </td>
+
+                                    {{-- COLUMNA 8: ACCIONES (EN SU CELDA CORRECTA) --}}
                                     <td class="is-center" onclick="event.stopPropagation();">
                                         <div class="bolsa-row-actions">
                                             <a href="{{ route('pedidos-clientes.albaranes', $partida->id) }}" class="bolsa-btn bolsa-btn--ghost bolsa-btn--sm" title="Ver desglose y albaranes de esta partida">
@@ -180,7 +233,7 @@
                                                 <a href="{{ route('pedidos-clientes.edit', $partida->id) }}" class="bolsa-btn bolsa-btn--soft bolsa-btn--sm bolsa-btn--icon" title="Editar esta partida" aria-label="Editar partida">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
-                                                <form action="{{ route('bolsas.quitar-partida', ['bolsa' => $bolsa->id, 'pedido' => $partida->id]) }}" method="POST" onsubmit="return confirm('¿Seguro que quieres desvincular esta partida de la bolsa global? El pedido pasará a ser una bolsa suelta.');">
+                                                <form action="{{ route('bolsas.quitar-partida', ['bolsa' => $bolsa->id, 'pedido' => $partida->id]) }}" method="POST" class="d-inline m-0" onsubmit="return confirm('¿Seguro que quieres desvincular esta partida de la bolsa global? El pedido pasará a ser una bolsa suelta.');">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="bolsa-btn bolsa-btn--danger bolsa-btn--sm bolsa-btn--icon" title="Desvincular de esta bolsa global" aria-label="Desvincular partida">
@@ -193,7 +246,7 @@
                                 </tr>
 
                                 <tr class="collapse bolsa-subrow" id="partida-albaranes-{{ $partida->id }}">
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="bolsa-subtable">
                                             @if($albaranesPartida->isEmpty())
                                                 <p class="mb-0 text-muted" style="font-size: .9rem;">
@@ -240,7 +293,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="bolsa-empty" style="border: 0; box-shadow: none;">
                                             <i class="fas fa-folder-open" aria-hidden="true"></i>
                                             <h4>Esta bolsa global aún no tiene partidas vinculadas</h4>

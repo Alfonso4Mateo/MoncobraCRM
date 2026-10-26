@@ -14,14 +14,16 @@
     </label>
 
     <div class="pedido-file__selected" hidden>
-        <span class="badge badge-success px-2 py-1">
+        <span class="badge badge-success px-2 py-1" style="white-space: nowrap; flex-shrink: 0;">
             <i class="fas fa-check mr-1" aria-hidden="true"></i> Archivo listo para guardar
         </span>
         <span class="pedido-file__name"></span>
-        <span class="pedido-file__size"></span>
-        <button type="button" class="pedido-file__clear" aria-label="Quitar archivo">
-            <i class="fas fa-times" aria-hidden="true"></i>
-        </button>
+        <div class="pedido-file__meta">
+            <span class="pedido-file__size"></span>
+            <button type="button" class="pedido-file__clear" aria-label="Quitar archivo" title="Quitar archivo">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
     <small class="pedido-file__note" hidden>Se guardará al pulsar guardar. Límite real del servidor: {{ ini_get('upload_max_filesize') }}.</small>
     <small class="pedido-file__error" hidden></small>
@@ -33,7 +35,7 @@
         <div class="pedido-file__current">
             <i class="fas fa-check-circle pedido-file__check" aria-hidden="true"></i>
             <span>Documento adjunto actualmente</span>
-            <a href="{{ $urlActual }}" target="_blank" rel="noopener">Ver</a>
+            <a href="{{ $urlActual }}" target="_blank" rel="noopener" class="font-weight-bold">Ver</a>
             <label class="pedido-file__remove">
                 <input type="checkbox" name="eliminar_archivo" value="1"> Quitar
             </label>
@@ -47,18 +49,43 @@
         border:2px dashed #cbd5e1; border-radius:12px; background:#f8fafc; cursor:pointer;
         transition:border-color .15s, background .15s; }
     .pedido-file__drop:hover, .pedido-file.is-dragover .pedido-file__drop { border-color:#2563eb; background:#eff6ff; }
-    .pedido-file__icon { font-size:1.6rem; color:#2563eb; }
-    .pedido-file__text { display:flex; flex-direction:column; }
+    .pedido-file__icon { font-size:1.6rem; color:#2563eb; flex-shrink:0; }
+    .pedido-file__text { display:flex; flex-direction:column; min-width:0; }
     .pedido-file__text small, .pedido-file__note { color:#64748b; }
-    .pedido-file__selected, .pedido-file__current { display:flex; align-items:center; gap:10px; padding:10px 14px;
-        border:1px solid #86efac; background:#f0fdf4; border-radius:10px; }
-    .pedido-file__selected[hidden], .pedido-file__note[hidden], .pedido-file__error[hidden] { display:none; }
+    .pedido-file__selected, .pedido-file__current {
+        display:flex;
+        align-items:center;
+        flex-wrap:wrap;
+        gap:8px 12px;
+        padding:10px 14px;
+        border:1px solid #86efac;
+        background:#f0fdf4;
+        border-radius:10px;
+    }
+    .pedido-file__selected[hidden], .pedido-file__note[hidden], .pedido-file__error[hidden] { display:none !important; }
     .pedido-file__check { color:#16a34a; font-size:1.1rem; flex:none; }
-    .pedido-file__name { flex:1; min-width:0; font-weight:600; overflow-wrap:anywhere; }
-    .pedido-file__size { color:#64748b; white-space:nowrap; font-size:.85rem; }
-    .pedido-file__clear { border:0; background:none; color:#ef4444; cursor:pointer; padding:4px; }
+    .pedido-file__name {
+        flex:1 1 160px;
+        min-width:140px;
+        max-width:100%;
+        font-weight:700;
+        color:#065f46;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+    .pedido-file__meta {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        margin-left:auto;
+        flex-shrink:0;
+    }
+    .pedido-file__size { color:#047857; font-weight:600; white-space:nowrap; font-size:.85rem; }
+    .pedido-file__clear { border:0; background:none; color:#ef4444; cursor:pointer; padding:4px 6px; line-height:1; border-radius:6px; }
+    .pedido-file__clear:hover { background:#fee2e2; }
     .pedido-file__error { color:#dc2626; font-weight:600; }
-    .pedido-file__remove { margin:0 0 0 auto; font-size:.85rem; color:#b91c1c; cursor:pointer; }
+    .pedido-file__remove { margin:0 0 0 auto; font-size:.85rem; color:#b91c1c; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
     .pedido-file.has-selection .pedido-file__current { display:none; }
 </style>
 

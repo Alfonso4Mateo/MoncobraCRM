@@ -257,6 +257,18 @@
                     </div>
 
                     <div class="pedido-field pedido-field--wide" id="pedido_bolsa_global_wrap" {{ $pedidoBolsa ? '' : 'hidden' }}>
+                        @php
+                            $esPartidaAbiertaActual = (bool) old('es_partida_abierta', isset($pedidoCliente) ? $pedidoCliente->esPartidaAbierta() : false);
+                        @endphp
+                        <div class="pedido-field pedido-field--wide" id="pedido_partida_abierta_wrap" {{ $pedidoBolsa ? '' : 'hidden' }} style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; margin-top: 10px;">
+                            <label class="pedido-checkbox-inline" style="display:flex; align-items:center; gap:10px; margin:0; cursor:pointer;">
+                                <input type="checkbox" id="es_partida_abierta" name="es_partida_abierta" value="1" {{ $esPartidaAbiertaActual ? 'checked' : '' }}>
+                                <strong style="color: #1e40af;"><i class="fas fa-unlock-alt mr-1"></i> Partida Abierta (Sin techo / Facturación continua por albaranes)</strong>
+                            </label>
+                            <small class="pedido-help" style="color: #1d4ed8; display:block; margin-top:4px;">
+                                Si activas esta opción, no necesitas prefijar líneas ni un límite en esta partida. Podrás imputarle albaranes libremente (ej. control de gasto mensual) y ver el importe comprometido acumulado en tiempo real hasta que decidas cerrarla.
+                            </small>
+                        </div>
                         <label for="pedido_bolsa_id">Bolsa global</label>
                         <select id="pedido_bolsa_id" name="bolsa_id" class="pedido-select">
                         <option value="">Bolsa suelta (sin bolsa global)</option>
@@ -364,6 +376,8 @@
             const bolsaTextoInput = document.getElementById('pedido_bolsa_texto');
             const bolsaGlobalWrap = document.getElementById('pedido_bolsa_global_wrap');
             const bolsaIdSelect = document.getElementById('pedido_bolsa_id');
+            const partidaAbiertaWrap = document.getElementById('pedido_partida_abierta_wrap');
+            const partidaAbiertaCheckbox = document.getElementById('es_partida_abierta');
             const modoConsumoWrap = document.getElementById('line_modo_consumo_wrap');
             const modoConsumoSelect = document.getElementById('line_modo_consumo');
             const thModoConsumo = document.getElementById('th-modo-consumo');
@@ -469,23 +483,35 @@
 
             const syncBolsaUi = () => {
                 bolsaMode = bolsaCheckbox.checked;
+                if (partidaAbiertaWrap) {
+                    partidaAbiertaWrap.hidden = !bolsaMode;
+                }
+                if (!bolsaMode && partidaAbiertaCheckbox) {
+                    partidaAbiertaCheckbox.checked = false;
+                }
+                const esAbierta = bolsaMode && partidaAbiertaCheckbox && partidaAbiertaCheckbox.checked;
+
                 bolsaTotalWrap.hidden = true; 
-                bolsaTextoWrap.hidden = !bolsaMode;
-                lineFormGrid.hidden = false; 
-                lineTableWrap.hidden = false; 
+                lineFormGrid.hidden = esAbierta; 
+                lineTableWrap.hidden = esAbierta; 
+                addLineButton.hidden = esAbierta;
                 bolsaTotalInput.required = false;
 
                 if (bolsaGlobalWrap) bolsaGlobalWrap.hidden = !bolsaMode;
-                if (modoConsumoWrap) modoConsumoWrap.hidden = !bolsaMode;
-                if (thModoConsumo) thModoConsumo.hidden = !bolsaMode;
+                if (modoConsumoWrap) modoConsumoWrap.hidden = !bolsaMode || esAbierta;
+                if (thModoConsumo) thModoConsumo.hidden = !bolsaMode || esAbierta;
                 if (!bolsaMode && bolsaIdSelect) bolsaIdSelect.value = '';
                 if (!bolsaMode && modoConsumoSelect) modoConsumoSelect.value = 'cantidad';
 
                 filterBolsaIdOptions();
                 syncModoConsumoUi();
-                addLineButton.disabled = descripcionInput.value.trim().length === 0;
+                addLineButton.disabled = esAbierta || descripcionInput.value.trim().length === 0;
                 renderRows();
             };
+
+            if (partidaAbiertaCheckbox) {
+                partidaAbiertaCheckbox.addEventListener('change', syncBolsaUi);
+            }
 
             const items = normalizeLines(initialLines);
 

@@ -121,4 +121,20 @@ class Bolsa extends Model
 
         return max(0, round($tope - $this->totalAcumulado(), 2));
     }
+
+    public function totalFacturado(): float
+    {
+        return round(
+            $this->partidas->sum(fn ($partida) => $partida->importeFacturado()),
+            2
+        );
+    }
+
+    public function totalComprometido(): float
+    {
+        return round(
+            $this->partidas->sum(fn ($partida) => $partida->importeSoloComprometido()),
+            2
+        );
+    }
 }

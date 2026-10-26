@@ -4,6 +4,14 @@
 
 @section('css')
     @vite(['resources/css/pedidos-clientes-index.css'])
+    <style>
+        .pedido-chip--comprometido {
+            background-color: #e0f2fe !important;
+            color: #0369a1 !important;
+            border: 1px solid #bae6fd !important;
+            font-weight: 700;
+        }
+    </style>
 @endsection
 
 @section('content_header')
@@ -286,14 +294,28 @@
                                 </td>
                                 <td data-label="Facturación">
                                     <div class="pedido-facturacion-cell">
-                                        <div class="pedido-facturacion-line">
-                                            <span class="pedido-facturacion-label">Total:</span>
-                                            <strong class="pedido-total">{{ number_format($pedido->ui_total, 2, ',', '.') }}€</strong>
-                                        </div>
-                                        <div class="pedido-facturacion-line pedido-facturacion-line--pending">
-                                            <span class="pedido-facturacion-label">Pendiente a facturar:</span>
-                                            <strong>{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}€</strong>
-                                        </div>
+                                        @if ($pedido->ui_es_abierta ?? false)
+                                            <div class="pedido-facturacion-line">
+                                                <span class="pedido-facturacion-label" style="color:#0369a1; font-weight:700;"><i class="fas fa-unlock-alt"></i> Partida Abierta</span>
+                                            </div>
+                                            <div class="pedido-facturacion-line">
+                                                <span class="pedido-facturacion-label">Comprometido:</span>
+                                                <strong class="pedido-total" style="color:#0369a1;">{{ number_format($pedido->ui_total_facturaciones ?? 0, 2, ',', '.') }}€</strong>
+                                            </div>
+                                        @else
+                                            <div class="pedido-facturacion-line">
+                                                <span class="pedido-facturacion-label">Total:</span>
+                                                <strong class="pedido-total">{{ number_format($pedido->ui_total, 2, ',', '.') }}€</strong>
+                                            </div>
+                                            <div class="pedido-facturacion-line">
+                                                <span class="pedido-facturacion-label">Comprometido:</span>
+                                                <strong>{{ number_format($pedido->ui_total_facturaciones ?? 0, 2, ',', '.') }}€</strong>
+                                            </div>
+                                            <div class="pedido-facturacion-line pedido-facturacion-line--pending">
+                                                <span class="pedido-facturacion-label">Disponible:</span>
+                                                <strong>{{ number_format($pedido->ui_pendiente, 2, ',', '.') }}€</strong>
+                                            </div>
+                                        @endif
                                     </div>
                                 </td>
                                 <td data-label="Acciones">
@@ -335,8 +357,9 @@
                                                         @csrf
                                                         @method('PATCH')
                                                         <button class="dropdown-item" type="submit" name="estado" value="pendiente">Pendiente</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="comprometido">Comprometido</button>
                                                         <button class="dropdown-item" type="submit" name="estado" value="facturado_parcial">Facturado parcial</button>
-                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado</button>
+                                                        <button class="dropdown-item" type="submit" name="estado" value="facturado">Facturado (Cerrar)</button>
                                                     </form>
                                                 </div>
                                             </div>

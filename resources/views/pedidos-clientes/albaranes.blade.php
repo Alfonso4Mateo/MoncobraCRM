@@ -77,6 +77,27 @@
                     </a>
                 @endif
             @endcan
+            @can('pedidos.manage')
+                @if ($pedidoFacturado)
+                    <form action="{{ route('pedidos-clientes.estado.update', $pedidoCliente) }}" method="POST" class="d-inline m-0" onsubmit="return confirm('¿Reabrir esta partida? Volverá a estado COMPROMETIDO y aparecerá de nuevo en el selector de albaranes.');">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="estado" value="{{ $albaranes->total() > 0 ? 'comprometido' : 'pendiente' }}">
+                        <button type="submit" class="pedidos-clientes-action-btn" style="background-color: #f59e0b; color: #fff; border: none; font-weight: 700;">
+                            <i class="fas fa-lock-open" aria-hidden="true"></i> Reabrir Partida
+                        </button>
+                    </form>
+                @elseif ($pedidoCliente->bolsa)
+                    <form action="{{ route('pedidos-clientes.estado.update', $pedidoCliente) }}" method="POST" class="d-inline m-0" onsubmit="return confirm('¿Cerrar y marcar como FACTURADA esta partida? Desaparecerá del selector de nuevos albaranes.');">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="estado" value="facturado">
+                        <button type="submit" class="pedidos-clientes-action-btn" style="background-color: #10b981; color: #fff; border: none; font-weight: 700;">
+                            <i class="fas fa-check-circle" aria-hidden="true"></i> Cerrar / Facturar Partida
+                        </button>
+                    </form>
+                @endif
+            @endcan
         </div>
     </div>
 @endsection
@@ -145,20 +166,32 @@
             <div class="albaran-pagos-grid">
                 <div class="albaran-pago-item">
                     <div class="albaran-pago-info">
-                        <span class="albaran-pago-label">Total del Pedido</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalPedido, 2, ',', '.') }}</strong>
+                        <span class="albaran-pago-label">{{ $pedidoCliente->esPartidaAbierta() ? 'Modalidad de Partida' : 'Techo / Total del Pedido' }}</span>
+                        <strong class="albaran-pago-amount">
+                            @if($pedidoCliente->esPartidaAbierta())
+                                <span style="color: #0369a1; font-size: 1.15rem;"><i class="fas fa-unlock-alt mr-1"></i> Partida Abierta (Sin techo)</span>
+                            @else
+                                €{{ number_format((float) $totalPedido, 2, ',', '.') }}
+                            @endif
+                        </strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--paid">
                     <div class="albaran-pago-info">
-                        <span class="albaran-pago-label">Total Facturado (Albaranes)</span>
-                       <strong class="albaran-pago-amount">€{{ number_format((float) $totalFacturado, 2, ',', '.') }}</strong>
+                        <span class="albaran-pago-label">Importe Comprometido / Facturado</span>
+                        <strong class="albaran-pago-amount">€{{ number_format((float) $totalFacturado, 2, ',', '.') }}</strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--pending">
                     <div class="albaran-pago-info">
-                        <span class="albaran-pago-label">Pendiente de Facturar</span>
-                        <strong class="albaran-pago-amount">€{{ number_format((float) ($pendienteFacturar ?? 0), 2, ',', '.') }}</strong>
+                        <span class="albaran-pago-label">{{ $pedidoCliente->esPartidaAbierta() ? 'Estado Actual' : 'Saldo Disponible' }}</span>
+                        <strong class="albaran-pago-amount">
+                            @if($pedidoCliente->esPartidaAbierta())
+                                {{ strtoupper(str_replace('_', ' ', $pedidoCliente->estado ?: 'pendiente')) }}
+                            @else
+                                €{{ number_format((float) ($pendienteFacturar ?? 0), 2, ',', '.') }}
+                            @endif
+                        </strong>
                     </div>
                 </div>
                 <div class="albaran-pago-item albaran-pago-item--count">

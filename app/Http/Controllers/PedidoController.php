@@ -31,6 +31,7 @@ class PedidoController extends Controller
     private const MAX_TOTAL = 1000000000;
     private const PEDIDO_CLIENTE_ESTADOS = [
         'pendiente' => 'Pendiente',
+        'comprometido' => 'Comprometido',
         'facturado' => 'Facturado',
         'facturado_parcial' => 'Facturado parcial',
     ];
@@ -157,7 +158,7 @@ class PedidoController extends Controller
         $pedidosActivos = (clone $baseStatsQuery)
             ->where(function ($query) {
                 $query->whereNull('estado')
-                    ->orWhereIn('estado', ['pendiente', 'facturado_parcial']);
+                    ->orWhereIn('estado', ['pendiente', 'comprometido', 'facturado_parcial']);
             })
             ->count();
 
@@ -222,9 +223,11 @@ class PedidoController extends Controller
             $pedido->ui_estado_class = match ($pedido->ui_estado) {
                 'facturado' => 'pedido-chip pedido-chip--paid',
                 'facturado_parcial' => 'pedido-chip pedido-chip--partial',
+                'comprometido' => 'pedido-chip pedido-chip--comprometido',
                 default => 'pedido-chip pedido-chip--pending',
             };
             $pedido->ui_total = (float) ($pedido->total ?? 0);
+            $pedido->ui_es_abierta = $pedido->esPartidaAbierta();
             $pedido->ui_presupuesto_numero = $pedido->presupuesto?->numero;
 
             $albaranes = $pedido->albaranesEfectivos();
@@ -343,23 +346,26 @@ class PedidoController extends Controller
 
         $pedidoCliente = null;
         $bolsasParaPedido = Bolsa::query()
-            ->with('partidas')
+            ->with(['partidas.albaranesPivot'])
             ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->get(['id', 'id_cliente', 'numero', 'tipo_bolsa', 'total'])
             ->map(function (Bolsa $bolsa) use ($pedidoCliente) {
                 $esAbierta = (float) $bolsa->total <= 0;
 
-                $dineroComprometido = $bolsa->partidas->sum('total');
-                $saldoDisponible = max(0, $bolsa->total - $dineroComprometido);
+                // Comprometido real: para partidas con techo tomamos el mayor entre su techo y lo consumido; para abiertas, lo consumido
+                $dineroComprometido = $bolsa->partidas->sum(function (PedidoCliente $p) use ($pedidoCliente) {
+                    if (isset($pedidoCliente) && (int) $p->id === (int) $pedidoCliente->id) {
+                        return 0.0;
+                    }
+                    return max((float) $p->total, $p->importeConsumido());
+                });
 
-                if (isset($pedidoCliente) && $bolsa->id === $pedidoCliente->bolsa_id) {
-                    $saldoDisponible += (float) $pedidoCliente->total;
-                }
+                $saldoDisponible = $esAbierta ? 0.0 : max(0, (float) $bolsa->total - $dineroComprometido);
 
                 $saldoTexto = $esAbierta
-                    ? 'Bolsa Abierta'
-                    : number_format($saldoDisponible, 2, ',', '.') . ' € libres (Límite)';
+                    ? 'Bolsa Abierta (Sin límite)'
+                    : number_format($saldoDisponible, 2, ',', '.') . ' € libres (de ' . number_format((float) $bolsa->total, 2, ',', '.') . ' €)';
 
                 return [
                     'id' => $bolsa->id,
@@ -441,7 +447,6 @@ class PedidoController extends Controller
             'presupuesto_id' => [
                 'nullable',
                 'integer',
-                // CAMBIO: Validación de estados permitidos según constante
                 Rule::exists('presupuestos', 'id')->where(function ($query) use ($proyectoId) {
                     $query->where('proyecto_id', $proyectoId)
                         ->whereIn('estado', self::PRESUPUESTO_ESTADOS_PEDIDO);
@@ -450,7 +455,6 @@ class PedidoController extends Controller
                     $query->where('proyecto_id', $proyectoId);
                 }),
             ],
-            // CAMBIO: Validación estricta de estado del pedido
             'estado' => ['nullable', Rule::in(array_keys(self::PEDIDO_CLIENTE_ESTADOS))],
             'bolsa' => 'nullable|boolean',
             'bolsa_id' => [
@@ -503,31 +507,36 @@ class PedidoController extends Controller
             ->values()
             ->all();
 
-        if ($bolsa && empty($lineasFiltradas)) {
-             $total = round((float) ($validated['total'] ?? 0), 2);
+        $esPartidaAbierta = $bolsa && $request->boolean('es_partida_abierta');
+
+        if ($esPartidaAbierta) {
+            $lineas = [];
+            $lineasFiltradas = [];
+            $total = 0.0;
+        } elseif ($bolsa && empty($lineasFiltradas)) {
+            $total = round((float) ($validated['total'] ?? 0), 2);
         } else {
-             $this->validateLineasPayload($lineasFiltradas);
+            $this->validateLineasPayload($lineasFiltradas);
 
-             // CAMBIO: Normalización limpia, sin ensuciar la base de datos de artículos
-             $normalizer = new \App\Services\DocumentLineNormalizer();
+            $normalizer = new \App\Services\DocumentLineNormalizer();
 
-             $lineas = array_map(function (array $l) {
-                 $l['medida'] = $l['medida'] ?: 'und';
-                 $l['unidad'] = $l['medida'];
-                 return $l;
-             }, $normalizer->normalize($lineasFiltradas));
+            $lineas = array_map(function (array $l) {
+                $l['medida'] = $l['medida'] ?: 'und';
+                $l['unidad'] = $l['medida'];
+                return $l;
+            }, $normalizer->normalize($lineasFiltradas));
 
-             $total = (float) collect($lineas)->sum('total');
+            $total = (float) collect($lineas)->sum('total');
         }
 
         // --- ESCUDO DE SEGURIDAD LÍMITE DE BOLSA ---
         if ($bolsa && $bolsaGlobalId) {
-            $bolsaGlobal = Bolsa::find($bolsaGlobalId);
+            $bolsaGlobal = Bolsa::with('partidas.albaranesPivot')->find($bolsaGlobalId);
             if ($bolsaGlobal && $bolsaGlobal->total > 0) {
-                $dineroComprometido = $bolsaGlobal->partidas()->sum('total');
-                $saldoLibreParaPartidas = $bolsaGlobal->total - $dineroComprometido;
+                $dineroComprometido = $bolsaGlobal->partidas->sum(fn (PedidoCliente $p) => max((float) $p->total, $p->importeConsumido()));
+                $saldoLibreParaPartidas = max(0, (float) $bolsaGlobal->total - $dineroComprometido);
 
-                if ($total > $saldoLibreParaPartidas) {
+                if ($total > $saldoLibreParaPartidas + 0.001) {
                     throw ValidationException::withMessages([
                         'bolsa_id' => 'No hay capacidad suficiente. Límite restante para nuevas partidas: ' . number_format($saldoLibreParaPartidas, 2, ',', '.') . ' €'
                     ]);
@@ -834,12 +843,10 @@ class PedidoController extends Controller
             abort(404);
         }
 
-        // 1. Refactorización aquí: Uso de albaranesEfectivos()
         $albaranes = $pedidoCliente->albaranesEfectivos()
             ->sortByDesc(fn (AlbaranCliente $a) => sprintf('%s-%06d', optional($a->fecha)->format('Y-m-d') ?? '0000-00-00', (int) $a->id))
             ->values();
 
-        // 2. Totales calculados desde el modelo (sin bucles foreach)
         $totalPedido = round((float) ($pedidoCliente->total ?? 0), 2);
         $totalFacturado = $pedidoCliente->importeConsumido();
         $pendienteFacturar = $pedidoCliente->pendienteFacturar();
@@ -856,17 +863,16 @@ class PedidoController extends Controller
             $pagedItems, $albaranes->count(), $perPage, $currentPage, ['path' => request()->url(), 'query' => request()->query()]
         );
 
-        // 3. Widget global del cliente (Simplificado con map y filter)
         $resumenBolsasCliente = null;
         if ($pedidoCliente->bolsa) {
             $bolsasActivas = PedidoCliente::with(['albaranesPivot', 'albaran', 'albaranes'])
                 ->where('proyecto_id', $proyectoId)
                 ->where('id_cliente', $pedidoCliente->id_cliente)
                 ->where('bolsa', true)
-                ->where('id', '<>', $pedidoCliente->id) // Excluimos la bolsa que ya se está viendo
+                ->where('id', '<>', $pedidoCliente->id)
                 ->where(function ($query) {
                     $query->whereNull('estado')
-                          ->orWhereIn('estado', ['pendiente', 'facturado_parcial']);
+                          ->orWhereIn('estado', ['pendiente', 'comprometido', 'facturado_parcial']);
                 })
                 ->orderByDesc('id')
                 ->get();
@@ -875,10 +881,11 @@ class PedidoController extends Controller
                 'id' => $b->id,
                 'numero_pedido' => $b->numero_pedido,
                 'ot' => $b->ot,
+                'es_abierta' => $b->esPartidaAbierta(),
                 'total' => round((float) $b->total, 2),
                 'facturado' => $b->importeConsumido(),
                 'saldo_disponible' => $b->pendienteFacturar(),
-            ])->filter(fn ($b) => $b['saldo_disponible'] > 0.001)->values();
+            ])->filter(fn ($b) => $b['es_abierta'] || $b['saldo_disponible'] > 0.001)->values();
 
             if ($bolsasResumen->isNotEmpty()) {
                 $resumenBolsasCliente = [
@@ -888,13 +895,12 @@ class PedidoController extends Controller
             }
         }
 
-        // 4. Se pasa 'totalFacturado' a la vista en lugar de 'totalAlbaranes'
         return view('pedidos-clientes.albaranes', [
             'pedidoCliente' => $pedidoCliente,
             'albaranes' => $albaranesPaginados,
-            'facturaciones' => collect(), // Se mantiene por seguridad si la vista aún lo pide
+            'facturaciones' => collect(),
             'totalPedido' => $totalPedido,
-            'totalFacturado' => $totalFacturado, // Cambio clave aquí
+            'totalFacturado' => $totalFacturado,
             'pendienteFacturar' => $pendienteFacturar,
             'resumenBolsasCliente' => $resumenBolsasCliente,
             'activities' => $activities,
@@ -961,29 +967,27 @@ class PedidoController extends Controller
             ];
         })->values()->all();
 
-        // En PedidoController.php (Aplica esto en createCliente y editCliente)
-
         $bolsasParaPedido = Bolsa::query()
-            ->with('partidas')
+            ->with(['partidas.albaranesPivot'])
             ->where('proyecto_id', $proyectoId)
             ->orderByDesc('fecha')
             ->get(['id', 'id_cliente', 'numero', 'tipo_bolsa', 'total'])
             ->map(function (Bolsa $bolsa) use ($pedidoCliente) {
                 $esAbierta = (float) $bolsa->total <= 0;
 
-                // CAMBIO: Calculamos en base al dinero comprometido por las partidas
-                $dineroComprometido = $bolsa->partidas->sum('total');
-                $saldoDisponible = max(0, $bolsa->total - $dineroComprometido);
+                // Comprometido real: para partidas con techo tomamos el mayor entre su techo y lo consumido; para abiertas, lo consumido
+                $dineroComprometido = $bolsa->partidas->sum(function (PedidoCliente $p) use ($pedidoCliente) {
+                    if (isset($pedidoCliente) && (int) $p->id === (int) $pedidoCliente->id) {
+                        return 0.0;
+                    }
+                    return max((float) $p->total, $p->importeConsumido());
+                });
 
-                // Ajuste inteligente para la edición: Le sumamos el total de este mismo pedido
-                // para calcular el límite real disponible para modificarlo.
-                if (isset($pedidoCliente) && $bolsa->id === $pedidoCliente->bolsa_id) {
-                    $saldoDisponible += (float) $pedidoCliente->total;
-                }
+                $saldoDisponible = $esAbierta ? 0.0 : max(0, (float) $bolsa->total - $dineroComprometido);
 
                 $saldoTexto = $esAbierta
-                    ? 'Bolsa Abierta'
-                    : number_format($saldoDisponible, 2, ',', '.') . ' € libres (Límite)';
+                    ? 'Bolsa Abierta (Sin límite)'
+                    : number_format($saldoDisponible, 2, ',', '.') . ' € libres (de ' . number_format((float) $bolsa->total, 2, ',', '.') . ' €)';
 
                 return [
                     'id' => $bolsa->id,
@@ -1109,53 +1113,58 @@ class PedidoController extends Controller
             ->values()
             ->all();
 
-        if ($bolsa && empty($lineasFiltradas)) {
-             $total = round((float) ($validated['total'] ?? 0), 2);
+        $esPartidaAbierta = $bolsa && $request->boolean('es_partida_abierta');
+
+        if ($esPartidaAbierta) {
+            $lineas = [];
+            $lineasFiltradas = [];
+            $total = 0.0;
+        } elseif ($bolsa && empty($lineasFiltradas)) {
+            $total = round((float) ($validated['total'] ?? 0), 2);
         } else {
-             $this->validateLineasPayload($lineasFiltradas);
+            $this->validateLineasPayload($lineasFiltradas);
 
-             $lineas = collect($lineasFiltradas)
-             ->map(function (array $linea, int $index) {
-                 $modoConsumo = ($linea['modo_consumo'] ?? 'cantidad') === 'importe' ? 'importe' : 'cantidad';
-                 $cantidad = $modoConsumo === 'importe' ? 1.0 : max(0, (float) ($linea['cantidad'] ?? 0));
-                 $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
-                 $margen = max(0, (float) ($linea['margen'] ?? 0));
-                 $totalLinea = $cantidad * $precioUnitario * (1 + ($margen / 100));
-                 $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                 $medida = $medida !== '' ? $medida : 'und';
-                 $articuloOriginal = trim((string) ($linea['articulo'] ?? ''));
-                 $articuloFinal = $articuloOriginal === '' ? (string) ($index + 1) : $articuloOriginal;
-                 $uid = $linea['uid'] ?? (string) Str::uuid();
+            $lineas = collect($lineasFiltradas)
+                ->map(function (array $linea, int $index) {
+                    $modoConsumo = ($linea['modo_consumo'] ?? 'cantidad') === 'importe' ? 'importe' : 'cantidad';
+                    $cantidad = $modoConsumo === 'importe' ? 1.0 : max(0, (float) ($linea['cantidad'] ?? 0));
+                    $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
+                    $margen = max(0, (float) ($linea['margen'] ?? 0));
+                    $totalLinea = $cantidad * $precioUnitario * (1 + ($margen / 100));
+                    $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
+                    $medida = $medida !== '' ? $medida : 'und';
+                    $articuloOriginal = trim((string) ($linea['articulo'] ?? ''));
+                    $articuloFinal = $articuloOriginal === '' ? (string) ($index + 1) : $articuloOriginal;
+                    $uid = $linea['uid'] ?? (string) Str::uuid();
 
-                 return [
-                     'uid' => $uid,
-                     'modo_consumo' => $modoConsumo,
-                     'articulo' => $articuloFinal,
-                     'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                     'cantidad' => round($cantidad, 2),
-                     'medida' => $medida,
-                     'precio_unitario' => round($precioUnitario, 2),
-                     'margen' => round($margen, 2),
-                     'total' => round($totalLinea, 2),
-                 ];
-             })
-             ->values()
-             ->all();
+                    return [
+                        'uid' => $uid,
+                        'modo_consumo' => $modoConsumo,
+                        'articulo' => $articuloFinal,
+                        'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
+                        'cantidad' => round($cantidad, 2),
+                        'medida' => $medida,
+                        'precio_unitario' => round($precioUnitario, 2),
+                        'margen' => round($margen, 2),
+                        'total' => round($totalLinea, 2),
+                    ];
+                })
+                ->values()
+                ->all();
 
-             $total = (float) collect($lineas)->sum('total');
+            $total = (float) collect($lineas)->sum('total');
         }
 
         if ($bolsa && $bolsaGlobalId) {
-            $bolsaGlobal = Bolsa::find($bolsaGlobalId);
+            $bolsaGlobal = Bolsa::with('partidas.albaranesPivot')->find($bolsaGlobalId);
             if ($bolsaGlobal && $bolsaGlobal->total > 0) {
-                $dineroComprometido = $bolsaGlobal->partidas()->sum('total');
-                $saldoLibreParaPartidas = $bolsaGlobal->total - $dineroComprometido;
+                $dineroComprometidoOtras = $bolsaGlobal->partidas
+                    ->reject(fn (PedidoCliente $p) => (int) $p->id === (int) $pedidoCliente->id)
+                    ->sum(fn (PedidoCliente $p) => max((float) $p->total, $p->importeConsumido()));
 
-                $limiteReal = ($pedidoCliente->bolsa_id == $bolsaGlobalId)
-                    ? $saldoLibreParaPartidas + $pedidoCliente->total
-                    : $saldoLibreParaPartidas;
+                $limiteReal = max(0, (float) $bolsaGlobal->total - $dineroComprometidoOtras);
 
-                if ($total > $limiteReal) {
+                if ($total > $limiteReal + 0.001) {
                     throw ValidationException::withMessages([
                         'bolsa_id' => 'No hay capacidad suficiente. Límite restante para modificar esta partida: ' . number_format($limiteReal, 2, ',', '.') . ' €'
                     ]);
@@ -1180,7 +1189,7 @@ class PedidoController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $archivoPdf) {
+            DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $esPartidaAbierta, $archivoPdf) {
 
                 if ($antiguoPresupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
                     Presupuesto::where('id', $antiguoPresupuestoId)->update(['estado' => 'pendiente']);
@@ -1223,7 +1232,9 @@ class PedidoController extends Controller
                     'archivo_pdf' => $archivoPdf,
                 ]);
 
-                if ($bolsa && !empty($lineasFiltradas)) {
+                if ($esPartidaAbierta) {
+                    (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, []);
+                } elseif ($bolsa && !empty($lineasFiltradas)) {
                     (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, $lineas);
                 }
             });
@@ -1255,14 +1266,40 @@ class PedidoController extends Controller
         }
 
         $validated = $request->validate([
-            'estado' => ['required', Rule::in(['pendiente', 'facturado', 'facturado_parcial'])],
+            'estado' => ['required', Rule::in(['pendiente', 'comprometido', 'facturado', 'facturado_parcial'])],
         ]);
+
+        $estadoAnterior = $pedidoCliente->estado ?: 'pendiente';
+        $nuevoEstado = $validated['estado'];
 
         $pedidoCliente->update([
-            'estado' => $validated['estado'],
+            'estado' => $nuevoEstado,
         ]);
 
-        return redirect()->route('pedidos-clientes.index')->with('success', 'Estado del pedido actualizado');
+        if ($estadoAnterior !== $nuevoEstado && function_exists('activity')) {
+            $accionLog = ($estadoAnterior === 'facturado' && $nuevoEstado !== 'facturado')
+                ? 'Partida reabierta manualmente'
+                : 'Cambio de estado de partida';
+
+            activity()
+                ->performedOn($pedidoCliente)
+                ->causedBy($request->user())
+                ->event('estado_partida')
+                ->withProperties([
+                    'custom_message' => sprintf(
+                        '%s (%s): %s → %s',
+                        $accionLog,
+                        $pedidoCliente->numero_pedido,
+                        strtoupper($estadoAnterior),
+                        strtoupper($nuevoEstado)
+                    ),
+                    'attributes' => ['estado' => $nuevoEstado],
+                    'old' => ['estado' => $estadoAnterior],
+                ])
+                ->log($accionLog);
+        }
+
+        return redirect()->back()->with('success', 'Estado de la partida actualizado a ' . (self::PEDIDO_CLIENTE_ESTADOS[$nuevoEstado] ?? $nuevoEstado) . '.');
     }
 
     /**

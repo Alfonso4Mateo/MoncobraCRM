@@ -219,21 +219,59 @@ class PedidoCliente extends Model
         return $this->albaranesEfectivosCache = $pivot->concat($legacy)->unique('id')->values();
     }
 
+    /**
+     * Determina si es una Partida Abierta (modalidad bolsa sin límite/techo prefijado).
+     */
+    public function esPartidaAbierta(): bool
+    {
+        return (bool) $this->bolsa && round((float) ($this->total ?? 0), 2) <= 0.001;
+    }
+
+    /**
+     * Importe total comprometido/consumido por albaranes activos (no cancelados ni rechazados).
+     */
     public function importeConsumido(?int $excluirAlbaranId = null): float
     {
         $contables = $this->albaranesEfectivos()
             ->reject(fn ($a) => in_array($a->estado, ['cancelado', 'rechazado'], true))
-            ->when($excluirAlbaranId, fn ($c) => $c->reject(fn ($a) => (int) $a->id === $excluirAlbaranId))
-            ->when(! $this->bolsa, fn ($c) => $c->where('estado', 'facturado'));
+            ->when($excluirAlbaranId, fn ($c) => $c->reject(fn ($a) => (int) $a->id === $excluirAlbaranId));
 
         return round($contables->sum(function ($a) {
             $imp = isset($a->pivot) ? (float) $a->pivot->importe_imputado : 0.0;
-            return $imp > 0.001 ? $imp : (float) $a->total;   // escudo legacy
+            return $imp > 0.001 ? $imp : (float) $a->total; // escudo legacy
         }), 2);
+    }
+    
+    public function importeFacturado(?int $excluirAlbaranId = null): float
+    {
+        $contables = $this->albaranesEfectivos()
+            ->reject(fn ($a) => in_array($a->estado, ['cancelado', 'rechazado'], true))
+            ->when($excluirAlbaranId, fn ($c) => $c->reject(fn ($a) => (int) $a->id === $excluirAlbaranId));
+
+        if ($this->estado === 'facturado') {
+            return round($contables->sum(function ($a) {
+                $imp = isset($a->pivot) ? (float) $a->pivot->importe_imputado : 0.0;
+                return $imp > 0.001 ? $imp : (float) $a->total;
+            }), 2);
+        }
+
+        return round($contables->where('estado', 'facturado')->sum(function ($a) {
+            $imp = isset($a->pivot) ? (float) $a->pivot->importe_imputado : 0.0;
+            return $imp > 0.001 ? $imp : (float) $a->total;
+        }), 2);
+    }
+
+    public function importeSoloComprometido(?int $excluirAlbaranId = null): float
+    {
+        return max(0.0, round($this->importeConsumido($excluirAlbaranId) - $this->importeFacturado($excluirAlbaranId), 2));
     }
 
     public function pendienteFacturar(?int $excluirAlbaranId = null): float
     {
+        if ($this->esPartidaAbierta()) {
+            return 0.0;
+        }
+
         return round(max(0, (float) $this->total - $this->importeConsumido($excluirAlbaranId)), 2);
     }
 

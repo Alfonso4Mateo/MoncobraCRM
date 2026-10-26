@@ -241,18 +241,18 @@ class AlbaranClienteController extends Controller
         $numeroAlbaranAuto = $this->resolveNextAlbaranClienteNumber($proyectoId)['numero'];
         $pedidoContext = $this->resolvePedidoContext($request, $proyectoId);
         $pedidosClientes = PedidoCliente::query()
-            ->with('cliente' , 'bolsaGlobal')
+            ->with(['cliente', 'bolsaGlobal', 'albaranesPivot'])
             ->where('proyecto_id', $proyectoId)
             ->where(function ($query) use ($pedidoContext) {
                 $query->whereNull('estado')
                     ->orWhere('estado', '<>', 'facturado');
 
-                if ($pedidoContext) {
+                if ($pedidoContext && $pedidoContext->estado !== 'facturado') {
                     $query->orWhere('id', $pedidoContext->id);
                 }
             })
             ->orderByDesc('id')
-            ->get(['id', 'numero_pedido', 'id_cliente', 'ot', 'bolsa' , 'bolsa_id']);
+            ->get(['id', 'numero_pedido', 'id_cliente', 'ot', 'bolsa', 'bolsa_id', 'total', 'estado']);
             
         $pedidoBolsa = (bool) ($pedidoContext?->bolsa ?? false);
         $pedidoModoRestringido = false; 
@@ -348,9 +348,20 @@ class AlbaranClienteController extends Controller
         $validated['pedido_cliente'] = !empty($pedidosSeleccionados) ? $pedidosSeleccionados[0] : null;
         unset($validated['pedidos_cliente']);
 
-        // --- INICIO CUARTO CANDADO: Bloqueo de bolsas incompatibles ---
+        // --- INICIO CUARTO CANDADO: Bloqueo de bolsas incompatibles y partidas cerradas ---
         if (!empty($pedidosSeleccionados)) {
-            $pedidosAVincular = PedidoCliente::with('bolsaGlobal')->where('proyecto_id', $proyectoId)->whereIn('numero_pedido', $pedidosSeleccionados)->get();
+            $pedidosAVincular = PedidoCliente::with('bolsaGlobal')
+                ->where('proyecto_id', $proyectoId)
+                ->whereIn('numero_pedido', $pedidosSeleccionados)
+                ->get();
+
+            $partidasCerradas = $pedidosAVincular->filter(fn (PedidoCliente $p) => $p->estado === 'facturado');
+            if ($partidasCerradas->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'pedidos_cliente' => 'Bloqueo de Seguridad: La partida ' . $partidasCerradas->pluck('numero_pedido')->implode(', ') . ' ya está CERRADA / FACTURADA. Reábrela primero si necesitas imputarle un nuevo albarán.'
+                ]);
+            }
+
             $tiposBolsa = $pedidosAVincular
                 ->filter(fn ($p) => $p->bolsa)
                 ->map(fn ($p) => $p->bolsaGlobal ? mb_strtoupper(trim((string) $p->bolsaGlobal->tipo_bolsa), 'UTF-8') : 'BOLSA_SUELTA')
@@ -455,7 +466,6 @@ class AlbaranClienteController extends Controller
         return redirect()->route('albaranes.index')->with('success', 'Albarán procesado correctamente');
     }
 
-
     public function edit(AlbaranCliente $albaran)
     {
         // --- GUARDIA DE LA MURALLA ---
@@ -476,7 +486,7 @@ class AlbaranClienteController extends Controller
         $pedidosVinculadosIds = $albaran->pedidosClientes->pluck('id');
 
         $pedidosClientes = PedidoCliente::query()
-            ->with('cliente' , 'bolsaGlobal')
+            ->with(['cliente', 'bolsaGlobal', 'albaranesPivot'])
             ->where('proyecto_id', $proyectoId)
             ->where(function ($query) use ($pedidosVinculadosIds) {
                 $query->whereNull('estado')
@@ -484,7 +494,7 @@ class AlbaranClienteController extends Controller
                     ->orWhereIn('id', $pedidosVinculadosIds);
             })
             ->orderByDesc('id')
-            ->get(['id', 'numero_pedido', 'id_cliente', 'ot', 'bolsa' , 'bolsa_id']);
+            ->get(['id', 'numero_pedido', 'id_cliente', 'ot', 'bolsa', 'bolsa_id', 'total', 'estado']);
 
         if ($albaran->cliente && !$clientes->contains('id', $albaran->cliente_id)) {
             $clientes->prepend($albaran->cliente);
@@ -493,7 +503,7 @@ class AlbaranClienteController extends Controller
         return view('albaranes.edit', compact('albaran', 'clientes', 'pedidosClientes', 'centrosCoste'));
     }
 
-        public function update(Request $request, AlbaranCliente $albaran)
+    public function update(Request $request, AlbaranCliente $albaran)
     {
         // --- GUARDIA DE LA MURALLA ---
         $this->authorize('albaranes.manage');
@@ -565,9 +575,31 @@ class AlbaranClienteController extends Controller
         $validated['pedido_cliente'] = !empty($pedidosSeleccionados) ? $pedidosSeleccionados[0] : null;
         unset($validated['pedidos_cliente']);
 
-        // --- INICIO CUARTO CANDADO: Bloqueo de bolsas incompatibles ---
+        // --- INICIO CUARTO CANDADO: Bloqueo de bolsas incompatibles y partidas cerradas ---
         if (!empty($pedidosSeleccionados)) {
-            $pedidosAVincular = PedidoCliente::with('bolsaGlobal')->where('proyecto_id', $proyectoId)->whereIn('numero_pedido', $pedidosSeleccionados)->get();
+            $albaran->loadMissing('pedidosClientes');
+            $pedidosAVincular = PedidoCliente::with('bolsaGlobal')
+                ->where('proyecto_id', $proyectoId)
+                ->whereIn('numero_pedido', $pedidosSeleccionados)
+                ->get();
+
+            $partidasCerradas = $pedidosAVincular->filter(function (PedidoCliente $p) use ($albaran) {
+                if ($p->estado !== 'facturado') {
+                    return false;
+                }
+                // Si estamos editando, solo permitimos si ya estaba vinculada antes a este mismo albarán
+                if ($albaran->pedidosClientes->contains('id', $p->id)) {
+                    return false;
+                }
+                return true;
+            });
+
+            if ($partidasCerradas->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'pedidos_cliente' => 'Bloqueo de Seguridad: La partida ' . $partidasCerradas->pluck('numero_pedido')->implode(', ') . ' ya está CERRADA / FACTURADA. Reábrela primero si necesitas imputarle un nuevo albarán.'
+                ]);
+            }
+
             $tiposBolsa = $pedidosAVincular
                 ->filter(fn ($p) => $p->bolsa)
                 ->map(fn ($p) => $p->bolsaGlobal ? mb_strtoupper(trim((string) $p->bolsaGlobal->tipo_bolsa), 'UTF-8') : 'BOLSA_SUELTA')
@@ -685,7 +717,6 @@ class AlbaranClienteController extends Controller
         return redirect()->route('albaranes.index')->with('success', 'Albarán actualizado correctamente.');
     }
 
-
     public function updateEstado(Request $request, AlbaranCliente $albaran)
     {
         $this->authorize('albaranes.manage');
@@ -776,6 +807,24 @@ class AlbaranClienteController extends Controller
                 }
 
                 $this->recalculatePedidosEstadoFromAlbaran($proyectoId, [$pedidoAfectado], $albaran);
+
+                if (function_exists('activity')) {
+                    activity()
+                        ->performedOn($pedidoAfectado)
+                        ->causedBy(request()->user())
+                        ->event('albaran_desvinculado')
+                        ->withProperties([
+                            'custom_message' => sprintf(
+                                'Albarán %s desvinculado manualmente de la partida %s. Saldo comprometido actualizado a %s €.',
+                                $albaran->numero,
+                                $pedidoAfectado->numero_pedido,
+                                number_format($pedidoAfectado->importeConsumido(), 2, ',', '.')
+                            ),
+                            'albaran_id' => $albaran->id,
+                            'albaran_numero' => $albaran->numero,
+                        ])
+                        ->log('Albarán desvinculado');
+                }
                 
             } else {
                 // MODO DESTRUCCIÓN GLOBAL
@@ -800,6 +849,28 @@ class AlbaranClienteController extends Controller
 
                 $pedidosARecalcular = $pedidosAfectados->push($pedidoPrimario)->filter()->unique('id')->all();
                 $this->recalculatePedidosEstadoFromAlbaran($proyectoId, $pedidosARecalcular, $albaran);
+
+                if (function_exists('activity')) {
+                    foreach ($pedidosARecalcular as $pedRec) {
+                        if ($pedRec instanceof PedidoCliente) {
+                            activity()
+                                ->performedOn($pedRec)
+                                ->causedBy(request()->user())
+                                ->event('albaran_desvinculado')
+                                ->withProperties([
+                                    'custom_message' => sprintf(
+                                        'Albarán %s desvinculado globalmente de la partida %s. Saldo comprometido actualizado a %s €.',
+                                        $albaran->numero,
+                                        $pedRec->numero_pedido,
+                                        number_format($pedRec->importeConsumido(), 2, ',', '.')
+                                    ),
+                                    'albaran_id' => $albaran->id,
+                                    'albaran_numero' => $albaran->numero,
+                                ])
+                                ->log('Albarán desvinculado');
+                        }
+                    }
+                }
             }
         });
 
@@ -1301,6 +1372,7 @@ class AlbaranClienteController extends Controller
     private function syncPedidoClienteLink(AlbaranCliente $albaran, int $proyectoId, array $pedidosNumeros = [], array $lineas = []): float
     {
         $pedidosAnteriores = $albaran->pedidosClientes()->get();
+        $idsAnteriores = $pedidosAnteriores->pluck('id')->all();
         $albaran->pedidosClientes()->detach();
 
         foreach ($pedidosAnteriores as $pedidoAnterior) {
@@ -1354,6 +1426,8 @@ class AlbaranClienteController extends Controller
                 ->get()
         )->unique('id')->values();
 
+        $idsNuevos = [];
+
         foreach ($pedidos as $pedido) {
             $importeAImputar = round((float) ($imputacionesV3[$pedido->id] ?? 0), 2);
 
@@ -1363,24 +1437,78 @@ class AlbaranClienteController extends Controller
                     2
                 );
             } elseif ($importeAImputar <= 0.0001 && $totalSinBolsaEspecifica > 0.001) {
-                $pendiente = $this->calculatePedidoPendienteFacturar($pedido, $proyectoId, $albaran->id);
-                $asignar = max(0, min($totalSinBolsaEspecifica, $pendiente));
+                // SOPORTE NATIVO PARTIDA ABIERTA: Si no tiene techo, absorbe el 100% del saldo flotante
+                if ($pedido->esPartidaAbierta()) {
+                    $asignar = $totalSinBolsaEspecifica;
+                } else {
+                    $pendiente = $this->calculatePedidoPendienteFacturar($pedido, $proyectoId, $albaran->id);
+                    $asignar = max(0, min($totalSinBolsaEspecifica, $pendiente));
+                }
                 
                 if ($asignar > 0.001) {
-                    $importeAImputar = $asignar;
-                    $totalSinBolsaEspecifica -= $asignar;
+                    $importeAImputar = round($asignar, 2);
+                    $totalSinBolsaEspecifica = round($totalSinBolsaEspecifica - $asignar, 2);
                 }
             }
 
             if ($importeAImputar > 0.001) {
                 $albaran->pedidosClientes()->attach($pedido->id, ['importe_imputado' => round($importeAImputar, 2)]);
                 $pedido->clearAlbaranesCache();
+                $idsNuevos[$pedido->id] = round($importeAImputar, 2);
                 
                 if (empty($pedido->albaran_id)) {
                     $pedido->forceFill(['albaran_id' => $albaran->id])->save();
                 }
+
+                // AUDITORÍA EXPLÍCITA: Imputación / Vinculación a la partida
+                if (function_exists('activity')) {
+                    $eraNuevoVinculo = !in_array($pedido->id, $idsAnteriores, true);
+                    $acumuladoActual = $pedido->importeConsumido();
+                    activity()
+                        ->performedOn($pedido)
+                        ->causedBy(request()->user())
+                        ->event($eraNuevoVinculo ? 'albaran_vinculado' : 'albaran_actualizado')
+                        ->withProperties([
+                            'custom_message' => sprintf(
+                                'Albarán %s %s a la partida %s por %s €. Total comprometido en partida: %s €.',
+                                $albaran->numero,
+                                $eraNuevoVinculo ? 'vinculado' : 'actualizado',
+                                $pedido->numero_pedido,
+                                number_format($importeAImputar, 2, ',', '.'),
+                                number_format($acumuladoActual, 2, ',', '.')
+                            ),
+                            'albaran_id' => $albaran->id,
+                            'albaran_numero' => $albaran->numero,
+                            'importe_imputado' => $importeAImputar,
+                            'acumulado_partida' => $acumuladoActual,
+                        ])
+                        ->log($eraNuevoVinculo ? 'Albarán vinculado' : 'Consumo de albarán actualizado');
+                }
             }
         }
+
+        // AUDITORÍA EXPLÍCITA: Si el albarán se ha movido de una partida a otra en la edición
+        foreach ($pedidosAnteriores as $pedAnt) {
+            if (!array_key_exists($pedAnt->id, $idsNuevos) && function_exists('activity')) {
+                $pedAnt->clearAlbaranesCache();
+                activity()
+                    ->performedOn($pedAnt)
+                    ->causedBy(request()->user())
+                    ->event('albaran_desvinculado')
+                    ->withProperties([
+                        'custom_message' => sprintf(
+                            'Albarán %s desvinculado/movido fuera de la partida %s. Total comprometido restante: %s €.',
+                            $albaran->numero,
+                            $pedAnt->numero_pedido,
+                            number_format($pedAnt->importeConsumido(), 2, ',', '.')
+                        ),
+                        'albaran_id' => $albaran->id,
+                        'albaran_numero' => $albaran->numero,
+                    ])
+                    ->log('Albarán desvinculado');
+            }
+        }
+
         $primero = $albaran->pedidosClientes()
             ->orderBy('pedidos_clientes.fecha_pedido')->orderBy('pedidos_clientes.id')->first();
         $albaran->forceFill(['pedido_cliente' => $primero?->numero_pedido])->save();
@@ -1439,16 +1567,17 @@ class AlbaranClienteController extends Controller
     private function limpiarRastrosBolsa(AlbaranCliente $albaran, ?int $pedidoId = null): void
     {
         // 1. Limpiar rastro de la Bolsa V3 estricta
-        $queryPartidas = \App\Models\AlbaranLineaPartida::where('albaran_id',$albaran->id);
+        $queryPartidas = \App\Models\AlbaranLineaPartida::where('albaran_id', $albaran->id);
         if ($pedidoId !== null) {
-            $queryPartidas->where('pedido_id',$pedidoId);
+            $queryPartidas->where('pedido_id', $pedidoId);
         }
-        $lineaIds = $queryPartidas->pluck('linea_id')->unique();$queryPartidas->delete();
+        $lineaIds = $queryPartidas->pluck('linea_id')->unique();
+        $queryPartidas->delete();
 
         // 2. Limpiar rastro de la Bolsa V2/Mixta (El causante de la duplicación)
-        $queryPedidoLineas = \App\Models\AlbaranPedidoLinea::where('albaran_id',$albaran->id);
+        $queryPedidoLineas = \App\Models\AlbaranPedidoLinea::where('albaran_id', $albaran->id);
         if ($pedidoId !== null) {
-            $queryPedidoLineas->where('pedido_id',$pedidoId);
+            $queryPedidoLineas->where('pedido_id', $pedidoId);
         }
         $queryPedidoLineas->delete();
 
@@ -1458,7 +1587,8 @@ class AlbaranClienteController extends Controller
                 ->where('estado', LineaBolsa::ESTADO_AGOTADA)
                 ->get()
                 ->each(function (LineaBolsa $linea) {
-                    if ($linea->importeDisponible() > 0) {$linea->update(['estado' => LineaBolsa::ESTADO_ACTIVA]);
+                    if ($linea->importeDisponible() > 0) {
+                        $linea->update(['estado' => LineaBolsa::ESTADO_ACTIVA]);
                     }
                 });
         }
@@ -1477,9 +1607,7 @@ class AlbaranClienteController extends Controller
 
         // BUGFIX: si el mismo uid aparece más de una vez en el envío (por ejemplo,
         // porque el usuario seleccionó dos partidas que alimentan la misma línea),
-        // hay que sumar lo pedido ANTES de comparar contra el disponible. Comparar
-        // entrada por entrada permitía colar, p.ej., 2.000 € + 2.000 € contra una
-        // línea con 2.500 € reales, porque cada entrada por separado pasaba el check.
+        // hay que sumar lo pedido ANTES de comparar contra el disponible.
         $importePedidoPorUid = collect($lineas)
             ->groupBy(fn ($l) => trim((string) ($l['uid'] ?? '')))
             ->map(fn ($grupo) => round($grupo->sum(fn ($l) => (float) ($l['total'] ?? 0)), 2));
@@ -1516,18 +1644,6 @@ class AlbaranClienteController extends Controller
     /**
      * QUINTO CANDADO: el tope de la bolsa global (`bolsas.total`) también se
      * respeta al facturar, no solo al crear/editar una partida.
-     *
-     * Antes de este método, nada en el flujo de facturación comprobaba el
-     * tope de la bolsa: `assertLimitesLineaBolsa` solo mira el disponible de
-     * cada línea, y el escudo de `PedidoController` solo actúa al crear o
-     * editar una partida (comparando contra lo YA facturado, que al crear
-     * una partida nueva suele ser 0 €" así que apenas bloqueaba nada). Esto
-     * cierra el hueco: suma, por cada bolsa implicada en las partidas
-     * seleccionadas, lo que este albarán le añadiría a lo que esa bolsa ya
-     * tiene facturado, y lo compara contra su tope.
-     *
-     * $pedidosAVincular: partidas seleccionadas en el albarán, con
-     * `bolsaGlobal` precargada (se reutiliza la consulta del cuarto candado).
      */
     private function assertLimitesBolsaGlobal($pedidosAVincular, array $lineas, ?int $albaranId = null): void
     {
@@ -1558,9 +1674,6 @@ class AlbaranClienteController extends Controller
 
             $partidaIdsDeEstaBolsa = $bolsa->partidas()->pluck('id');
 
-            // Cuánto de ESTE albarán es dinero que puede salir de ESTA bolsa:
-            // líneas cuyo linea_id está ligado (vía linea_partida) a alguna
-            // partida de esta bolsa.
             $nuevoImporteDeEstaBolsa = 0.0;
             foreach ($lineas as $linea) {
                 $importeLinea = round((float) ($linea['total'] ?? 0), 2);
@@ -1597,6 +1710,12 @@ class AlbaranClienteController extends Controller
                     if ($propietario) {
                         $nuevoImporteDeEstaBolsa += $importeLinea;
                     }
+                } elseif (!$lineaBolsa) {
+                    // Línea libre imputada a una Partida Abierta que cuelga de esta Bolsa Global con techo
+                    $partidaDeEstaBolsa = $pedidosAVincular->first(fn ($p) => (int) $p->bolsa_id === (int) $bolsa->id);
+                    if ($partidaDeEstaBolsa) {
+                        $nuevoImporteDeEstaBolsa += $importeLinea;
+                    }
                 }
             }
 
@@ -1608,12 +1727,22 @@ class AlbaranClienteController extends Controller
 
             // Si se edita un albarán que ya tenía imputado algo a esta bolsa,
             // se le devuelve antes de comparar, para no restarlo dos veces.
-            $previoDeEsteAlbaran = $albaranId
-                ? (float) \App\Models\AlbaranLineaPartida::where('albaran_id', $albaranId)
+            $previoDeEsteAlbaran = 0.0;
+            if ($albaranId) {
+                $previoPivot = (float) DB::table('pedido_cliente_albaran_cliente')
+                    ->join('albaranes_clientes', 'pedido_cliente_albaran_cliente.albaran_cliente_id', '=', 'albaranes_clientes.id')
+                    ->where('pedido_cliente_albaran_cliente.albaran_cliente_id', $albaranId)
+                    ->whereIn('pedido_cliente_albaran_cliente.pedido_cliente_id', $partidaIdsDeEstaBolsa)
+                    ->whereNotIn('albaranes_clientes.estado', ['cancelado', 'rechazado'])
+                    ->sum('pedido_cliente_albaran_cliente.importe_imputado');
+
+                $previoV3 = (float) \App\Models\AlbaranLineaPartida::where('albaran_id', $albaranId)
                     ->whereIn('pedido_id', $partidaIdsDeEstaBolsa)
                     ->whereHas('albaran', fn ($query) => $query->whereNotIn('estado', ['cancelado', 'rechazado']))
-                    ->sum('importe')
-                : 0.0;
+                    ->sum('importe');
+
+                $previoDeEsteAlbaran = max($previoPivot, $previoV3);
+            }
 
             $proyectado = round($yaFacturadoDeEstaBolsa - $previoDeEsteAlbaran + $nuevoImporteDeEstaBolsa, 2);
 
@@ -1638,28 +1767,30 @@ class AlbaranClienteController extends Controller
     // OTROS HELPERS DE PEDIDOS Y ESTADOS
     // ========================================================================
 
-    private function resolvePedidoContext(Request $request, int$proyectoId): ?PedidoCliente
+    private function resolvePedidoContext(Request $request, int $proyectoId): ?PedidoCliente
     {
-        $pedidoId = (int) $request->input('pedido_id',$request->query('pedido_id', 0));
-        if ($pedidoId > 0) {$pedido = PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->find($pedidoId);
-            if ($pedido) return$pedido;
+        $pedidoId = (int) $request->input('pedido_id', $request->query('pedido_id', 0));
+        if ($pedidoId > 0) {
+            $pedido = PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->find($pedidoId);
+            if ($pedido) return $pedido;
         }
 
-        $numeroPedido = trim((string) $request->input('pedido_cliente',$request->query('pedido_cliente', '')));
+        $numeroPedido = trim((string) $request->input('pedido_cliente', $request->query('pedido_cliente', '')));
         if ($numeroPedido === '') return null;
 
-        return PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->where('numero_pedido',$numeroPedido)->first();
+        return PedidoCliente::query()->with('cliente')->where('proyecto_id', $proyectoId)->where('numero_pedido', $numeroPedido)->first();
     }
 
-    private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int$proyectoId): array
+    private function buildLineasInicialesFromPedido(PedidoCliente $pedidoCliente, int $proyectoId): array
     {
-        $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];$lineasPedido = collect($this->normalizePedidoLineas($lineas));
+        $lineas = is_array($pedidoCliente->lista_articulos) ? $pedidoCliente->lista_articulos : [];
+        $lineasPedido = collect($this->normalizePedidoLineas($lineas));
 
         if ($lineasPedido->isEmpty()) return [];
 
-        return $lineasPedido->map(function (array$linea) {
+        return $lineasPedido->map(function (array $linea) {
             $cantidad = round((float) ($linea['cantidad'] ?? 0), 2);
-            $linea['cantidad'] =$cantidad;
+            $linea['cantidad'] = $cantidad;
             $linea['cantidad_max'] = max($cantidad, (float) ($linea['cantidad_max'] ?? $cantidad));
             $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
             $margen = (float) ($linea['margen'] ?? 0);
@@ -1677,38 +1808,64 @@ class AlbaranClienteController extends Controller
 
     private function resolveVisibleAlbaranProyectoId(AlbaranCliente $albaran): ?int
     {
-        $proyectoId = $this->resolveProyectoIdWithFallback((int)$albaran->proyecto_id);
+        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
         $this->validateProyectoAccess($proyectoId);
 
-        if ((int) $albaran->proyecto_id !==$proyectoId) return null;
+        if ((int) $albaran->proyecto_id !== $proyectoId) return null;
         return $proyectoId;
     }
 
-    private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array$lineasDelAlbaran = []): void
+    private function syncPedidoEstadoFromAlbaran(AlbaranCliente $albaran, int $proyectoId, array $lineasDelAlbaran = []): void
     {
-        $pedidos = $albaran->pedidosClientes()->get();$pedidoPrimario = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);$pedidosARecalcular = $pedidos->push($pedidoPrimario)->filter()->unique('id')->all();
+        $pedidos = $albaran->pedidosClientes()->get();
+        $pedidoPrimario = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
+        $pedidosARecalcular = $pedidos->push($pedidoPrimario)->filter()->unique('id')->all();
         
-        $this->recalculatePedidosEstadoFromAlbaran($proyectoId, $pedidosARecalcular,$albaran);
+        $this->recalculatePedidosEstadoFromAlbaran($proyectoId, $pedidosARecalcular, $albaran);
     }
 
     private function recalculatePedidoEstado(PedidoCliente $pedido, int $proyectoId): void
     {
-        $pedido    = PedidoCliente::where('proyecto_id', $proyectoId)->find($pedido->id) ?? $pedido;
-        $total     = round((float) ($pedido->total ?? 0), 2);
-        $consumido = $pedido->importeConsumido();
+        $pedido = PedidoCliente::where('proyecto_id', $proyectoId)->find($pedido->id) ?? $pedido;
+        $pedido->loadMissing('bolsaGlobal');
+        $pedido->clearAlbaranesCache();
 
-        $estado = 'pendiente';
-        if ($total > 0 && $consumido > 0) {
-            $estado = $consumido >= $total - 0.01 ? 'facturado' : 'facturado_parcial';
+        $total = round((float) ($pedido->total ?? 0), 2);
+        $albaranesActivos = $pedido->albaranesEfectivos()
+            ->reject(fn ($a) => in_array($a->estado, ['cancelado', 'rechazado'], true));
+
+        $consumidoTotal = $pedido->importeConsumido();
+        $esDeBolsaAbierta = $pedido->esPartidaAbierta()
+            || ($pedido->bolsa && $pedido->bolsaGlobal && (float) $pedido->bolsaGlobal->total <= 0);
+
+        if ($albaranesActivos->isEmpty() || $consumidoTotal <= 0.001) {
+            $estado = 'pendiente';
+        } elseif ($esDeBolsaAbierta) {
+            // El estado 'comprometido' es exclusivo de las bolsas/partidas abiertas
+            if ($pedido->estado === 'facturado') {
+                $estado = 'facturado';
+            } else {
+                $estado = 'comprometido';
+            }
+        } else {
+            // Partida con Techo o Pedido Normal: evalúa lo usado frente al total de la partida
+            if ($total > 0 && $consumidoTotal >= $total - 0.01) {
+                $estado = 'facturado';
+            } elseif ($consumidoTotal > 0.001) {
+                $estado = 'facturado_parcial';
+            } else {
+                $estado = 'pendiente';
+            }
         }
 
         $pedido->forceFill(['estado' => $estado])->save();
     }
 
-    private function recalculatePedidosEstadoFromAlbaran(int $proyectoId, array $pedidos, AlbaranCliente$albaran): void
+    private function recalculatePedidosEstadoFromAlbaran(int $proyectoId, array $pedidos, AlbaranCliente $albaran): void
     {
-        foreach (collect($pedidos)->filter() as$pedido) {
-            if ($pedido instanceof PedidoCliente) {$this->recalculatePedidoEstado($pedido,$proyectoId);
+        foreach (collect($pedidos)->filter() as $pedido) {
+            if ($pedido instanceof PedidoCliente) {
+                $this->recalculatePedidoEstado($pedido, $proyectoId);
             }
         }
     }
@@ -1781,21 +1938,22 @@ class AlbaranClienteController extends Controller
 
     private function normalizePedidoLineaSignature(array $linea): string
     {
-        $descripcion = mb_strtolower(trim((string) ($linea['descripcion'] ?? '')));$medida = mb_strtolower(trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))));
+        $descripcion = mb_strtolower(trim((string) ($linea['descripcion'] ?? '')));
+        $medida = mb_strtolower(trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? ''))));
 
-        return $descripcion . '|' .$medida;
+        return $descripcion . '|' . $medida;
     }
 
-    private function albaranAportaPedido(AlbaranCliente $albaran,$lineasPedido): bool
+    private function albaranAportaPedido(AlbaranCliente $albaran, $lineasPedido): bool
     {
-        $lineasAlbaran = collect(is_array($albaran->lista_articulos) ?$albaran->lista_articulos : [])
+        $lineasAlbaran = collect(is_array($albaran->lista_articulos) ? $albaran->lista_articulos : [])
             ->filter(fn ($linea) => is_array($linea) && !empty(trim((string) ($linea['descripcion'] ?? ''))))
             ->map(fn (array $linea) => $this->normalizePedidoLineaSignature($linea))
             ->filter()
             ->values();
 
         if ($lineasPedido instanceof \Illuminate\Support\Collection) {
-            $lineasPedido =$lineasPedido->values();
+            $lineasPedido = $lineasPedido->values();
         } else {
             $lineasPedido = collect($lineasPedido)->values();
         }
@@ -1805,18 +1963,18 @@ class AlbaranClienteController extends Controller
         return $lineasAlbaran->intersect($lineasPedido)->isNotEmpty();
     }
 
-    private function resolvePedidoFromAlbaran(AlbaranCliente $albaran, int$proyectoId): ?PedidoCliente
+    private function resolvePedidoFromAlbaran(AlbaranCliente $albaran, int $proyectoId): ?PedidoCliente
     {
-        $pedido =$albaran->pedidosClientes()->first();
+        $pedido = $albaran->pedidosClientes()->first();
 
-        if ($pedido && (int) $pedido->proyecto_id ===$proyectoId) {
+        if ($pedido && (int) $pedido->proyecto_id === $proyectoId) {
             return $pedido;
         }
 
         $pedidoNumero = trim((string) ($albaran->pedido_cliente ?? ''));
         if ($pedidoNumero === '') return null;
 
-        return PedidoCliente::query()->where('proyecto_id', $proyectoId)->where('numero_pedido',$pedidoNumero)->first();
+        return PedidoCliente::query()->where('proyecto_id', $proyectoId)->where('numero_pedido', $pedidoNumero)->first();
     }
 
     private function adjustArticulosStock(array $lineas, int $proyectoId, int $direction): void

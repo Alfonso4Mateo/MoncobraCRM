@@ -240,6 +240,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const updateTotal = () => {
         const total = lineas.reduce((acc, linea) => acc + (pedidoMode && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
         totalElement.textContent = `${moneyFormatter.format(round4(total))} €`;
+
+        // Aviso en vivo si se seleccionan partidas con techo en modo libre y se supera su saldo
+        if (!pedidoMode && pedidoClienteSelect) {
+            const opts = Array.from(pedidoClienteSelect.selectedOptions);
+            const hayAbierta = opts.some((o) => o.dataset.esAbierta === "1");
+            if (opts.length > 0 && !hayAbierta) {
+                const dispTotal = opts.reduce((acc, o) => acc + clampNumber(o.dataset.disponible ?? 0), 0);
+                if (dispTotal > 0 && total > dispTotal + 0.001) {
+                    setSaldoStatus("error", `⚠️ Atención: El total del albarán (${moneyFormatter.format(total)} €) supera el techo disponible de la partida seleccionada (${moneyFormatter.format(dispTotal)} €).`);
+                } else if (dispTotal > 0) {
+                    setSaldoStatus("ok", `Partida con techo: ${moneyFormatter.format(dispTotal)} € disponibles.`);
+                }
+            }
+        }
     };
 
     const getMaxTotal = (linea) => {
@@ -652,6 +666,7 @@ document.addEventListener("DOMContentLoaded", () => {
             otInput.value = "";
             pedidoBolsaMode = false;
             setPedidoMode(false);
+            setSaldoStatus(null, "");
             activePedidoKey = null;
             if (!isInitialEditLoad) {
                 lineas = [];
@@ -687,10 +702,15 @@ document.addEventListener("DOMContentLoaded", () => {
             otInput.value = firstPedido.ot;
         }
 
+        const describePartidasAbiertas = () => {
+            const resumen = Array.from(pedidoClienteSelect.selectedOptions)
+                .map((o) => `${o.value} (Comprometido: ${moneyFormatter.format(clampNumber(o.dataset.comprometido ?? 0))} €)`)
+                .join(" · ");
+            setSaldoStatus("ok", `🔓 Partida Abierta activa: puedes añadir libremente todos los artículos de este albarán. [${resumen}]`);
+        };
+
         if (isInitialEditLoad) {
             isInitialEditLoad = false;
-            pedidoBolsaMode = true;
-            setPedidoMode(true);
             const fetchPromises = pedidos.map(pedido => {
                 if (!pedido.id) return Promise.resolve([]);
 
@@ -709,47 +729,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 const disponibles = dedupeLineasPorUid(resultados.flat());
                 const actuales = editBaseLineas.map(linea => ({ ...linea }));
 
-                lineas = disponibles.length === 0
-                    ? actuales
-                    : disponibles.map(disponible => {
-                        const actual = actuales.find(linea =>
-                            (disponible.uid && linea.uid === disponible.uid)
-                            || (disponible.linea_id && Number(linea.linea_id) === Number(disponible.linea_id))
-                        );
+                if (disponibles.length === 0) {
+                    // Es una Partida Abierta o sin líneas prefijadas: mantenemos edición libre de líneas
+                    pedidoBolsaMode = false;
+                    setPedidoMode(false);
+                    lineas = actuales;
+                    describePartidasAbiertas();
+                    renderRows();
+                    return;
+                }
 
-                        if (!actual) return disponible;
+                pedidoBolsaMode = true;
+                setPedidoMode(true);
+                lineas = disponibles.map(disponible => {
+                    const actual = actuales.find(linea =>
+                        (disponible.uid && linea.uid === disponible.uid)
+                        || (disponible.linea_id && Number(linea.linea_id) === Number(disponible.linea_id))
+                    );
 
-                        const importeActual = round2(actual.total ?? 0);
-                        const importeDisponible = round2(
-                            Number(disponible.importe_disponible ?? 0) + importeActual
-                        );
-                        const unitPriceWithMargin = round2(
-                            Number(disponible.precio_unitario ?? 0)
-                            * (1 + Number(disponible.margen ?? 0) / 100)
-                        );
+                    if (!actual) return disponible;
 
-                        return {
-                            ...actual,
-                            uid: disponible.uid ?? actual.uid,
-                            linea_id: disponible.linea_id ?? actual.linea_id,
-                            pedido_id: disponible.pedido_id ?? actual.pedido_id,
-                            importe_disponible: importeDisponible,
-                            cantidad_max: disponible.modo_consumo === "importe"
-                                ? 1
-                                : (unitPriceWithMargin > 0
-                                    ? round2(importeDisponible / unitPriceWithMargin)
-                                    : round2(actual.cantidad ?? 0)),
-                        };
-                    });
+                    const importeActual = round2(actual.total ?? 0);
+                    const importeDisponible = round2(
+                        Number(disponible.importe_disponible ?? 0) + importeActual
+                    );
+                    const unitPriceWithMargin = round2(
+                        Number(disponible.precio_unitario ?? 0)
+                        * (1 + Number(disponible.margen ?? 0) / 100)
+                    );
+
+                    return {
+                        ...actual,
+                        uid: disponible.uid ?? actual.uid,
+                        linea_id: disponible.linea_id ?? actual.linea_id,
+                        pedido_id: disponible.pedido_id ?? actual.pedido_id,
+                        importe_disponible: importeDisponible,
+                        cantidad_max: disponible.modo_consumo === "importe"
+                            ? 1
+                            : (unitPriceWithMargin > 0
+                                ? round2(importeDisponible / unitPriceWithMargin)
+                                : round2(actual.cantidad ?? 0)),
+                    };
+                });
 
                 renderRows();
             });
             return;
         }
 
-        pedidoBolsaMode = true;
-        setPedidoMode(true);
-        setSaldoStatus('ok', 'Cargando saldo de las bolsas...');
+        setSaldoStatus('ok', 'Comprobando modalidad y saldo de las partidas...');
 
         const fetchPromises = pedidos.map(pedido => {
             if (!pedido.id) return Promise.resolve([]);
@@ -765,18 +793,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 return [];
             })
-            .catch(err => {
-                return [];
-            });
+            .catch(() => []);
         });
 
         Promise.all(fetchPromises).then(resultados => {
-            lineas = dedupeLineasPorUid(resultados.flat());
+            const lineasCargadas = dedupeLineasPorUid(resultados.flat());
             
-            if (lineas.length > 0) {
-                setSaldoStatus('ok', 'Saldo real cargado: Se muestran las líneas disponibles de todas las bolsas seleccionadas.');
+            if (lineasCargadas.length > 0) {
+                pedidoBolsaMode = true;
+                setPedidoMode(true);
+                lineas = lineasCargadas;
+                setSaldoStatus('ok', 'Saldo real cargado: Se muestran las líneas disponibles de todas las partidas seleccionadas.');
             } else {
-                setSaldoStatus('error', 'Las bolsas seleccionadas no tienen líneas con saldo disponible.');
+                // PARTIDA ABIERTA: No tiene líneas cerradas, dejamos el editor de artículos libre habilitado
+                pedidoBolsaMode = false;
+                setPedidoMode(false);
+                describePartidasAbiertas();
             }
             
             renderRows();
