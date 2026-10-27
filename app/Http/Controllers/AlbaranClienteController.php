@@ -941,17 +941,19 @@ class AlbaranClienteController extends Controller
             return redirect()->route('albaranes.index')->with('error', 'No se pudo ver el albarán seleccionado.');
         }
 
-        return view('albaranes.preview', [
+        $albaran->loadMissing(['cliente', 'pedidosClientes.bolsaGlobal']);
+
+        $activities = \Spatie\Activitylog\Models\Activity::with('causer')
+            ->forSubject($albaran)
+            ->latest()
+            ->take(30)
+            ->get();
+
+        return view('albaranes.show', [
             'albaran' => $albaran,
-            'activities' => \Spatie\Activitylog\Models\Activity::with('causer')
-                ->forSubject($albaran)
-                ->latest()
-                ->limit(8)
-                ->get(),
-            'pdfUrlWithPresupuesto' => route('albaranes.pdf.file', $albaran) . '?with_presupuesto=1',
-            'pdfUrlWithoutPresupuesto' => route('albaranes.pdf.file', $albaran) . '?with_presupuesto=0',
-            'downloadUrlWithPresupuesto' => route('albaranes.pdf.download', $albaran) . '?with_presupuesto=1',
-            'downloadUrlWithoutPresupuesto' => route('albaranes.pdf.download', $albaran) . '?with_presupuesto=0',
+            'activities' => $activities,
+            'titulo' => 'Detalle de Albarán ' . ($albaran->numero ?: '#' . $albaran->id),
+            'breadcrumb' => 'Albaranes · Detalle',
         ]);
     }
 
@@ -1838,22 +1840,36 @@ class AlbaranClienteController extends Controller
         $esDeBolsaAbierta = $pedido->esPartidaAbierta()
             || ($pedido->bolsa && $pedido->bolsaGlobal && (float) $pedido->bolsaGlobal->total <= 0);
 
+        // Suma únicamente los albaranes que han pasado a estado 'facturado' de forma efectiva
+        $facturadoFirme = (float) $albaranesActivos
+            ->where('estado', 'facturado')
+            ->sum(function ($alb) use ($pedido) {
+                return (float) ($alb->pivot->importe_imputado ?? $alb->pivot->importe ?? $alb->total ?? 0);
+            });
+
         if ($albaranesActivos->isEmpty() || $consumidoTotal <= 0.001) {
             $estado = 'pendiente';
         } elseif ($esDeBolsaAbierta) {
-            // El estado 'comprometido' es exclusivo de las bolsas/partidas abiertas
-            if ($pedido->estado === 'facturado') {
+            // En bolsas/partidas abiertas: si el usuario forzó el cierre manual del pedido
+            // o si todos sus albaranes activos están en 'facturado' (y hay al menos uno)
+            $todosFacturados = $albaranesActivos->isNotEmpty() && $albaranesActivos->every(fn ($a) => $a->estado === 'facturado');
+
+            if ($pedido->estado === 'facturado' || $todosFacturados) {
                 $estado = 'facturado';
             } else {
                 $estado = 'comprometido';
             }
         } else {
-            // Partida con Techo o Pedido Normal: evalúa lo usado frente al total de la partida
-            if ($total > 0 && $consumidoTotal >= $total - 0.01) {
+            // Partida con Techo o Pedido Normal:
+            // 1. Facturado: solo si lo facturado en firme cubre el techo del pedido (o todos sus albaranes están facturados)
+            if ($total > 0 && $facturadoFirme >= $total - 0.01) {
                 $estado = 'facturado';
-            } elseif ($consumidoTotal > 0.001) {
+            } elseif ($facturadoFirme > 0.001) {
+                // 2. Facturado Parcial: ya hay al menos un albarán facturado en firme
                 $estado = 'facturado_parcial';
             } else {
+                // 3. Pendiente: hay albaranes creados pero NINGUNO está aún facturado en firme
+                // (evita el falso 'facturado' prematuro mientras los albaranes sean borradores/pendientes)
                 $estado = 'pendiente';
             }
         }

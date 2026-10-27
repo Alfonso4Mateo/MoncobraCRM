@@ -156,8 +156,12 @@
                                     // Total original con el que se creó la partida/pedido
                                     $totalPartida = round((float) ($partida->total ?? 0), 2);
                                     
-                                    // Total usado real por los albaranes de esta partida
+                                    // Total usado real por los albaranes de esta partida y desglose comprometido
                                     $totalUsadoPartida = $partida->importeConsumido();
+                                    $facturadoFirmePartida = method_exists($partida, 'importeFacturado') ? $partida->importeFacturado() : 0.0;
+                                    $comprometidoPartida = method_exists($partida, 'importeSoloComprometido')
+                                        ? $partida->importeSoloComprometido()
+                                        : max(0.0, round($totalUsadoPartida - $facturadoFirmePartida, 2));
                                     
                                     // Lo que falta por facturar de esa partida con techo
                                     $pendienteDeFacturar = max(0, round($totalPartida - $totalUsadoPartida, 2));
@@ -182,7 +186,7 @@
                                     <td>{{ optional(\Carbon\Carbon::parse($partida->fecha_pedido))->format('d/m/Y') }}</td>
                                     <td><span class="bolsa-chip bolsa-chip--muted">{{ $partida->ot ?: 'Sin CC' }}</span></td>
 
-                                    {{-- COLUMNA 4: TOTAL PARTIDA (Muestra el importe asignado original o "Abierta") --}}
+                                    {{-- COLUMNA 4: TOTAL PARTIDA --}}
                                     <td class="is-right">
                                         @if($esPartidaAbierta)
                                             <span class="bolsa-chip bolsa-chip--open" title="Partida Abierta sin límite prefijado">
@@ -193,7 +197,7 @@
                                         @endif
                                     </td>
 
-                                    {{-- COLUMNA 5: TOTAL USADO + SUBTEXTO (Pendiente de facturar vs Comprometido) --}}
+                                    {{-- COLUMNA 5: TOTAL USADO + SUBTEXTO --}}
                                     <td class="is-right">
                                         <strong style="color: {{ $totalUsadoPartida > 0 ? '#dc2626' : '#0f172a' }};">
                                             {{ number_format($totalUsadoPartida, 2, ',', '.') }} €
@@ -214,7 +218,7 @@
                                         <span class="bolsa-chip {{ $estadoClass }}">{{ $estadoLabel }}</span>
                                     </td>
 
-                                    {{-- COLUMNA 7: BOTÓN DESPLEGABLE DE ALBARANES (EN SU CELDA CORRECTA) --}}
+                                    {{-- COLUMNA 7: BOTÓN DESPLEGABLE DE ALBARANES --}}
                                     <td class="is-center">
                                         <span class="bolsa-btn bolsa-btn--ghost bolsa-btn--sm">
                                             <i class="fas fa-chevron-down" aria-hidden="true"></i>
@@ -222,9 +226,32 @@
                                         </span>
                                     </td>
 
-                                    {{-- COLUMNA 8: ACCIONES (EN SU CELDA CORRECTA) --}}
+                                    {{-- COLUMNA 8: ACCIONES (CON ACCESO RÁPIDO A CREAR ALBARÁN) --}}
                                     <td class="is-center" onclick="event.stopPropagation();">
                                         <div class="bolsa-row-actions">
+                                            @can('albaranes.manage')
+                                                @php
+                                                    $saldoPendiente = $partida->pendienteFacturar();
+                                                    $estaBloqueada = ($partida->estado === 'facturado') || (!$esPartidaAbierta && $saldoPendiente <= 0.001);
+                                                @endphp
+
+                                                @if($estaBloqueada)
+                                                    {{-- Botón atenuado y deshabilitado si está facturada o 100% comprometida en albaranes --}}
+                                                    <span class="bolsa-btn bolsa-btn--soft bolsa-btn--sm" 
+                                                        style="opacity: 0.45; cursor: not-allowed; pointer-events: none;" 
+                                                        title="Partida sin saldo disponible (100% comprometida en albaranes)">
+                                                        <i class="fas fa-file-invoice"></i>
+                                                    </span>
+                                                @else
+                                                    {{-- Botón activo normal --}}
+                                                    <a href="{{ route('albaranes.create', ['pedido_id' => $partida->id]) }}" 
+                                                       class="bolsa-btn bolsa-btn--primary bolsa-btn--sm" 
+                                                       title="Crear albarán imputado a esta partida">
+                                                        <i class="fas fa-file-invoice"></i>
+                                                    </a>
+                                                @endif
+                                            @endcan
+
                                             <a href="{{ route('pedidos-clientes.albaranes', $partida->id) }}" class="bolsa-btn bolsa-btn--ghost bolsa-btn--sm" title="Ver desglose y albaranes de esta partida">
                                                 <i class="fas fa-eye" aria-hidden="true"></i> Detalle
                                             </a>

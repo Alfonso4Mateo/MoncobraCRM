@@ -117,27 +117,51 @@
                                 <!-- Caja de Pedido Cliente (75% del espacio restante) -->
                                 <div class="field" style="flex: 1; margin-bottom: 0;">
                                     <label for="pedido_cliente">Pedido cliente</label>
-                                   <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias partidas / pedidos..." style="width: 100%;">
+                                    <select id="pedido_cliente" name="pedidos_cliente[]" multiple="multiple" data-placeholder="Selecciona una o varias partidas / pedidos..." style="width: 100%;">
                                         @foreach ($pedidosClientes as $pedido)
                                             @php
                                                 $clienteNombre = $pedido->cliente?->empresa_nombre ?: 'Sin cliente';
                                                 $otTexto = $pedido->ot ? ' | OT ' . $pedido->ot : '';
-                                                $comprometido = $pedido->importeConsumido(isset($albaran) ? $albaran->id : null);
-                                                $esAbierta = $pedido->esPartidaAbierta();
-                                                $pendiente = $pedido->pendienteFacturar(isset($albaran) ? $albaran->id : null);
-                                                $estadoTag = strtoupper(str_replace('_', ' ', $pedido->estado ?: 'pendiente'));
+                                                $consumidoTotal = $pedido->importeConsumido($albaran->id);
+                                                
+                                                // Desglose de facturado en firme y pendiente de facturar (comprometido en albarán)
+                                                $facturadoFirme = method_exists($pedido, 'importeFacturado')
+                                                    ? $pedido->importeFacturado($albaran->id)
+                                                    : 0.0;
+                                                
+                                                $pendienteComprometido = max(0.0, round($consumidoTotal - $facturadoFirme, 2));
+
+                                                $esBolsaGlobalAbierta = $pedido->bolsaGlobal && (float) $pedido->bolsaGlobal->total <= 0;
+                                                $esAbierta = $pedido->esPartidaAbierta() || $esBolsaGlobalAbierta;
+                                                
+                                                $disponible = $pedido->pendienteFacturar($albaran->id);
+
+                                                // Detectamos si la partida con techo ya no tiene saldo libre disponible
+                                                $sinSaldoDisponible = !$esAbierta && $disponible <= 0.001 && $consumidoTotal > 0.001;
+
+                                                $estadoVisual = $pedido->estado ?: 'pendiente';
+                                                if (!$esAbierta && $estadoVisual === 'comprometido') {
+                                                    $estadoVisual = $consumidoTotal > 0 ? 'facturado_parcial' : 'pendiente';
+                                                }
+                                                $estadoTag = strtoupper(str_replace('_', ' ', $estadoVisual));
 
                                                 if ($pedido->bolsa) {
                                                     $macroRef = $pedido->bolsaGlobal ? ($pedido->bolsaGlobal->numero ?: '#' . $pedido->bolsaGlobal->id) : 'Suelta';
                                                     $partidaRef = $pedido->numero_pedido ?: 'Sin número';
-                                                    $infoSaldo = $esAbierta
-                                                        ? "🔓 ABIERTA · Comprometido: " . number_format($comprometido, 2, ',', '.') . " €"
-                                                        : "Comprometido: " . number_format($comprometido, 2, ',', '.') . " € · Disp: " . number_format($pendiente, 2, ',', '.') . " €";
+                                                    
+                                                    // Información según la modalidad de bolsa
+                                                    if ($esAbierta) {
+                                                        $infoSaldo = "🔓 ABIERTA · Comprometido: " . number_format($consumidoTotal, 2, ',', '.') . " €";
+                                                    } elseif ($sinSaldoDisponible) {
+                                                        $infoSaldo = "⚠️ COPADA EN ALBARANES · Facturado: " . number_format($facturadoFirme, 2, ',', '.') . " € · Pendiente: " . number_format($pendienteComprometido, 2, ',', '.') . " € · Disp: 0,00 €";
+                                                    } else {
+                                                        $infoSaldo = "Facturado: " . number_format($facturadoFirme, 2, ',', '.') . " € · Pendiente: " . number_format($pendienteComprometido, 2, ',', '.') . " € · Disp: " . number_format($disponible, 2, ',', '.') . " €";
+                                                    }
 
                                                     $pedidoLabel = "📦 Bolsa {$macroRef} | Partida {$partidaRef} ({$infoSaldo}) [{$estadoTag}] | {$clienteNombre}{$otTexto}";
                                                 } else {
                                                     $pedidoRef = $pedido->numero_pedido ?: 'Pedido sin número';
-                                                    $pedidoLabel = "{$pedidoRef} (Comprometido: " . number_format($comprometido, 2, ',', '.') . " €) [{$estadoTag}] | {$clienteNombre}{$otTexto}";
+                                                    $pedidoLabel = "{$pedidoRef} (Facturado: " . number_format($facturadoFirme, 2, ',', '.') . " € · Pendiente: " . number_format($pendienteComprometido, 2, ',', '.') . " €) [{$estadoTag}] | {$clienteNombre}{$otTexto}";
                                                 }
                                             @endphp
                                             <option
@@ -147,8 +171,10 @@
                                                 data-ot="{{ $pedido->ot }}"
                                                 data-bolsa="{{ $pedido->bolsa ? '1' : '0' }}"
                                                 data-es-abierta="{{ $esAbierta ? '1' : '0' }}"
-                                                data-comprometido="{{ $comprometido }}"
-                                                data-disponible="{{ $pendiente }}"
+                                                data-comprometido="{{ $consumidoTotal }}"
+                                                data-facturado="{{ $facturadoFirme }}"
+                                                data-pendiente="{{ $pendienteComprometido }}"
+                                                data-disponible="{{ $disponible }}"
                                                 @selected(is_array($pedidosVinculados) && in_array($pedido->numero_pedido, $pedidosVinculados))
                                             >
                                                 {{ $pedidoLabel }}
@@ -167,32 +193,32 @@
 
                     <section class="card-block">
                         <h2>ARTÍCULOS</h2>
-                            <div class="line-row linea-input-row">
-                                <div class="field flex-6">
-                                    <label for="linea_descripcion">Descripción</label>
-                                    <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
-                                </div>
-                                
-                                <div class="field flex-compact">
-                                    <label for="linea_cantidad">Cantidad</label>
-                                    <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
-                                </div>
-                                <div class="field flex-compact">
-                                    <label for="linea_medida">Medida</label>
-                                    <input type="text" id="linea_medida" placeholder="u, kg, m...">
-                                </div>
-                                
-                                <div class="field flex-compact-lg">
-                                    <label for="linea_precio">P. unitario</label>
-                                    <input type="number" id="linea_precio" value="0.00" min="0" max="10000000" step="0.01">
-                                </div>
-                                <div class="field flex-compact">
-                                    <label for="linea_margen">Margen (%)</label>
-                                    <input type="number" id="linea_margen" value="0" min="0" step="0.01">
-                                </div>
-                                
-                                <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
+                        <div class="line-row linea-input-row">
+                            <div class="field flex-6">
+                                <label for="linea_descripcion">Descripción</label>
+                                <textarea id="linea_descripcion" placeholder="Escriba el nombre del artículo..."></textarea>
                             </div>
+                            
+                            <div class="field flex-compact">
+                                <label for="linea_cantidad">Cantidad</label>
+                                <input type="number" id="linea_cantidad" value="1" min="0" step="0.01">
+                            </div>
+                            <div class="field flex-compact">
+                                <label for="linea_medida">Medida</label>
+                                <input type="text" id="linea_medida" placeholder="u, kg, m...">
+                            </div>
+                            
+                            <div class="field flex-compact-lg">
+                                <label for="linea_precio">P. unitario</label>
+                                <input type="number" id="linea_precio" value="0.00" min="0" max="10000000" step="0.01">
+                            </div>
+                            <div class="field flex-compact">
+                                <label for="linea_margen">Margen (%)</label>
+                                <input type="number" id="linea_margen" value="0" min="0" step="0.01">
+                            </div>
+                            
+                            <button type="button" class="add-btn" id="btnAddLinea">+ Agregar</button>
+                        </div>
                     </section>
 
                     <section class="card-block empty-table">
@@ -279,7 +305,6 @@
     @vite(['resources/css/albaranes-edit.css'])
     
     <style>
-        /* Ajuste visual para que la caja múltiple encaje con tu diseño */
         .ts-control {
             border: 1px solid #d8e1ec !important;
             border-radius: 0.5rem !important;
@@ -295,20 +320,15 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // --- PROTECCIÓN FRONTEND CONTRA DOBLE ENVÍO ---
             const formularios = document.querySelectorAll('form');
             formularios.forEach(form => {
                 form.addEventListener('submit', function (e) {
-                    
-                    // --- NUEVA LÓGICA DE BLOQUEO ---
-                    // Buscamos si hay algún input con el borde rojo (que indica que se excedió el límite)
                     const inputsConError = this.querySelectorAll('input[style*="border-color: rgb(192, 57, 43)"], input[style*="border-color: #c0392b"]');
                     if (inputsConError.length > 0) {
-                        e.preventDefault(); // Detenemos el envío
+                        e.preventDefault();
                         alert("Por favor, corrige los importes o cantidades marcados en rojo antes de guardar. Hay líneas que superan el saldo disponible.");
                         return false;
                     }
-                    // --- FIN NUEVA LÓGICA ---
                     
                     const btnSubmit = this.querySelector('button[type="submit"]');
                     if (btnSubmit) {

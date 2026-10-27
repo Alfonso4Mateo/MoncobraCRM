@@ -52,7 +52,7 @@
             <form method="GET" action="{{ route('presupuestos.index') }}" class="presupuestos-search-form">
                 <div class="presupuestos-search-copy">
                     <span class="presupuestos-search-label">Buscador</span>
-                    <h2>Encuentra presupuestos por numero, cliente, CC, fecha o estado</h2>
+                    <h2>Encuentra presupuestos por número, título, cliente, CC, fecha o estado</h2>
                     <p>Usa texto libre y combina rango de fechas con estado para acotar resultados.</p>
                 </div>
 
@@ -63,7 +63,7 @@
                             type="search"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por numero, cliente, CC"
+                            placeholder="Buscar por número, título, cliente, CC"
                             autocomplete="off"
                         >
                     </div>

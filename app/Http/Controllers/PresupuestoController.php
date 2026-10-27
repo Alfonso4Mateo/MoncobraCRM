@@ -66,6 +66,7 @@ class PresupuestoController extends Controller
             $presupuestosQuery->where(function ($query) use ($like, $dateValue) {
                 $query->where('documento', 'like', $like)
                     ->orWhere('numero', 'like', $like)
+                    ->orWhere('titulo', 'like', $like)
                     ->orWhere('ot', 'like', $like)
                     ->orWhereHas('cliente', function ($clienteQuery) use ($like) {
                         $clienteQuery->where('empresa_nombre', 'like', $like);

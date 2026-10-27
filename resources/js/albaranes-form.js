@@ -241,16 +241,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const total = lineas.reduce((acc, linea) => acc + (pedidoMode && linea.selected === false ? 0 : clampNumber(linea.total)), 0);
         totalElement.textContent = `${moneyFormatter.format(round4(total))} €`;
 
-        // Aviso en vivo si se seleccionan partidas con techo en modo libre y se supera su saldo
+        // Aviso dinámico si se seleccionan partidas con techo en modo libre y se supera su saldo
         if (!pedidoMode && pedidoClienteSelect) {
             const opts = Array.from(pedidoClienteSelect.selectedOptions);
             const hayAbierta = opts.some((o) => o.dataset.esAbierta === "1");
             if (opts.length > 0 && !hayAbierta) {
                 const dispTotal = opts.reduce((acc, o) => acc + clampNumber(o.dataset.disponible ?? 0), 0);
                 if (dispTotal > 0 && total > dispTotal + 0.001) {
-                    setSaldoStatus("error", `⚠️ Atención: El total del albarán (${moneyFormatter.format(total)} €) supera el techo disponible de la partida seleccionada (${moneyFormatter.format(dispTotal)} €).`);
+                    setSaldoStatus("error", `⚠️ Atención: El total del albarán (${moneyFormatter.format(total)} €) supera el saldo disponible de las partidas seleccionadas (${moneyFormatter.format(dispTotal)} €).`);
                 } else if (dispTotal > 0) {
-                    setSaldoStatus("ok", `Partida con techo: ${moneyFormatter.format(dispTotal)} € disponibles.`);
+                    setSaldoStatus("ok", `Partidas con techo: ${moneyFormatter.format(dispTotal)} € disponibles en total.`);
                 }
             }
         }
@@ -703,10 +703,42 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const describePartidasAbiertas = () => {
-            const resumen = Array.from(pedidoClienteSelect.selectedOptions)
-                .map((o) => `${o.value} (Comprometido: ${moneyFormatter.format(clampNumber(o.dataset.comprometido ?? 0))} €)`)
+            const selectedOpts = Array.from(pedidoClienteSelect.selectedOptions);
+
+            // 1. Revisamos si alguna partida seleccionada está ya agotada por albaranes pendientes
+            const partidasAgotadas = selectedOpts.filter((o) => {
+                const esAb = o.dataset.esAbierta === "1";
+                const disp = clampNumber(o.dataset.disponible ?? 0);
+                const pend = clampNumber(o.dataset.pendiente ?? 0);
+                return !esAb && disp <= 0.001 && pend > 0;
+            });
+
+            if (partidasAgotadas.length > 0) {
+                const nombres = partidasAgotadas.map((o) => o.value).join(", ");
+                setSaldoStatus("error", `⚠️ Atención: La partida ${nombres} ya tiene el 100% de su saldo comprometido en otros albaranes pendientes (Disponible: 0,00 €). No podrás guardar más artículos sobre ella.`);
+                return;
+            }
+
+            // 2. Si no hay error, mostramos el resumen habitual
+            const resumen = selectedOpts
+                .map((o) => {
+                    const esAb = o.dataset.esAbierta === "1";
+                    if (esAb) {
+                        return `${o.value} (Comprometido: ${moneyFormatter.format(clampNumber(o.dataset.comprometido ?? 0))} €)`;
+                    }
+                    const facturado = moneyFormatter.format(clampNumber(o.dataset.facturado ?? 0));
+                    const pendiente = moneyFormatter.format(clampNumber(o.dataset.pendiente ?? 0));
+                    const disp = moneyFormatter.format(clampNumber(o.dataset.disponible ?? 0));
+                    return `${o.value} (Facturado: ${facturado} € · Pendiente: ${pendiente} € · Disp: ${disp} €)`;
+                })
                 .join(" · ");
-            setSaldoStatus("ok", `🔓 Partida Abierta activa: puedes añadir libremente todos los artículos de este albarán. [${resumen}]`);
+
+            const hayAbierta = selectedOpts.some(o => o.dataset.esAbierta === "1");
+            const mensajePrefijo = hayAbierta 
+                ? "🔓 Partida Abierta activa: puedes añadir libremente todos los artículos de este albarán." 
+                : "Partida con facturación continua activa: añade o ajusta los artículos a facturar.";
+
+            setSaldoStatus("ok", `${mensajePrefijo} [${resumen}]`);
         };
 
         if (isInitialEditLoad) {
@@ -805,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 lineas = lineasCargadas;
                 setSaldoStatus('ok', 'Saldo real cargado: Se muestran las líneas disponibles de todas las partidas seleccionadas.');
             } else {
-                // PARTIDA ABIERTA: No tiene líneas cerradas, dejamos el editor de artículos libre habilitado
+                // PARTIDA ABIERTA O SIN LÍNEAS PREDEFINIDAS: editor manual de artículos habilitado
                 pedidoBolsaMode = false;
                 setPedidoMode(false);
                 describePartidasAbiertas();
@@ -1008,7 +1040,6 @@ document.addEventListener("DOMContentLoaded", () => {
             let newQty = round4(target.value);
             linea.aviso = null;
             
-            // --- CAMBIO: Solo mostramos el aviso, pero NO sobreescribimos newQty = maxCantidad ---
             if (Number.isFinite(maxCantidad) && newQty > maxCantidad + 0.001) {
                 linea.aviso = `Has escrito ${newQty} ${linea.medida}, pero solo quedan ${maxCantidad} disponibles. Ajusta el valor antes de guardar.`;
             }
@@ -1039,7 +1070,6 @@ document.addEventListener("DOMContentLoaded", () => {
             let newTotal = round4(target.value); 
             linea.aviso = null;
             
-            // --- CAMBIO: Solo mostramos el aviso, pero NO sobreescribimos newTotal = maxTotal ---
             if (Number.isFinite(maxTotal) && newTotal > maxTotal + 0.001) {
                 linea.aviso = `Has escrito ${moneyFormatter.format(newTotal)} €, pero solo quedan ${moneyFormatter.format(maxTotal)} € disponibles. Ajusta el valor antes de guardar.`;
             }

@@ -247,10 +247,12 @@
                                 <td>
                                     <div class="presupuesto-action-group">
                                         @can('albaranes.download')
-                                            <a href="{{ route('albaranes.preview', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Previsualizar albarán" title="Previsualizar albarán">
+                                            <!-- El OJO va a la ficha de detalle y auditoría -->
+                                            <a href="{{ route('albaranes.show', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Ver detalle del albarán" title="Ver detalle y auditoría">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán">
+                                            <!-- El PDF va a la previsualización/impresión directa del PDF -->
+                                            <a href="{{ route('albaranes.pdf', $albaran) }}" class="presupuesto-action-btn presupuesto-action-btn--view" aria-label="Abrir PDF del albarán" title="Abrir PDF del albarán" target="_blank">
                                                 <i class="fas fa-file-pdf"></i>
                                             </a>
                                         @endcan
