@@ -19,7 +19,8 @@
 
     <section class="almacen-create-page">
         <section class="almacen-create-head">
-            <h1>Crear Nuevo Almacen de Almacén</h1>
+            <a href="{{ route('inventario.index') }}" class="btn-cancel mb-3">← Volver al Inventario</a>
+            <h1>Crear nuevo almacén</h1>
             <p>Configure los parámetros técnicos de la nueva zona logística en el sistema.</p>
         </section>
 
@@ -60,7 +61,7 @@
                 </div>
 
                 <footer class="almacen-create-actions">
-                    <a href="{{ route('dashboard') }}" class="btn-cancel">Cancelar</a>
+                    <a href="{{ route('inventario.index') }}" class="btn-cancel">Cancelar</a>
                     <button type="submit" class="btn-create">
                         <i class="far fa-plus-square"></i>
                         Crear Ubicación

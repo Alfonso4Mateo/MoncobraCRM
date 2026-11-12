@@ -28,6 +28,7 @@ class InventarioVariante extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'articulo_id',
         'proyecto_id',
         'nombre',
         'codigo',
@@ -39,6 +40,10 @@ class InventarioVariante extends Model
         'stock_minimo',
         'nivel_critico',
         'tipos_atributos',
+        'atributos',
+        'codigo_barras',
+        'activo',
+        'nombre_proveedor',
     ];
 
     /**
@@ -50,6 +55,8 @@ class InventarioVariante extends Model
         'stock_minimo' => 'integer',
         'nivel_critico' => 'integer',
         'tipos_atributos' => 'array',
+        'atributos' => 'array',
+        'activo' => 'boolean',
     ];
 
     /**
@@ -76,12 +83,38 @@ class InventarioVariante extends Model
         return $this->hasMany(Inventario::class, 'inventario_variante_id');
     }
 
+    public function articulo(): BelongsTo
+    {
+        return $this->belongsTo(InventarioArticulo::class, 'articulo_id');
+    }
+
+    public function stockAlmacenes(): HasMany
+    {
+        return $this->hasMany(InventarioStockAlmacen::class, 'variante_id');
+    }
+
+    // Alias para compatibilidad con las consultas del controlador
+    public function stocksAlmacen(): HasMany
+    {
+        return $this->stockAlmacenes();
+    }
+
+    // Accessor para que $variante->sku devuelva el código si no existe columna sku
+    public function getSkuAttribute(): ?string
+    {
+        return $this->attributes['codigo'] ?? null;
+    }
+
     /**
      * Get the total stock for this variant across all items.
      */
     public function getStockTotalAttribute(): int
     {
-        return $this->items()->sum('stock_actual') ?? 0;
+        if ($this->relationLoaded('stockAlmacenes')) {
+            return (int) $this->stockAlmacenes->sum('cantidad');
+        }
+
+        return (int) $this->stockAlmacenes()->sum('cantidad');
     }
 
     /**
@@ -89,9 +122,7 @@ class InventarioVariante extends Model
      */
     public function isStockCritical(): bool
     {
-        return $this->items()
-            ->whereColumn('stock_actual', '<=', 'nivel_critico')
-            ->exists();
+        return $this->stockTotal <= (int) ($this->nivel_critico ?? 0);
     }
 
     /**
@@ -99,9 +130,7 @@ class InventarioVariante extends Model
      */
     public function isStockLow(): bool
     {
-        return $this->items()
-            ->whereColumn('stock_actual', '<=', 'stock_minimo')
-            ->exists();
+        return $this->stockTotal <= (int) ($this->stock_minimo ?? 0);
     }
 
     public function tapActivity(Activity $activity, string $eventName): void

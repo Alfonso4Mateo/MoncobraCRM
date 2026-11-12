@@ -2,24 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EntradaStock;
-use App\Models\Inventario;
-use App\Models\SalidaStock;
-use App\Models\TrasladoStock;
+use App\Models\InventarioMovimiento;
+use App\Services\InventarioStockService;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class InventarioAccionController extends Controller
 {
-    public function __construct()
+    public function __construct(private readonly InventarioStockService $stockService)
     {
         $this->middleware('auth');
+        $this->middleware('permission:inventario.view')->only(['index', 'show']);
+        $this->middleware('permission:inventario.manage')->only(['cancel']);
     }
 
     /**
-     * Muestra el registro de acciones de inventario según la pestaña (Salidas, Entradas, Traslados, Logs).
+     * Muestra el registro de acciones de inventario directamente desde el Kardex relacional.
      */
     public function index(Request $request)
     {
@@ -39,156 +37,76 @@ class InventarioAccionController extends Controller
         $solicitante = trim((string) $request->query('solicitante', ''));
         $desde = $request->query('desde');
         $hasta = $request->query('hasta');
-
         $perPage = 10;
 
-        $applyFilters = function ($query) use ($proyectoId, $solicitante, $desde, $hasta) {
-            $query->where('proyecto_id', $proyectoId);
+        $query = InventarioMovimiento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['almacenOrigen', 'almacenDestino', 'personal', 'usuario', 'lineas.variante.articulo']);
 
-            if ($solicitante !== '') {
-                $query->where('solicitante', 'like', '%' . $solicitante . '%');
-            }
+        if ($solicitante !== '') {
+            $query->where(function ($q) use ($solicitante) {
+                $q->where('observaciones', 'like', '%' . $solicitante . '%')
+                  ->orWhere('motivo', 'like', '%' . $solicitante . '%')
+                  ->orWhere('numero_documento', 'like', '%' . $solicitante . '%')
+                  ->orWhere('ot', 'like', '%' . $solicitante . '%')
+                  ->orWhere('documento_referencia', 'like', '%' . $solicitante . '%')
+                  ->orWhereHas('personal', function ($qp) use ($solicitante) {
+                      $qp->where('name', 'like', '%' . $solicitante . '%')
+                         ->orWhere('apellido', 'like', '%' . $solicitante . '%');
+                  })
+                  ->orWhereHas('usuario', function ($qu) use ($solicitante) {
+                      $qu->where('name', 'like', '%' . $solicitante . '%');
+                  });
+            });
+        }
 
-            if (!empty($desde)) {
-                $query->whereDate('fecha', '>=', $desde);
-            }
+        if (!empty($desde)) {
+            $query->whereDate('created_at', '>=', $desde);
+        }
 
-            if (!empty($hasta)) {
-                $query->whereDate('fecha', '<=', $hasta);
-            }
-
-            return $query;
-        };
+        if (!empty($hasta)) {
+            $query->whereDate('created_at', '<=', $hasta);
+        }
 
         if ($tab === 'salidas') {
-            $registros = $applyFilters(SalidaStock::query())
-                ->where('estado', 'aceptado')
-                ->orderByDesc('fecha')
-                ->paginate($perPage)
-                ->withQueryString()
-                ->through(function (SalidaStock $row) {
-                    return (object) [
-                        'tipo' => 'salida',
-                        'numero' => $row->numero_salida,
-                        'fecha' => $row->fecha,
-                        'solicitante' => $row->solicitante,
-                        'iniciales' => $this->makeIniciales($row->solicitante),
-                        'ot' => $row->ot,
-                        'almacen_origen' => $row->almacen_origen,
-                        'almacen_actual' => null,
-                        'estado' => $row->estado,
-                        'id' => $row->id,
-                    ];
-                });
-
+            $query->where('tipo', 'SALIDA')->where('estado', 'REGISTRADO');
             $tipo = 'salida';
         } elseif ($tab === 'entradas') {
-            $registros = $applyFilters(EntradaStock::query())
-                ->where('estado', 'aceptado')
-                ->orderByDesc('fecha')
-                ->paginate($perPage)
-                ->withQueryString()
-                ->through(function (EntradaStock $row) {
-                    return (object) [
-                        'tipo' => 'entrada',
-                        'numero' => $row->numero_entrada,
-                        'fecha' => $row->fecha,
-                        'solicitante' => $row->solicitante,
-                        'iniciales' => $this->makeIniciales($row->solicitante),
-                        'ot' => $row->ot,
-                        'almacen_origen' => $row->almacen_origen,
-                        'almacen_actual' => null,
-                        'estado' => $row->estado,
-                        'id' => $row->id,
-                    ];
-                });
-
+            $query->where('tipo', 'ENTRADA')->where('estado', 'REGISTRADO');
             $tipo = 'entrada';
         } elseif ($tab === 'traslados') {
-            $registros = $applyFilters(TrasladoStock::query())
-                ->where('estado', 'aceptado')
-                ->orderByDesc('fecha')
-                ->paginate($perPage)
-                ->withQueryString()
-                ->through(function (TrasladoStock $row) {
-                    return (object) [
-                        'tipo' => 'traslado',
-                        'numero' => $row->numero_traslado,
-                        'fecha' => $row->fecha,
-                        'solicitante' => $row->solicitante,
-                        'iniciales' => $this->makeIniciales($row->solicitante),
-                        'ot' => $row->ot,
-                        'almacen_origen' => $row->almacen_origen,
-                        'almacen_actual' => $row->almacen_actual,
-                        'estado' => $row->estado,
-                        'id' => $row->id,
-                    ];
-                });
-
+            $query->where('tipo', 'TRASLADO')->where('estado', 'REGISTRADO');
             $tipo = 'traslado';
         } else {
-            $page = max(1, (int) $request->query('page', 1));
-
-            $salidas = $applyFilters(SalidaStock::query())->get()->map(fn ($row) => (object) [
-                'tipo' => 'salida',
-                'numero' => $row->numero_salida,
-                'fecha' => $row->fecha,
-                'solicitante' => $row->solicitante,
-                'iniciales' => $this->makeIniciales($row->solicitante),
-                'ot' => $row->ot,
-                'almacen_origen' => $row->almacen_origen,
-                'almacen_actual' => null,
-                'estado' => $row->estado,
-                'id' => $row->id,
-            ]);
-
-            $entradas = $applyFilters(EntradaStock::query())->get()->map(fn ($row) => (object) [
-                'tipo' => 'entrada',
-                'numero' => $row->numero_entrada,
-                'fecha' => $row->fecha,
-                'solicitante' => $row->solicitante,
-                'iniciales' => $this->makeIniciales($row->solicitante),
-                'ot' => $row->ot,
-                'almacen_origen' => $row->almacen_origen,
-                'almacen_actual' => null,
-                'estado' => $row->estado,
-                'id' => $row->id,
-            ]);
-
-            $traslados = $applyFilters(TrasladoStock::query())->get()->map(fn ($row) => (object) [
-                'tipo' => 'traslado',
-                'numero' => $row->numero_traslado,
-                'fecha' => $row->fecha,
-                'solicitante' => $row->solicitante,
-                'iniciales' => $this->makeIniciales($row->solicitante),
-                'ot' => $row->ot,
-                'almacen_origen' => $row->almacen_origen,
-                'almacen_actual' => $row->almacen_actual,
-                'estado' => $row->estado,
-                'id' => $row->id,
-            ]);
-
-            /** @var Collection $all */
-            $all = $salidas->concat($entradas)->concat($traslados)
-                ->sortByDesc(fn ($row) => $row->fecha)
-                ->values();
-
-            $total = $all->count();
-            $slice = $all->slice(($page - 1) * $perPage, $perPage)->values();
-
-            $registros = new LengthAwarePaginator(
-                $slice,
-                $total,
-                $perPage,
-                $page,
-                [
-                    'path' => $request->url(),
-                    'query' => $request->query(),
-                ]
-            );
-
             $tipo = 'log';
         }
+
+        $registros = $query
+            ->orderByDesc('created_at')
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(function (InventarioMovimiento $mov) {
+                $tipoLower = mb_strtolower((string) $mov->tipo);
+                $solicitanteNombre = $mov->personal
+                    ? trim($mov->personal->name . ' ' . $mov->personal->apellido)
+                    : ($mov->usuario?->name ?? 'Sistema');
+
+                $estadoVista = $mov->estado === 'CANCELADO' ? 'cancelado' : 'aceptado';
+
+                return (object) [
+                    'tipo' => $tipoLower,
+                    'numero' => $mov->numero_documento ?: ('MOV-' . $mov->id),
+                    'fecha' => $mov->created_at,
+                    'solicitante' => $solicitanteNombre,
+                    'iniciales' => $this->makeIniciales($solicitanteNombre),
+                    'ot' => $mov->ot,
+                    'documento_referencia' => $mov->documento_referencia,
+                    'almacen_origen' => $mov->almacenOrigen?->nombre ?? ($mov->almacenDestino?->nombre ?? '—'),
+                    'almacen_actual' => $mov->almacenDestino?->nombre,
+                    'estado' => $estadoVista,
+                    'id' => $mov->id,
+                ];
+            });
 
         return view('inventario.acciones.index', compact('tab', 'registros', 'tipo', 'isAdmin'));
     }
@@ -197,127 +115,114 @@ class InventarioAccionController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
 
-        $registro = $this->findRegistroOrFail($tipo, $id, $proyectoId);
+        $mov = InventarioMovimiento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['almacenOrigen', 'almacenDestino', 'personal', 'usuario', 'lineas.variante.articulo'])
+            ->findOrFail($id);
 
         $user = $request->user();
         $isAdmin = $user && ($user->role === 'admin' || $user->role === 'superadmin');
-        if (!$isAdmin && (string) $registro->estado === 'cancelado') {
+        if (!$isAdmin && $mov->estado === 'CANCELADO') {
             abort(403);
         }
 
+        $solicitanteNombre = $mov->personal
+            ? trim($mov->personal->name . ' ' . $mov->personal->apellido)
+            : ($mov->usuario?->name ?? 'Sistema');
+
+        // Adaptador para que la vista show.blade.php reciba las propiedades que espera
+        $registro = (object) [
+            'id' => $mov->id,
+            'numero_salida' => $mov->numero_documento,
+            'numero_entrada' => $mov->numero_documento,
+            'numero_traslado' => $mov->numero_documento,
+            'numero' => $mov->numero_documento,
+            'fecha' => $mov->created_at,
+            'solicitante' => $solicitanteNombre,
+            'ot' => $mov->ot,
+            'almacen_origen' => $mov->almacenOrigen?->nombre ?? ($mov->almacenDestino?->nombre ?? '—'),
+            'almacen_actual' => $mov->almacenDestino?->nombre ?? '—',
+            'observaciones' => $mov->observaciones ?? $mov->motivo,
+            'estado' => $mov->estado === 'CANCELADO' ? 'cancelado' : 'aceptado',
+            'documento_meta' => null,
+        ];
+
+        $items = $mov->lineas->map(function ($linea) use ($mov) {
+            $variante = $linea->variante;
+            $articulo = $variante?->articulo;
+            $esObsoleta = $variante && (!$variante->activo || str_contains((string) $variante->descripcion, '[OBSOLETO]'));
+
+            return [
+                'inventario_id' => $linea->variante_id,
+                'codigo' => $variante?->sku ?? $variante?->codigo ?? 'S/C',
+                'descripcion' => $variante?->nombre ?: ($articulo?->nombre ?: $articulo?->descripcion ?: 'Ítem'),
+                'cantidad' => (int) $linea->cantidad,
+                'almacen_origen' => $mov->almacenOrigen?->nombre ?? '—',
+                'almacen_actual' => $mov->almacenDestino?->nombre ?? '—',
+                'activo' => (bool) ($variante?->activo ?? true),
+                'obsoleto' => $esObsoleta,
+            ];
+        })->all();
+
         return view('inventario.acciones.show', [
-            'tipo' => $tipo,
+            'tipo' => mb_strtolower((string) $mov->tipo),
             'registro' => $registro,
-            'items' => (array) ($registro->items ?? []),
+            'items' => $items,
+            'isAdmin' => $isAdmin,
         ]);
     }
 
     public function cancel(Request $request, string $tipo, int $id)
     {
+        abort_unless(in_array($request->user()?->role, ['admin', 'superadmin'], true), 403);
+
         $proyectoId = $this->resolveActiveProyectoId($request);
 
-        $registro = $this->findRegistroOrFail($tipo, $id, $proyectoId);
+        $mov = InventarioMovimiento::query()
+            ->with(['lineas.variante.articulo.clase', 'almacenOrigen', 'almacenDestino', 'personal'])
+            ->where('proyecto_id', $proyectoId)
+            ->findOrFail($id);
 
-        if ((string) $registro->estado === 'cancelado') {
-            return back()->with('success', 'El registro ya estaba cancelado.');
+        if ($mov->estado === 'CANCELADO') {
+            return back()->with('success', 'El movimiento ya estaba cancelado.');
         }
 
-        $items = collect((array) ($registro->items ?? []))
-            ->filter(fn ($item) => is_array($item) || is_object($item))
-            ->map(function ($item) {
-                $data = (array) $item;
-                return [
-                    'inventario_id' => isset($data['inventario_id']) ? (int) $data['inventario_id'] : null,
-                    'inventario_destino_id' => isset($data['inventario_destino_id']) ? (int) $data['inventario_destino_id'] : null,
-                    'cantidad' => isset($data['cantidad']) ? (int) $data['cantidad'] : null,
-                    'almacen_origen' => isset($data['almacen_origen']) ? (string) $data['almacen_origen'] : null,
-                ];
-            })
-            ->filter(fn ($item) => !empty($item['inventario_id']))
-            ->values();
-
         try {
-            DB::transaction(function () use ($tipo, $registro, $items, $proyectoId) {
-                if ($tipo === 'salida') {
-                    foreach ($items as $item) {
-                        $inv = Inventario::query()
-                            ->where('proyecto_id', $proyectoId)
-                            ->where('id', $item['inventario_id'])
-                            ->lockForUpdate()
-                            ->first();
-                        if (!$inv) {
-                            continue;
-                        }
+            $this->stockService->revertir($mov);
 
-                        $inv->stock_actual = (int) $inv->stock_actual + (int) ($item['cantidad'] ?? 0);
-                        $inv->save();
-                    }
-                } elseif ($tipo === 'entrada') {
-                    foreach ($items as $item) {
-                        $inv = Inventario::query()
-                            ->where('proyecto_id', $proyectoId)
-                            ->where('id', $item['inventario_id'])
-                            ->lockForUpdate()
-                            ->first();
-                        if (!$inv) {
-                            continue;
-                        }
+            // Enriquecer el log de Spatie con el detalle exacto de los artículos y clases afectados
+            if (class_exists(\Spatie\Activitylog\Models\Activity::class) && method_exists($mov, 'obtenerResumenLineasAuditoria')) {
+                $resumenArticulos = $mov->obtenerResumenLineasAuditoria();
+                $clasesInvolucradas = $mov->obtenerClasesInvolucradasAuditoria();
+                $totalUds = (int) $mov->lineas->sum('cantidad'); // <-- Corregido de $movimiento a $mov
 
-                        $newStock = (int) $inv->stock_actual - (int) ($item['cantidad'] ?? 0);
-                        if ($newStock < 0) {
-                            throw new \RuntimeException('No se puede cancelar la entrada porque dejaría stock negativo.');
-                        }
+                activity('inventario')
+                    ->performedOn($mov)
+                    ->causedBy($request->user())
+                    ->event('updated')
+                    ->withProperties([
+                        'attributes' => [
+                            'numero_documento' => $mov->numero_documento,
+                            'tipo' => strtoupper($tipo),
+                            'estado' => 'CANCELADO',
+                            'clases_afectadas' => $clasesInvolucradas,
+                            'total_unidades_revertidas' => $totalUds . ' uds.',
+                            'articulos_afectados' => $resumenArticulos,
+                        ],
+                        'old' => [
+                            'estado' => 'REGISTRADO',
+                        ],
+                    ])
+                    ->log("Anulación de movimiento {$tipo} {$mov->numero_documento} y reversión de stock");
+            }
 
-                        $inv->stock_actual = $newStock;
-                        $inv->save();
-                    }
-                } else {
-                    foreach ($items as $item) {
-                        $origen = Inventario::query()
-                            ->where('proyecto_id', $proyectoId)
-                            ->where('id', $item['inventario_id'])
-                            ->lockForUpdate()
-                            ->first();
-                        if (!$origen) {
-                            continue;
-                        }
-
-                        $destinoId = $item['inventario_destino_id'];
-                        if ($destinoId && $destinoId !== $item['inventario_id']) {
-                            $destino = Inventario::query()
-                                ->where('proyecto_id', $proyectoId)
-                                ->where('id', $destinoId)
-                                ->lockForUpdate()
-                                ->first();
-                            if (!$destino || (int) $destino->stock_actual < (int) $item['cantidad']) {
-                                throw new \RuntimeException('No se puede cancelar el traslado porque parte del stock trasladado ya ha sido consumido en el almacén de destino.');
-                            }
-
-                            $destino->stock_actual -= (int) $item['cantidad'];
-                            $destino->save();
-                            $origen->stock_actual += (int) $item['cantidad'];
-                            $origen->save();
-                            continue;
-                        }
-
-                        $almacenOrigen = (string) ($item['almacen_origen'] ?? '');
-                        if ($almacenOrigen !== '') {
-                            $origen->almacen = $almacenOrigen;
-                            $origen->save();
-                        }
-                    }
-                }
-
-                $registro->estado = 'cancelado';
-                $registro->save();
-            });
-        } catch (\RuntimeException $e) {
+        } catch (Throwable $e) {
             return back()->with('error', $e->getMessage());
         }
 
         return redirect()
             ->route('inventario.acciones.index', ['tab' => $request->query('tab', 'salidas')])
-            ->with('success', 'Registro cancelado y cambios revertidos.');
+            ->with('success', 'Movimiento cancelado en el Kardex y saldos revertidos.');
     }
 
     private function makeIniciales(?string $nombre): string
@@ -334,18 +239,5 @@ class InventarioAccionController extends Controller
             ->join('');
 
         return $iniciales !== '' ? mb_strtoupper($iniciales) : '—';
-    }
-
-    private function findRegistroOrFail(string $tipo, int $id, int $proyectoId): SalidaStock|EntradaStock|TrasladoStock
-    {
-        if ($tipo === 'salida') {
-            return SalidaStock::query()->where('proyecto_id', $proyectoId)->findOrFail($id);
-        }
-
-        if ($tipo === 'entrada') {
-            return EntradaStock::query()->where('proyecto_id', $proyectoId)->findOrFail($id);
-        }
-
-        return TrasladoStock::query()->where('proyecto_id', $proyectoId)->findOrFail($id);
     }
 }

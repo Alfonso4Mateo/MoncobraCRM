@@ -7,6 +7,7 @@ use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Activity;
 
 class Almacen extends Model
@@ -29,8 +30,12 @@ class Almacen extends Model
     protected $fillable = [
         'proyecto_id',
         'nombre',
+        'codigo',
         'descripcion',
+        'activo',
     ];
+
+    protected $casts = ['activo' => 'boolean'];
 
     /**
      * Get the proyecto that owns the almacen.
@@ -38,6 +43,11 @@ class Almacen extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    public function stocks(): HasMany
+    {
+        return $this->hasMany(InventarioStockAlmacen::class, 'almacen_id');
     }
 
     public function tapActivity(Activity $activity, string $eventName): void

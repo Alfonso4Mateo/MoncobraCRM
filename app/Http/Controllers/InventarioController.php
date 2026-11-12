@@ -4,21 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Almacen;
 use App\Models\Clase;
-use App\Models\EntradaStock;
 use App\Models\Inventario;
+use App\Models\InventarioArticulo;
+use App\Models\InventarioMovimiento;
+use App\Models\InventarioStockAlmacen;
 use App\Models\InventarioVariante;
 use App\Models\Personal;
 use App\Models\Proyecto;
 use App\Models\SalidaStock;
-use App\Models\TrasladoStock;
-use Illuminate\Pagination\LengthAwarePaginator;
+use App\Services\InventarioStockService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class InventarioController extends Controller
 {
-    public function __construct()
+    public function __construct(private readonly ?InventarioStockService $stockService = null)
     {
         $this->middleware('auth');
         $this->middleware('permission:inventario.view')->only(['index', 'show']);
@@ -40,27 +41,36 @@ class InventarioController extends Controller
     public function index()
     {
         $request = request();
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $proyectoId = $this->resolveActiveProyectoId($request);
         $descripcion = trim((string) $request->query('descripcion', ''));
         $claseId = $request->query('clase_id');
-        $almacen = trim((string) $request->query('almacen', ''));
+        $almacenId = $request->query('almacen_id');
 
-        $baseQuery = Inventario::query()
+        $baseArticulosQuery = InventarioArticulo::query()
             ->where('proyecto_id', $proyectoId)
-            ->with(['claseRelacion', 'variante'])
+            ->where('activo', true)
+            ->with(['clase', 'variantes.stockAlmacenes.almacen'])
             ->when($descripcion !== '', function ($query) use ($descripcion) {
                 $query->where(function ($q) use ($descripcion) {
                     $q->where('codigo', 'like', '%' . $descripcion . '%')
                       ->orWhere('nombre', 'like', '%' . $descripcion . '%')
                       ->orWhere('descripcion', 'like', '%' . $descripcion . '%')
-                      ->orWhere('referencia_proveedor', 'like', '%' . $descripcion . '%');
+                      ->orWhere('referencia_proveedor', 'like', '%' . $descripcion . '%')
+                      ->orWhere('nombre_proveedor', 'like', '%' . $descripcion . '%')
+                      ->orWhereHas('variantes', function ($qv) use ($descripcion) {
+                          $qv->where('codigo', 'like', '%' . $descripcion . '%')
+                             ->orWhere('nombre', 'like', '%' . $descripcion . '%')
+                             ->orWhere('descripcion', 'like', '%' . $descripcion . '%');
+                      });
                 });
             })
             ->when($claseId !== null && $claseId !== '', function ($query) use ($claseId) {
                 $query->where('clase_id', $claseId);
             })
-            ->when($almacen !== '', function ($query) use ($almacen) {
-                $query->where('almacen', 'like', '%' . $almacen . '%');
+            ->when($almacenId !== null && $almacenId !== '', function ($query) use ($almacenId) {
+                $query->whereHas('variantes.stockAlmacenes', function ($q) use ($almacenId) {
+                    $q->where('almacen_id', $almacenId)->where('cantidad', '>', 0);
+                });
             });
 
         $clases = Clase::query()
@@ -68,43 +78,84 @@ class InventarioController extends Controller
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
 
-        // Paginate by parent groups (not by child rows), so each page shows 8 parent items.
-        $inventarioAgrupado = (clone $baseQuery)
+        $almacenesRegistrados = Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo']);
+
+        $articulosCollection = (clone $baseArticulosQuery)
             ->orderBy('codigo')
-            ->orderBy('id')
             ->get()
-            ->groupBy(function (Inventario $item) {
-                $varianteId = (int) ($item->inventario_variante_id ?? 0);
+            ->map(function (InventarioArticulo $articulo) use ($almacenId) {
+                $variantes = $articulo->variantes->where('activo', true);
 
-                return $varianteId > 0 ? 'variante_' . $varianteId : 'item_' . (int) $item->id;
-            })
-            ->map(function ($grupo) {
-                $grupo = collect($grupo)->sortBy('id')->values();
-                $productoPadre = $grupo->first();
+                $stockTotalArticulo = 0;
+                $hijos = collect();
+                $hijosCriticos = 0;
+                $hijosReposicion = 0;
 
-                if (is_array($productoPadre)) {
-                    $productoPadre = (object) $productoPadre;
+                foreach ($variantes as $variante) {
+                    $stocksFiltrados = ($variante->stockAlmacenes ?? collect())->when($almacenId, function ($c) use ($almacenId) {
+                        return $c->where('almacen_id', (int) $almacenId);
+                    });
+
+                    $stockVariante = (int) $stocksFiltrados->sum('cantidad');
+                    $stockTotalArticulo += $stockVariante;
+
+                    $stockMin = (int) ($variante->stock_minimo ?? $articulo->stock_minimo_global ?? 0);
+                    $criticoMin = (int) ($variante->nivel_critico ?? $articulo->nivel_critico_global ?? 0);
+
+                    if ($stockVariante <= $criticoMin) {
+                        $estadoVar = 'critico';
+                        $estadoVarTexto = 'Crítico';
+                        if ($stockVariante > 0) $hijosCriticos++;
+                    } elseif ($stockVariante <= $stockMin) {
+                        $estadoVar = 'bajo';
+                        $estadoVarTexto = 'Reposición';
+                        if ($stockVariante > 0) $hijosReposicion++;
+                    } else {
+                        $estadoVar = 'optimo';
+                        $estadoVarTexto = 'Óptimo';
+                    }
+
+                    $nombresAlmacenes = $stocksFiltrados->where('cantidad', '>', 0)->map(function ($sa) {
+                        return ($sa->almacen?->nombre ?? 'Almacén') . " ({$sa->cantidad})";
+                    })->join(', ');
+
+                    $atributosChips = collect($variante->atributos ?? [])
+                        ->map(function ($valores,$tipo) {
+                            $valStr = is_array($valores) ? implode(', ', $valores) : (string)$valores;
+                            return trim($tipo . ': ' .$valStr);
+                        })
+                        ->filter()
+                        ->values()
+                        ->all();
+
+                    $hijos->push((object) [
+                        'id' => $variante->id,
+                        'codigo' => $variante->sku ?? $variante->codigo,
+                        'nombre' => $variante->nombre,
+                        'descripcion' => $variante->descripcion ?: ($variante->nombre ?: $articulo->descripcion),
+                        'atributos_chips' => $atributosChips,
+                        'referencia_proveedor' => $variante->referencia_proveedor ?: $articulo->referencia_proveedor,
+                        'clase_relacion' => (object) ['nombre' => $articulo->clase?->nombre ?? 'Sin clase'],
+                        'almacen' => $nombresAlmacenes ?: 'Sin existencias',
+                        'stock_actual' => $stockVariante,
+                        'stock_minimo' => $stockMin,
+                        'nivel_critico' => $criticoMin,
+                        'estado' => $estadoVar,
+                        'estado_texto' => $estadoVarTexto,
+                    ]);
                 }
 
-                $variantePadre = data_get($productoPadre, 'variante');
-                $stockGrupo = (int) $grupo->sum('stock_actual');
+                $stockMinPadre = (int) ($articulo->stock_minimo_global ?? 0);
+                $criticoPadre = (int) ($articulo->nivel_critico_global ?? 0);
 
-                $stockMinimoGrupo = (int) (
-                    data_get($variantePadre, 'stock_minimo')
-                    ?? data_get($productoPadre, 'stock_minimo')
-                    ?? 0
-                );
-
-                $nivelCriticoGrupo = (int) (
-                    data_get($variantePadre, 'nivel_critico')
-                    ?? data_get($productoPadre, 'nivel_critico')
-                    ?? 0
-                );
-
-                if ($stockGrupo <= $nivelCriticoGrupo) {
+                if ($stockTotalArticulo <= $criticoPadre) {
                     $estadoGrupo = 'critico';
                     $estadoTextoGrupo = 'Crítico';
-                } elseif ($stockGrupo <= $stockMinimoGrupo) {
+                } elseif ($stockTotalArticulo <= $stockMinPadre) {
                     $estadoGrupo = 'bajo';
                     $estadoTextoGrupo = 'Reposición';
                 } else {
@@ -112,189 +163,128 @@ class InventarioController extends Controller
                     $estadoTextoGrupo = 'Óptimo';
                 }
 
-                $hijos = $grupo->skip(1)->map(function ($producto) use ($productoPadre) {
-                    if (is_array($producto)) {
-                        $producto = (object) $producto;
-                    }
+                $almacenesPadre = $articulo->variantes->flatMap(fn ($v) => $v->stockAlmacenes ?? collect())
+                    ->where('cantidad', '>', 0)
+                    ->map(fn ($sa) => $sa->almacen?->nombre)
+                    ->filter()
+                    ->unique()
+                    ->join(', ');
 
-                    $stockActual = (int) data_get($producto, 'stock_actual', 0);
-                    $stockMinimo = (int) data_get($producto, 'stock_minimo', 0);
-                    $nivelCritico = (int) data_get($producto, 'nivel_critico', 0);
-
-                    if ($stockActual <= $nivelCritico) {
-                        $estado = 'critico';
-                        $estadoTexto = 'Crítico';
-                    } elseif ($stockActual <= $stockMinimo) {
-                        $estado = 'bajo';
-                        $estadoTexto = 'Reposición';
-                    } else {
-                        $estado = 'optimo';
-                        $estadoTexto = 'Óptimo';
-                    }
-
-                    return (object) [
-                        'codigo' => data_get($producto, 'codigo'),
-                        'nombre' => data_get($producto, 'nombre'),
-                        'descripcion' => data_get($producto, 'descripcion'),
-                        'referencia_proveedor' => data_get($producto, 'referencia_proveedor'),
-                        'almacen' => data_get($producto, 'almacen'),
-                        'id' => data_get($producto, 'id'),
-                        'clase_relacion' => data_get($producto, 'claseRelacion') ?: data_get($productoPadre, 'claseRelacion'),
-                        'stock_actual' => $stockActual,
-                        'stock_minimo' => $stockMinimo,
-                        'nivel_critico' => $nivelCritico,
-                        'estado' => $estado,
-                        'estado_texto' => $estadoTexto,
-                    ];
-                })->values();
-
-                $hijosReposicion = $hijos->filter(fn ($hijo) => $hijo->stock_actual > 0 && $hijo->stock_actual <= $hijo->stock_minimo)->count();
-                $hijosCriticos = $hijos->filter(fn ($hijo) => $hijo->stock_actual > 0 && $hijo->stock_actual <= $hijo->nivel_critico)->count();
+                $primeraVarianteId = $variantes->first()?->id ?? $articulo->id;
 
                 return (object) [
-                    'padre' => $productoPadre,
-                    'idPadre' => data_get($productoPadre, 'id'),
-                    'variantePadre' => $variantePadre,
-                    'variantePadreId' => data_get($variantePadre, 'id'),
-                    'codigoPadre' => data_get($variantePadre, 'codigo') ?? data_get($productoPadre, 'codigo'),
-                    'nombrePadre' => data_get($variantePadre, 'nombre') ?? data_get($productoPadre, 'nombre'),
-                    'descripcionPadre' => data_get($variantePadre, 'descripcion') ?? data_get($productoPadre, 'descripcion'),
-                    'referenciaPadre' => data_get($variantePadre, 'referencia_proveedor') ?? data_get($productoPadre, 'referencia_proveedor'),
-                    'almacenPadre' => data_get($variantePadre, 'almacen') ?? data_get($productoPadre, 'almacen'),
-
-                    'clasePadre' => is_object(data_get($productoPadre, 'claseRelacion'))
-                        ? data_get($productoPadre, 'claseRelacion.nombre')
-                        : data_get($productoPadre, 'clase', 'Sin clase'),
-                    'stockGrupo' => $stockGrupo,
+                    'padre' => $articulo,
+                    'idPadre' => $primeraVarianteId,
+                    'variantePadreId' => $articulo->id,
+                    'codigoPadre' => $articulo->codigo,
+                    'nombrePadre' => $articulo->nombre,
+                    'descripcionPadre' => $articulo->descripcion,
+                    'referenciaPadre' => $articulo->referencia_proveedor,
+                    'clasePadre' => $articulo->clase?->nombre ?? 'Sin clase',
+                    'almacenPadre' => $almacenesPadre ?: 'Sin existencias',
+                    'stockGrupo' => $stockTotalArticulo,
                     'estadoGrupo' => $estadoGrupo,
                     'estadoTextoGrupo' => $estadoTextoGrupo,
                     'hijosReposicion' => $hijosReposicion,
                     'hijosCriticos' => $hijosCriticos,
-                    'tieneHijos' => $grupo->count() > 1,
+                    'tieneHijos' => $hijos->count() > 1,
                     'hijos' => $hijos,
                 ];
-            })
-            ->values();
+            });
 
         $perPage = 8;
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $totalGrupos = $inventarioAgrupado->count();
-        $gruposPagina = $inventarioAgrupado
-            ->slice(($currentPage - 1) * $perPage, $perPage)
-            ->values();
+        $totalGrupos = $articulosCollection->count();
+        $gruposPagina = $articulosCollection->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
         $inventarios = new LengthAwarePaginator(
             $gruposPagina,
             $totalGrupos,
             $perPage,
             $currentPage,
-            [
-                'path' => request()->url(),
-                'query' => request()->query(),
-            ]
+            ['path' => request()->url(), 'query' => request()->query()]
         );
 
-        $totalProductos = (clone $baseQuery)->count();
-        $nivelCritico = (clone $baseQuery)->whereColumn('stock_actual', '<=', 'nivel_critico')->count();
-        $stockBajo = (clone $baseQuery)->whereColumn('stock_actual', '<=', 'stock_minimo')->count();
-        $stockTotal = (clone $baseQuery)->sum('stock_actual');
-        $almacenesRegistrados = Almacen::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('nombre')
-            ->get(['id', 'nombre']);
+        $totalProductos = InventarioArticulo::where('proyecto_id', $proyectoId)->where('activo', true)->count();
+        $stockTotal = (int) InventarioStockAlmacen::query()
+            ->whereHas('almacen', fn ($q) => $q->where('proyecto_id', $proyectoId))
+            ->whereHas('variante', fn ($q) => $q->where('activo', true))
+            ->sum('cantidad');
 
-        $almacenes = $almacenesRegistrados->count();
-
-        $normalizarMovimiento = function ($movimiento, string $etiqueta, string $icono, string $tono, string $numeroCampo) {
-            $items = is_array($movimiento->items) ? $movimiento->items : [];
-            $unidades = collect($items)->sum(fn ($item) => (int) ($item['cantidad'] ?? 0));
-            $numero = trim((string) ($movimiento->{$numeroCampo} ?? ''));
-
-            return (object) [
-                'etiqueta' => $etiqueta,
-                'icono' => $icono,
-                'tono' => $tono,
-                'titulo' => sprintf('%s: %s (%s uds.)', $etiqueta, $numero ?: 'Sin número', number_format($unidades, 0, ',', '.')),
-                'subtitulo' => trim((string) ($movimiento->solicitante ?? '')) ?: 'Sin solicitante',
-                'tiempo' => $movimiento->fecha?->diffForHumans() ?? 'Reciente',
-                '_fecha' => $movimiento->fecha?->timestamp ?? 0,
-            ];
-        };
-
-        $movimientosRecientes = collect()
-            ->concat(EntradaStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
-                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Entrada', 'fa-arrow-down', 'positive', 'numero_entrada')))
-            ->concat(SalidaStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
-                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Salida', 'fa-arrow-up', 'negative', 'numero_salida')))
-            ->concat(TrasladoStock::where('proyecto_id', $proyectoId)->latest('fecha')->limit(3)->get()
-                ->map(fn ($movimiento) => $normalizarMovimiento($movimiento, 'Transferencia', 'fa-exchange-alt', 'neutral', 'numero_traslado')))
-            ->sortByDesc('_fecha')
-            ->take(3)
-            ->map(function ($movimiento) {
-                unset($movimiento->_fecha);
-                return $movimiento;
-            })
-            ->values();
-
-        $inventarioPorAlmacen = (clone $baseQuery)
-            ->selectRaw('almacen, COUNT(*) as total_productos, SUM(stock_actual) as stock_total')
-            ->whereNotNull('almacen')
-            ->where('almacen', '<>', '')
-            ->groupBy('almacen')
+        $nivelCritico = InventarioVariante::query()
+            ->whereHas('articulo', fn ($q) => $q->where('proyecto_id', $proyectoId))
+            ->where('activo', true)
+            ->withSum('stockAlmacenes as stock_calculado', 'cantidad')
             ->get()
-            ->mapWithKeys(function ($item) {
-                $nombre = trim((string) ($item->almacen ?? ''));
+            ->filter(fn ($v) => (int) ($v->stock_calculado ?? 0) <= (int) ($v->nivel_critico ?? 0))
+            ->count();
 
-                return [
-                    $nombre => (object) [
-                        'total_productos' => (int) ($item->total_productos ?? 0),
-                        'stock_total' => (int) ($item->stock_total ?? 0),
-                    ],
+        $stockBajo = InventarioVariante::query()
+            ->whereHas('articulo', fn ($q) => $q->where('proyecto_id', $proyectoId))
+            ->where('activo', true)
+            ->withSum('stockAlmacenes as stock_calculado', 'cantidad')
+            ->get()
+            ->filter(fn ($v) => (int) ($v->stock_calculado ?? 0) <= (int) ($v->stock_minimo ?? 0))
+            ->count();
+
+        $movimientosRecientes = InventarioMovimiento::query()
+            ->where('proyecto_id', $proyectoId)
+            ->with(['lineas', 'almacenOrigen', 'almacenDestino'])
+            ->latest('created_at')
+            ->limit(3)
+            ->get()
+            ->map(function (InventarioMovimiento $mov) {
+                $uds = $mov->lineas->sum('cantidad');
+                $tipoNormalizado = strtolower((string) $mov->tipo);
+                $tipoEtiqueta = match ($tipoNormalizado) {
+                    'entrada' => 'Entrada',
+                    'salida' => 'Salida',
+                    'traslado' => 'Transferencia',
+                    default => ucfirst($tipoNormalizado),
+                };
+                $icono = match ($tipoNormalizado) {
+                    'entrada' => 'fa-arrow-down',
+                    'salida' => 'fa-arrow-up',
+                    'traslado' => 'fa-exchange-alt',
+                    default => 'fa-box',
+                };
+                $tono = match ($tipoNormalizado) {
+                    'entrada' => 'positive',
+                    'salida' => 'negative',
+                    default => 'neutral',
+                };
+
+                return (object) [
+                    'etiqueta' => $tipoEtiqueta,
+                    'icono' => $icono,
+                    'tono' => $tono,
+                    'titulo' => sprintf('%s: %s (%s uds.)', $tipoEtiqueta, $mov->numero_documento ?: '#' . $mov->id, number_format($uds, 0, ',', '.')),
+                    'subtitulo' => $mov->motivo ?: ($mov->observaciones ?: 'Sin referencia'),
+                    'tiempo' => $mov->created_at ? $mov->created_at->diffForHumans() : 'Reciente',
                 ];
             });
 
-        $ocupacionAlmacenes = $almacenesRegistrados
-            ->map(function (Almacen $almacenItem) use ($inventarioPorAlmacen, $totalProductos) {
-                $nombre = trim((string) $almacenItem->nombre);
-                $inventario = $inventarioPorAlmacen->get($nombre);
-                $total = (int) ($inventario->total_productos ?? 0);
+        $ocupacionAlmacenes = $almacenesRegistrados->map(function (Almacen $almacenItem) use ($stockTotal) {
+            $baseStockAlm = InventarioStockAlmacen::query()
+                ->where('almacen_id', $almacenItem->id)
+                ->whereHas('variante', fn ($q) => $q->where('activo', true));
 
-                return (object) [
-                    'nombre' => $nombre,
-                    'total_productos' => $total,
-                    'stock_total' => (int) ($inventario->stock_total ?? 0),
-                    'porcentaje' => $totalProductos > 0 && $total > 0
-                        ? max(5, (int) round(($total * 100) / $totalProductos))
-                        : 0,
-                ];
-            })
-            ->sortByDesc('total_productos')
-            ->values();
+            $totalProds = (clone $baseStockAlm)->where('cantidad', '>', 0)->count();
+            $stockSum = (int) (clone $baseStockAlm)->sum('cantidad');
 
-        // Include legacy warehouse names found in inventory that are not in almacenes table yet.
-        $nombresRegistrados = $almacenesRegistrados
-            ->map(fn (Almacen $almacenItem) => trim((string) $almacenItem->nombre))
-            ->filter()
-            ->values();
+            return (object) [
+                'id' => $almacenItem->id,
+                'nombre' => $almacenItem->nombre,
+                'total_productos' => $totalProds,
+                'stock_total' => $stockSum,
+                'porcentaje' => $stockTotal > 0 && $stockSum > 0
+                    ? max(5, (int) round(($stockSum * 100) / $stockTotal))
+                    : 0,
+            ];
+        })->sortByDesc('stock_total')->values();
 
-        $ocupacionLegacy = $inventarioPorAlmacen
-            ->reject(fn ($item, $nombre) => $nombresRegistrados->contains($nombre))
-            ->map(function ($inventario, $nombre) use ($totalProductos) {
-                $total = (int) ($inventario->total_productos ?? 0);
-
-                return (object) [
-                    'nombre' => $nombre,
-                    'total_productos' => $total,
-                    'stock_total' => (int) ($inventario->stock_total ?? 0),
-                    'porcentaje' => $totalProductos > 0 && $total > 0
-                        ? max(5, (int) round(($total * 100) / $totalProductos))
-                        : 0,
-                ];
-            })
-            ->sortByDesc('total_productos')
-            ->values();
-
-        $ocupacionAlmacenes = $ocupacionAlmacenes->concat($ocupacionLegacy)->values();
+        $almacenes = $almacenesRegistrados->count();
+        $almacen = $almacenId;
 
         return view('inventario.index', compact(
             'inventarios',
@@ -304,10 +294,12 @@ class InventarioController extends Controller
             'stockBajo',
             'stockTotal',
             'almacenes',
+            'almacenesRegistrados',
             'movimientosRecientes',
             'ocupacionAlmacenes',
             'descripcion',
             'claseId',
+            'almacenId',
             'almacen'
         ));
     }
@@ -316,67 +308,94 @@ class InventarioController extends Controller
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
 
-        $catalogo = Inventario::query()
+        $almacenes = Almacen::query()
             ->where('proyecto_id', $proyectoId)
-            ->orderBy('descripcion')
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo']);
+
+        $variantes = InventarioVariante::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->with(['articulo.clase'])
             ->orderBy('codigo')
-            ->limit(30)
-            ->get(['id', 'codigo', 'descripcion', 'nombre', 'almacen', 'stock_actual']);
+            ->get();
 
-        $proveedores = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->whereNotNull('referencia_proveedor')
-            ->where('referencia_proveedor', '<>', '')
-            ->orderBy('referencia_proveedor')
-            ->distinct()
-            ->pluck('referencia_proveedor')
-            ->values();
-
-        $clases = \App\Models\Clase::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('nombre')
-            ->pluck('nombre', 'id');
-
-        $almacenes = \App\Models\Almacen::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('nombre')
-            ->get(['id', 'nombre']);
-
-        $stockBase = (int) ($catalogo->first()?->stock_actual ?? 0);
-
-        return view('inventario.create', compact('catalogo', 'proveedores', 'clases', 'stockBase', 'almacenes'));
+        return view('inventario.create', compact('almacenes', 'variantes'));
     }
+
     public function createItem()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
         $varianteId = request()->query('variante_id');
 
-        $ultimaAccion = Inventario::query()
+        $ultimaAccion = InventarioVariante::query()
             ->where('proyecto_id', $proyectoId)
             ->orderByDesc('updated_at')
             ->first();
 
         $varianteBase = null;
         $valoresIniciales = [];
+        $variantesIniciales = [];
 
         if (!empty($varianteId)) {
-            $varianteBase = \App\Models\InventarioVariante::query()
+            $articulo = InventarioArticulo::query()
                 ->where('proyecto_id', $proyectoId)
-                ->with('items')
-                ->findOrFail($varianteId);
+                ->with(['variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')])
+                ->find($varianteId);
 
-            foreach ($varianteBase->items as $item) {
-                foreach (($item->atributos_variante ?? []) as $tipo => $valor) {
-                    $valores = is_array($valor) ? $valor : [$valor];
-                    foreach ($valores as $valorItem) {
-                        $valorItem = trim((string) $valorItem);
-                        if ($valorItem === '') {
-                            continue;
+            if (!$articulo) {
+                $varEncontrada = InventarioVariante::query()
+                    ->where('proyecto_id', $proyectoId)
+                    ->with(['articulo.variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')])
+                    ->find($varianteId);
+                $articulo = $varEncontrada?->articulo;
+            }
+
+            if ($articulo) {
+                $primeraVar = $articulo->variantes->first();
+                $primerAlmacen = $primeraVar?->stockAlmacenes?->first()?->almacen?->nombre
+                    ?? $primeraVar?->almacen;
+
+                $varianteBase = (object) [
+                    'id' => $articulo->id,
+                    'codigo' => $articulo->codigo,
+                    'nombre' => $articulo->nombre,
+                    'descripcion' => $articulo->descripcion,
+                    'referencia_proveedor' => $articulo->referencia_proveedor,
+                    'nombre_proveedor' => $articulo->nombre_proveedor,
+                    'clase_id' => $articulo->clase_id,
+                    'almacen' => $primerAlmacen,
+                    'stock_actual' => (int) ($primeraVar?->stockAlmacenes?->sum('cantidad') ?? 0),
+                    'stock_minimo' => $articulo->stock_minimo_global,
+                    'nivel_critico' => $articulo->nivel_critico_global,
+                    'tipos_atributos' => $articulo->tipos_atributos,
+                ];
+
+                foreach ($articulo->variantes as $varItem) {
+                    foreach (($varItem->atributos ?? []) as $tipo => $valor) {
+                        $valores = is_array($valor) ? $valor : [$valor];
+                        foreach ($valores as $valorItem) {
+                            $valorItem = trim((string) $valorItem);
+                            if ($valorItem === '') continue;
+                            $valoresIniciales[$tipo][] = $valorItem;
                         }
-
-                        $valoresIniciales[$tipo][] = $valorItem;
                     }
                 }
+
+                $variantesIniciales = $articulo->variantes->map(function ($v) {
+                    $primerStockAlm = $v->stockAlmacenes->first();
+                    return [
+                        'id' => $v->id,
+                        'sku' => $v->codigo,
+                        'almacen_id' => $primerStockAlm?->almacen?->nombre ?? $v->almacen,
+                        'atributos' => $v->atributos,
+                        'stock_actual' => (int) $v->stockAlmacenes->sum('cantidad'),
+                        'stock_minimo' => (int) ($v->stock_minimo ?? 10),
+                        'nivel_critico' => (int) ($v->nivel_critico ?? 5),
+                        'activo' => (bool) $v->activo,
+                    ];
+                })->values()->toArray();
             }
 
             foreach ($valoresIniciales as $tipo => $valores) {
@@ -384,26 +403,45 @@ class InventarioController extends Controller
             }
         }
 
-        $clases = \App\Models\Clase::query()
+        $clases = Clase::query()
             ->where('proyecto_id', $proyectoId)
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
-        
-        $almacenes = \App\Models\Almacen::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('nombre')
-            ->get(['id', 'nombre']);
 
-        return view('inventario.create-item', compact('ultimaAccion', 'clases', 'varianteBase', 'valoresIniciales', 'almacenes'));
+        $almacenes = Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo']);
+
+        return view('inventario.create-item', compact(
+            'ultimaAccion',
+            'clases',
+            'varianteBase',
+            'valoresIniciales',
+            'variantesIniciales',
+            'almacenes'
+        ));
     }
 
     public function createSalida()
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
-        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
-        $delegacionPrefill = Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '';
-        $solicitantePrefill = null;
         $personalId = (int) request()->query('personal_id', 0);
+
+        $almacenes = Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo']);
+
+    $variantesConStock = InventarioStockAlmacen::query()
+            ->whereHas('almacen', fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true))
+            ->whereHas('variante', fn ($q) => $q->where('activo', true))
+            ->where('cantidad', '>', 0)
+            ->with(['variante.articulo.clase', 'almacen'])
+            ->get();
+
         $trabajadoresQuery = Personal::query()
             ->where('activo', true)
             ->orderBy('name')
@@ -415,243 +453,131 @@ class InventarioController extends Controller
         }
 
         $trabajadores = $trabajadoresQuery->get([
-            'id', 'name', 'apellido', 'id_rrhh', 'puesto', 'camiseta', 'sudadera',
+            'id', 'name', 'apellido', 'dni_nie', 'id_rrhh', 'puesto', 'camiseta', 'sudadera',
             'chaqueta', 'pantalon', 'calzado', 'casco', 'guantes', 'gafas', 'bolsa_fod', 'sin_tallas',
         ]);
 
+        $solicitantePrefill = null;
         if ($personalId > 0) {
-            $persona = Personal::query()->find($personalId);
+            $persona = Personal::find($personalId);
             if ($persona) {
-                $solicitantePrefill = trim((string) $persona->name . ' ' . (string) $persona->apellido);
+                $solicitantePrefill = trim("{$persona->name} {$persona->apellido}");
             }
         }
 
-        if (!$solicitantePrefill) {
-            $querySolicitante = trim((string) request()->query('solicitante', ''));
-            $solicitantePrefill = $querySolicitante !== '' ? $querySolicitante : null;
-        }
-
-        $catalogo = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('descripcion')
-            ->orderBy('codigo')
-            ->get(['id', 'codigo', 'descripcion', 'almacen', 'stock_actual']);
-
-        $salidasRecientes = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->where('stock_actual', '>', 0)
-            ->orderByDesc('updated_at')
-            ->limit(2)
-            ->get(['codigo', 'descripcion', 'updated_at', 'stock_actual']);
-
-        $solicitantes = Personal::query()
-            ->orderBy('name')
-            ->orderBy('apellido')
-            ->get(['name', 'apellido'])
-            ->map(function (Personal $persona) {
-                return trim((string) $persona->name . ' ' . (string) $persona->apellido);
-            })
-            ->filter()
-            ->unique()
-            ->values();
-
         return view('inventario.salida', compact(
-            'catalogo', 'salidasRecientes', 'solicitantes', 'solicitantePrefill',
-            'delegacionPrefill', 'centrosCoste', 'trabajadores', 'personalId'
+            'almacenes',
+            'variantesConStock',
+            'trabajadores',
+            'solicitantePrefill',
+            'personalId'
         ));
+    }
+
+    public function createTraslado()
+    {
+        $proyectoId = $this->resolveActiveProyectoId(request());
+
+        $almacenes = Almacen::query()
+            ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo']);
+
+        $stocks = InventarioStockAlmacen::query()
+            ->whereHas('almacen', fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true))
+            ->where('cantidad', '>', 0)
+            ->with(['variante.articulo', 'almacen'])
+            ->get();
+
+        $transaccionId = 'TRF-' . now()->format('Ymd-His');
+
+        return view('inventario.traslado', compact('almacenes', 'stocks', 'transaccionId'));
     }
 
     public function storeSalida(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId($request);
-
-        $validated = $request->validate([
-            'producto_busqueda' => 'nullable|string|max:1000',
-            'codigo' => 'nullable|string|max:255',
-            'items' => 'nullable|array',
-            'items.*.inventario_id' => 'nullable|integer',
-            'items.*.producto_busqueda' => 'nullable|string|max:1000',
-            'items.*.cantidad' => 'nullable|integer|min:1',
-            'ot' => 'nullable|string|max:255',
-            'solicitante' => 'nullable|string|max:255',
-            'personal_id' => 'nullable|integer|exists:personal,id',
-            'pdf_delegacion' => 'nullable|string|max:255',
-            'pdf_fecha' => 'nullable|string|max:30',
-            'pdf_trabajador' => 'nullable|string|max:255',
-            'pdf_ficha' => 'nullable|string|max:255',
-            'pdf_observaciones' => 'nullable|string|max:2000',
-        ]);
-
-        $personalId = (int) ($validated['personal_id'] ?? 0);
-        $solicitanteNombre = trim((string) ($validated['solicitante'] ?? ''));
-        $persona = $personalId > 0 ? Personal::find($personalId) : null;
-
-        if ($persona) {
-            $solicitanteNombre = trim((string) $persona->name . ' ' . (string) $persona->apellido);
-        } elseif ($solicitanteNombre !== '') {
-            $normalizado = mb_strtolower(preg_replace('/\s+/', ' ', $solicitanteNombre));
-            $persona = Personal::query()
-                ->get(['id', 'name', 'apellido'])
-                ->first(function (Personal $trabajador) use ($normalizado) {
-                    return mb_strtolower(trim(preg_replace('/\s+/', ' ', $trabajador->name . ' ' . $trabajador->apellido))) === $normalizado;
-                });
-            $personalId = (int) ($persona?->id ?? 0);
-            if ($persona) {
-                $solicitanteNombre = trim((string) $persona->name . ' ' . (string) $persona->apellido);
-            }
-        }
-
-        $itemsToProcess = [];
-
-        if (!empty($validated['items']) && is_array($validated['items'])) {
-            foreach ($validated['items'] as $it) {
-                $busqueda = trim((string) ($it['producto_busqueda'] ?? ''));
-                $cantidad = isset($it['cantidad']) ? (int) $it['cantidad'] : 0;
-                if ($busqueda !== '' && $cantidad > 0) {
-                    $itemsToProcess[] = ['busqueda' => $busqueda, 'cantidad' => $cantidad];
-                }
-            }
-        }
-
-        if (empty($itemsToProcess)) {
-            return back()->withInput()->withErrors(['producto_busqueda' => 'No se especificaron items para la salida.']);
-        }
-
-        $numeroSalida = 'SL-' . now()->format('Ymd-His-u');
-        $lineasDocumento = array_map(function ($it) {
-            return ['articulo' => $it['busqueda'], 'cantidad' => $it['cantidad']];
-        }, $itemsToProcess);
-
-        $documentoMeta = [
-            'nombre' => 'EPI_' . $numeroSalida . '.pdf',
-            'delegacion' => trim((string) $request->input('pdf_delegacion', Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '')),
-            'fecha' => trim((string) $request->input('pdf_fecha', now()->format('d/m/Y'))),
-            'trabajador' => trim((string) $request->input('pdf_trabajador', $validated['solicitante'] ?? '')),
-            'ficha' => trim((string) $request->input('pdf_ficha', '')),
-            'observaciones' => trim((string) $request->input('pdf_observaciones', '')),
-            'lineas' => $lineasDocumento,
-        ];
-
-        $documentoMeta = array_filter($documentoMeta, function ($value, $key) {
-            if ($key === 'lineas') {
-                return !empty($value);
-            }
-
-            return $value !== '' && $value !== null;
-        }, ARRAY_FILTER_USE_BOTH);
-
-        $guardarDocumento = $request->boolean('guardar_documento');
-        $documentoMeta = $guardarDocumento ? $documentoMeta : null;
-
-        // Resolve products existence (prefer inventario_id when provided) but defer stock validation to transactional lock
-        $resolved = [];
-        foreach ($itemsToProcess as $it) {
-            $busqueda = $it['busqueda'];
-            $inventarioId = isset($it['inventario_id']) ? (int) $it['inventario_id'] : null;
-            $codigo = trim((string) ($it['codigo'] ?? ''));
-
-            $producto = null;
-            if ($inventarioId && $inventarioId > 0) {
-                $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $inventarioId)->first();
-            }
-
-            if (!$producto && $codigo !== '') {
-                $producto = Inventario::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where('codigo', $codigo)
-                    ->first();
-            }
-
-            if (!$producto) {
-                $producto = Inventario::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->where(function ($query) use ($busqueda) {
-                        $query->where('descripcion', $busqueda)
-                            ->orWhere('codigo', $busqueda);
-                    })
-                    ->first();
-            }
-
-            if (!$producto) {
-                return back()->withInput()->withErrors(['producto_busqueda' => "No se encontró el item: {$busqueda}"]);
-            }
-
-            $resolved[] = ['producto' => $producto, 'cantidad' => (int) $it['cantidad']];
-        }
-
-        $seenIds = [];
-        foreach ($resolved as $r) {
-            $id = (int) $r['producto']->id;
-            if (isset($seenIds[$id])) {
-                return back()->withInput()->withErrors(['items' => 'No puedes añadir dos veces el mismo producto.']);
-            }
-            $seenIds[$id] = true;
-        }
-
-        $salida = null;
-
-        try {
-            DB::transaction(function () use ($proyectoId, $resolved, $validated, $numeroSalida, $documentoMeta, $personalId, $solicitanteNombre, &$salida) {
-                $itemsForSalida = [];
-
-                foreach ($resolved as $entry) {
-                    $id = (int) $entry['producto']->id;
-                    // lock the row for update
-                    $producto = Inventario::query()->where('proyecto_id', $proyectoId)->where('id', $id)->lockForUpdate()->first();
-                    $cantidad = (int) $entry['cantidad'];
-
-                    if (!$producto) {
-                        throw new \RuntimeException("No se encontró el item con id {$id} durante la transacción.");
-                    }
-
-                    if ((int) $producto->stock_actual < $cantidad) {
-                        throw new \RuntimeException("Stock insuficiente para {$producto->codigo} ({$producto->descripcion})");
-                    }
-
-                    $producto->stock_actual = (int) $producto->stock_actual - $cantidad;
-                    $producto->save();
-
-                    $itemsForSalida[] = [
-                        'inventario_id' => (int) $producto->id,
-                        'codigo' => (string) $producto->codigo,
-                        'descripcion' => (string) $producto->descripcion,
-                        'cantidad' => (int) $cantidad,
-                        'almacen_origen' => (string) $producto->almacen,
-                        'almacen_actual' => (string) ($producto->almacen ?? ''),
-                    ];
-                }
-
-                $salida = SalidaStock::create([
-                    'proyecto_id' => $proyectoId,
-                    'numero_salida' => $numeroSalida,
-                    'fecha' => now(),
-                    'personal_id' => $personalId > 0 ? $personalId : null,
-                    'solicitante' => $solicitanteNombre !== '' ? $solicitanteNombre : null,
-                    'ot' => $validated['ot'] ?? null,
-                    'almacen_origen' => count($itemsForSalida) === 1 ? $itemsForSalida[0]['almacen_origen'] : 'Varios',
-                    'items' => $itemsForSalida,
-                    'documento_meta' => !empty($documentoMeta) ? $documentoMeta : null,
-                    'estado' => 'aceptado',
-                ]);
-            });
-        } catch (\RuntimeException $ex) {
-            return back()->withInput()->withErrors(['items' => $ex->getMessage()]);
-        }
-
-        if ($guardarDocumento && $salida) {
-            return redirect()->route('inventario.salida.documento', $salida)->with('success', 'Salida registrada y documento guardado correctamente.');
-        }
-
-        return redirect()->route('inventario.index')->with('success', 'Salida de stock registrada correctamente.');
+        return app(InventarioMovimientoController::class)->storeSalida($request);
     }
 
-    public function showSalidaDocumento(SalidaStock $salida)
+    public function storeEntrada(Request $request)
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        return app(InventarioMovimientoController::class)->storeEntrada($request);
+    }
 
-        if ((int) $salida->proyecto_id !== $proyectoId) {
-            abort(404);
+    public function storeTraslado(Request $request)
+    {
+        return app(InventarioMovimientoController::class)->storeTraslado($request);
+    }
+
+    /**
+     * Soporta tanto un ID de InventarioMovimiento (Kardex nuevo) como un SalidaStock (Legacy)
+     */
+    public function showSalidaDocumento(Request $request, $id)
+    {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        // 1. Buscar primero en el nuevo motor de Kardex (InventarioMovimiento)
+        $movimiento = \App\Models\InventarioMovimiento::with(['lineas.variante.articulo', 'personal', 'almacenOrigen'])
+            ->where('proyecto_id', $proyectoId)
+            ->where('tipo', 'SALIDA')
+            ->find($id);
+
+        if ($movimiento) {
+            $nombreTrabajador = $movimiento->personal
+                ? trim($movimiento->personal->name . ' ' . $movimiento->personal->apellido)
+                : ($movimiento->observaciones ?: 'Sin asignar');
+
+            $salida = (object) [
+                'id' => $movimiento->id,
+                'numero_salida' => $movimiento->numero_documento,
+                'fecha' => $movimiento->created_at,
+                'solicitante' => $nombreTrabajador,
+            ];
+
+            $documento = [
+                'delegacion' => $movimiento->almacenOrigen?->nombre ?? 'Cádiz',
+                'fecha' => $movimiento->created_at?->format('d/m/Y') ?? now()->format('d/m/Y'),
+                'trabajador' => $nombreTrabajador,
+                'ficha' => $movimiento->personal?->id_rrhh ?? ($movimiento->personal?->dni_nie ?? ''),
+                'observaciones' => $movimiento->observaciones ?? '',
+            ];
+
+            $lineasDocumento = $movimiento->lineas->map(function ($linea) {
+                $variante = $linea->variante;
+                $articulo = $variante?->articulo;
+                $sku = $variante?->sku ?? $variante?->codigo ?? '';
+
+                $atributos = collect($variante?->atributos ?? [])
+                    ->map(fn ($v, $k) => ucfirst($k) . ': ' . (is_array($v) ? implode(', ', $v) : $v))
+                    ->implode(' · ');
+
+                // Usamos el nombre del artículo padre para no duplicar los atributos que ya vienen en $variante->nombre
+                $nombreBase = $articulo?->nombre ?: ($variante?->nombre ?: ($articulo?->descripcion ?: 'Artículo'));
+                $textoArticulo = $atributos ? "{$nombreBase} ({$atributos})" : $nombreBase;
+
+                if ($sku !== '') {
+                    $textoArticulo = "[{$sku}] " . $textoArticulo;
+                }
+
+                return [
+                    'articulo' => $textoArticulo,
+                    'cantidad' => (string) $linea->cantidad,
+                ];
+            })->values()->all();    
+
+            return view('inventario.salida-documento', [
+                'salida' => $salida,
+                'documento' => $documento,
+                'lineasDocumento' => $lineasDocumento,
+                'delegacionPrefill' => 'Cádiz',
+            ]);
         }
+
+        // 2. Fallback a SalidaStock legacy si era un registro antiguo
+        $salida = SalidaStock::query()
+            ->where('proyecto_id', $proyectoId)
+            ->findOrFail($id);
 
         $documento = (array) ($salida->documento_meta ?? []);
         $lineasDocumento = $documento['lineas'] ?? [];
@@ -660,196 +586,17 @@ class InventarioController extends Controller
         if (empty($lineasDocumento) && is_array($salida->items)) {
             $lineasDocumento = collect($salida->items)
                 ->filter(fn ($item) => is_array($item))
-                ->map(function (array $item) {
-                    return [
-                        'articulo' => $item['descripcion'] ?? $item['codigo'] ?? 'Item',
-                        'cantidad' => (string) ($item['cantidad'] ?? ''),
-                    ];
-                })
+                ->map(fn (array $item) => [
+                    'articulo' => $item['descripcion'] ?? $item['codigo'] ?? 'Item',
+                    'cantidad' => (string) ($item['cantidad'] ?? ''),
+                ])
                 ->values()
                 ->all();
         }
 
         $lineasDocumento = array_slice($lineasDocumento, 0, 10);
 
-        return view('inventario.salida-documento', [
-            'salida' => $salida,
-            'documento' => $documento,
-            'lineasDocumento' => $lineasDocumento,
-            'delegacionPrefill' => $delegacionPrefill,
-        ]);
-    }
-
-    public function createTraslado()
-    {
-        $proyectoId = $this->resolveActiveProyectoId(request());
-        $centrosCoste = \App\Models\CentroCoste::orderBy('codigo')->get();
-
-        $catalogo = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->orderBy('descripcion')
-            ->orderBy('codigo')
-            ->get(['id', 'codigo', 'descripcion', 'referencia_proveedor', 'almacen', 'stock_actual']);
-
-        $destinos = Inventario::query()
-            ->where('proyecto_id', $proyectoId)
-            ->whereNotNull('almacen')
-            ->where('almacen', '<>', '')
-            ->orderBy('almacen')
-            ->distinct()
-            ->pluck('almacen')
-            ->values();
-
-        $transaccionId = 'TRF-' . now()->format('Ymd-His');
-
-        return view('inventario.traslado', compact('catalogo', 'destinos', 'transaccionId', 'centrosCoste'));
-    }
-
-    public function storeTraslado(Request $request)
-    {
-        $proyectoId = $this->resolveActiveProyectoId($request);
-
-        $validated = $request->validate([
-            'destino_global' => 'required|string|max:255',
-            'ot' => 'nullable|string|max:255',
-            'solicitante' => 'nullable|string|max:255',
-            'item_ids' => 'required|array|min:1',
-            'item_ids.*' => 'required|integer',
-            'cantidades' => 'required|array|min:1',
-            'cantidades.*' => 'required|integer|min:1',
-        ]);
-
-        $itemIds = collect($validated['item_ids'])->map(fn ($value) => (int) $value)->values();
-        $cantidades = collect($validated['cantidades'])->map(fn ($value) => (int) $value)->values();
-        $destinoGlobal = trim((string) $validated['destino_global']);
-        $itemsMovimiento = [];
-        $almacenesOrigen = [];
-
-        DB::transaction(function () use ($proyectoId, $validated, $itemIds, $cantidades, $destinoGlobal, &$itemsMovimiento, &$almacenesOrigen) {
-            foreach ($itemIds as $index => $itemId) {
-                $cantidad = (int) ($cantidades[$index] ?? 0);
-                $productoOrigen = Inventario::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->lockForUpdate()
-                    ->find($itemId);
-
-                if (!$productoOrigen || $cantidad < 1) {
-                    throw new \RuntimeException('Se detectaron cantidades invalidas en el traslado.');
-                }
-
-                $stockOrigen = (int) $productoOrigen->stock_actual;
-                if ($cantidad > $stockOrigen) {
-                    throw new \RuntimeException('La cantidad a trasladar no puede superar el stock disponible.');
-                }
-
-                $almacenOrigenItem = trim((string) ($productoOrigen->almacen ?? ''));
-                if ($almacenOrigenItem !== '' && mb_strtolower($almacenOrigenItem) === mb_strtolower($destinoGlobal)) {
-                    throw new \RuntimeException('El almacén de destino debe ser distinto al almacén de origen.');
-                }
-                if ($almacenOrigenItem !== '') {
-                    $almacenesOrigen[] = $almacenOrigenItem;
-                }
-
-                $productoDestino = $this->findStockInAlmacen($productoOrigen, $destinoGlobal);
-                if ($productoDestino) {
-                    $productoOrigen->stock_actual = $stockOrigen - $cantidad;
-                    $productoOrigen->save();
-                    $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
-                    $productoDestino->save();
-                } elseif ($cantidad === $stockOrigen) {
-                    $productoOrigen->almacen = $destinoGlobal;
-                    $productoOrigen->save();
-                    $productoDestino = $productoOrigen;
-                } else {
-                    $productoOrigen->stock_actual = $stockOrigen - $cantidad;
-                    $productoOrigen->save();
-                    $productoDestino = $this->resolveOrCreateStockInAlmacen($productoOrigen, $destinoGlobal);
-                    $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
-                    $productoDestino->save();
-                }
-
-                $itemsMovimiento[] = [
-                    'inventario_id' => (int) $productoOrigen->id,
-                    'inventario_destino_id' => (int) $productoDestino->id,
-                    'codigo' => (string) $productoOrigen->codigo,
-                    'descripcion' => (string) $productoOrigen->descripcion,
-                    'cantidad' => $cantidad,
-                    'almacen_origen' => $almacenOrigenItem,
-                    'almacen_actual' => $destinoGlobal,
-                ];
-            }
-
-            TrasladoStock::create([
-                'proyecto_id' => $proyectoId,
-                'numero_traslado' => 'TR-' . now()->format('Ymd-His-u'),
-                'fecha' => now(),
-                'solicitante' => $validated['solicitante'] ?? null,
-                'ot' => $validated['ot'] ?? null,
-                'almacen_origen' => count(array_unique($almacenesOrigen)) === 1 ? $almacenesOrigen[0] : 'Varios',
-                'almacen_actual' => $destinoGlobal,
-                'items' => $itemsMovimiento,
-                'estado' => 'aceptado',
-            ]);
-        });
-
-        return redirect()
-            ->route('inventario.index')
-            ->with('success', 'Traslado de lote registrado correctamente.');
-    }
-
-    public function storeEntrada(Request $request)
-    {
-        $proyectoId = $this->resolveActiveProyectoId($request);
-
-        // 1. Validamos que nos llegue el array de items y los datos de logística
-        $validated = $request->validate([
-            'almacen_global' => 'required|string|max:255',
-            'solicitante' => 'required|string|max:255',
-            'items' => 'required|array|min:1',
-            'items.*.inventario_id' => 'required|integer|exists:inventario,id',
-            'items.*.cantidad' => 'required|integer|min:1',
-        ]);
-
-        DB::transaction(function () use ($proyectoId, $validated) {
-            $itemsForEntrada = [];
-
-            // 2. Procesamos cada artículo del "carrito"
-            foreach ($validated['items'] as $itemData) {
-                // Buscamos el artículo y bloqueamos la fila para evitar errores de concurrencia
-                $productoSeleccionado = Inventario::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->lockForUpdate()
-                    ->findOrFail($itemData['inventario_id']);
-
-                $cantidad = (int) $itemData['cantidad'];
-                $productoDestino = $this->resolveOrCreateStockInAlmacen($productoSeleccionado, $validated['almacen_global']);
-                $productoDestino->stock_actual = (int) $productoDestino->stock_actual + $cantidad;
-                $productoDestino->save();
-
-                // Preparamos el array de historial para guardarlo en EntradaStock
-                $itemsForEntrada[] = [
-                    'inventario_id' => (int) $productoDestino->id,
-                    'codigo' => (string) $producto->codigo,
-                    'descripcion' => (string) $producto->descripcion,
-                    'cantidad' => $cantidad,
-                ];
-            }
-
-            // 3. Registramos la acción global en el historial
-            EntradaStock::create([
-                'proyecto_id' => $proyectoId,
-                'numero_entrada' => 'EN-' . now()->format('Ymd-His-u'),
-                'fecha' => now(),
-                'solicitante' => $validated['solicitante'],
-                'almacen_origen' => $validated['almacen_global'], 
-                'items' => $itemsForEntrada,
-                'estado' => 'aceptado',
-            ]);
-        });
-
-        return redirect()
-            ->route('inventario.index')
-            ->with('success', 'Entrada múltiple de stock registrada correctamente.');
+        return view('inventario.salida-documento', compact('salida', 'documento', 'lineasDocumento', 'delegacionPrefill'));
     }
 
     public function store(Request $request)
@@ -875,168 +622,338 @@ class InventarioController extends Controller
             'variantes.*.stock_actual' => 'nullable|integer|min:0|max:999999',
             'variantes.*.atributos' => 'nullable|array',
             'variantes.*.atributos.*' => 'nullable|string|max:255',
-            'inventario_variante_id' => 'nullable|integer|exists:inventario_variantes,id',
-            'items.*.cantidad' => 'required|integer|min:1|max:99999',
+            'inventario_variante_id' => 'nullable|integer',
+            'variantes.*.sku' => 'nullable|string|max:255',
+            'variantes.*.almacen_id' => 'nullable|string|max:255',
+            'variantes.*.stock_minimo' => 'nullable|integer|min:0',
+            'variantes.*.nivel_critico' => 'nullable|integer|min:0',
+            'nombre_proveedor' => 'nullable|string|max:255'
         ]);
 
-        $validated['proyecto_id'] = $proyectoId;
+        $nombreBase = trim((string) ($validated['nombre'] ?? ''));
+        $descripcionBase = trim((string) ($validated['descripcion'] ?? ''));
 
-        if (!empty($validated['nombre'])) {
-            $validated['descripcion'] = $validated['nombre'];
-        }
+        if ($descripcionBase === '' && $nombreBase !== '') $descripcionBase = $nombreBase;
+        if ($nombreBase === '' && $descripcionBase !== '') $nombreBase = $descripcionBase;
+
+        $validated['nombre'] = $nombreBase !== '' ? $nombreBase : $validated['codigo'];
+        $validated['descripcion'] = $descripcionBase !== '' ? $descripcionBase : $validated['nombre'];
 
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
-        $variantes = $this->normalizeVariantRows($validated['variantes'] ?? null);
-        $variante = null;
+        $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null, true);
 
-        if (!empty($validated['inventario_variante_id'])) {
-            $variante = \App\Models\InventarioVariante::query()
+        // Resolver almacén físico donde depositar el stock inicial
+        $almacenModel = null;
+        if (!empty($validated['almacen'])) {
+            $almacenModel = Almacen::query()
                 ->where('proyecto_id', $proyectoId)
-                ->findOrFail((int) $validated['inventario_variante_id']);
-        } else {
-            $variante = \App\Models\InventarioVariante::firstOrCreate(
+                ->where(function ($q) use ($validated) {
+                    $q->where('nombre', $validated['almacen'])
+                      ->orWhere('id', is_numeric($validated['almacen']) ? (int) $validated['almacen'] : 0);
+                })
+                ->first();
+        }
+        if (!$almacenModel) {
+            $almacenModel = Almacen::query()->where('proyecto_id', $proyectoId)->orderBy('id')->first();
+        }
+
+        DB::transaction(function () use ($proyectoId, $validated, $tiposAtributos, $atributosVariante, $variantesRows, $almacenModel) {
+            // 1. Crear o actualizar el Artículo Maestro
+            $articulo = InventarioArticulo::updateOrCreate(
+                ['proyecto_id' => $proyectoId, 'codigo' => $validated['codigo']],
                 [
-                    'proyecto_id' => $proyectoId,
-                    'codigo' => $validated['codigo'],
-                ],
-                [
-                    'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
-                    'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? null,
-                    'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                    'clase_id' => $validated['clase_id'] ?? null, // Blindado
-                    'almacen' => $validated['almacen'] ?? null, // Blindado
-                    'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                    'nivel_critico' => $validated['nivel_critico'] ?? 0,
+                    'nombre' => $validated['nombre'],
+                    'descripcion' => $validated['descripcion'],
+                    'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                    'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                    'clase_id' => $validated['clase_id'] ?? null,
+                    'tiene_variantes' => !empty($variantesRows),
                     'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                    'stock_minimo_global' => (int) ($validated['stock_minimo'] ?? 0),
+                    'nivel_critico_global' => (int) ($validated['nivel_critico'] ?? 0),
+                    'activo' => true,
                 ]
             );
-        }
 
-        $claseIdParaItems = !empty($validated['inventario_variante_id'])
-            ? $variante->clase_id
-            : ($validated['clase_id'] ?? null);
+            // 2. Si tiene múltiples variantes en la rejilla
+            if (!empty($variantesRows)) {
+                $existingVariantes = $articulo->variantes()->with('stockAlmacenes')->get()->keyBy('id');
+                $processedVariantIds = [];
+                $activeNewVariants = collect();
 
-        $variante->update([
-            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? $variante->nombre,
-            'descripcion' => $validated['descripcion'] ?? $validated['nombre'] ?? $variante->descripcion,
-            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-            'clase_id' => !empty($validated['inventario_variante_id'])
-                ? $variante->clase_id
-                : ($validated['clase_id'] ?? null), // Blindado
-            'almacen' => $validated['almacen'] ?? null, // Blindado
-            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-            'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : $variante->tipos_atributos,
-        ]);
-
-        if (!empty($variantes)) {
-            $existingItems = $variante->items()->get();
-
-            DB::transaction(function () use ($proyectoId, $validated, $variante, $variantes, $tiposAtributos, $claseIdParaItems, $existingItems) {
-                foreach ($variantes as $index => $varianteRow) {
+                foreach ($variantesRows as $index => $varianteRow) {
                     $atributos = $varianteRow['atributos'];
-                    $stockActual = (int) $varianteRow['stock_actual'];
+                    $activo = (bool) ($varianteRow['activo'] ?? true);
+                    $rowId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
 
-                    $existingItem = $existingItems->first(function ($item) use ($atributos) {
-                        return json_encode($item->atributos_variante) === json_encode($atributos);
-                    });
+                    // Reutilizar ID solo si la variante conserva exactamente los mismos atributos dimensionales
+                    $existingVar = null;
+                    if ($rowId && $existingVariantes->has($rowId)) {
+                        $candidate = $existingVariantes->get($rowId);
+                        if ($this->sameVariantAttributes($candidate->atributos ?? [], $atributos)) {
+                            $existingVar = $candidate;
+                        }
+                    }
+                    if (!$existingVar) {
+                        $existingVar = $existingVariantes->first(
+                            fn ($v) => $this->sameVariantAttributes($v->atributos ?? [], $atributos)
+                        );
+                    }
 
-                    if ($existingItem) {
-                        $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingItem->id);
-                        $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
+                    if (!$activo) {
+                        if ($existingVar) {
+                            $existingVar->update(['activo' => false]);
+                            $processedVariantIds[] = $existingVar->id;
+                        }
+                        continue;
+                    }
 
-                        $existingItem->update([
+                    $stockActual = isset($varianteRow['stock_actual']) ? (int) $varianteRow['stock_actual'] : 0;
+                    $minFila = isset($varianteRow['stock_minimo']) ? (int) $varianteRow['stock_minimo'] : (int) ($validated['stock_minimo'] ?? 10);
+                    $critFila = isset($varianteRow['nivel_critico']) ? (int) $varianteRow['nivel_critico'] : (int) ($validated['nivel_critico'] ?? 5);
+
+                    $codigoItem = !empty($varianteRow['sku'])
+                        ? $varianteRow['sku']
+                        : $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingVar?->id);
+
+                    $descripcionItem = $this->buildVariantDescription($validated['descripcion'], $atributos);
+
+                    $almacenFila = $almacenModel;
+                    if (!empty($varianteRow['almacen_id'])) {
+                        $encontradoAlm = Almacen::where('proyecto_id', $proyectoId)
+                            ->where(fn ($q) => $q->where('nombre', $varianteRow['almacen_id'])->orWhere('id', (int) $varianteRow['almacen_id']))
+                            ->first();
+                        if ($encontradoAlm) {
+                            $almacenFila = $encontradoAlm;
+                        }
+                    }
+
+                    if ($existingVar) {
+                        $existingVar->update([
                             'codigo' => $codigoItem,
-                            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                            'nombre' => $descripcionItem,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                            'clase_id' => $claseIdParaItems,
-                            'almacen' => $validated['almacen'] ?? null, // Blindado
-                            'stock_actual' => $stockActual,
-                            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-                            'atributos_variante' => $atributos,
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                            'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                            'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                            'almacen' => $almacenFila?->nombre ?? $existingVar->almacen,
+                            'stock_minimo' => $minFila,
+                            'nivel_critico' => $critFila,
+                            'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                            'atributos' => $atributos,
+                            'activo' => true,
                         ]);
+                        $targetVar = $existingVar;
                     } else {
-                        $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index);
-                        $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
-
-                        Inventario::create([
+                        $targetVar = InventarioVariante::create([
+                            'articulo_id' => $articulo->id,
                             'proyecto_id' => $proyectoId,
-                            'inventario_variante_id' => $variante->id,
                             'codigo' => $codigoItem,
-                            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                            'nombre' => $descripcionItem,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                            'clase_id' => $claseIdParaItems,
-                            'almacen' => $validated['almacen'] ?? null, // Blindado
-                            'stock_actual' => $stockActual,
-                            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-                            'atributos_variante' => $atributos,
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                            'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                            'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                            'almacen' => $almacenFila?->nombre ?? null,
+                            'stock_minimo' => $minFila,
+                            'nivel_critico' => $critFila,
+                            'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                            'atributos' => $atributos,
+                            'activo' => true,
                         ]);
                     }
+
+                    if ($almacenFila) {
+                        InventarioStockAlmacen::updateOrCreate(
+                            ['variante_id' => $targetVar->id, 'almacen_id' => $almacenFila->id],
+                            ['cantidad' => $stockActual]
+                        );
+                    }
+
+                    $processedVariantIds[] = $targetVar->id;
+                    $activeNewVariants->push($targetVar);
                 }
-            });
 
-            return redirect()->route('inventario.index')->with('success', 'Variantes guardadas correctamente');
-        }
+                // Sincronizar y depurar variantes antiguas/desfasadas que ya no pertenecen a la matriz
+                $this->depurarVariantesDesfasadas($existingVariantes, $processedVariantIds, $activeNewVariants);
+            } else {
+                // 3. Producto simple sin matriz de variantes (1 Artículo = 1 Variante base)
+                $stockInicial = (int) ($validated['stock_actual'] ?? 0);
 
-        $codigoItem = $validated['codigo'];
+                $varModel = InventarioVariante::updateOrCreate(
+                    [
+                        'proyecto_id' => $proyectoId,
+                        'codigo' => $validated['codigo'],
+                    ],
+                    [
+                        'articulo_id' => $articulo->id,
+                        'nombre' => $validated['nombre'],
+                        'descripcion' => $validated['descripcion'],
+                        'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                        'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                        'clase_id' => $validated['clase_id'] ?? null,
+                        'almacen' => $almacenModel?->nombre ?? ($validated['almacen'] ?? null),
+                        'stock_minimo' => (int) ($validated['stock_minimo'] ?? 0),
+                        'nivel_critico' => (int) ($validated['nivel_critico'] ?? 0),
+                        'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                        'atributos' => !empty($atributosVariante) ? $atributosVariante : null,
+                        'activo' => true,
+                    ]
+                );
 
-        Inventario::create([
-            'proyecto_id' => $proyectoId,
-            'inventario_variante_id' => $variante->id,
-            'codigo' => $codigoItem,
-            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
-            'descripcion' => $validated['descripcion'],
-            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-            'clase_id' => $claseIdParaItems,
-            'almacen' => $validated['almacen'] ?? null, // Blindado
-            'stock_actual' => (int) ($validated['stock_actual'] ?? 0),
-            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-            'atributos_variante' => !empty($atributosVariante) ? $atributosVariante : null,
-        ]);
+                if ($almacenModel) {
+                    InventarioStockAlmacen::updateOrCreate(
+                        ['variante_id' => $varModel->id, 'almacen_id' => $almacenModel->id],
+                        ['cantidad' => $stockInicial]
+                    );
+                }
+            }
+        });
 
-        return redirect()->route('inventario.index')->with('success', 'Producto con variante creado correctamente');
+        return redirect()->route('inventario.index')->with('success', 'Producto y existencias guardados correctamente en el catálogo.');
     }
 
-    public function show(Inventario $inventario)
+    /**
+     * Resuelve el ítem tanto si $id es de InventarioVariante, InventarioArticulo o Inventario legacy
+     */
+    public function show($id)
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
 
-        if ((int) $inventario->proyecto_id !== $proyectoId) {
-            abort(404);
+        $variante = InventarioVariante::with(['articulo.clase', 'stockAlmacenes.almacen'])
+            ->where('proyecto_id', $proyectoId)
+            ->find($id);
+
+        if (!$variante) {
+            $articulo = InventarioArticulo::with(['clase', 'variantes.stockAlmacenes.almacen'])
+                ->where('proyecto_id', $proyectoId)
+                ->find($id);
+            $variante = $articulo?->variantes->first();
         }
 
+        if ($variante) {
+            $stockTotal = (int) $variante->stockAlmacenes->sum('cantidad');
+            $almacenesStr = $variante->stockAlmacenes
+                ->where('cantidad', '>', 0)
+                ->map(fn ($sa) => $sa->almacen?->nombre . ' (' . $sa->cantidad . ')')
+                ->join(', ');
+
+            $inventario = (object) [
+                'id' => $variante->id,
+                'proyecto_id' => $variante->proyecto_id,
+                'codigo' => $variante->codigo,
+                'nombre' => $variante->nombre ?: $variante->articulo?->nombre,
+                'descripcion' => $variante->descripcion ?: $variante->articulo?->descripcion,
+                'referencia_proveedor' => $variante->referencia_proveedor ?: $variante->articulo?->referencia_proveedor,
+                'nombre_proveedor' => $variante->nombre_proveedor ?: $variante->articulo?->nombre_proveedor,
+                'clase_id' => $variante->clase_id ?: $variante->articulo?->clase_id,
+                'claseRelacion' => $variante->articulo?->clase ?? $variante->claseRelacion,
+                'almacen' => $almacenesStr ?: ($variante->almacen ?: 'Sin existencias'),
+                'stock_actual' => $stockTotal,
+                'stock_minimo' => $variante->stock_minimo ?? $variante->articulo?->stock_minimo_global ?? 0,
+                'nivel_critico' => $variante->nivel_critico ?? $variante->articulo?->nivel_critico_global ?? 0,
+                'atributos_variante' => $variante->atributos,
+                'created_at' => $variante->created_at,
+                'updated_at' => $variante->updated_at,
+            ];
+
+            return view('inventario.show', compact('inventario'));
+        }
+
+        $inventario = Inventario::where('proyecto_id', $proyectoId)->findOrFail($id);
         return view('inventario.show', compact('inventario'));
     }
 
-    public function edit(Inventario $inventario)
+    public function edit($id)
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
 
-        if ((int) $inventario->proyecto_id !== $proyectoId) {
-            abort(404);
+        $variante = InventarioVariante::with([
+            'articulo.variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')
+        ])->where('proyecto_id', $proyectoId)->find($id);
+
+        $articulo = $variante?->articulo;
+
+        if (!$articulo) {
+            $articulo = InventarioArticulo::with([
+                'variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')
+            ])->where('proyecto_id', $proyectoId)->find($id);
+            $variante = $articulo?->variantes->first();
         }
 
-        $inventario->loadMissing(['variante.items']);
-
-        $clases = \App\Models\Clase::query()
+        $clases = Clase::query()
             ->where('proyecto_id', $proyectoId)
             ->orderBy('nombre')
             ->pluck('nombre', 'id');
 
-        $almacenes = \App\Models\Almacen::query()
+        $almacenes = Almacen::query()
             ->where('proyecto_id', $proyectoId)
+            ->where('activo', true)
             ->orderBy('nombre')
-            ->get(['id', 'nombre']);
+            ->get(['id', 'nombre', 'codigo']);
 
+        if ($articulo && $variante) {
+            $valoresIniciales = [];
+            foreach ($articulo->variantes as $varItem) {
+                foreach (($varItem->atributos ?? []) as $tipo => $valor) {
+                    $valores = is_array($valor) ? $valor : [$valor];
+                    foreach ($valores as $valorItem) {
+                        $valorItem = trim((string) $valorItem);
+                        if ($valorItem !== '') {
+                            $valoresIniciales[$tipo][] = $valorItem;
+                        }
+                    }
+                }
+            }
+            foreach ($valoresIniciales as $tipo => $valores) {
+                $valoresIniciales[$tipo] = collect($valores)->unique()->values()->all();
+            }
+
+            $primerAlmacen = $variante->stockAlmacenes->first()?->almacen?->nombre
+                ?? $variante->almacen
+                ?? $almacenes->first()?->nombre;
+
+            $stockVariante = (int) $variante->stockAlmacenes->sum('cantidad');
+
+            $varianteBase = (object) [
+                'id' => $articulo->id,
+                'codigo' => $articulo->codigo,
+                'nombre' => $articulo->nombre,
+                'descripcion' => $articulo->descripcion,
+                'referencia_proveedor' => $articulo->referencia_proveedor,
+                'nombre_proveedor' => $articulo->nombre_proveedor,
+                'clase_id' => $articulo->clase_id,
+                'almacen' => $primerAlmacen,
+                'stock_actual' => $stockVariante,
+                'stock_minimo' => $articulo->stock_minimo_global ?? $variante->stock_minimo ?? 0,
+                'nivel_critico' => $articulo->nivel_critico_global ?? $variante->nivel_critico ?? 0,
+                'tipos_atributos' => $articulo->tipos_atributos ?? array_keys($valoresIniciales),
+            ];
+
+            $variantesIniciales = $articulo->variantes->map(function ($v) {
+                $primerStockAlm = $v->stockAlmacenes->first();
+                return [
+                    'id' => $v->id,
+                    'sku' => $v->codigo,
+                    'almacen_id' => $primerStockAlm?->almacen?->nombre ?? $v->almacen,
+                    'atributos' => $v->atributos,
+                    'stock_actual' => (int) $v->stockAlmacenes->sum('cantidad'),
+                    'stock_minimo' => (int) ($v->stock_minimo ?? 10),
+                    'nivel_critico' => (int) ($v->nivel_critico ?? 5),
+                    'activo' => (bool) $v->activo,
+                ];
+            })->values()->toArray();
+
+            $inventario = $variante;
+            $inventario->stock_actual = $stockVariante;
+
+            return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales', 'almacenes'));
+        }
+
+        // Fallback a tabla legacy si no estaba en catálogo
+        $inventario = Inventario::where('proyecto_id', $proyectoId)->findOrFail($id);
         $valoresIniciales = $this->normalizeVariantAttributes($inventario->atributos_variante ?? []);
-        $tiposAtributos = $inventario->variante?->tipos_atributos;
-
         $varianteBase = (object) [
             'codigo' => $inventario->codigo,
             'nombre' => $inventario->nombre,
@@ -1047,38 +964,32 @@ class InventarioController extends Controller
             'stock_actual' => $inventario->stock_actual,
             'stock_minimo' => $inventario->stock_minimo,
             'nivel_critico' => $inventario->nivel_critico,
-            'tipos_atributos' => $tiposAtributos ?? array_keys($valoresIniciales),
+            'tipos_atributos' => array_keys($valoresIniciales),
         ];
-
-       $variantesIniciales = $inventario->variante
-            ? $inventario->variante->items->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'atributos' => $item->atributos_variante,
-                    'stock_actual' => $item->stock_actual,
-                ];
-            })->toArray()
-            : [];
+        $variantesIniciales = [];
 
         return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales', 'almacenes'));
     }
 
-    public function update(Request $request, Inventario $inventario)
+    public function update(Request $request, $id)
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
 
-        if ((int) $inventario->proyecto_id !== $proyectoId) {
+        $variante = InventarioVariante::with('articulo')->where('proyecto_id', $proyectoId)->find($id);
+        $articulo = $variante?->articulo ?? InventarioArticulo::where('proyecto_id', $proyectoId)->find($id);
+
+        if (!$articulo) {
             abort(404);
         }
 
         $validated = $request->validate([
             'codigo' => 'required|string|max:255',
             'nombre' => 'required|string|max:255',
-            'descripcion' => 'required|string',
+            'descripcion' => 'nullable|string',
             'referencia_proveedor' => 'nullable|string|max:255',
             'clase_id' => 'nullable|integer|exists:clases,id',
             'almacen' => 'nullable|string|max:255',
-            'stock_actual' => 'required|integer|min:0',
+            'stock_actual' => 'nullable|integer|min:0|required_without:variantes',
             'stock_minimo' => 'nullable|integer|min:0',
             'nivel_critico' => 'nullable|integer|min:0',
             'tipos_atributos' => 'nullable|string',
@@ -1086,137 +997,231 @@ class InventarioController extends Controller
             'atributos_variante.*' => 'nullable|array',
             'atributos_variante.*.*' => 'nullable|string|max:255',
             'variantes' => 'nullable|array',
-            'variantes.*.id' => 'nullable|integer|exists:inventario,id',
+            'variantes.*.id' => 'nullable|integer',
             'variantes.*.activo' => 'nullable|boolean',
             'variantes.*.stock_actual' => 'nullable|integer|min:0',
             'variantes.*.atributos' => 'nullable|array',
             'variantes.*.atributos.*' => 'nullable|string|max:255',
+            'variantes.*.sku' => 'nullable|string|max:255',
+            'variantes.*.almacen_id' => 'nullable|string|max:255',
+            'variantes.*.stock_minimo' => 'nullable|integer|min:0',
+            'variantes.*.nivel_critico' => 'nullable|integer|min:0',
+            'nombre_proveedor' => 'nullable|string|max:255'
         ]);
+
+        $validated['descripcion'] = trim((string) ($validated['descripcion'] ?? '')) !== ''
+            ? $validated['descripcion']
+            : $validated['nombre'];
 
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
-        $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null);
+        $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null, false);
 
-        $claseIdParaItems = !empty($inventario->inventario_variante_id)
-            ? $inventario->variante?->clase_id
-            : ($validated['clase_id'] ?? null);
+        $almacenModel = null;
+        if (!empty($validated['almacen'])) {
+            $almacenModel = Almacen::query()
+                ->where('proyecto_id', $proyectoId)
+                ->where(function ($q) use ($validated) {
+                    $q->where('nombre', $validated['almacen'])
+                      ->orWhere('id', is_numeric($validated['almacen']) ? (int) $validated['almacen'] : 0);
+                })
+                ->first();
+        }
+        if (!$almacenModel) {
+            $almacenModel = Almacen::query()->where('proyecto_id', $proyectoId)->orderBy('id')->first();
+        }
 
-        if ($inventario->variante) {
-            $inventario->variante->update([
+        DB::transaction(function () use ($proyectoId, $articulo, $variante, $validated, $tiposAtributos, $atributosVariante, $variantesRows, $almacenModel) {
+            $articulo->update([
                 'codigo' => $validated['codigo'],
                 'nombre' => $validated['nombre'],
                 'descripcion' => $validated['descripcion'],
-                'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                'clase_id' => $validated['clase_id'] ?? null, // Blindado
-                'almacen' => $validated['almacen'] ?? null, // Blindado
-                'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                'nivel_critico' => $validated['nivel_critico'] ?? 0,
+                'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                'tiene_variantes' => !empty($variantesRows),
                 'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                'stock_minimo_global' => (int) ($validated['stock_minimo'] ?? 0),
+                'nivel_critico_global' => (int) ($validated['nivel_critico'] ?? 0),
             ]);
-        }
 
-        $inventario->update([
-            'codigo' => $validated['codigo'],
-            'nombre' => $validated['nombre'],
-            'descripcion' => $validated['descripcion'],
-            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-            'clase_id' => $validated['clase_id'] ?? null, // Blindado
-            'almacen' => $validated['almacen'] ?? null, // Blindado
-            'stock_actual' => $validated['stock_actual'],
-            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-            'atributos_variante' => !empty($atributosVariante) ? $atributosVariante : null, 
-        ]);
+            if (!empty($variantesRows)) {
+                $existingVariantes = $articulo->variantes()->with('stockAlmacenes')->get()->keyBy('id');
+                $processedVariantIds = [];
+                $activeNewVariants = collect();
 
-        if ($inventario->variante && !empty($variantesRows)) {
-            $existingItems = $inventario->variante->items()->get()->keyBy('id');
-            $keptIds = [];
-
-            DB::transaction(function () use ($proyectoId, $validated, $variantesRows, $existingItems, $inventario, $claseIdParaItems, &$keptIds) {
                 foreach ($variantesRows as $index => $varianteRow) {
                     $atributos = $varianteRow['atributos'];
-                    $stockActual = (int) $varianteRow['stock_actual'];
-                    $itemId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
+                    $activo = (bool) ($varianteRow['activo'] ?? true);
+                    $rowId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
 
-                    $existingItem = null;
-                    if ($itemId && $existingItems->has($itemId)) {
-                        $existingItem = $existingItems->get($itemId);
-                    } else {
-                        $existingItem = $existingItems->first(function ($item) use ($atributos) {
-                            return json_encode($item->atributos_variante) === json_encode($atributos);
-                        });
+                    // Reutilizar ID solo si la variante conserva exactamente los mismos atributos dimensionales
+                    $existingVar = null;
+                    if ($rowId && $existingVariantes->has($rowId)) {
+                        $candidate = $existingVariantes->get($rowId);
+                        if ($this->sameVariantAttributes($candidate->atributos ?? [], $atributos)) {
+                            $existingVar = $candidate;
+                        }
+                    }
+                    if (!$existingVar) {
+                        $existingVar = $existingVariantes->first(
+                            fn ($v) => $this->sameVariantAttributes($v->atributos ?? [], $atributos)
+                        );
                     }
 
-                    if ($existingItem) {
-                        $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingItem->id);
-                        $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
+                    if (!$activo) {
+                        if ($existingVar) {
+                            $existingVar->update(['activo' => false]);
+                            $processedVariantIds[] = $existingVar->id;
+                        }
+                        continue;
+                    }
 
-                        $existingItem->update([
+                    $stockActual = isset($varianteRow['stock_actual']) ? (int) $varianteRow['stock_actual'] : 0;
+                    $minFila = isset($varianteRow['stock_minimo']) ? (int) $varianteRow['stock_minimo'] : (int) ($validated['stock_minimo'] ?? 10);
+                    $critFila = isset($varianteRow['nivel_critico']) ? (int) $varianteRow['nivel_critico'] : (int) ($validated['nivel_critico'] ?? 5);
+
+                    $codigoItem = !empty($varianteRow['sku'])
+                        ? $varianteRow['sku']
+                        : $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingVar?->id);
+
+                    $descripcionItem = $this->buildVariantDescription($validated['descripcion'], $atributos);
+
+                    $almacenFila = $almacenModel;
+                    if (!empty($varianteRow['almacen_id'])) {
+                        $encontradoAlm = Almacen::where('proyecto_id', $proyectoId)
+                            ->where(fn ($q) => $q->where('nombre', $varianteRow['almacen_id'])->orWhere('id', (int) $varianteRow['almacen_id']))
+                            ->first();
+                        if ($encontradoAlm) {
+                            $almacenFila = $encontradoAlm;
+                        }
+                    }
+
+                    if ($existingVar) {
+                        $existingVar->update([
                             'codigo' => $codigoItem,
-                            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                            'nombre' => $descripcionItem,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                            'clase_id' => $claseIdParaItems,
-                            'almacen' => $validated['almacen'] ?? null, // Blindado
-                            'stock_actual' => $stockActual,
-                            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-                            'atributos_variante' => $atributos,
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                            'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                            'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                            'almacen' => $almacenFila?->nombre ?? $existingVar->almacen,
+                            'stock_minimo' => $minFila,
+                            'nivel_critico' => $critFila,
+                            'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                            'atributos' => $atributos,
+                            'activo' => true,
                         ]);
-
-                        $keptIds[] = $existingItem->id;
+                        $targetVar = $existingVar;
                     } else {
-                        $codigoItem = $this->buildVariantCode($validated['codigo'], $atributos, $index);
-                        $descripcionItem = $this->buildVariantDescription($validated['descripcion'] ?? $validated['nombre'] ?? '', $atributos);
-
-                        $createdItem = Inventario::create([
+                        $targetVar = InventarioVariante::create([
+                            'articulo_id' => $articulo->id,
                             'proyecto_id' => $proyectoId,
-                            'inventario_variante_id' => $inventario->variante->id,
                             'codigo' => $codigoItem,
-                            'nombre' => $validated['nombre'] ?? $validated['descripcion'] ?? null,
+                            'nombre' => $descripcionItem,
                             'descripcion' => $descripcionItem,
-                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null, // Blindado
-                            'clase_id' => $claseIdParaItems,
-                            'almacen' => $validated['almacen'] ?? null, // Blindado
-                            'stock_actual' => $stockActual,
-                            'stock_minimo' => $validated['stock_minimo'] ?? 0,
-                            'nivel_critico' => $validated['nivel_critico'] ?? 0,
-                            'atributos_variante' => $atributos,
+                            'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                            'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                            'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                            'almacen' => $almacenFila?->nombre ?? null,
+                            'stock_minimo' => $minFila,
+                            'nivel_critico' => $critFila,
+                            'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                            'atributos' => $atributos,
+                            'activo' => true,
                         ]);
-
-                        $keptIds[] = $createdItem->id;
                     }
+
+                    if ($almacenFila) {
+                        InventarioStockAlmacen::updateOrCreate(
+                            ['variante_id' => $targetVar->id, 'almacen_id' => $almacenFila->id],
+                            ['cantidad' => $stockActual]
+                        );
+                    }
+
+                    $processedVariantIds[] = $targetVar->id;
+                    $activeNewVariants->push($targetVar);
                 }
 
-                $inventario->variante->items()
-                    ->whereNotIn('id', $keptIds)
-                    ->delete();
+                // Depuración y archivo de variantes de la estructura anterior
+                $this->depurarVariantesDesfasadas($existingVariantes, $processedVariantIds, $activeNewVariants);
+            }
+        });
+
+        return redirect()->route('inventario.index')->with('success', 'Producto actualizado correctamente.');
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        $scope = $request->input('scope', 'auto'); // 'padre', 'variante' o 'auto'
+
+        // 1. Si se pide borrar una variante hija específica (desde el modal)
+        if ($scope === 'variante') {
+            $variante = InventarioVariante::where('proyecto_id', $proyectoId)->findOrFail($id);
+            $stockVariante = (int) InventarioStockAlmacen::where('variante_id', $variante->id)->sum('cantidad');
+
+            if ($stockVariante > 0) {
+                return back()->with('error', "No se puede eliminar la variante '{$variante->codigo}' porque aún tiene {$stockVariante} uds. en stock. Registra antes una salida.");
+            }
+
+            DB::transaction(function () use ($variante) {
+                $variante->update(['activo' => false]);
+
+                // Si era la última variante activa del artículo padre, damos de baja también al padre
+                if ($variante->articulo_id) {
+                    $quedanActivas = InventarioVariante::where('articulo_id', $variante->articulo_id)
+                        ->where('activo', true)
+                        ->exists();
+
+                    if (!$quedanActivas) {
+                        InventarioArticulo::where('id', $variante->articulo_id)->update(['activo' => false]);
+                    }
+                }
             });
 
-            return redirect()->route('inventario.index')->with('success', 'Producto actualizado');
+            return redirect()->route('inventario.index')->with('success', "Variante '{$variante->codigo}' eliminada correctamente.");
         }
 
-        return redirect()->route('inventario.index')->with('success', 'Producto actualizado');
+        // 2. Si se pide borrar el Artículo Padre completo (con todas sus variantes)
+        $articulo = InventarioArticulo::where('proyecto_id', $proyectoId)->find($id);
+        if (!$articulo) {
+            $variante = InventarioVariante::where('proyecto_id', $proyectoId)->find($id);
+            $articulo = $variante?->articulo;
+        }
+
+        if ($articulo) {
+            $stockTotal = (int) InventarioStockAlmacen::whereHas('variante', fn ($q) => $q->where('articulo_id', $articulo->id)->where('activo', true))
+                ->sum('cantidad');
+
+            if ($stockTotal > 0) {
+                return back()->with('error', "No se puede eliminar el producto '{$articulo->nombre}' porque sus variantes suman {$stockTotal} uds. en almacén.");
+            }
+
+            DB::transaction(function () use ($articulo) {
+                $articulo->variantes()->update(['activo' => false]);
+                $articulo->update(['activo' => false]);
+            });
+
+            return redirect()->route('inventario.index')->with('success', "Producto '{$articulo->nombre}' y todas sus variantes han sido eliminados.");
+        }
+
+        $inventario = Inventario::where('proyecto_id', $proyectoId)->findOrFail($id);
+        $inventario->delete();
+
+        return redirect()->route('inventario.index')->with('success', 'Producto eliminado.');
     }
 
     protected function normalizeVariantTypes(mixed $value): array
     {
-        if (empty($value)) {
-            return [];
-        }
+        if (empty($value)) return [];
 
         if (is_string($value)) {
             $decoded = json_decode($value, true);
-            if (is_array($decoded)) {
-                $value = $decoded;
-            } else {
-                $value = explode(',', $value);
-            }
+            $value = is_array($decoded) ? $decoded : explode(',', $value);
         }
 
-        if (!is_array($value)) {
-            return [];
-        }
+        if (!is_array($value)) return [];
 
         return collect($value)
             ->map(fn ($item) => trim((string) $item))
@@ -1228,21 +1233,14 @@ class InventarioController extends Controller
 
     protected function normalizeVariantAttributes(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
+        if (!is_array($value)) return [];
 
         $atributos = [];
-
         foreach ($value as $tipo => $valores) {
             $tipo = trim((string) $tipo);
-
-            if ($tipo === '') {
-                continue;
-            }
+            if ($tipo === '') continue;
 
             $listaValores = is_array($valores) ? $valores : [$valores];
-
             $listaValores = collect($listaValores)
                 ->map(fn ($item) => trim((string) $item))
                 ->filter()
@@ -1258,125 +1256,44 @@ class InventarioController extends Controller
         return $atributos;
     }
 
-    protected function normalizeVariantRows(mixed $value): array
+    protected function normalizeVariantRows(mixed $value, bool $onlyActive = true): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
+        if (!is_array($value)) return [];
 
         $variantes = [];
-
         foreach ($value as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
+            if (!is_array($row)) continue;
 
             $activo = filter_var($row['activo'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            $activo = $activo !== false;
 
-            if ($activo === false) {
-                continue;
-            }
+            if ($onlyActive && !$activo) continue;
 
             $atributos = $this->normalizeVariantAttributes($row['atributos'] ?? []);
-            $stockActual = isset($row['stock_actual']) ? (int) $row['stock_actual'] : null;
-            $rowId = isset($row['id']) ? (int) $row['id'] : null;
-
-            if (empty($atributos) || $stockActual === null) {
-                continue;
-            }
+            if (empty($atributos)) continue;
 
             $variantes[] = [
-                'id' => $rowId,
-                'activo' => true,
+                'id' => isset($row['id']) ? (int) $row['id'] : null,
+                'sku' => isset($row['sku']) && trim((string) $row['sku']) !== '' ? trim((string) $row['sku']) : null,
+                'almacen_id' => isset($row['almacen_id']) && trim((string) $row['almacen_id']) !== '' ? trim((string) $row['almacen_id']) : null,
+                'activo' => $activo,
                 'atributos' => $atributos,
-                'stock_actual' => max(0, $stockActual),
+                'stock_actual' => max(0, isset($row['stock_actual']) ? (int) $row['stock_actual'] : 0),
+                'stock_minimo' => max(0, isset($row['stock_minimo']) ? (int) $row['stock_minimo'] : 0),
+                'nivel_critico' => max(0, isset($row['nivel_critico']) ? (int) $row['nivel_critico'] : 0),
             ];
         }
 
         return $variantes;
     }
 
-    private function findStockInAlmacen(Inventario $origen, string $almacenDestino): ?Inventario
-    {
-        $atributosOrigen = json_encode($origen->atributos_variante);
-
-        return Inventario::query()
-            ->where('proyecto_id', $origen->proyecto_id)
-            ->where(function ($query) use ($origen) {
-                if ($origen->inventario_variante_id) {
-                    $query->where('inventario_variante_id', $origen->inventario_variante_id);
-                } else {
-                    $query->where('codigo', $origen->codigo);
-                }
-            })
-            ->lockForUpdate()
-            ->get()
-            ->first(function (Inventario $item) use ($atributosOrigen, $almacenDestino) {
-                return json_encode($item->atributos_variante) === $atributosOrigen
-                    && mb_strtolower(trim((string) $item->almacen)) === mb_strtolower(trim($almacenDestino));
-            });
-    }
-
-    private function resolveOrCreateStockInAlmacen(Inventario $origen, string $almacenDestino): Inventario
-    {
-        $almacenDestino = trim($almacenDestino);
-        $almacenOrigen = mb_strtolower(trim((string) $origen->almacen));
-
-        if ($almacenOrigen === mb_strtolower($almacenDestino)
-            || ((int) $origen->stock_actual === 0 && trim((string) $origen->almacen) === '')) {
-            $origen->almacen = $almacenDestino;
-            $origen->save();
-            return $origen;
-        }
-
-        if (!$origen->inventario_variante_id) {
-            $variante = InventarioVariante::firstOrCreate(
-                ['proyecto_id' => $origen->proyecto_id, 'codigo' => $origen->codigo],
-                [
-                    'nombre' => $origen->nombre,
-                    'descripcion' => $origen->descripcion,
-                    'referencia_proveedor' => $origen->referencia_proveedor,
-                    'clase_id' => $origen->clase_id,
-                    'stock_minimo' => $origen->stock_minimo,
-                    'nivel_critico' => $origen->nivel_critico,
-                ]
-            );
-            $origen->inventario_variante_id = $variante->id;
-            $origen->save();
-        }
-
-        $existente = $this->findStockInAlmacen($origen, $almacenDestino);
-        if ($existente) {
-            return $existente;
-        }
-
-        return Inventario::create([
-            'proyecto_id' => $origen->proyecto_id,
-            'inventario_variante_id' => $origen->inventario_variante_id,
-            'nombre' => $origen->nombre,
-            'codigo' => $origen->codigo,
-            'descripcion' => $origen->descripcion,
-            'referencia_proveedor' => $origen->referencia_proveedor,
-            'clase_id' => $origen->clase_id,
-            'stock_minimo' => $origen->stock_minimo,
-            'nivel_critico' => $origen->nivel_critico,
-            'atributos_variante' => $origen->atributos_variante,
-            'almacen' => $almacenDestino,
-            'stock_actual' => 0,
-        ]);
-    }
-
     protected function buildVariantCode(string $baseCode, array $atributos, int $index, ?int $ignoreId = null): string
     {
         $segmentos = [];
-
         foreach ($atributos as $valores) {
             $valor = is_array($valores) ? implode('-', $valores) : (string) $valores;
             $segmento = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', $valor) ?? '');
-
-            if ($segmento !== '') {
-                $segmentos[] = $segmento;
-            }
+            if ($segmento !== '') $segmentos[] = $segmento;
         }
 
         $codigoBase = trim($baseCode);
@@ -1384,7 +1301,7 @@ class InventarioController extends Controller
         $candidato = $codigo;
         $contador = 2;
 
-        while (Inventario::query()
+        while (InventarioVariante::query()
             ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
             ->where('proyecto_id', $this->resolveActiveProyectoId(request()))
             ->where('codigo', $candidato)
@@ -1399,26 +1316,198 @@ class InventarioController extends Controller
     protected function buildVariantDescription(string $baseDescription, array $atributos): string
     {
         $partes = [];
-
         foreach ($atributos as $tipo => $valores) {
             $valoresTexto = is_array($valores) ? implode(', ', $valores) : (string) $valores;
             $partes[] = trim($tipo . ' ' . $valoresTexto);
         }
 
         $etiqueta = trim(implode(' / ', array_filter($partes)));
-
         return $etiqueta !== '' ? trim($baseDescription . ' - ' . $etiqueta) : $baseDescription;
     }
 
-    public function destroy(Inventario $inventario)
+    /**
+     * Normaliza un valor de atributo (sea string o array) a texto plano sin acentos en minúsculas.
+     */
+    protected function cleanAttrString(mixed $val): string
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $str = is_array($val) ? implode(',', array_map('trim', $val)) : trim((string) $val);
+        $str = mb_strtolower($str, 'UTF-8');
+        return strtr($str, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'ä' => 'a', 'ë' => 'e', 'ï' => 'i', 'ö' => 'o', 'ü' => 'u',
+        ]);
+    }
 
-        if ((int) $inventario->proyecto_id !== $proyectoId) {
-            abort(404);
+    /**
+     * Compara dos arrays de atributos de variante sin importar el orden de las claves, tildes o formato array/string.
+     */
+    protected function sameVariantAttributes(array $a, array $b): bool
+    {
+        if (count($a) !== count($b)) {
+            return false;
         }
 
-        $inventario->delete();
-        return redirect()->route('inventario.index')->with('success', 'Producto eliminado');
+        $norm = function (array $attrs): array {
+            $res = [];
+            foreach ($attrs as $k => $v) {
+                $key = $this->cleanAttrString($k);
+                $res[$key] = $this->cleanAttrString($v);
+            }
+            ksort($res);
+            return $res;
+        };
+
+        return $norm($a) === $norm($b);
+    }
+
+    /**
+     * Busca si una variante desfasada (ej. Talla: 11) tiene una heredera directa
+     * en la nueva matriz (ej. Talla: 11 + Ignífugo: No, o Talla: 11 + Color: Verde).
+     */
+    protected function encontrarVarianteHeredera(InventarioVariante $oldVar, \Illuminate\Support\Collection $newVariants): ?InventarioVariante
+    {
+        $oldAttrs = $oldVar->atributos ?? [];
+        $valoresNeutros = ['no', '00', '0', 'false', 'estandar', 'standard', 'std', 'unica', 'unico', 'uni', 'n/a', 'na', 'normal', 'sin especificar'];
+
+        // Si la variante antigua era el producto base sin atributos (0 dimensiones),
+        // su heredera es la variante con valores neutros o la primera de la nueva matriz
+        if (empty($oldAttrs)) {
+            return $newVariants->first(function (InventarioVariante $cand) use ($valoresNeutros) {
+                foreach (($cand->atributos ?? []) as $v) {
+                    if (in_array($this->cleanAttrString($v), $valoresNeutros, true)) {
+                        return true;
+                    }
+                }
+                return false;
+            }) ?? $newVariants->first();
+        }
+
+        // 1. Filtrar las nuevas variantes que contengan TODOS los atributos que ya tenía la variante antigua
+        $candidatas = $newVariants->filter(function (InventarioVariante $newVar) use ($oldAttrs) {
+            $newAttrs = $newVar->atributos ?? [];
+            foreach ($oldAttrs as $tipoOld => $valOld) {
+                $cleanKeyOld = $this->cleanAttrString($tipoOld);
+                $cleanValOld = $this->cleanAttrString($valOld);
+
+                $matched = false;
+                foreach ($newAttrs as $tipoNew => $valNew) {
+                    if ($cleanKeyOld === $this->cleanAttrString($tipoNew)) {
+                        if ($cleanValOld === $this->cleanAttrString($valNew)) {
+                            $matched = true;
+                        }
+                        break;
+                    }
+                }
+                if (!$matched) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        if ($candidatas->isEmpty()) {
+            return null;
+        }
+
+        // 2. Priorizar la candidata cuyos atributos NUEVOS tengan un valor neutro ("No", "00", "Estándar", etc.)
+        $oldKeysClean = array_map(fn ($k) => $this->cleanAttrString($k), array_keys($oldAttrs));
+
+        $herederaPorDefecto = $candidatas->first(function (InventarioVariante $cand) use ($oldKeysClean, $valoresNeutros) {
+            foreach (($cand->atributos ?? []) as $k => $v) {
+                if (!in_array($this->cleanAttrString($k), $oldKeysClean, true)) {
+                    if (in_array($this->cleanAttrString($v), $valoresNeutros, true)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+
+        // 3. Si no hay valor neutro (ej. se añadió Color: Verde, Rojo, Azul), devuelve la primera candidata de esa misma Talla
+        return $herederaPorDefecto ?? $candidatas->first();
+    }
+
+    /**
+     * Procesa las variantes que quedaron fuera de la nueva matriz dimensional:
+     * - Si ninguna de las nuevas variantes hijas de su rama recibió stock en el formulario,
+     *   traspasa el stock viejo a su heredera natural para evitar pérdidas accidentales.
+     * - Si el usuario ya asignó el stock en el formulario (ej. a "rojo" o repartido entre "verde" y "rojo"),
+     *   respeta exactamente el reparto del formulario sin duplicar.
+     * - Si la variante antigua tiene historial en Kardex, la archiva como inactiva ([OBSOLETO]) con stock 0.
+     * - Si no tiene historial en Kardex, la elimina físicamente de la base de datos.
+     */
+    protected function depurarVariantesDesfasadas(
+        \Illuminate\Support\Collection $existingVariantes,
+        array $processedVariantIds,
+        \Illuminate\Support\Collection $activeNewVariants
+    ): void {
+        $obsoletas = $existingVariantes->except($processedVariantIds);
+
+        foreach ($obsoletas as $oldVar) {
+            $stocksViejos = $oldVar->stockAlmacenes ?? collect();
+            $totalViejo = (int) $stocksViejos->sum('cantidad');
+
+            if ($totalViejo > 0 && $activeNewVariants->isNotEmpty()) {
+                $oldAttrs = $oldVar->atributos ?? [];
+
+                // Buscar todas las variantes nuevas que son hijas de esta variante antigua (ej. todas las de Talla 11)
+                $hijasDeRama = $activeNewVariants->filter(function (InventarioVariante $newVar) use ($oldAttrs) {
+                    if (empty($oldAttrs)) return true;
+                    $newAttrs = $newVar->atributos ?? [];
+                    foreach ($oldAttrs as $tipoOld => $valOld) {
+                        $cleanKeyOld = $this->cleanAttrString($tipoOld);
+                        $cleanValOld = $this->cleanAttrString($valOld);
+                        $matched = false;
+                        foreach ($newAttrs as $tipoNew => $valNew) {
+                            if ($cleanKeyOld === $this->cleanAttrString($tipoNew)) {
+                                if ($cleanValOld === $this->cleanAttrString($valNew)) {
+                                    $matched = true;
+                                }
+                                break;
+                            }
+                        }
+                        if (!$matched) return false;
+                    }
+                    return true;
+                });
+
+                // Comprobar cuánto stock total tienen ya asignado las hijas de esta rama tras guardar el formulario
+                $idsHijas = $hijasDeRama->pluck('id')->all();
+                $stockYaAsignadoEnRama = !empty($idsHijas)
+                    ? (int) InventarioStockAlmacen::whereIn('variante_id', $idsHijas)->sum('cantidad')
+                    : 0;
+
+                // Solo auto-migramos en backend si la rama entera llegó con 0 stock desde el formulario
+                if ($stockYaAsignadoEnRama === 0) {
+                    $heredera = $this->encontrarVarianteHeredera($oldVar, $activeNewVariants);
+                    if ($heredera) {
+                        foreach ($stocksViejos as $stockAlm) {
+                            if ((int) $stockAlm->cantidad <= 0) continue;
+
+                            InventarioStockAlmacen::updateOrCreate(
+                                ['variante_id' => $heredera->id, 'almacen_id' => $stockAlm->almacen_id],
+                                ['cantidad' => (int) $stockAlm->cantidad]
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Comprobar si tiene historial en el Kardex (movimientos registrados)
+            $tieneHistorialKardex = \App\Models\InventarioMovimientoLinea::where('variante_id', $oldVar->id)->exists();
+
+            if ($tieneHistorialKardex) {
+                InventarioStockAlmacen::where('variante_id', $oldVar->id)->update(['cantidad' => 0]);
+                $oldVar->update([
+                    'activo' => false,
+                    'descripcion' => str_contains((string) $oldVar->descripcion, '[OBSOLETO]')
+                        ? $oldVar->descripcion
+                        : trim($oldVar->descripcion . ' [OBSOLETO]'),
+                ]);
+            } else {
+                InventarioStockAlmacen::where('variante_id', $oldVar->id)->delete();
+                $oldVar->delete();
+            }
+        }
     }
 }

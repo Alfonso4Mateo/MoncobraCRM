@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Activity;
 
 class Personal extends Model
@@ -51,6 +52,9 @@ class Personal extends Model
         'activo',
         'prl_revisado',
         'fecha_reactivacion',
+        // CORRECCIÓN FASE 3: Permite guardar físicamente los documentos subidos
+        'documento_riesgos',
+        'documento_epi',
     ];
 
     protected $casts = [
@@ -71,7 +75,7 @@ class Personal extends Model
         return $this->belongsToMany(Proyecto::class, 'personal_proyecto')->withTimestamps();
     }
 
-    public function cursos()
+    public function cursos(): BelongsToMany
     {
         return $this->belongsToMany(Curso::class, 'curso_personal')
                     ->using(PersonalCurso::class)
@@ -79,43 +83,43 @@ class Personal extends Model
                     ->withTimestamps();
     }
 
-    public function entregasEpis()
+    public function entregasEpis(): HasMany
     {
-        return $this->hasMany(\App\Models\EntregaEpi::class, 'personal_id');
+        return $this->hasMany(EntregaEpi::class, 'personal_id');
     }
 
-    public function salidasStock()
+    public function salidasStock(): HasMany
     {
         return $this->hasMany(SalidaStock::class, 'personal_id');
     }
 
-    public function equiposInformaticos()
+    public function equiposInformaticos(): HasMany
     {
         return $this->hasMany(EquipoInformatico::class, 'personal_id');
     }
 
-    public function herramientasPlanta()
+    public function herramientasPlanta(): HasMany
     {
         return $this->hasMany(HerramientaPlanta::class, 'personal_id');
     }
 
-    public function aparatosCalibrables()
+    public function aparatosCalibrables(): HasMany
     {
         return $this->hasMany(AparatoCalibrable::class, 'personal_id');
     }
 
-    public function historialPrl()
+    public function historialPrl(): HasMany
     {
-        return $this->hasMany(\App\Models\HistorialPrl::class)->orderByDesc('created_at');
+        return $this->hasMany(HistorialPrl::class)->orderByDesc('created_at');
     }
 
-    public function puestos()
+    public function puestos(): BelongsToMany
     {
         return $this->belongsToMany(Puesto::class, 'personal_puesto', 'personal_id', 'puesto_id')
                     ->withTimestamps();
     }
 
-    public function puestoTrabajo()
+    public function puestoTrabajo(): BelongsTo
     {
         return $this->belongsTo(PuestoTrabajo::class, 'puesto_trabajo_id');
     }

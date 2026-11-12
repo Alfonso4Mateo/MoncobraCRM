@@ -5,6 +5,7 @@ use App\Http\Controllers\ClaseController;
 use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\InventarioController;
+use App\Http\Controllers\InventarioMovimientoController;
 use App\Http\Controllers\PersonalController;
 use App\Http\Controllers\PuestoTrabajoController; 
 use App\Http\Controllers\UserController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\EquiposController;
 use App\Http\Controllers\HerramientasPlantaController;
 use App\Http\Controllers\AlertasMantenimientoController;
 use App\Http\Controllers\UbicacionController;
+use App\Http\Controllers\InventarioInformeController;
 
 // ==========================================
 // 0. ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
@@ -131,12 +133,33 @@ Route::get('inventario/traslados/nuevo', [InventarioController::class, 'createTr
 Route::post('inventario/traslados', [InventarioController::class, 'storeTraslado'])
     ->name('inventario.traslado.store')
     ->middleware('permission:inventario.manage');
+Route::post('inventario/kardex/entradas', [InventarioMovimientoController::class, 'storeEntrada'])
+    ->name('inventario.kardex.entrada.store');
+Route::post('inventario/kardex/salidas', [InventarioMovimientoController::class, 'storeSalida'])
+    ->name('inventario.kardex.salida.store');
+Route::post('inventario/kardex/traslados', [InventarioMovimientoController::class, 'storeTraslado'])
+    ->name('inventario.kardex.traslado.store');
+Route::post('inventario/kardex/{movimiento}/revertir', [InventarioMovimientoController::class, 'revertir'])
+    ->name('inventario.kardex.revertir')
+    ->middleware('permission:inventario.manage');
+Route::get('inventario/informes', [InventarioInformeController::class, 'index'])
+    ->name('inventario.informes.index')
+    ->middleware('permission:inventario.view');
+Route::post('inventario/informes/exportar', [InventarioInformeController::class, 'exportar'])
+    ->name('inventario.informes.exportar')
+    ->middleware('permission:inventario.view');
+Route::get('inventario/informes/{id}/descargar', [InventarioInformeController::class, 'descargarHistorico'])
+    ->name('inventario.informes.descargar')
+    ->middleware('permission:inventario.view');
 Route::get('inventario/nuevo-item', [InventarioController::class, 'createItem'])
     ->name('inventario.item.create')
     ->middleware('permission:inventario.manage');
 Route::resource('inventario', InventarioController::class);
 Route::get('inventario/historial', [HistoricoController::class, 'index'])
     ->name('inventario.acciones')
+    ->middleware('permission:inventario.manage');
+Route::get('/inventario/salidas/{id}/documento', [InventarioController::class, 'showSalidaDocumento'])
+    ->name('inventario.salidas.documento')
     ->middleware('permission:inventario.manage');
 Route::resource('historico', HistoricoController::class)->only(['index']);
 
@@ -147,8 +170,20 @@ Route::resource('historico', HistoricoController::class)->only(['index']);
 Route::get('almacenes/nuevo', [AlmacenController::class, 'create'])
     ->name('almacenes.create')
     ->middleware('permission:inventario.manage');
+Route::get('almacenes', [AlmacenController::class, 'index'])
+    ->name('almacenes.index')
+    ->middleware('permission:inventario.view');
 Route::post('almacenes', [AlmacenController::class, 'store'])
     ->name('almacenes.store')
+    ->middleware('permission:inventario.manage');
+Route::get('almacenes/{almacen}/editar', [AlmacenController::class, 'edit'])
+    ->name('almacenes.edit')
+    ->middleware('permission:inventario.manage');
+Route::put('almacenes/{almacen}', [AlmacenController::class, 'update'])
+    ->name('almacenes.update')
+    ->middleware('permission:inventario.manage');
+Route::delete('almacenes/{almacen}', [AlmacenController::class, 'destroy'])
+    ->name('almacenes.destroy')
     ->middleware('permission:inventario.manage');
 Route::resource('clases', ClaseController::class);
 

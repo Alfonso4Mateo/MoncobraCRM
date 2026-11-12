@@ -1,935 +1,562 @@
 @extends('adminlte::page')
 
-@section('title', 'Nueva Salida de Stock - MoncobraCRM')
+@section('title', 'Registrar Salida de Stock - MoncobraCRM')
+
+@section('plugins.Select2', true)
 
 @section('css')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/css/inventario-salida.css'])
     <style>
-        .row-error { outline: 2px solid #f87171; background: #fff6f6; }
-        #client-errors { display: none; }
-        #client-errors.is-visible { display: block; }
+        .kardex-page { font-family: 'Manrope', sans-serif; padding: 1.25rem 0.5rem; }
+        .kardex-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .kardex-tag { display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.25rem 0.65rem; border-radius: 999px; margin-bottom: 0.35rem; }
+        .kardex-title { font-size: 1.7rem; font-weight: 800; color: #0f2747; margin: 0; }
+        .kardex-subtitle { color: #64748b; font-size: 0.9rem; margin: 0.2rem 0 0 0; }
+
+        .btn-erp-back { display: inline-flex; align-items: center; gap: 0.5rem; background: #fff; border: 1px solid #cbd5e1; color: #173e67; font-weight: 800; font-size: 0.85rem; padding: 0.6rem 1.15rem; border-radius: 10px; text-decoration: none !important; transition: all 0.15s; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+        .btn-erp-back:hover { background: #f8fafc; border-color: #94a3b8; color: #0f2747; }
+        .btn-erp-navy { display: inline-flex; align-items: center; gap: 0.5rem; background: #173e67; border: 1px solid #173e67; color: #fff !important; font-weight: 800; font-size: 0.85rem; padding: 0.6rem 1.15rem; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+        .btn-erp-navy:hover { background: #0f2747; color: #fff !important; }
+
+        .kardex-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1.25rem; align-items: start; }
+        @media (max-width: 1100px) { .kardex-grid { grid-template-columns: 1fr; } }
+
+        .erp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 15px rgba(15,23,42,0.03); margin-bottom: 1.25rem; overflow: hidden; }
+        .erp-card-header { padding: 1.1rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #fcfdff; }
+        .erp-card-title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f2747; display: flex; align-items: center; gap: 0.55rem; }
+        .erp-card-body { padding: 1.4rem 1.5rem; }
+
+        .erp-label { display: block; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+        .erp-input, .erp-select { width: 100%; height: 42px; border-radius: 10px; border: 1px solid #cbd5e1; padding: 0 0.85rem; font-weight: 600; font-size: 0.9rem; color: #0f172a; background: #fff; transition: all 0.15s; }
+        .erp-input:focus, .erp-select:focus { outline: none; border-color: #173e67; box-shadow: 0 0 0 3px rgba(23, 62, 103, 0.12); }
+
+        /* Adaptación visual de Select2 al diseño ERP */
+        .select2-container--bootstrap4 .select2-selection {
+            border-radius: 10px !important;
+            border: 1px solid #cbd5e1 !important;
+            height: 42px !important;
+            padding: 0.35rem 0.5rem !important;
+            font-size: 0.9rem !important;
+            font-weight: 600 !important;
+        }
+        .select2-container--bootstrap4.select2-container--focus .select2-selection {
+            border-color: #173e67 !important;
+            box-shadow: 0 0 0 3px rgba(23, 62, 103, 0.12) !important;
+        }
+        .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+            line-height: 28px !important;
+            color: #0f172a !important;
+        }
+        .select2-dropdown {
+            border-radius: 10px !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12) !important;
+            font-family: 'Manrope', sans-serif !important;
+            font-size: 0.88rem !important;
+        }
+        .select2-results__option--highlighted[aria-selected] {
+            background-color: #6dabee !important;
+        }
+
+        .tallas-box { background: #f8fbff; border: 1px solid #dce6f4; border-radius: 12px; padding: 0.85rem 1rem; margin-top: 0.5rem; display: none; }
+        .tallas-badge { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; color: #173e67; margin: 3px; }
+
+        .picker-bar { display: grid; grid-template-columns: minmax(0, 1fr) 150px 140px; gap: 0.85rem; align-items: end; background: #f8fbff; border: 1px solid #dce6f4; border-radius: 12px; padding: 1.1rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) { .picker-bar { grid-template-columns: 1fr; } }
+
+        .kardex-table-wrap { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+        .kardex-table { width: 100%; border-collapse: collapse; margin: 0; }
+        .kardex-table th { background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 0.85rem 1.1rem; font-size: 0.72rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; text-align: left; }
+        .kardex-table td { padding: 0.85rem 1.1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 0.9rem; color: #1e293b; }
+        .qty-input { width: 105px; height: 36px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 0.6rem; font-weight: 800; color: #0f2747; text-align: center; }
+        .btn-delete-row { background: #fff5f5; color: #dc2626; border: 1px solid #fecaca; width: 34px; height: 34px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
+        .btn-delete-row:hover { background: #fee2e2; color: #b91c1c; }
+
+        .kardex-summary-card { background: #f8fbff; border: 1px solid #dce6f4; border-radius: 16px; padding: 1.35rem; position: sticky; top: 1rem; }
+        .kardex-summary-title { font-size: 1rem; font-weight: 800; color: #0f2747; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.1rem; }
+        .kardex-summary-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px dashed #cbd5e1; }
+        .kardex-summary-row span { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; }
+        .kardex-summary-row strong { font-size: 1.25rem; font-weight: 800; color: #0f2747; }
+        .epi-doc-notice { margin-top: 1rem; padding: 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; font-size: 0.78rem; font-weight: 700; color: #1e40af; display: none; }
+        .btn-confirm-kardex { width: 100%; margin-top: 1.25rem; background: #173e67; color: #fff; border: none; border-radius: 11px; padding: 0.9rem 1rem; font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; transition: all 0.15s; box-shadow: 0 4px 12px rgba(23, 62, 103, 0.2); }
+        .btn-confirm-kardex:hover:not(:disabled) { background: #0f2747; }
+        .btn-confirm-kardex:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; opacity: 0.65; }
     </style>
 @endsection
 
 @section('content')
-    <section class="stock-out-page">
-        <header class="stock-out-head">
-            <nav class="stock-out-breadcrumb" aria-label="breadcrumb">
-                <a href="{{ route('inventario.index') }}">Inventario</a>
-                <span><i class="fas fa-chevron-right"></i></span>
-                <strong>Nueva Salida de Stock</strong>
-            </nav>
+<section class="container-fluid kardex-page">
+    <header class="kardex-head">
+        <div>
+            <span class="kardex-tag">MÓDULO DE INVENTARIO</span>
+            <h1 class="kardex-title">Registrar Salida de Material / EPI</h1>
+            <p class="kardex-subtitle">Descarga existencias del almacén, asigna material a operarios y genera el acta de entrega EPI.</p>
+        </div>
+        <div>
+            <a href="{{ route('inventario.index') }}" class="btn-erp-back">
+                <i class="fas fa-arrow-left"></i> Volver al Inventario
+            </a>
+        </div>
+    </header>
 
-            <div class="stock-out-datetime">
-                <i class="far fa-calendar-alt"></i>
-                {{ now()->format('d M Y, H:i A') }}
-            </div>
-        </header>
+    @if(session('error'))
+        <div class="alert alert-danger" style="border-radius: 12px; font-weight: 700;">
+            <i class="fas fa-exclamation-triangle mr-2"></i> {{ session('error') }}
+        </div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger" style="border-radius: 12px;">
+            <ul class="mb-0 font-weight-bold">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-        <section class="stock-out-title">
-            <h1>Registro de Salida</h1>
-            <p>Control de egresos de materiales y componentes industriales.</p>
-        </section>
-
-        <div id="client-errors" class="stock-out-alert" role="alert" aria-hidden="true"></div>
-
-        <style>
-            .stock-out-alert { display:none; background:#fff4f4; border:1px solid #f5c6cb; padding:0.75rem; border-radius:4px; margin-bottom:0.75rem; }
-            .stock-out-alert.is-visible { display:block; }
-            .item-row.row-error { background:#fff6f6; border-left:4px solid #e3342f; }
-            .item-row .is-invalid { border-color:#e3342f; }
-        </style>
-
-        @if ($errors->any())
-            <div class="stock-out-alert" role="alert">
-                <strong>No se pudo registrar la salida.</strong>
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
-        <form id="stock-out-form" action="{{ route('inventario.salida.store') }}" method="POST" novalidate>
+    <div class="kardex-grid">
+        <form action="{{ route('inventario.kardex.salida.store') }}" method="POST" id="form-salida" novalidate>
             @csrf
 
-            <div class="stock-out-layout">
-                <div class="stock-out-main">
-                    <article class="out-card">
-                        <header><h2><i class="far fa-copy"></i> Identificacion del producto</h2></header>
-
-                        <div class="out-grid out-grid-top">
-                            <div class="field-group field-wide">
-                                <label for="producto_busqueda">Producto</label>
-                                <div class="autocomplete-wrapper">
-                                    <input
-                                        id="producto_busqueda"
-                                        name="producto_busqueda"
-                                        type="search"
-                                        placeholder="Escribe SKU o nombre..."
-                                        data-sync="producto_busqueda"
-                                        class="input-auto-grow @error('producto_busqueda') is-invalid @enderror"
-                                        required
-                                        value="{{ old('producto_busqueda') }}"
-                                    >
-                                    <div id="producto-suggestions" class="autocomplete-dropdown" role="listbox" aria-label="Sugerencias de productos"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <article class="selected-product-card">
-                            <div class="selected-head">
-                                <span>Seleccionado</span>
-                                <span class="state-ok">En stock</span>
-                            </div>
-
-                            <div class="selected-body">
-                                <div class="selected-icon"><i class="fas fa-cart-arrow-down"></i></div>
-                                <div>
-                                    <h3 id="selected-product-name">{{ old('producto_busqueda', 'Selecciona un item del inventario') }}</h3>
-                                    <small id="selected-product-code">SKU: -</small>
-                                </div>
-                                <div class="selected-stock">
-                                    <small>Stock Actual</small>
-                                    <strong><span id="selected-stock-value">0</span> unid</strong>
-                                    <small id="selected-product-warehouse">Almacén: -</small>
-                                </div>
-                            </div>
-                        </article>
-
-                        <div id="items-section-top" style="margin-top:0.75rem;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
-                                <small>Agrega las filas que quieras; se enviarán como <strong>items[]</strong></small>
-                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.2rem; min-width:18rem;">
-                                    <button type="button" id="add-item-btn" class="btn-pdf btn-pdf--small" title="Añadir producto"> <i class="fas fa-plus"></i> Añadir producto</button>
-                                    <small id="add-item-hint" style="min-height:1rem; color:#7b8ca4; font-size:0.72rem; line-height:1.1; text-align:right; opacity:0; transition:opacity 0.15s ease;">producto ya en la lista</small>
-                                </div>
-                            </div>
-
-                            <div id="items-container" style="margin-top:0.75rem;"></div>
-                        </div>
-                    </article>
-
-                    <article class="out-card">
-                        <header><h2><i class="far fa-clipboard"></i> Trazabilidad y asignacion</h2></header>
-
-                        <div class="out-grid out-grid-bottom">
-                            <div class="field-group">
-                                <label for="ot">Orden de trabajo (OT)</label>
-                                <input id="ot" name="ot" type="text" value="{{ old('ot') }}" placeholder="Buscar OT activa..." list="cc_frecuentes" autocomplete="off" class="@error('ot') is-invalid @enderror">
-                                <datalist id="cc_frecuentes">
-                                    @foreach($centrosCoste ?? [] as $cc)
-                                        <option value="{{ $cc->etiqueta_completa }}">
-                                    @endforeach
-                                </datalist>
-                            </div>
-
-                            <div class="field-group">
-                                <label for="solicitante">Solicitante</label>
-                                <input id="solicitante" name="solicitante" type="text" value="{{ old('solicitante', $solicitantePrefill ?? (auth()->user()->name ?? '')) }}" placeholder="Nombre del solicitante" list="solicitantes-list" autocomplete="off" class="@error('solicitante') is-invalid @enderror" data-sync="solicitante">
-                                <input type="hidden" name="personal_id" id="personal_id" value="{{ old('personal_id', $personalId ?? request('personal_id', '')) }}">
-                                <div id="tallas-trabajador" class="mt-2 p-2 rounded" style="display: none; background: #f8fafc; border: 1px solid #dbeafe;">
-                                    <strong class="d-block text-primary mb-1"><i class="fas fa-ruler-combined mr-1"></i> Guía de Tallas del Trabajador</strong>
-                                    <div id="tallas-trabajador-body" class="small text-muted"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <footer class="out-actions">
-                            <button type="submit" class="btn-confirm-out">
-                                <i class="far fa-check-circle"></i>
-                                Confirmar salida de stock
-                            </button>
-                            <a href="{{ route('inventario.index') }}" class="btn-cancel-out">Cancelar</a>
-                        </footer>
-                    </article>
+            {{-- SECCIÓN 1: ORIGEN Y DESTINATARIO --}}
+            <div class="erp-card">
+                <div class="erp-card-header">
+                    <h2 class="erp-card-title">
+                        <i class="fas fa-warehouse text-primary"></i> 1. Origen y Destinatario
+                    </h2>
                 </div>
-
-                <aside class="stock-out-side">
-                    <article class="side-summary-card">
-                        <h2>Resumen de operación</h2>
-
-                        <dl class="summary-list">
-                            <div>
-                                <dt>Operador</dt>
-                                <dd>{{ auth()->user()->name ?? 'Operador' }}</dd>
-                            </div>
-                            <div>
-                                <dt>Cantidad de productos</dt>
-                                <dd id="qty-preview">0</dd>
-                            </div>
-                            <div>
-                                <dt>Criticidad</dt>
-                                <dd><span class="crit-level">Media</span></dd>
-                            </div>
-                        </dl>
-
-                        <div class="security-note">
-                            <small>NOTA DE SEGURIDAD</small>
-                            <p>Asegurese de verificar fisicamente el numero de serie antes de completar el retiro del almacen central.</p>
+                <div class="erp-card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="erp-label" for="almacen_origen_id">Almacén de Origen <span class="text-danger">*</span></label>
+                            <select name="almacen_origen_id" id="almacen_origen_id" class="erp-select" required>
+                                <option value="">-- Selecciona el almacén --</option>
+                                @foreach($almacenes as $alm)
+                                    <option value="{{ $alm->id }}" @selected(old('almacen_origen_id') == $alm->id)>
+                                        {{ $alm->nombre }} ({{ $alm->codigo ?? 'ALM-' . $alm->id }})
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
 
-                        <div class="pdf-action-stack">
-                            <button type="button" class="btn-pdf" data-pdf-open aria-controls="salida-pdf-modal" onclick="openSalidaPdf && openSalidaPdf()">Ver PDF</button>
-                            <button type="button" class="btn-pdf btn-pdf--print" data-pdf-print>Imprimir</button>
-                            <button type="submit" class="btn-pdf btn-pdf--save" name="guardar_documento" value="1">Guardar documento</button>
+                        <div class="col-md-4 mb-3">
+                            <label class="erp-label" for="personal_id">Trabajador / Receptor (Opcional)</label>
+                            <select name="personal_id" id="personal_id" class="erp-select">
+                                <option value="">-- Ninguno (Salida general / Proyecto) --</option>
+                                @foreach($trabajadores as $t)
+                                    <option value="{{ $t->id }}" @selected(old('personal_id', $personalId ?? 0) == $t->id)>
+                                        {{ $t->name }} {{ $t->apellido }} ({{ $t->dni_nie ?: 'ID: ' . $t->id_rrhh }})
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
-                    </article>
 
-                    <article class="side-history-card">
-                        <h3>Salidas recientes</h3>
-                        <div class="history-list">
-                            @forelse($salidasRecientes as $item)
-                                <article>
-                                    <div class="history-icon"><i class="far fa-minus-square"></i></div>
-                                    <div>
-                                        <strong>{{ $item->descripcion }}</strong>
-                                        <small>{{ $item->updated_at?->format('d-m-Y H:i') }} · Hace {{ $item->updated_at?->diffForHumans() }}</small>
-                                    </div>
-                                    <span>-{{ max(1, (int) round($item->stock_actual * 0.05)) }}</span>
-                                </article>
-                            @empty
-                                <p class="history-empty">No hay salidas recientes registradas.</p>
-                            @endforelse
+                        <div class="col-md-4 mb-3">
+                            <label class="erp-label" for="ot">Orden de Trabajo (OT) / Proyecto</label>
+                            <input type="text" id="ot" name="ot" class="erp-input" placeholder="Ej. OT-2026-042" value="{{ old('ot') }}">
                         </div>
-                        <button type="button" class="btn-history" onclick="window.location.href='{{ route('inventario.acciones.index') }}'">Ver todo el historial    </button>
-                    </article>
-                </aside>
-            </div>
 
-            <datalist id="inventario-catalogo-salida">
-                @foreach ($catalogo as $producto)
-                    <option value="{{ $producto->descripcion }}" data-codigo="{{ $producto->codigo }}"></option>
-                    <option value="{{ $producto->codigo }}" data-codigo="{{ $producto->codigo }}"></option>
-                @endforeach
-            </datalist>
-            <datalist id="solicitantes-list">
-                @foreach (($trabajadores ?? []) as $trabajador)
-                    <option value="{{ trim($trabajador->name . ' ' . $trabajador->apellido) }}" data-personal-id="{{ $trabajador->id }}"></option>
-                @endforeach
-            </datalist>
-            <input type="hidden" name="codigo" id="codigo" value="{{ old('codigo') }}">
-
-            <div class="pdf-modal" id="salida-pdf-modal" aria-hidden="true" role="dialog" aria-modal="true">
-                <div class="pdf-modal__backdrop" data-pdf-close></div>
-                <div class="pdf-modal__panel" role="document">
-                    <header class="pdf-modal__header">
-                        <h2>Vista previa del documento</h2>
-                        <div class="pdf-modal__actions">
-                            <button type="button" class="pdf-print-btn" data-pdf-print>
-                                <i class="fas fa-print"></i>
-                                Imprimir
-                            </button>
-                            <button type="button" class="pdf-close-btn" data-pdf-close aria-label="Cerrar vista previa">
-                                <i class="fas fa-times"></i>
-                            </button>
+                        <div class="col-md-5 mb-2">
+                            <label class="erp-label" for="documento_referencia">Documento de Referencia / Albarán</label>
+                            <input type="text" id="documento_referencia" name="documento_referencia" class="erp-input" placeholder="Ej. ALB-78945" value="{{ old('documento_referencia') }}">
                         </div>
-                    </header>
 
-                    <div class="pdf-modal__body">
-                        <article class="pdf-sheet">
-                            <div class="pdf-sheet__top">
-                                <div class="pdf-logo">
-                                    <img src="{{ asset('images/moncobra-1l.png') }}?v={{ @filemtime(public_path('images/moncobra-1l.png')) }}" alt="Moncobra">
-                                </div>
-                                <div class="pdf-title">
-                                    <span>EQUIPO DE PROTECCION PERSONAL (EPI'S)</span>
-                                    <span>(CONTROL DE ENTREGA/REPOSICION)</span>
-                                </div>
-                                <div class="pdf-service">SERVICIO DE PREVENCION</div>
-                            </div>
-
-                            <div class="pdf-meta-row">
-                                <div class="pdf-field pdf-field--wide">
-                                    <label for="pdf_delegacion">DELEGACION:</label>
-                                    <input id="pdf_delegacion" name="pdf_delegacion" type="text" value="{{ old('pdf_delegacion', $delegacionPrefill ?? '') }}" placeholder="Delegacion">
-                                </div>
-                                <div class="pdf-field">
-                                    <label for="pdf_fecha">FECHA:</label>
-                                    <input id="pdf_fecha" name="pdf_fecha" type="text" value="{{ old('pdf_fecha', now()->format('d/m/Y')) }}">
-                                </div>
-                            </div>
-
-                            <div class="pdf-meta-row">
-                                <div class="pdf-field pdf-field--wide">
-                                    <label for="pdf_trabajador">TRABAJADOR (NOMBRE Y APELLIDOS):</label>
-                                    <input id="pdf_trabajador" name="pdf_trabajador" type="text" data-sync="solicitante" list="solicitantes-list" autocomplete="off" value="{{ old('solicitante', $solicitantePrefill ?? (auth()->user()->name ?? '')) }}" placeholder="Nombre del trabajador">
-                                </div>
-                                <div class="pdf-field">
-                                    <label for="pdf_ficha">FICHA N:</label>
-                                    <input id="pdf_ficha" name="pdf_ficha" type="text" value="{{ old('pdf_ficha') }}">
-                                </div>
-                            </div>
-
-                            <div class="pdf-table-wrap">
-                                <table class="pdf-table">
-                                    <thead>
-                                        <tr>
-                                            <th>ARTICULO</th>
-                                            <th>REPOSICIONES / NUEVAS NECESIDADES</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>
-                                                <textarea
-                                                    data-pdf-line="1"
-                                                    class="pdf-cell-input pdf-auto-grow"
-                                                    placeholder="Nombre del producto"
-                                                    readonly
-                                                ></textarea>
-                                            </td>
-                                            <td>
-                                                <textarea data-pdf-line="1-qty" class="pdf-cell-input pdf-cell-input--center pdf-auto-grow" placeholder="Cantidad" readonly></textarea>
-                                            </td>
-                                        </tr>
-                                        @for ($i = 2; $i <= 10; $i++)
-                                            <tr>
-                                                <td><textarea data-pdf-line="{{ $i }}" class="pdf-cell-input pdf-auto-grow" placeholder="" readonly></textarea></td>
-                                                <td><textarea data-pdf-line="{{ $i }}-qty" class="pdf-cell-input pdf-cell-input--center pdf-auto-grow" placeholder="" readonly></textarea></td>
-                                            </tr>
-                                        @endfor
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="pdf-observaciones">
-                                <label for="pdf_observaciones">OBSERVACIONES:</label>
-                                <textarea id="pdf_observaciones" name="pdf_observaciones" class="pdf-auto-grow" placeholder="Escriba cualquier nota o comentario adicional...">{{ old('pdf_observaciones') }}</textarea>
-                            </div>
-
-                            <div class="pdf-legal">
-                                De conformidad con la normativa vigente, este registro documenta la entrega y reposicion de equipos de proteccion.
-                            </div>
-
-                            <div class="pdf-signatures">
-                                <div class="pdf-sign">Firma del Responsable</div>
-                                <div class="pdf-sign">Firma del Trabajador</div>
-                            </div>
-                        </article>
+                        <div class="col-md-7 mb-2">
+                            <label class="erp-label" for="observaciones">Observaciones de la entrega</label>
+                            <input type="text" id="observaciones" name="observaciones" class="erp-input" placeholder="Detalles de la entrega o motivo de reposición..." value="{{ old('observaciones') }}">
+                        </div>
                     </div>
 
-                    <footer class="pdf-modal__footer">
-                        <button type="button" class="btn-pdf-close" data-pdf-close>Cerrar vista</button>
-                    </footer>
+                    <div id="tallas-trabajador-box" class="tallas-box">
+                        <span style="font-size: 0.74rem; font-weight: 800; color: #173e67; text-transform: uppercase; display: block; margin-bottom: 4px;">
+                            <i class="fas fa-user-check mr-1"></i> Tallas registradas del operario:
+                        </span>
+                        <div id="tallas-badges-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- SECCIÓN 2: ARTÍCULOS A RETIRAR --}}
+            <div class="erp-card mb-0">
+                <div class="erp-card-header">
+                    <h2 class="erp-card-title">
+                        <i class="fas fa-boxes text-primary"></i> 2. Artículos a Retirar
+                    </h2>
+                </div>
+                <div class="erp-card-body">
+                    <div class="picker-bar">
+                        <div>
+                            <label class="erp-label" for="select-producto-picker">Buscar Producto con Stock en el Almacén</label>
+                            <select id="select-producto-picker" class="form-control">
+                                <option value="">-- Primero selecciona el almacén de origen --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="erp-label" for="input-cantidad-picker">Uds. a retirar</label>
+                            <input type="number" id="input-cantidad-picker" class="erp-input text-center font-weight-bold" min="1" value="1">
+                        </div>
+                        <div>
+                            <button type="button" class="btn-erp-navy w-100 justify-content-center" id="btn-add-linea" style="height: 42px;">
+                                <i class="fas fa-plus"></i> Añadir línea
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="kardex-table-wrap table-responsive">
+                        <table class="kardex-table" id="tabla-lineas">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%;">SKU / Código</th>
+                                    <th style="width: 42%;">Artículo / Variante</th>
+                                    <th style="width: 14%; text-align: center;">Stock Disp.</th>
+                                    <th style="width: 14%; text-align: center;">Cantidad</th>
+                                    <th style="width: 10%; text-align: center;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lineas-tbody">
+                                <tr id="empty-row">
+                                    <td colspan="5" class="text-center py-4 text-muted font-weight-bold">
+                                        No hay artículos añadidos a la salida todavía.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </form>
-    </section>
+
+        {{-- RESUMEN LATERAL UNIFICADO --}}
+        <aside class="kardex-summary-card">
+            <div class="kardex-summary-title">
+                <i class="fas fa-clipboard-list text-primary"></i> Resumen de Salida
+            </div>
+
+            <div class="kardex-summary-row">
+                <span>Referencias</span>
+                <strong id="summary-salida-items">0</strong>
+            </div>
+
+            <div class="kardex-summary-row" style="border-bottom: none;">
+                <span>Total a retirar</span>
+                <strong id="summary-salida-units" style="color: #dc2626; font-size: 1.45rem;">0</strong>
+            </div>
+
+            <div id="epi-doc-notice" class="epi-doc-notice">
+                <i class="fas fa-print mr-1"></i> Al confirmar, se abrirá automáticamente el <strong>Documento de Entrega EPI</strong> listo para imprimir y firmar.
+            </div>
+
+            <button type="submit" form="form-salida" class="btn-confirm-kardex" id="btn-submit-form" disabled>
+                <i class="fas fa-check-circle"></i> Confirmar Salida
+            </button>
+
+            <div class="text-center mt-3">
+                <a href="{{ route('inventario.index') }}" style="font-size: 0.82rem; color: #64748b; font-weight: 700; text-decoration: underline;">
+                    Cancelar y volver
+                </a>
+            </div>
+        </aside>
+    </div>
+</section>
 @endsection
 
 @section('js')
     @php
-        $catalogoSalidaJs = $catalogo
-            ->map(function ($item) {
-                return [
-                    'id' => (int) $item->id,
-                    'codigo' => (string) $item->codigo,
-                    'nombre' => (string) ($item->nombre ?? ''),
-                    'descripcion' => (string) $item->descripcion,
-                    'stock_actual' => (int) ($item->stock_actual ?? 0),
-                ];
-            })
-            ->values();
+        $stocksJs = $variantesConStock->map(function ($s) {
+            $articulo = $s->variante?->articulo;
+            $clase = $articulo?->clase?->nombre ?? '';
+            return [
+                'almacen_id' => (int) $s->almacen_id,
+                'variante_id' => (int) ($s->variante_id ?? $s->inventario_variante_id),
+                'sku' => (string) ($s->variante?->sku ?? $s->variante?->codigo ?? 'S/C'),
+                'nombre' => (string) ($s->variante?->nombre ?: $articulo?->nombre ?: $articulo?->descripcion ?: 'Artículo'),
+                'clase' => (string) $clase,
+                'stock' => (int) $s->cantidad,
+            ];
+        })->values();
+
+        $trabajadoresJs = $trabajadores->mapWithKeys(function ($t) {
+            return [
+                $t->id => [
+                    'nombre' => trim("{$t->name} {$t->apellido}"),
+                    'tallas' => array_filter([
+                        'Camiseta' => $t->camiseta,
+                        'Pantalón' => $t->pantalon,
+                        'Calzado' => $t->calzado,
+                        'Chaqueta' => $t->chaqueta,
+                        'Sudadera' => $t->sudadera,
+                        'Casco' => $t->casco,
+                        'Guantes' => $t->guantes,
+                        'Gafas' => $t->gafas,
+                    ]),
+                ]
+            ];
+        });
     @endphp
 
     <script>
-        (function () {
-            const trabajadores = @json(($trabajadores ?? collect())->mapWithKeys(fn ($trabajador) => [
-                $trabajador->id => [
-                    'nombre' => trim($trabajador->name . ' ' . $trabajador->apellido),
-                    'camiseta' => $trabajador->camiseta,
-                    'sudadera' => $trabajador->sudadera,
-                    'chaqueta' => $trabajador->chaqueta,
-                    'pantalon' => $trabajador->pantalon,
-                    'calzado' => $trabajador->calzado,
-                    'casco' => $trabajador->casco,
-                    'guantes' => $trabajador->guantes,
-                    'gafas' => $trabajador->gafas,
-                    'bolsa_fod' => $trabajador->bolsa_fod,
-                ],
-            ]));
-            const personalInput = document.getElementById('personal_id');
-            const solicitanteInput = document.getElementById('solicitante');
-            const guide = document.getElementById('tallas-trabajador');
-            const guideBody = document.getElementById('tallas-trabajador-body');
-            const labels = { camiseta: 'Camiseta', sudadera: 'Sudadera', chaqueta: 'Chaqueta', pantalon: 'Pantalón', calzado: 'Calzado', casco: 'Casco', guantes: 'Guantes', gafas: 'Gafas', bolsa_fod: 'Bolsa F.O.D.' };
+        $(document).ready(function () {
+            const stocksDisponibles = @json($stocksJs);
+            const trabajadoresData = @json($trabajadoresJs);
 
-            function renderGuide() {
-                const selected = trabajadores[personalInput?.value];
-                if (!selected) {
-                    guide.style.display = 'none';
-                    return;
-                }
-                solicitanteInput.value = selected.nombre;
-                guideBody.innerHTML = Object.entries(labels)
-                    .map(([key, label]) => `<span class="d-inline-block mr-3 mb-1"><strong>${label}:</strong> ${selected[key] || '—'}</span>`)
-                    .join('');
-                guide.style.display = 'block';
+            const $selectAlmacen = $('#almacen_origen_id');
+            const $selectPersonal = $('#personal_id');
+            const $pickerProducto = $('#select-producto-picker');
+            const $pickerCantidad = $('#input-cantidad-picker');
+            const $btnAdd = $('#btn-add-linea');
+            const tbody = document.getElementById('lineas-tbody');
+            const emptyRow = document.getElementById('empty-row');
+            const boxTallas = document.getElementById('tallas-trabajador-box');
+            const containerTallas = document.getElementById('tallas-badges-container');
+            const summaryItems = document.getElementById('summary-salida-items');
+            const summaryUnits = document.getElementById('summary-salida-units');
+            const btnSubmit = document.getElementById('btn-submit-form');
+            const epiNotice = document.getElementById('epi-doc-notice');
+
+            let lineasCargadas = [];
+
+            // 1. Inicializar Select2 en Trabajador para búsqueda por nombre/DNI
+            $selectPersonal.select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                placeholder: '-- Ninguno (Salida general / Proyecto) --',
+                allowClear: true
+            });
+
+            // Función para normalizar texto (sin acentos ni mayúsculas) para búsqueda predictiva
+            function normalizar(texto) {
+                return (texto || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             }
 
-            solicitanteInput?.addEventListener('input', function () {
-                const match = Object.entries(trabajadores).find(([, trabajador]) => trabajador.nombre.toLowerCase() === this.value.trim().toLowerCase());
-                personalInput.value = match ? match[0] : '';
-                renderGuide();
-            });
-            renderGuide();
-        })();
-    </script>
-
-    <script>
-        (function () {
-            const catalogo = @json($catalogoSalidaJs);
-            const productoInput = document.getElementById('producto_busqueda');
-            const suggestionsDropdown = document.getElementById('producto-suggestions');
-            const qtyPreview = document.getElementById('qty-preview');
-            const selectedName = document.getElementById('selected-product-name');
-            const selectedCode = document.getElementById('selected-product-code');
-            const selectedStock = document.getElementById('selected-stock-value');
-            const selectedWarehouse = document.getElementById('selected-product-warehouse');
-            const codigoHidden = document.getElementById('codigo');
-            const pdfOpenButton = document.querySelector('[data-pdf-open]');
-            const pdfModal = document.getElementById('salida-pdf-modal');
-            const pdfCloseButtons = pdfModal ? pdfModal.querySelectorAll('[data-pdf-close]') : [];
-            const pdfPrintButtons = document.querySelectorAll('[data-pdf-print]');
-            const syncInputs = document.querySelectorAll('[data-sync]');
-            const autoGrowAreas = document.querySelectorAll('.pdf-auto-grow');
-            const formAutoGrowAreas = document.querySelectorAll('.input-auto-grow');
-            const MIN_SEARCH_LENGTH = 2;
-            let confirmedSelectedProducto = null;
-            const addItemHint = document.getElementById('add-item-hint');
-
-            const closeSuggestions = () => {
-                suggestionsDropdown.classList.remove('is-open');
-                suggestionsDropdown.innerHTML = '';
-            };
-
-            const showClientErrors = (errors) => {
-                const container = document.getElementById('client-errors');
-                if (!container) return;
-                container.innerHTML = `<strong>Errores:</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
-                container.classList.add('is-visible');
-                
-                document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
-                
-                const rows = document.querySelectorAll('.item-row');
-                rows.forEach(row => {
-                    const qtyEl = row.querySelector('input[data-item-qty]');
-                    if (!qtyEl) return;
-                    const maxStock = parseInt(qtyEl.dataset.maxStock || qtyEl.max || '0', 10) || 0;
-                    const qty = parseInt(qtyEl.value || '0', 10) || 0;
-                    if (maxStock > 0 && qty > maxStock) row.classList.add('row-error');
-                });
-                container.scrollIntoView({behavior: 'smooth', block: 'center'});
-            };
-
-            const clearClientErrors = () => {
-                const container = document.getElementById('client-errors');
-                if (!container) return;
-                container.innerHTML = '';
-                container.classList.remove('is-visible');
-                document.querySelectorAll('.item-row.row-error').forEach(r => r.classList.remove('row-error'));
-            };
-
-            const setAddItemHint = (text) => {
-                if (!addItemHint) return;
-                addItemHint.textContent = text || '';
-                addItemHint.style.opacity = text ? '1' : '0';
-            };
-
-            const getProductoFingerprint = (producto) => {
-                if (!producto) return null;
-
-                return {
-                    id: String(producto.id || '').trim(),
-                    codigo: normalize(producto.codigo || ''),
-                    descripcion: normalize(producto.descripcion || ''),
-                };
-            };
-
-            const isProductAlreadyAdded = (producto) => {
-                if (!producto) return false;
-
-                const fingerprint = getProductoFingerprint(producto);
-                if (!fingerprint) return false;
-
-                return Array.from(document.querySelectorAll('.item-row')).some((row) => {
-                    const hidden = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
-                    const rowId = String(hidden?.value || row.dataset.inventarioId || '').trim();
-                    const rowCodigo = normalize(row.dataset.productCodigo || '');
-                    const rowDescripcion = normalize(row.dataset.productDescripcion || '');
-
-                    // Only consider a match when both sides have a non-empty value.
-                    if (fingerprint.id && rowId && rowId === fingerprint.id) return true;
-                    if (fingerprint.codigo && rowCodigo && rowCodigo === fingerprint.codigo) return true;
-                    if (fingerprint.descripcion && rowDescripcion && rowDescripcion === fingerprint.descripcion) return true;
-                    return false;
-                });
-            };
-
-            const refreshAddItemHint = () => {
-                const producto = getSelectedProducto();
-                if (!producto) { setAddItemHint(''); return; }
-
-                // If product has no stock, hint 'sin stock'
-                const stock = Number(producto.stock_actual || 0);
-                if (stock <= 0) { setAddItemHint('sin stock'); return; }
-
-                if (isProductAlreadyAdded(producto)) {
-                    setAddItemHint('producto ya en la lista');
-                    return;
-                }
-
-                setAddItemHint('');
-            };
-
-            const normalize = (value) => String(value || '').trim().toLowerCase();
-
-            const findProducto = () => {
-                const search = normalize(productoInput.value);
-                if (!search) return null;
-                return catalogo.find((item) => {
-                    return normalize(item.codigo) === search
-                        || normalize(item.descripcion) === search
-                        || normalize(item.nombre) === search;
-                }) || null;
-            };
-
-            const getSelectedProducto = () => {
-                // SOLUCIÓN BUG "ACEITE": Si hizo clic en un elemento, nos fiamos ciegamente de él.
-                if (confirmedSelectedProducto) return confirmedSelectedProducto;
-                return findProducto();
-            };
-
-            const findSimilarProductos = (query) => {
-                if (!query) return [];
-                const normalized = normalize(query);
-                return catalogo.filter((item) => {
-                    return normalize(item.codigo).includes(normalized)
-                        || normalize(item.descripcion).includes(normalized)
-                        || normalize(item.nombre).includes(normalized);
-                }).slice(0, 8);
-            };
-
-            const renderSuggestions = () => {
-                const query = productoInput.value.trim();
-                if (query.length < MIN_SEARCH_LENGTH) {
-                    closeSuggestions();
-                    return;
-                }
-
-                const similares = findSimilarProductos(query);
-                if (similares.length === 0) {
-                    closeSuggestions();
-                    return;
-                }
-
-                suggestionsDropdown.innerHTML = similares
-                    .map((item, index) => `
-                        <div class="autocomplete-item" data-index="${index}" role="option">
-                            <strong>${item.codigo}</strong>
-                            <small>${item.descripcion} · Almacén: ${item.almacen || 'Sin almacén'} · Stock: ${item.stock_actual}</small>
-                        </div>
-                    `)
-                    .join('');
-
-                suggestionsDropdown.classList.add('is-open');
-
-                suggestionsDropdown.querySelectorAll('.autocomplete-item').forEach((item) => {
-                    item.addEventListener('mousedown', (e) => { // <--- Solución
-                        e.preventDefault(); // Evita que el input principal pierda el foco al instante
-                        
-                        const index = parseInt(item.dataset.index, 10);
-                        const selected = similares[index];
-                        productoInput.value = selected.descripcion;
-                        confirmedSelectedProducto = selected;
-                        if (codigoHidden) codigoHidden.value = selected.id;
-                        hydrateProduct();
-                        closeSuggestions();
-                        refreshAddItemHint();
-                    });
-                });
-            };
-
-            const hydrateProduct = () => {
-                const producto = getSelectedProducto();
-
-                if (!producto) {
-                    confirmedSelectedProducto = null;
-                    selectedName.textContent = productoInput.value || 'Selecciona un item del inventario';
-                    selectedCode.textContent = 'SKU: -';
-                    selectedStock.textContent = '0';
-                    if (selectedWarehouse) selectedWarehouse.textContent = 'Almacén: -';
-                    if (codigoHidden) codigoHidden.value = '';
-                    refreshAddItemHint();
-                    return;
-                }
-
-                confirmedSelectedProducto = producto;
-                selectedName.textContent = producto.descripcion;
-                selectedCode.textContent = `SKU: ${producto.codigo}`;
-                selectedStock.textContent = producto.stock_actual;
-                if (selectedWarehouse) selectedWarehouse.textContent = `Almacén: ${producto.almacen || 'Sin almacén'}`;
-                if (codigoHidden) codigoHidden.value = producto.id;
-                refreshAddItemHint();
-            };
-
-            productoInput.addEventListener('change', hydrateProduct);
-            productoInput.addEventListener('input', () => {
-                clearClientErrors();
-                confirmedSelectedProducto = null;
-                if (codigoHidden) codigoHidden.value = '';
-                renderSuggestions();
-                hydrateProduct();
-                refreshAddItemHint();
-            });
-            
-            productoInput.addEventListener('blur', () => window.setTimeout(closeSuggestions, 120));
-            
-            document.addEventListener('click', (event) => {
-                if (!event.target.closest('.autocomplete-wrapper')) closeSuggestions();
-            });
-
-            // Lógica Modal PDF...
-            if (pdfOpenButton && pdfModal) {
-                const openModal = () => {
-                    populatePdfPreview();
-                    pdfModal.classList.add('is-open');
-                    pdfModal.setAttribute('aria-hidden', 'false');
-                    document.body.classList.add('pdf-modal-open');
-                };
-
-                const populatePdfPreview = () => {
-                    const lines = Array.from(pdfModal.querySelectorAll('textarea[data-pdf-line]'));
-                    lines.forEach(t => t.value = '');
-                    const itemsContainerLocal = document.getElementById('items-container');
-                    const rows = itemsContainerLocal ? itemsContainerLocal.querySelectorAll('.item-row') : [];
-
-                    if (rows.length === 0) {
-                        showClientErrors(['Agrega al menos un producto antes de previsualizar.']);
-                        return false;
-                    }
-
-                    let idx = 1;
-                    rows.forEach((row) => {
-                        const prodText = (row.querySelector('textarea') || {}).value || '';
-                        const qty = (row.querySelector('input[type="number"]') || {}).value || '';
-                        const lineEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}"]`);
-                        const qtyEl = pdfModal.querySelector(`textarea[data-pdf-line="${idx}-qty"]`);
-                        if (lineEl) lineEl.value = prodText;
-                        if (qtyEl) qtyEl.value = qty;
-                        idx++;
-                    });
-                    return true;
-                };
-
-                const closeModal = () => {
-                    pdfModal.classList.remove('is-open');
-                    pdfModal.setAttribute('aria-hidden', 'true');
-                    document.body.classList.remove('pdf-modal-open');
-                };
-
-                const triggerPrint = () => {
-                    if (!pdfModal.classList.contains('is-open')) {
-                        if (!populatePdfPreview()) return;
-                        openModal();
-                    }
-                    setTimeout(() => window.print(), 0);
-                };
-
-                window.openSalidaPdf = () => {
-                    try {
-                        if (!populatePdfPreview()) return;
-                        openModal();
-                    } catch (err) { console.warn('Error PDF', err); }
-                };
-
-                pdfOpenButton.addEventListener('click', openModal);
-                pdfCloseButtons.forEach((button) => button.addEventListener('click', closeModal));
-                pdfPrintButtons.forEach((button) => button.addEventListener('click', triggerPrint));
-                document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape' && pdfModal.classList.contains('is-open')) closeModal();
-                });
-            }
-
-            // Sync Inputs y Auto Grow...
-            if (syncInputs.length) {
-                const syncGroups = new Map();
-                const syncState = { active: false };
-
-                syncInputs.forEach((input) => {
-                    const key = input.dataset.sync || '';
-                    if (!key) return;
-                    if (!syncGroups.has(key)) syncGroups.set(key, []);
-                    syncGroups.get(key).push(input);
-                });
-
-                const syncHandler = (event) => {
-                    if (syncState.active) return;
-                    const source = event.target;
-                    const group = syncGroups.get(source.dataset.sync || '');
-                    if (!group) return;
-                    
-                    syncState.active = true;
-                    group.forEach((input) => {
-                        if (input !== source && input.value !== source.value) {
-                            input.value = source.value;
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
+            // 2. Inicializar Select2 en Buscador de Productos con matcher multicriterio
+            function initProductSelect2() {
+                $pickerProducto.select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    placeholder: 'Escribe SKU, nombre o atributo (ej: ptr-3012, guantes, verde)...',
+                    allowClear: true,
+                    matcher: function (params, data) {
+                        if ($.trim(params.term) === '') {
+                            return data;
                         }
-                    });
-                    syncState.active = false;
-                };
 
-                syncGroups.forEach((group) => {
-                    group.forEach((input) => input.addEventListener('input', syncHandler));
+                        // Términos ingresados separados por espacios
+                        const queryTerms = normalizar(params.term).split(' ').filter(t => t.length > 0);
+                        const itemText = normalizar(data.text);
+
+                        // Si todas las palabras coinciden en el texto, se muestra
+                        const matchesAll = queryTerms.every(term => itemText.includes(term));
+                        return matchesAll ? data : null;
+                    }
                 });
             }
 
-            const bindAutoGrow = (areas) => {
-                if(!areas.length) return;
-                const resizeArea = (el) => {
-                    el.style.height = 'auto';
-                    el.style.height = `${el.scrollHeight}px`;
-                };
-                areas.forEach((area) => {
-                    resizeArea(area);
-                    area.addEventListener('input', () => resizeArea(area));
-                });
-            };
-            bindAutoGrow(autoGrowAreas);
-            bindAutoGrow(formAutoGrowAreas);
+            initProductSelect2();
 
-            hydrateProduct();
+            // Al elegir producto en el selector, enfocar directamente la cantidad para agilidad
+            $pickerProducto.on('select2:select', function () {
+                $pickerCantidad.focus().select();
+            });
 
-            // --- LÓGICA DEL LISTADO DE PRODUCTOS (LA MAGIA DEL BOTÓN) ---
-            (function () {
-                const itemsContainer = document.getElementById('items-container');
-                const addItemBtn = document.getElementById('add-item-btn');
-                let nextIndex = 0;
+            // Permitir añadir pulsando Enter en el campo de cantidad
+            $pickerCantidad.on('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    $btnAdd.trigger('click');
+                }
+            });
 
-                const recalcQtyPreview = () => {
-                    const qtyEls = itemsContainer.querySelectorAll('input[data-item-qty]');
-                    let total = 0;
-                    qtyEls.forEach((el) => { total += parseInt(el.value || '0', 10) || 0; });
-                    qtyPreview.textContent = `-${total}`;
-                };
+            // Manejo de cambio de trabajador y badge de tallas
+            $selectPersonal.on('change', function () {
+                const val = $(this).val();
+                const hasWorker = Boolean(val);
+                if (epiNotice) {
+                    epiNotice.style.display = hasWorker ? 'block' : 'none';
+                }
 
-                const createRow = (index, product = '', qty = 1) => {
-                    const row = document.createElement('div');
-                    row.className = 'item-row';
-                    row.style.display = 'flex';
-                    row.style.gap = '0.5rem';
-                    row.style.alignItems = 'center';
-                    row.style.marginTop = '0.5rem';
+                const trabajador = trabajadoresData[val];
+                if (!trabajador || Object.keys(trabajador.tallas).length === 0) {
+                    boxTallas.style.display = 'none';
+                    return;
+                }
 
-                    const prod = document.createElement('textarea');
-                    prod.name = `items[${index}][producto_busqueda]`;
-                    prod.placeholder = 'SKU o descripción';
-                    prod.rows = 1;
-                    prod.className = 'input-auto-grow';
-                    prod.style.flex = '1';
-                    
-                    if (product && typeof product === 'object') {
-                        prod.value = product.descripcion || product.nombre || '';
-                        prod.readOnly = true;
-                        row.dataset.inventarioId = String(product.id || '');
-                        row.dataset.productCodigo = String(product.codigo || '');
-                        row.dataset.productDescripcion = String(product.descripcion || '');
+                containerTallas.innerHTML = Object.entries(trabajador.tallas)
+                    .map(([prenda, talla]) => `<span class="tallas-badge"><strong>${prenda}:</strong> ${talla}</span>`)
+                    .join('');
+                boxTallas.style.display = 'block';
+            });
+            if ($selectPersonal.val()) $selectPersonal.trigger('change');
+
+            // Manejo de cambio de Almacén de Origen
+            $selectAlmacen.on('change', function () {
+                const almId = parseInt($(this).val(), 10);
+
+                if (lineasCargadas.length > 0) {
+                    if (confirm('Al cambiar de almacén se limpiarán los artículos ya agregados. ¿Deseas continuar?')) {
+                        lineasCargadas = [];
+                        renderLineas();
                     } else {
-                        prod.value = product || '';
+                        return;
                     }
+                }
 
-                    const qtyInput = document.createElement('input');
-                    qtyInput.type = 'number';
-                    qtyInput.min = '1';
-                    qtyInput.step = '1';
-                    qtyInput.value = qty || 1;
-                    qtyInput.name = `items[${index}][cantidad]`;
-                    qtyInput.dataset.itemQty = '1';
-                    qtyInput.style.width = '5.5rem';
+                // Destruir instancia anterior de Select2 para limpiar el DOM
+                if ($pickerProducto.hasClass('select2-hidden-accessible')) {
+                    $pickerProducto.select2('destroy');
+                }
+                $pickerProducto.empty();
 
-                    const removeBtn = document.createElement('button');
-                    removeBtn.type = 'button';
-                    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
-                    removeBtn.className = 'btn-mini btn-danger';
+                if (!almId) {
+                    $pickerProducto.html('<option value="">-- Primero selecciona el almacén de origen --</option>');
+                    initProductSelect2();
+                    return;
+                }
 
-                    const suggestions = document.createElement('div');
-                    suggestions.className = 'autocomplete-dropdown';
-                    suggestions.style.position = 'relative';
+                const filtrados = stocksDisponibles.filter((s) => s.almacen_id === almId);
 
-                    prod.addEventListener('input', () => {
-                        const query = prod.value.trim();
-                        if (!query) { suggestions.classList.remove('is-open'); suggestions.innerHTML = ''; recalcQtyPreview(); return; }
-                        const similares = findSimilarProductos(query);
-                        if (similares.length === 0) { suggestions.classList.remove('is-open'); suggestions.innerHTML = ''; return; }
-                        suggestions.innerHTML = similares.map((item, idx) => `
-                            <div class="autocomplete-item" data-index="${idx}" role="option">
-                                <strong>${item.codigo}</strong>
-                                <small>${item.descripcion}</small>
-                            </div>
-                        `).join('');
-                        suggestions.classList.add('is-open');
-                       suggestions.querySelectorAll('.autocomplete-item').forEach((it) => {
-                            it.addEventListener('mousedown', (e) => {
-                                e.preventDefault();
-                                
-                                const si = parseInt(it.dataset.index, 10);
-                                const selected = similares[si];
-                                prod.value = selected.descripcion;
-                                
-                                
-                                let hidden = row.querySelector(`input[type="hidden"][name="items[${index}][inventario_id]"]`);
-                                if (!hidden) {
-                                    hidden = document.createElement('input');
-                                    hidden.type = 'hidden';
-                                    hidden.name = `items[${index}][inventario_id]`;
-                                    row.appendChild(hidden);
-                                }
-                                hidden.value = selected.id;
+                if (filtrados.length === 0) {
+                    $pickerProducto.html('<option value="">No hay productos con existencias en este almacén</option>');
+                    initProductSelect2();
+                    return;
+                }
 
-                                if (qtyInput) {
-                                    qtyInput.max = selected.stock_actual;
-                                    qtyInput.dataset.maxStock = selected.stock_actual;
-                                    if (parseInt(qtyInput.value || '0', 10) > selected.stock_actual) {
-                                        qtyInput.value = selected.stock_actual;
-                                    }
-                                }
-
-                                suggestions.classList.remove('is-open');
-                                suggestions.innerHTML = '';
-                                recalcQtyPreview();
-                            });
-                        });
+                $pickerProducto.append('<option value=""></option>');
+                filtrados.forEach((p) => {
+                    const tagClase = p.clase ? `[${p.clase}] ` : '';
+                    const label = `${tagClase}[${p.sku}] ${p.nombre} — (Stock: ${p.stock} uds.)`;
+                    const $opt = $('<option>', {
+                        value: p.variante_id,
+                        text: label
                     });
+                    $opt.attr('data-sku', p.sku);
+                    $opt.attr('data-nombre', p.nombre);
+                    $opt.attr('data-stock', p.stock);
+                    $pickerProducto.append($opt);
+                });
 
-                    qtyInput.addEventListener('input', () => {
-                        const maxStock = parseInt(qtyInput.dataset.maxStock || qtyInput.max || '0', 10) || 0;
-                        if (maxStock > 0 && parseInt(qtyInput.value || '0', 10) > maxStock) {
-                            qtyInput.classList.add('is-invalid');
-                        } else {
-                            qtyInput.classList.remove('is-invalid');
-                        }
-                        recalcQtyPreview();
-                    });
-                    
-                    removeBtn.addEventListener('click', () => { row.remove(); recalcQtyPreview(); refreshAddItemHint(); });
+                initProductSelect2();
+                $pickerProducto.val('').trigger('change');
+            });
+            if ($selectAlmacen.val()) $selectAlmacen.trigger('change');
 
-                    row.appendChild(prod);
-                    row.appendChild(qtyInput);
-                    row.appendChild(removeBtn);
-                    row.appendChild(suggestions);
+            // Añadir línea a la tabla
+            $btnAdd.on('click', function () {
+                const varianteId = parseInt($pickerProducto.val(), 10);
+                const $opt = $pickerProducto.find('option:selected');
+                const cantidad = parseInt($pickerCantidad.val(), 10);
 
-                    if (product && typeof product === 'object') {
-                        let hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = `items[${index}][inventario_id]`;
-                        hidden.value = product.id || '';
-                        row.appendChild(hidden);
+                if (!varianteId) {
+                    alert('Selecciona un artículo de la lista.');
+                    $pickerProducto.select2('open');
+                    return;
+                }
 
-                        if (qtyInput) {
-                            qtyInput.max = product.stock_actual || ''; 
-                            qtyInput.dataset.maxStock = product.stock_actual || 0;
-                        }
-                    }
+                const maxStock = parseInt($opt.attr('data-stock'), 10);
+                if (cantidad < 1 || isNaN(cantidad)) {
+                    alert('Introduce una cantidad válida.');
+                    $pickerCantidad.focus().select();
+                    return;
+                }
 
-                    return row;
-                };
+                const existente = lineasCargadas.find((l) => l.variante_id === varianteId);
+                const cantTotal = (existente ? existente.cantidad : 0) + cantidad;
 
-                // Cargar items antiguos si falla la validación del formulario
-                const oldItems = @json(old('items', []));
-                if (Array.isArray(oldItems) && oldItems.length > 0) {
-                    oldItems.forEach((it) => {
-                        let prod = it.producto_busqueda ?? '';
-                        if (it.inventario_id) {
-                            const found = catalogo.find(i => String(i.id) === String(it.inventario_id));
-                            if (found) prod = found;
-                        }
-                        itemsContainer.appendChild(createRow(nextIndex++, prod, it.cantidad ?? 1));
+                if (cantTotal > maxStock) {
+                    alert(`No puedes retirar ${cantTotal} uds. El stock disponible en este almacén es de ${maxStock} uds.`);
+                    $pickerCantidad.focus().select();
+                    return;
+                }
+
+                if (existente) {
+                    existente.cantidad = cantTotal;
+                } else {
+                    lineasCargadas.push({
+                        variante_id: varianteId,
+                        sku: $opt.attr('data-sku'),
+                        nombre: $opt.attr('data-nombre'),
+                        stock_disp: maxStock,
+                        cantidad: cantidad
                     });
                 }
 
-                refreshAddItemHint();
+                $pickerCantidad.val(1);
+                $pickerProducto.val('').trigger('change');
+                renderLineas();
 
-                addItemBtn.addEventListener('click', () => {
-                    clearClientErrors();
-                    const prod = getSelectedProducto();
-                    const qty = 1;
-                    if (!prod) {
-                        showClientErrors(['Selecciona un producto válido antes de añadir.']);
-                        setAddItemHint('');
-                        return;
+                // Reabrir buscador de productos para añadir el siguiente artículo rápidamente
+                $pickerProducto.select2('open');
+            });
+
+            function updateSummaryTotals() {
+                summaryItems.textContent = String(lineasCargadas.length);
+                const total = lineasCargadas.reduce((acc, l) => acc + l.cantidad, 0);
+                summaryUnits.textContent = String(total);
+                btnSubmit.disabled = lineasCargadas.length === 0;
+            }
+
+            function renderLineas() {
+                if (lineasCargadas.length === 0) {
+                    tbody.innerHTML = '';
+                    tbody.appendChild(emptyRow);
+                    updateSummaryTotals();
+                    return;
+                }
+
+                tbody.innerHTML = lineasCargadas.map((l, idx) => `
+                    <tr>
+                        <td><strong style="color: #173e67; font-weight: 800;">${l.sku}</strong></td>
+                        <td><strong style="color: #1e293b;">${l.nombre}</strong></td>
+                        <td class="text-center"><span class="badge badge-info" style="font-size: 0.82rem; padding: 0.35rem 0.6rem;">${l.stock_disp} uds.</span></td>
+                        <td class="text-center">
+                            <input type="number"
+                                   name="lineas[${idx}][cantidad]"
+                                   class="qty-input input-row-qty"
+                                   data-idx="${idx}"
+                                   min="1"
+                                   max="${l.stock_disp}"
+                                   value="${l.cantidad}"
+                                   required>
+                            <input type="hidden" name="lineas[${idx}][variante_id]" value="${l.variante_id}">
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn-delete-row js-btn-delete" data-idx="${idx}" title="Quitar fila">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                updateSummaryTotals();
+            }
+
+            tbody.addEventListener('input', function (e) {
+                if (e.target.classList.contains('input-row-qty')) {
+                    const idx = parseInt(e.target.dataset.idx, 10);
+                    let val = parseInt(e.target.value, 10);
+                    const max = lineasCargadas[idx].stock_disp;
+
+                    if (val > max) {
+                        alert(`La cantidad no puede superar el stock disponible (${max} uds.).`);
+                        val = max;
                     }
+                    if (val < 1 || isNaN(val)) val = 1;
 
-                    // Prevent adding products without available stock
-                    const prodStock = Number(prod.stock_actual || 0);
-                    if (prodStock <= 0) {
-                        showClientErrors(['No hay stock disponible para el producto seleccionado.']);
-                        setAddItemHint('sin stock');
-                        return;
-                    }
+                    lineasCargadas[idx].cantidad = val;
+                    e.target.value = val;
+                    updateSummaryTotals();
+                }
+            });
 
-                    if (isProductAlreadyAdded(prod)) {
-                        setAddItemHint('producto ya en la lista');
-                        return;
-                    }
-
-                    itemsContainer.appendChild(createRow(nextIndex++, prod, qty));
-                    productoInput.value = '';
-                    if (codigoHidden) codigoHidden.value = '';
-                    confirmedSelectedProducto = null;
-                    hydrateProduct();
-                    setAddItemHint('');
-                    recalcQtyPreview();
-                    refreshAddItemHint();
-                });
-
-                const stockForm = document.getElementById('stock-out-form');
-                stockForm.addEventListener('submit', (e) => {
-                    const rows = itemsContainer.querySelectorAll('.item-row');
-                    const errors = [];
-
-                    if (rows.length === 0) {
-                        errors.push('Debes añadir al menos una fila a la lista antes de guardar. Usa el botón de "+ Añadir producto"');
-                    }
-
-                    rows.forEach((row, rIdx) => {
-                        const qtyEl = row.querySelector('input[data-item-qty]');
-                        const codeEl = row.querySelector('input[type="hidden"][name$="[inventario_id]"]');
-                        const prodText = row.querySelector('textarea');
-                        const qty = parseInt(qtyEl?.value || '0', 10) || 0;
-                        
-                        if (qty < 1) {
-                            errors.push(`Cantidad inválida en la fila ${rIdx + 1}.`);
-                            return;
-                        }
-
-                        let maxStock = 0;
-                        if (codeEl && codeEl.value) {
-                            const found = catalogo.find(i => String(i.id) === String(codeEl.value) || normalize(i.codigo) === normalize(codeEl.value));
-                            if (found) maxStock = found.stock_actual || 0;
-                        } else {
-                            const found = catalogo.find(i => normalize(i.descripcion) === normalize(prodText.value) || normalize(i.codigo) === normalize(prodText.value) || normalize(i.nombre) === normalize(prodText.value));
-                            if (found) maxStock = found.stock_actual || 0;
-                        }
-
-                        if (maxStock > 0 && qty > maxStock) {
-                            errors.push(`Stock insuficiente para ${prodText.value} (Solicitado: ${qty}, Máximo: ${maxStock}).`);
-                        }
-                    });
-
-                    if (errors.length > 0) {
-                        e.preventDefault();
-                        showClientErrors(errors);
-                        return false;
-                    }
-                });
-
-                recalcQtyPreview();
-            })();
-        })();
+            tbody.addEventListener('click', function (e) {
+                const btn = e.target.closest('.js-btn-delete');
+                if (btn) {
+                    const idx = parseInt(btn.dataset.idx, 10);
+                    lineasCargadas.splice(idx, 1);
+                    renderLineas();
+                }
+            });
+        });
     </script>
 @endsection

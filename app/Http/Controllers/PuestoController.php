@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Puesto;
 use App\Models\Curso;
+use App\Models\Epi;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -17,7 +18,8 @@ class PuestoController extends Controller
     public function index(): View
     {
         $this->authorize('cursos.view');
-        // Cargamos los puestos contando cuántos cursos obligatorios, EPIs y personal tienen
+
+        // withCount('epis') cuenta únicamente los EPIs activos gracias a la relación en el modelo Puesto
         $puestos = Puesto::withCount(['cursos', 'personal', 'epis'])
             ->orderBy('nombre')
             ->get();
@@ -43,22 +45,35 @@ class PuestoController extends Controller
     public function edit(Puesto $puesto): View
     {
         $this->authorize('cursos.edit');
-        // Recuperamos todos los cursos agrupados por categoría para pintar el "Panel de Normas"
+
         $cursos = Curso::orderBy('categoria')->orderBy('nombre')->get();
         $cursosPorCategoria = $cursos->groupBy(function ($curso) {
             return $curso->categoria ?: 'Sin categoría';
         });
 
-        $episDisponibles = \App\Models\Epi::where('activo', true)->orderBy('nombre')->get();
+        // Solo EPIs activos disponibles para asignar, precargando su stock e inventario vinculado
+        $episDisponibles = Epi::where('activo', true)
+            ->with(['inventario', 'inventarioVariante.items'])
+            ->orderBy('nombre')
+            ->get();
 
-        $episAsignados = $puesto->epis->mapWithKeys(function ($epi) {
-            return [$epi->id => ['cantidad' => $epi->pivot->cantidad]];
-        })->toArray();
+        // Solo EPIs activos asignados actualmente
+        $episAsignados = $puesto->epis()
+            ->get()
+            ->mapWithKeys(function ($epi) {
+                return [$epi->id => ['cantidad' => (int) ($epi->pivot->cantidad ?? 1)]];
+            })
+            ->toArray();
 
-        // Extraemos solo los IDs de los cursos que este puesto ya tiene marcados como obligatorios
         $cursosAsignados = $puesto->cursos->pluck('id')->toArray();
 
-        return view('puestos.edit', compact('puesto', 'cursosPorCategoria', 'cursosAsignados', 'episDisponibles', 'episAsignados'));
+        return view('puestos.edit', compact(
+            'puesto',
+            'cursosPorCategoria',
+            'cursosAsignados',
+            'episDisponibles',
+            'episAsignados'
+        ));
     }
 
     public function syncEpis(Request $request, Puesto $puesto)
@@ -74,14 +89,24 @@ class PuestoController extends Controller
         $syncData = [];
         if ($request->has('epis')) {
             foreach ($request->epis as $epiId) {
-                // Recuperamos la cantidad introducida; si no viene por seguridad, ponemos 1
                 $cantidad = (int) $request->input("cantidades.{$epiId}", 1);
                 $syncData[$epiId] = ['cantidad' => max(1, $cantidad)];
             }
         }
 
-        // Aplicamos la inteligencia del sync() de Laravel con el atributo de la tabla pivot
-        $puesto->epis()->sync($syncData);
+        // Recuperar los EPIs que ya estaban asignados pero que están actualmente inactivos,
+        // para conservarlos en la tabla pivote y no eliminarlos si en el futuro se reactivan.
+        $inactivosConservar = $puesto->todosLosEpis()
+            ->where('epis.activo', false)
+            ->get();
+
+        foreach ($inactivosConservar as $epiInactivo) {
+            if (!isset($syncData[$epiInactivo->id])) {
+                $syncData[$epiInactivo->id] = ['cantidad' => (int) ($epiInactivo->pivot->cantidad ?? 1)];
+            }
+        }
+
+        $puesto->todosLosEpis()->sync($syncData);
 
         return redirect()->route('puestos.edit', $puesto->id)->with('success', 'Dotación de EPIs del puesto actualizada correctamente.');
     }
@@ -103,13 +128,11 @@ class PuestoController extends Controller
     public function syncCursos(Request $request, Puesto $puesto)
     {
         $this->authorize('cursos.edit');
-        // Validamos que lo que nos llega es un array de IDs que existen en la tabla cursos
         $request->validate([
             'cursos' => 'nullable|array',
             'cursos.*' => 'exists:cursos,id',
         ]);
 
-        // Preparamos el array con los datos adicionales para la tabla pivote (es_obligatorio)
         $syncData = [];
         if ($request->has('cursos')) {
             foreach ($request->cursos as $cursoId) {
@@ -143,7 +166,6 @@ class PuestoController extends Controller
     public function destroy(Puesto $puesto)
     {
         $this->authorize('cursos.edit');
-        // Medida de seguridad: No dejamos borrar un puesto si hay gente usándolo
         if ($puesto->personal()->exists()) {
             return redirect()->route('puestos.index')->with('error', 'No se puede eliminar: Hay trabajadores con este puesto asignado.');
         }
@@ -152,9 +174,6 @@ class PuestoController extends Controller
         return redirect()->route('puestos.index')->with('success', 'Puesto eliminado correctamente.');
     }
 
-    /**
-     * DASHBOARD WEB: Muestra la matriz visual de cumplimiento
-     */
     public function auditoria(Puesto $puesto)
     {
         $this->authorize('cursos.view');
@@ -183,7 +202,6 @@ class PuestoController extends Controller
             foreach ($cursosExigidos as $cursoNorma) {
                 $cursoTrabajador = $trabajador->cursos->firstWhere('id', $cursoNorma->id);
                 
-                // Valores por defecto
                 $estado = 'pendiente'; 
                 $tooltip = 'No realizado o No Apto';
                 $fechaRealizacionStr = '—';
@@ -229,7 +247,6 @@ class PuestoController extends Controller
                     }
                 }
 
-                // Guardamos todo el detalle para que el modal (clic) pueda leerlo
                 $matrizTemporal[$cursoNorma->id] = [
                     'estado' => $estado,
                     'tooltip' => $tooltip,
@@ -248,9 +265,6 @@ class PuestoController extends Controller
         return view('puestos.auditoria', compact('puesto', 'cursosExigidos', 'trabajadores', 'totalTrabajadores', 'porcentajeCumplimiento', 'alertas'));
     }
 
-    /**
-     * Exporta la matriz de cumplimiento (Auditoría) del Puesto a formato CSV.
-     */
     public function exportAuditoria(Puesto $puesto)
     {
         $this->authorize('cursos.view');
@@ -275,18 +289,16 @@ class PuestoController extends Controller
 
         $callback = function () use ($puesto, $cursosExigidos) {
             $file = fopen('php://output', 'w');
-            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
+            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            // Construir Cabecera Dinámica
             $cabeceras = ['ID RRHH', 'Trabajador', 'Departamento', 'Puesto'];
             foreach ($cursosExigidos as $c) {
-                $cabeceras[] = $c->nombre; // 1 Columna por curso
+                $cabeceras[] = $c->nombre;
             }
             fputcsv($file, $cabeceras, ';');
 
             $hoy = \Carbon\Carbon::now()->startOfDay();
 
-            // Rellenar Filas (1 fila por trabajador)
             foreach ($puesto->personal as $trabajador) {
                 $deptos = is_string($trabajador->departamento) 
                     ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
@@ -333,26 +345,20 @@ class PuestoController extends Controller
         return response()->streamDownload($callback, $fileName, $headers);
     }
 
-    /**
-     * Genera el documento PDF oficial con la dotación de EPIs de un puesto (Norma SST-0840-002-1-2 Rev.4).
-     */
-    /**
-     * Genera el documento PDF oficial con la dotación de EPIs de un puesto.
-     */
     public function exportEpisPdf(Request $request, Puesto $puesto)
     {
         $this->authorize('cursos.view');
 
+        // Carga únicamente los EPIs activos (los dados de baja se omiten del documento oficial)
         $puesto->load(['epis' => function ($query) {
-            $query->orderBy('id');
+            $query->where('epis.activo', true)->orderBy('id');
         }]);
 
-        $download = $request->input('download', 0) == 1; // Leemos si pulsó "Descargar" o "Visualizar"
+        $download = (int) $request->input('download', 0) === 1;
         $slug = \Illuminate\Support\Str::slug($puesto->nombre ?: 'puesto-' . $puesto->id);
         $fileName = 'ficha_epis_' . $slug . '.pdf';
         $pdfContent = null;
 
-        // 1. ATRAMPAMOS LOS DATOS DEL MODAL (Con los valores oficiales por defecto)
         $configPdf = [
             'codigo'           => $request->input('codigo_iso', 'SST-0840-002-1-2'),
             'revision'         => $request->input('revision_iso', 'Rev. 4'),
@@ -360,11 +366,10 @@ class PuestoController extends Controller
             'marco_prl'        => $request->input('marco_prl', 'RD 773/1997'),
             'sello_prevencion' => $request->input('sello_prevencion', 'FIRMADO / HOMOLOGADO'),
             'sello_delegacion' => $request->input('sello_delegacion', 'CONFORME / VALIDADO'),
-            'dpto_prevencion'  => $request->input('dpto_prevencion', 'Dpto. SST Moncobra, S.A.'), // <--- NUEVO
-            'dpto_delegacion'  => $request->input('dpto_delegacion', 'Jefatura de Producción / Planta'), // <--- NUEVO
+            'dpto_prevencion'  => $request->input('dpto_prevencion', 'Dpto. SST Moncobra, S.A.'),
+            'dpto_delegacion'  => $request->input('dpto_delegacion', 'Jefatura de Producción / Planta'),
         ];
 
-        // 2. SE LOS INYECTAMOS A LA VISTA BLADE
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('puestos.pdf-epis-placeholder', compact('puesto', 'configPdf'))
                 ->setPaper('a4', 'portrait');
@@ -392,7 +397,6 @@ class PuestoController extends Controller
             ]);
         }
 
-        // Visor HTML + Blob en cliente para evitar net::ERR_CONNECTION_RESET en 127.0.0.1:8000
         $payloadJson = json_encode([
             'mime' => 'application/pdf',
             'filename' => $fileName,

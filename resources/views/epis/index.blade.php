@@ -5,7 +5,6 @@
 @section('css')
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Reutilizamos tu sistema de diseño base */
         .erp-hero { background: #fff; border: 1px solid #e7ecf3; border-radius: 18px; box-shadow: 0 16px 30px rgba(15, 23, 42, .06); display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; margin-bottom: 20px; align-items: center; }
         .erp-hero h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; color: #173e67; }
         .erp-hero p { margin: 0; color: #667085; font-size: .92rem; }
@@ -13,14 +12,12 @@
         .erp-primary-btn:hover { opacity: 0.9; color: #fff; }
         .erp-primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        /* Barra de búsqueda / filtros */
         .epi-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
         .epi-toolbar input[type="search"],
         .epi-toolbar select { border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px; font-size: 0.9rem; }
         .epi-toolbar input[type="search"] { flex: 1; min-width: 220px; }
         .filter-toggle-inactive { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #64748b; cursor: pointer; user-select: none; margin: 0; }
 
-        /* Agrupación por categoría */
         .epi-category-group { margin-bottom: 28px; }
         .epi-category-title {
             font-size: 0.85rem; font-weight: 800; color: #173e67; text-transform: uppercase;
@@ -29,16 +26,14 @@
         }
         .epi-category-count { background: #eef2f7; color: #667085; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; font-weight: 800; text-transform: none; letter-spacing: 0; }
 
-        /* Grid de EPIs */
         .epi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
         .epi-card { background: #fff; border: 1px solid #e7ecf3; border-radius: 14px; padding: 18px; transition: all 0.2s ease; display: flex; flex-direction: column; }
         .epi-card:hover { border-color: #0284c7; box-shadow: 0 8px 15px rgba(15, 23, 42, 0.05); transform: translateY(-2px); }
-        .epi-card__title { font-size: 1.15rem; font-weight: 800; color: #173e67; margin: 0 0 8px 0; }
+        .epi-card__title { font-size: 1.15rem; font-weight: 800; color: #173e67; margin: 0 0 4px 0; }
         .epi-card__desc { font-size: 0.85rem; color: #64748b; margin-bottom: 16px; flex-grow: 1; }
         .epi-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px dashed #eef2f7; }
         .epi-badge { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; }
 
-        /* Barra de acciones de la tarjeta */
         .epi-card__actions { display: flex; gap: 6px; padding-top: 10px; margin-top: 10px; border-top: 1px dashed #eef2f7; }
         .epi-action-btn {
             flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -54,20 +49,17 @@
 
         .epi-empty-state { grid-column: 1 / -1; padding: 40px; text-align: center; border: 2px dashed #cbd5e1; border-radius: 16px; color: #64748b; }
 
-        /* Modal Estilos (compartido: crear, editar, confirmación) */
         .erp-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1060; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
         .erp-modal-overlay.is-open { display: flex; opacity: 1; }
         .erp-modal-panel { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(20px); transition: transform 0.2s; padding: 24px; }
         .erp-modal-overlay.is-open .erp-modal-panel { transform: translateY(0); }
 
-        /* Formulario Puestos List */
         .puesto-assign-list { border: 1px solid #e2e8f0; border-radius: 10px; max-height: 250px; overflow-y: auto; background: #f8fafc; padding: 10px; margin-top: 10px; }
         .puesto-assign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e2e8f0; background: #fff; border-radius: 8px; margin-bottom: 6px; }
         .puesto-assign-item:last-child { margin-bottom: 0; }
         .qty-input { width: 70px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; }
         .qty-input:disabled { background: #e2e8f0; opacity: 0.6; cursor: not-allowed; }
 
-        /* Toasts */
         #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
         .erp-toast {
             background: #fff; border-left: 4px solid #10b981; border-radius: 10px;
@@ -86,7 +78,6 @@
 
 @section('content')
     <section style="font-family: 'Manrope', sans-serif;">
-        <!-- Mensajes de feedback (fallback sin JS) -->
         @if(session('success'))
             <div class="alert alert-success" style="border-radius: 12px; font-weight: 600;">{{ session('success') }}</div>
         @endif
@@ -103,12 +94,11 @@
             </div>
         @endif
 
-        <!-- Cabecera -->
         <header class="erp-hero">
             <div>
                 <div style="font-size:.75rem;font-weight:800;letter-spacing:.12em;color:#8a98ab;text-transform:uppercase;">Prevención y Seguridad</div>
                 <h1>Catálogo de EPIs</h1>
-                <p>Gestiona los Equipos de Protección Individual y vincúlalos a los perfiles de trabajo.</p>
+                <p>Gestiona los Equipos de Protección Individual y vincúlalos al inventario y a los perfiles formativos.</p>
             </div>
             <div>
                 <button type="button" class="erp-primary-btn" id="btn-open-modal">
@@ -121,7 +111,6 @@
             <i class="fas fa-arrow-left"></i> Volver
         </a>
 
-        <!-- Buscador y filtros -->
         <div class="epi-toolbar">
             <input type="search" id="epi-search" placeholder="Buscar EPI por nombre..." autocomplete="off">
 
@@ -133,12 +122,11 @@
             </select>
 
             <label class="filter-toggle-inactive">
-                <input type="checkbox" id="epi-toggle-inactive" checked>
+                <input type="checkbox" id="epi-toggle-inactive">
                 Mostrar inactivos
             </label>
         </div>
 
-        <!-- Catálogo agrupado por categoría -->
         <div id="epis-catalog">
             @forelse($episPorCategoria as $categoriaNombre => $episGrupo)
                 <section class="epi-category-group" data-category="{{ $categoriaNombre }}">
@@ -156,14 +144,12 @@
             @endforelse
         </div>
 
-        <!-- Estado vacío: no hay ningún EPI en el sistema -->
         <div id="epis-empty-global" class="epi-empty-state" style="{{ $episPorCategoria->isEmpty() ? '' : 'display:none;' }}">
             <i class="fas fa-hard-hat fa-3x mb-3 text-muted"></i>
             <h4>No hay EPIs registrados</h4>
             <p>Utiliza el botón superior para crear tu primer Equipo de Protección Individual.</p>
         </div>
 
-        <!-- Estado vacío: hay EPIs pero ninguno coincide con el filtro/búsqueda -->
         <div id="epis-empty-search" class="epi-empty-state" style="display:none;">
             <i class="fas fa-search fa-2x mb-2 text-muted"></i>
             <h4>Sin resultados</h4>
@@ -171,7 +157,6 @@
         </div>
     </section>
 
-    <!-- Datalist compartido de categorías (crear + editar) -->
     <datalist id="categorias-datalist">
         @foreach($categoriasDisponibles as $cat)
             <option value="{{ $cat }}"></option>
@@ -190,10 +175,41 @@
 
             <form id="form-create-epi" action="{{ route('epis.store') }}" method="POST">
                 @csrf
+                <input type="hidden" name="inventario_id" id="create-inventario-id" value="">
+                <input type="hidden" name="inventario_variante_id" id="create-inventario-variante-id" value="">
+
+                <!-- Vinculación con Inventario -->
+                <div class="form-group" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 10px; padding: 12px 14px;">
+                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px;">
+                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Inventario (Opcional)
+                    </label>
+                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Conecta este EPI con el stock real del almacén para controlar existencias y tallas.</p>
+                    <select id="create-select-inventario" class="form-control" style="border-radius: 8px; font-weight: 600;">
+                        <option value="">-- Sin vinculación a inventario --</option>
+                        @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
+                            <optgroup label="Productos con Variantes (Familias de Tallas/Colores)">
+                                @foreach($variantesInventario as $var)
+                                    <option value="var-{{ $var->id }}" data-tipo="variante" data-id="{{ $var->id }}" data-nombre="{{ $var->nombre }}">
+                                        [FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} (Stock total: {{ $var->stock_total }} uds.)
+                                    </option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
+                            <optgroup label="Productos Simples (Sin Variantes)">
+                                @foreach($itemsSueltosInventario as $it)
+                                    <option value="item-{{ $it->id }}" data-tipo="item" data-id="{{ $it->id }}" data-nombre="{{ $it->nombre ?: $it->descripcion }}">
+                                        [ITEM] {{ $it->codigo }} - {{ $it->nombre ?: $it->descripcion }} (Stock: {{ $it->stock_actual }} uds.)
+                                    </option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                    </select>
+                </div>
 
                 <div class="form-group">
                     <label style="font-weight: 700; color: #1e293b;">Nombre del EPI <span class="text-danger">*</span></label>
-                    <input type="text" name="nombre" class="form-control" style="border-radius: 8px;" placeholder="Ej. Casco de seguridad Clase A" required value="{{ old('nombre') }}">
+                    <input type="text" name="nombre" id="create-epi-nombre" class="form-control" style="border-radius: 8px;" placeholder="Ej. CASCO DE SEGURIDAD CLASE A" required value="{{ old('nombre') }}">
                 </div>
 
                 <div class="form-group">
@@ -203,10 +219,9 @@
 
                 <div class="form-group">
                     <label style="font-weight: 700; color: #1e293b;">Descripción / Normativa</label>
-                    <textarea name="descripcion" class="form-control" style="border-radius: 8px;" rows="2" placeholder="Detalles técnicos o normativa aplicable...">{{ old('descripcion') }}</textarea>
+                    <textarea name="descripcion" class="form-control" style="border-radius: 8px;" rows="2" placeholder="Detalles técnicos o normativa aplicable (ej. UNE-EN 397)...">{{ old('descripcion') }}</textarea>
                 </div>
 
-                <!-- Lista de vinculación rápida a Puestos -->
                 <div class="form-group" style="margin-top: 24px;">
                     <label style="font-weight: 700; color: #1e293b; margin-bottom: 4px;">Vinculación Inicial a Perfiles de Trabajo</label>
                     <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0;">Selecciona a qué puestos aplica este EPI y especifica la cantidad necesaria por trabajador.</p>
@@ -237,7 +252,7 @@
         </div>
     </div>
 
-    <!-- Modal para Editar EPI (compartido, se rellena por JS al pulsar "Editar" en una tarjeta) -->
+    <!-- Modal para Editar EPI -->
     <div class="erp-modal-overlay" id="modal-edit-epi">
         <div class="erp-modal-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px;">
@@ -250,6 +265,37 @@
             <form id="form-edit-epi" action="" method="POST">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="inventario_id" id="edit-inventario-id" value="">
+                <input type="hidden" name="inventario_variante_id" id="edit-inventario-variante-id" value="">
+
+                <!-- Vinculación con Inventario -->
+                <div class="form-group" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 10px; padding: 12px 14px;">
+                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px;">
+                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Inventario (Opcional)
+                    </label>
+                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Conecta este EPI con el stock real del almacén para controlar existencias y tallas.</p>
+                    <select id="edit-select-inventario" class="form-control" style="border-radius: 8px; font-weight: 600;">
+                        <option value="">-- Sin vinculación a inventario --</option>
+                        @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
+                            <optgroup label="Productos con Variantes (Familias de Tallas/Colores)">
+                                @foreach($variantesInventario as $var)
+                                    <option value="var-{{ $var->id }}" data-tipo="variante" data-id="{{ $var->id }}" data-nombre="{{ $var->nombre }}">
+                                        [FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} (Stock total: {{ $var->stock_total }} uds.)
+                                    </option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
+                            <optgroup label="Productos Simples (Sin Variantes)">
+                                @foreach($itemsSueltosInventario as $it)
+                                    <option value="item-{{ $it->id }}" data-tipo="item" data-id="{{ $it->id }}" data-nombre="{{ $it->nombre ?: $it->descripcion }}">
+                                        [ITEM] {{ $it->codigo }} - {{ $it->nombre ?: $it->descripcion }} (Stock: {{ $it->stock_actual }} uds.)
+                                    </option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                    </select>
+                </div>
 
                 <div class="form-group">
                     <label style="font-weight: 700; color: #1e293b;">Nombre del EPI <span class="text-danger">*</span></label>
@@ -296,7 +342,7 @@
         </div>
     </div>
 
-    <!-- Modal de confirmación genérico (reemplaza al confirm() nativo del navegador) -->
+    <!-- Modal de confirmación genérico -->
     <div class="erp-modal-overlay" id="confirm-modal">
         <div class="erp-modal-panel" style="max-width: 420px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
@@ -313,7 +359,6 @@
         </div>
     </div>
 
-    <!-- Contenedor de notificaciones toast -->
     <div id="toast-container"></div>
 @endsection
 
@@ -327,9 +372,6 @@
             const emptyGlobal = document.getElementById('epis-empty-global');
             const emptySearch = document.getElementById('epis-empty-search');
 
-            // ---------------------------------------------------------
-            // Toasts
-            // ---------------------------------------------------------
             function showToast(message, type = 'success') {
                 const container = document.getElementById('toast-container');
                 const toast = document.createElement('div');
@@ -343,9 +385,6 @@
                 }, 3500);
             }
 
-            // ---------------------------------------------------------
-            // Modal de confirmación genérico (basado en Promesas)
-            // ---------------------------------------------------------
             function confirmAction(message) {
                 return new Promise((resolve) => {
                     const modal = document.getElementById('confirm-modal');
@@ -372,10 +411,6 @@
                 });
             }
 
-            // ---------------------------------------------------------
-            // Helpers de DOM: insertar/reemplazar/eliminar tarjetas y
-            // mantener las secciones de categoría coherentes.
-            // ---------------------------------------------------------
             function getOrCreateCategoryGroup(categoriaNombre) {
                 let group = catalog.querySelector(`.epi-category-group[data-category="${CSS.escape(categoriaNombre)}"]`);
                 if (group) return group;
@@ -408,8 +443,6 @@
                 const newCard = wrapper.firstElementChild;
                 const epiId = newCard.dataset.epiId;
 
-                // Si ya existía (edición o cambio de estado), la quitamos primero,
-                // porque puede haber cambiado de categoría.
                 const existing = document.getElementById(`epi-card-${epiId}`);
                 const oldGroup = existing ? existing.closest('.epi-category-group') : null;
                 if (existing) existing.remove();
@@ -441,7 +474,7 @@
             }
 
             // ---------------------------------------------------------
-            // Búsqueda + filtro de categoría + mostrar/ocultar inactivos
+            // Búsqueda + filtros (Inactivos DESACTIVADOS por defecto)
             // ---------------------------------------------------------
             const searchInput = document.getElementById('epi-search');
             const categoriaSelect = document.getElementById('epi-filter-categoria');
@@ -449,7 +482,8 @@
             const storageKey = 'epiCatalogoMostrarInactivos';
 
             const savedState = localStorage.getItem(storageKey);
-            toggleInactive.checked = savedState !== null ? savedState === 'true' : true;
+            // Por defecto falso (ocultar inactivos), solo true si el usuario lo marcó expresamente
+            toggleInactive.checked = savedState === 'true';
 
             function applyFilters() {
                 const term = searchInput.value.trim().toLowerCase();
@@ -491,27 +525,10 @@
             checkEmptyStates();
             applyFilters();
 
-            // ---------------------------------------------------------
-            // Modal genérico open/close
-            // ---------------------------------------------------------
             const toggleModal = (modal, show) => {
                 if (show === undefined) modal.classList.toggle('is-open');
                 else modal.classList.toggle('is-open', show);
             };
-
-            // ---------------------------------------------------------
-            // Modal CREAR
-            // ---------------------------------------------------------
-            const modalCreate = document.getElementById('modal-create-epi');
-            const btnOpen = document.getElementById('btn-open-modal');
-            const btnClose = document.getElementById('btn-close-modal');
-            const btnCancel = document.getElementById('btn-cancel-modal');
-            const formCreate = document.getElementById('form-create-epi');
-
-            btnOpen.addEventListener('click', () => toggleModal(modalCreate, true));
-            btnClose.addEventListener('click', () => toggleModal(modalCreate, false));
-            btnCancel.addEventListener('click', () => toggleModal(modalCreate, false));
-            modalCreate.addEventListener('click', (e) => { if (e.target === modalCreate) toggleModal(modalCreate, false); });
 
             function bindQtyToggle(checkboxSelector) {
                 document.querySelectorAll(checkboxSelector).forEach(chk => {
@@ -525,9 +542,51 @@
             bindQtyToggle('.puesto-checkbox');
             bindQtyToggle('.puesto-checkbox-edit');
 
-            @if($errors->any())
+            // ---------------------------------------------------------
+            // Modal CREAR (con selector de Inventario y autocompletado)
+            // ---------------------------------------------------------
+            const modalCreate = document.getElementById('modal-create-epi');
+            const btnOpen = document.getElementById('btn-open-modal');
+            const btnClose = document.getElementById('btn-close-modal');
+            const btnCancel = document.getElementById('btn-cancel-modal');
+            const formCreate = document.getElementById('form-create-epi');
+            const createSelectInv = document.getElementById('create-select-inventario');
+            const createInputInvId = document.getElementById('create-inventario-id');
+            const createInputVarId = document.getElementById('create-inventario-variante-id');
+            const createInputNombre = document.getElementById('create-epi-nombre');
+
+            createSelectInv.addEventListener('change', function () {
+                const opt = this.options[this.selectedIndex];
+                createInputInvId.value = '';
+                createInputVarId.value = '';
+
+                if (!opt.value) return;
+
+                const tipo = opt.dataset.tipo;
+                const id = opt.dataset.id;
+                const nombreSugerido = opt.dataset.nombre || '';
+
+                if (tipo === 'variante') {
+                    createInputVarId.value = id;
+                } else if (tipo === 'item') {
+                    createInputInvId.value = id;
+                }
+
+                // Autocompletar el nombre si el campo está vacío
+                if (createInputNombre.value.trim() === '' && nombreSugerido) {
+                    createInputNombre.value = nombreSugerido.toUpperCase();
+                }
+            });
+
+            btnOpen.addEventListener('click', () => {
+                createSelectInv.value = '';
+                createInputInvId.value = '';
+                createInputVarId.value = '';
                 toggleModal(modalCreate, true);
-            @endif
+            });
+            btnClose.addEventListener('click', () => toggleModal(modalCreate, false));
+            btnCancel.addEventListener('click', () => toggleModal(modalCreate, false));
+            modalCreate.addEventListener('click', (e) => { if (e.target === modalCreate) toggleModal(modalCreate, false); });
 
             formCreate.addEventListener('submit', async function (e) {
                 e.preventDefault();
@@ -551,6 +610,9 @@
                     showToast(data.message, 'success');
                     toggleModal(modalCreate, false);
                     formCreate.reset();
+                    createSelectInv.value = '';
+                    createInputInvId.value = '';
+                    createInputVarId.value = '';
                     document.querySelectorAll('.puesto-checkbox').forEach(chk => {
                         document.getElementById(chk.dataset.target).disabled = true;
                     });
@@ -562,15 +624,34 @@
             });
 
             // ---------------------------------------------------------
-            // Modal EDITAR
+            // Modal EDITAR (con selector de Inventario precargado)
             // ---------------------------------------------------------
             const modalEdit = document.getElementById('modal-edit-epi');
             const btnCloseEdit = document.getElementById('btn-close-edit-modal');
             const btnCancelEdit = document.getElementById('btn-cancel-edit-modal');
             const formEdit = document.getElementById('form-edit-epi');
+            const editSelectInv = document.getElementById('edit-select-inventario');
+            const editInputInvId = document.getElementById('edit-inventario-id');
+            const editInputVarId = document.getElementById('edit-inventario-variante-id');
             const inputEditNombre = document.getElementById('edit-epi-nombre');
             const inputEditDescripcion = document.getElementById('edit-epi-descripcion');
             const inputEditCategoria = document.getElementById('edit-epi-categoria');
+
+            editSelectInv.addEventListener('change', function () {
+                const opt = this.options[this.selectedIndex];
+                editInputInvId.value = '';
+                editInputVarId.value = '';
+
+                if (!opt.value) return;
+
+                const tipo = opt.dataset.tipo;
+                const id = opt.dataset.id;
+                if (tipo === 'variante') {
+                    editInputVarId.value = id;
+                } else if (tipo === 'item') {
+                    editInputInvId.value = id;
+                }
+            });
 
             btnCloseEdit.addEventListener('click', () => toggleModal(modalEdit, false));
             btnCancelEdit.addEventListener('click', () => toggleModal(modalEdit, false));
@@ -579,11 +660,24 @@
             function openEditModal(card) {
                 const epiId = card.dataset.epiId;
                 const puestosAsignados = JSON.parse(card.dataset.epiPuestos || '{}');
+                const invId = card.dataset.epiInventarioId || '';
+                const varId = card.dataset.epiInventarioVarianteId || '';
 
                 formEdit.action = `${baseEpisUrl}/${epiId}`;
                 inputEditNombre.value = card.dataset.epiNombre;
                 inputEditDescripcion.value = card.dataset.epiDescripcion;
                 inputEditCategoria.value = card.dataset.epiCategoria;
+
+                // Precargar la vinculación con Inventario en el selector
+                editInputInvId.value = invId;
+                editInputVarId.value = varId;
+                if (varId) {
+                    editSelectInv.value = `var-${varId}`;
+                } else if (invId) {
+                    editSelectInv.value = `item-${invId}`;
+                } else {
+                    editSelectInv.value = '';
+                }
 
                 document.querySelectorAll('.puesto-checkbox-edit').forEach(chk => {
                     chk.checked = false;
@@ -611,8 +705,6 @@
                 btnSubmit.disabled = true;
 
                 try {
-                    // Enviamos como POST con _method=PUT (spoofing) para evitar el
-                    // conocido problema de PHP con PUT + multipart/form-data.
                     const response = await fetch(formEdit.action, {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
@@ -636,9 +728,7 @@
             });
 
             // ---------------------------------------------------------
-            // Delegación de eventos sobre las tarjetas: editar / baja / eliminar
-            // (delegado en el contenedor porque las tarjetas se insertan
-            // dinámicamente y no tendrían listeners propios)
+            // Delegación de eventos en tarjetas (Editar / Toggle / Eliminar)
             // ---------------------------------------------------------
             catalog.addEventListener('click', async function (e) {
                 const btnEdit = e.target.closest('.js-btn-edit-epi');

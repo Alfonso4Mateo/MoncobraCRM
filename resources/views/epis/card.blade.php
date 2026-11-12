@@ -1,9 +1,9 @@
 {{-- resources/views/epis/card.blade.php --}}
-{{-- Se usa tanto en el render inicial de epis/index.blade.php como en las
-     respuestas JSON del controlador (crear/editar/dar de baja), para que el
-     frontend pueda insertar/reemplazar la tarjeta sin recargar la página. --}}
 @php
     $epiPuestosCantidades = $epi->puestos->pluck('pivot.cantidad', 'id');
+    $stockTotal = $epi->stock_disponible;
+    $codigoInventario = $epi->inventarioVariante?->codigo ?? $epi->inventario?->codigo;
+    $nombreInventario = $epi->inventarioVariante?->nombre ?? $epi->inventario?->nombre ?? $epi->inventario?->descripcion;
 @endphp
 <div class="epi-card {{ !$epi->activo ? 'opacity-50' : '' }}"
      id="epi-card-{{ $epi->id }}"
@@ -12,20 +12,40 @@
      data-epi-descripcion="{{ $epi->descripcion }}"
      data-epi-categoria="{{ $epi->categoria }}"
      data-epi-activo="{{ $epi->activo ? '1' : '0' }}"
+     data-epi-inventario-id="{{ $epi->inventario_id ?? '' }}"
+     data-epi-inventario-variante-id="{{ $epi->inventario_variante_id ?? '' }}"
      data-epi-puestos='@json($epiPuestosCantidades)'>
 
-    <h3 class="epi-card__title">{{ $epi->nombre }}</h3>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <h3 class="epi-card__title" style="margin-bottom: 4px;">{{ $epi->nombre }}</h3>
+        @if(!$epi->activo)
+            <span class="badge badge-secondary" style="flex-shrink: 0;">Inactivo</span>
+        @else
+            <span class="badge badge-success" style="background: #10b981; flex-shrink: 0;">Activo</span>
+        @endif
+    </div>
+
+    {{-- VINCULACIÓN CON INVENTARIO --}}
+    @if($codigoInventario)
+        <div style="margin-bottom: 8px;">
+            <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 2px 8px; border-radius: 6px; font-weight: 700;" title="Artículo de Inventario: {{ $nombreInventario }}">
+                <i class="fas fa-boxes"></i> SKU: {{ $codigoInventario }} · Stock: {{ $stockTotal }} uds.
+            </span>
+        </div>
+    @else
+        <div style="margin-bottom: 8px;">
+            <span style="font-size: 0.72rem; color: #94a3b8; font-style: italic;">
+                <i class="fas fa-unlink"></i> Sin ítem de inventario vinculado
+            </span>
+        </div>
+    @endif
+
     <p class="epi-card__desc">{{ $epi->descripcion ?: 'Sin descripción detallada.' }}</p>
 
     <div class="epi-card__footer">
         <span class="epi-badge" title="Cantidad de puestos que requieren este EPI">
             <i class="fas fa-users mr-1"></i> {{ $epi->puestos_count }} Puestos
         </span>
-        @if(!$epi->activo)
-            <span class="badge badge-secondary">Inactivo</span>
-        @else
-            <span class="badge badge-success" style="background: #10b981;">Activo</span>
-        @endif
     </div>
 
     <div class="epi-card__actions">

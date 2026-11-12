@@ -26,7 +26,6 @@
         .matrix-table tbody tr:hover td { background: #f8fafc; }
         .matrix-table tbody tr:hover td.col-worker { background: #f1f5f9; }
 
-        /* Semáforos */
         .status-dot { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; cursor: help; }
         .status-vigente { background: #dcfce7; color: #166534; box-shadow: 0 0 0 1px #bbf7d0; }
         .status-aviso { background: #fef9c3; color: #854d0e; box-shadow: 0 0 0 1px #fef08a; }
@@ -36,7 +35,6 @@
         .legend { display: flex; gap: 15px; padding: 15px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 0.8rem; font-weight: 600; color: #64748b; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
 
-        /* Estilos del Modal de Detalles */
         .audit-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1050; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
         .audit-modal-overlay.is-active { display: flex; opacity: 1; }
         .audit-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 450px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(20px); transition: transform 0.2s; overflow: hidden; }
@@ -52,7 +50,6 @@
         .audit-data-label { font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
         .audit-data-value { font-size: 0.95rem; font-weight: 800; color: #0f172a; text-align: right; }
         
-        /* Cursor pointer para las celdas */
         .matrix-table td.cell-interactive { cursor: pointer; transition: background 0.2s; }
         .matrix-table td.cell-interactive:hover { background: #e0e7ff !important; }
     </style>
@@ -60,7 +57,6 @@
 
 @section('content')
     <section class="p-3">
-        <!-- Cabecera y KPIs -->
         <div class="audit-hero">
             <div class="audit-title">
                 <div style="font-size: 0.75rem; font-weight: 800; color: #8a98ab; letter-spacing: 0.1em; margin-bottom: 4px;">REPORTE DE AUDITORÍA</div>
@@ -96,25 +92,23 @@
             </div>
         </div>
 
-        <!-- Matriz Visual (Tabla de doble entrada) -->
         <div class="matrix-container">
             <table class="matrix-table">
                 <thead>
-                        <tr>
-                            <th class="col-worker">TRABAJADOR / ID / DNI</th>
-                            <th>DEPARTAMENTO</th>
-                            <th>PUESTO</th>
-                            @foreach($cursosExigidos as $curso)
-                                <th title="{{ $curso->nombre }}">
-                                    {{ \Illuminate\Support\Str::limit($curso->nombre, 25) }}
-                                </th>
-                            @endforeach
-                        </tr>
-                    </thead>
+                    <tr>
+                        <th class="col-worker">TRABAJADOR / ID / DNI</th>
+                        <th>DEPARTAMENTO</th>
+                        <th>PUESTO</th>
+                        @foreach($cursosExigidos as $curso)
+                            <th title="{{ $curso->nombre }}">
+                                {{ \Illuminate\Support\Str::limit($curso->nombre, 25) }}
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
                 <tbody>
                     @forelse($trabajadores as $trabajador)
                         @php
-                            // Procesamos el departamento igual que en las otras vistas
                             $deptos = is_string($trabajador->departamento) 
                                 ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
                                 : (array) $trabajador->departamento;
@@ -161,7 +155,8 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $cursosExigidos->count() + 1 }}" class="text-center py-5 text-muted">
+                            {{-- Colspan ajustado a 3 columnas fijas + número de cursos --}}
+                            <td colspan="{{ $cursosExigidos->count() + 3 }}" class="text-center py-5 text-muted">
                                 <i class="fas fa-users-slash fa-2x mb-2 text-light"></i><br>
                                 No hay trabajadores asignados al perfil de {{ $puesto->nombre }}.
                             </td>
@@ -213,13 +208,11 @@
 
 @section('js')
     <script>
-        // Lógica del Modal de Detalles
         document.addEventListener('DOMContentLoaded', function() {
             const modal = document.getElementById('detail-modal');
             const btnClose = document.getElementById('close-modal');
             const cells = document.querySelectorAll('.js-open-detail');
 
-            // Elementos del modal
             const mCurso = document.getElementById('modal-curso-nombre');
             const mTrabajador = document.getElementById('modal-trabajador-nombre');
             const mEstadoDot = document.getElementById('modal-estado-dot');
@@ -230,7 +223,6 @@
 
             cells.forEach(cell => {
                 cell.addEventListener('click', function() {
-                    // Leer datos de la celda
                     mCurso.textContent = this.dataset.curso;
                     mTrabajador.textContent = this.dataset.trabajador;
                     mEstadoTexto.textContent = this.dataset.estadoTexto;
@@ -238,20 +230,16 @@
                     mVencimiento.textContent = this.dataset.vencimiento;
                     mRestante.textContent = this.dataset.restante;
                     
-                    // Actualizar semáforo
                     mEstadoDot.className = 'status-dot ' + this.dataset.estadoClase;
-
-                    // Mostrar modal
                     modal.classList.add('is-active');
                 });
             });
 
-            // Cerrar modal
             const closeModal = () => modal.classList.remove('is-active');
             
             btnClose.addEventListener('click', closeModal);
             modal.addEventListener('click', function(e) {
-                if(e.target === modal) closeModal(); // Clic fuera del modal
+                if(e.target === modal) closeModal();
             });
             document.addEventListener('keydown', (e) => {
                 if(e.key === 'Escape') closeModal();

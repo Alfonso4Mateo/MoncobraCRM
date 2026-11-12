@@ -672,21 +672,52 @@
                                     <table class="table profile-table">
                                         <thead><tr><th>Tipo</th><th>Activo</th><th>Estado</th><th>Responsable registrado</th><th>Ficha</th></tr></thead>
                                         <tbody>
-                                            @forelse(($activosAsignados ?? collect())->flatMap(fn ($items, $tipo) => $items->map(fn ($item) => compact('tipo', 'item'))) as $asignado)
+                                            @php
+                                                $listaActivos = collect();
+                                                foreach (($activosAsignados ?? []) as $tipoNombre => $coleccionItems) {
+                                                    foreach ($coleccionItems ?? [] as $elem) {
+                                                        $listaActivos->push([
+                                                            'item' => $elem,
+                                                            'tipo' => $tipoNombre,
+                                                        ]);
+                                                    }
+                                                }
+                                            @endphp
+
+                                            @forelse($listaActivos as $asignado)
                                                 @php
                                                     $item = $asignado['item'];
                                                     $tipo = $asignado['tipo'];
-                                                    $url = $tipo === 'Equipos IT' ? route('equipos.show', $item) : ($tipo === 'Maquinaria de planta' ? route('herramientas.planta.show', $item) : route('calibrables.show', $item));
+                                                    $url = $tipo === 'Equipos IT' 
+                                                        ? (Route::has('equipos.show') ? route('equipos.show', $item) : '#')
+                                                        : '#';
                                                 @endphp
                                                 <tr>
                                                     <td>{{ $tipo }}</td>
-                                                    <td><strong>{{ $item->nombre }}</strong><br><small class="text-muted">{{ $item->codigo ?: ($item->numero_serie ?? 'Sin código') }}</small></td>
-                                                    <td><span class="profile-chip profile-chip--ok">{{ $item->estado_label ?? ucfirst((string) ($item->estado ?? 'asignado')) }}</span></td>
-                                                    <td>{{ $item->responsable ?: '—' }}</td>
-                                                    <td><a href="{{ $url }}" class="profile-icon-link" title="Abrir ficha"><i class="fas fa-arrow-up-right-from-square"></i></a></td>
+                                                    <td>
+                                                        <strong>{{ $item->nombre ?? $item->descripcion ?? '—' }}</strong>
+                                                        @if(!empty($item->codigo))
+                                                            <br><small class="text-muted">{{ $item->codigo }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ $item->estado ?? 'Operativo' }}</td>
+                                                    <td>{{ $item->responsable ?? '—' }}</td>
+                                                    <td>
+                                                        @if($url !== '#')
+                                                            <a href="{{ $url }}" class="btn btn-xs btn-outline-primary" title="Ver ficha">
+                                                                <i class="fas fa-external-link-alt"></i>
+                                                            </a>
+                                                        @else
+                                                            —
+                                                        @endif
+                                                    </td>
                                                 </tr>
                                             @empty
-                                                <tr><td colspan="5"><div class="profile-empty-state"><i class="fas fa-toolbox"></i><strong>No hay activos asignados</strong><span>Los equipos y herramientas vinculados aparecerán aquí.</span></div></td></tr>
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-3 text-muted">
+                                                        No hay activos ni herramientas asignadas a este trabajador.
+                                                    </td>
+                                                </tr>
                                             @endforelse
                                         </tbody>
                                     </table>

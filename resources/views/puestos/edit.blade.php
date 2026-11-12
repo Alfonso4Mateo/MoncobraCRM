@@ -7,7 +7,6 @@
     <style>
         .puesto-edit-shell { font-family: 'Manrope', sans-serif; padding: 14px; }
 
-        /* CABECERA ESTILO STITCH (SCREEN 4 & 6) */
         .header-panel {
             background: #fff;
             border: 1px solid #e2e8f0;
@@ -93,7 +92,6 @@
         }
         .btn-top-action--csv:hover { background: #dbeafe; }
 
-        /* CONTENEDOR PRINCIPAL Y PESTAÑAS */
         .macro-container {
             background: #fff;
             border: 1px solid #e2e8f0;
@@ -140,7 +138,6 @@
         .tab-panel { display: none; }
         .tab-panel.is-active { display: block; }
 
-        /* CABECERA INTERNA DE PESTAÑA + BUSCADOR */
         .tab-subhead {
             display: flex;
             justify-content: space-between;
@@ -166,7 +163,6 @@
             outline: none;
         }
 
-        /* PESTAÑA 1: CURSOS OBLIGATORIOS */
         .category-group { margin-bottom: 20px; }
         .category-title {
             font-size: 0.8rem;
@@ -204,7 +200,6 @@
         .course-toggle input:checked + .course-toggle__track { background: #0f2942; }
         .course-toggle input:checked + .course-toggle__track .course-toggle__thumb { transform: translateX(22px); }
 
-        /* PESTAÑA 2: DOTACIÓN DE EPIS (DISEÑO STITCH SCREEN 6) */
         .epi-banner-actions {
             display: flex;
             justify-content: space-between;
@@ -238,13 +233,9 @@
             text-decoration: none !important;
             box-shadow: 0 6px 14px rgba(220, 38, 38, 0.22);
             transition: transform 0.15s ease, opacity 0.15s ease;
+            border: none;
         }
         .btn-pdf-epi:hover { transform: translateY(-1px); opacity: 0.95; }
-
-        .btn-pdf-epi--download {
-            background: #0f2942;
-            box-shadow: 0 6px 14px rgba(15, 41, 66, 0.18);
-        }
 
         .puesto-assign-list {
             display: flex;
@@ -299,6 +290,16 @@
             border-radius: 6px;
             letter-spacing: 0.03em;
         }
+        .epi-inv-pill {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.02em;
+        }
         .puesto-assign-item__desc {
             font-size: 0.8rem;
             color: #64748b;
@@ -306,7 +307,6 @@
             display: block;
         }
 
-        /* CONTROL DE UNIDADES (- 2 +) ESTILO STITCH SCREEN 6 */
         .qty-stepper {
             display: inline-flex;
             align-items: center;
@@ -348,7 +348,6 @@
         .qty-input::-webkit-outer-spin-button,
         .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-        /* BOTONES DE GUARDADO */
         .btn-save {
             background: #0f2942;
             color: white;
@@ -366,7 +365,6 @@
         }
         .btn-save:hover { background: #173e67; color: white; transform: translateY(-1px); }
 
-        /* TARJETAS KPI INFERIORES (SCREEN 6) */
         .epi-kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -424,7 +422,6 @@
             </div>
         @endif
 
-        <!-- CABECERA DEL PERFIL FORMATIVO -->
         <div class="header-panel">
             <div>
                 <div class="header-kicker">
@@ -458,7 +455,6 @@
             </div>
         </div>
 
-        <!-- CONTENEDOR PRINCIPAL DE PESTAÑAS -->
         <div class="macro-container">
 
             <div class="section-tabs-bar">
@@ -478,7 +474,7 @@
                 </div>
             </div>
 
-            <!-- ===================== PESTAÑA 1: CURSOS OBLIGATORIOS ===================== -->
+            <!-- PESTAÑA 1: CURSOS OBLIGATORIOS -->
             <div class="tab-panel" data-panel="cursos">
                 <div class="tab-subhead">
                     <div>
@@ -536,7 +532,7 @@
                 </form>
             </div>
 
-            <!-- ===================== PESTAÑA 2: DOTACIÓN DE EPIS ===================== -->
+            <!-- PESTAÑA 2: DOTACIÓN DE EPIS -->
             <div class="tab-panel" data-panel="epis">
                 <div class="tab-subhead">
                     <div>
@@ -546,11 +542,10 @@
                     <input type="search" id="search-epis-input" class="tab-search-input" placeholder="Buscar EPI o norma EN..." autocomplete="off">
                 </div>
 
-                <!-- BARRA DE ACCIONES DOCUMENTALES EPI -->
                 <div class="epi-banner-actions">
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         @can('cursos.view')
-                            <button type="button" class="btn-pdf-epi" data-toggle="modal" data-target="#modal-config-pdf" style="cursor: pointer;">
+                            <button type="button" class="btn-pdf-epi" data-toggle="modal" data-target="#modal-config-pdf">
                                 <i class="fas fa-sliders-h"></i> Parametrizar y Sacar Documento EPIs
                             </button>
                         @endcan
@@ -579,9 +574,11 @@
                                 @php
                                     $estaAsignado = array_key_exists($epi->id, $episAsignados);
                                     $cantidadActual = $estaAsignado ? (int) $episAsignados[$epi->id]['cantidad'] : 1;
+                                    $codigoInv = $epi->inventarioVariante?->codigo ?? $epi->inventario?->codigo;
+                                    $stockTotal = $epi->stock_disponible;
                                 @endphp
                                 <div class="puesto-assign-item js-epi-row {{ $estaAsignado ? 'is-selected' : '' }}"
-                                     data-search="{{ mb_strtolower($epi->nombre . ' ' . ($epi->categoria ?? '') . ' ' . ($epi->descripcion ?? '')) }}">
+                                     data-search="{{ mb_strtolower($epi->nombre . ' ' . ($epi->categoria ?? '') . ' ' . ($epi->descripcion ?? '') . ' ' . ($codigoInv ?? '')) }}">
                                     <label style="margin: 0; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; flex: 1; min-width: 0;">
                                         <input
                                             type="checkbox"
@@ -596,6 +593,11 @@
                                                 <span class="epi-item-name">{{ $epi->nombre }}</span>
                                                 @if (!empty($epi->categoria))
                                                     <span class="epi-norma-pill">{{ $epi->categoria }}</span>
+                                                @endif
+                                                @if ($codigoInv)
+                                                    <span class="epi-inv-pill" title="Enlazado con Inventario (Stock: {{ $stockTotal }} uds.)">
+                                                        <i class="fas fa-boxes"></i> SKU: {{ $codigoInv }} (Stock: {{ $stockTotal }})
+                                                    </span>
                                                 @endif
                                             </div>
                                             @if ($epi->descripcion)
@@ -636,7 +638,6 @@
                             </button>
                         </div>
 
-                        <!-- TARJETAS INFERIORES DE RESUMEN (STITCH SCREEN 6) -->
                         <div class="epi-kpi-grid">
                             <div class="epi-kpi-card">
                                 <div class="epi-kpi-card__label">TOTAL DOTACIÓN ESTIMADA</div>
@@ -674,7 +675,6 @@
                     </button>
                 </div>
                 
-                <!-- Fíjate: es un form GET con target="_blank" -->
                 <form action="{{ route('puestos.epis.pdf', $puesto->id) }}" method="GET" target="_blank">
                     <div class="modal-body" style="padding: 24px;">
                         <div class="row">
@@ -699,24 +699,24 @@
                         <hr style="border-color: #e2e8f0; margin: 20px 0;">
                         <h6 style="font-weight: 800; color: #0f2942; margin-bottom: 16px;">Textos de Sellos y Departamentos</h6>
                             
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Prevención SST</label>
-                                    <input type="text" name="sello_prevencion" class="form-control" value="FIRMADO / HOMOLOGADO" style="border-radius: 8px;">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Resp. Delegación</label>
-                                    <input type="text" name="sello_delegacion" class="form-control" value="CONFORME / VALIDADO" style="border-radius: 8px;">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Prevención (Texto bajo sello)</label>
-                                    <input type="text" name="dpto_prevencion" class="form-control" value="Dpto. SST Moncobra, S.A." style="border-radius: 8px;">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Delegación (Texto bajo sello)</label>
-                                    <input type="text" name="dpto_delegacion" class="form-control" value="Jefatura de Producción / Planta" style="border-radius: 8px;">
-                                </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Prevención SST</label>
+                                <input type="text" name="sello_prevencion" class="form-control" value="FIRMADO / HOMOLOGADO" style="border-radius: 8px;">
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Resp. Delegación</label>
+                                <input type="text" name="sello_delegacion" class="form-control" value="CONFORME / VALIDADO" style="border-radius: 8px;">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Prevención (Texto bajo sello)</label>
+                                <input type="text" name="dpto_prevencion" class="form-control" value="Dpto. SST Moncobra, S.A." style="border-radius: 8px;">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Delegación (Texto bajo sello)</label>
+                                <input type="text" name="dpto_delegacion" class="form-control" value="Jefatura de Producción / Planta" style="border-radius: 8px;">
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 14px 14px; padding: 16px 24px;">
@@ -737,9 +737,6 @@
 @section('js')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // ---------------------------------------------------------
-            // 1. PESTAÑAS (CURSOS / EPIS)
-            // ---------------------------------------------------------
             const tabButtons = document.querySelectorAll('#puesto-tabs .tab-btn');
             const tabPanels = document.querySelectorAll('.tab-panel');
             const storageKey = 'puestoEditActiveTab';
@@ -777,9 +774,6 @@
 
             activateTab(defaultTab);
 
-            // ---------------------------------------------------------
-            // 2. BUSCADOR EN VIVO DE CURSOS Y CONTADOR
-            // ---------------------------------------------------------
             const searchCursos = document.getElementById('search-cursos-input');
             const badgeCountCursos = document.getElementById('badge-count-cursos');
 
@@ -808,9 +802,6 @@
                 });
             }
 
-            // ---------------------------------------------------------
-            // 3. LÓGICA DE EPIS: CHECKBOXES, BOTONES (- / +) Y KPIS EN VIVO
-            // ---------------------------------------------------------
             const badgeCountEpis = document.getElementById('badge-count-epis');
             const prescritosText = document.getElementById('epi-prescritos-text');
             const kpiTotalUnidades = document.getElementById('kpi-total-unidades');

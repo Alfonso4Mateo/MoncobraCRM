@@ -20,6 +20,10 @@ class UpdateEpiRequest extends FormRequest
             'descripcion' => 'nullable|string|max:1000',
             'categoria' => 'nullable|string|max:100',
 
+            // Vinculación opcional con el módulo de Inventario
+            'inventario_id' => 'nullable|integer|exists:inventario,id',
+            'inventario_variante_id' => 'nullable|integer|exists:inventario_variantes,id',
+
             'puestos' => 'nullable|array',
             'puestos.*' => 'exists:puestos,id',
 

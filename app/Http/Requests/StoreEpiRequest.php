@@ -8,7 +8,6 @@ class StoreEpiRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // El control de acceso real ya lo hace el middleware de permisos en la ruta.
         return true;
     }
 
@@ -18,6 +17,10 @@ class StoreEpiRequest extends FormRequest
             'nombre' => 'required|string|max:255|unique:epis,nombre',
             'descripcion' => 'nullable|string|max:1000',
             'categoria' => 'nullable|string|max:100',
+
+            // Vinculación opcional con el módulo de Inventario
+            'inventario_id' => 'nullable|integer|exists:inventario,id',
+            'inventario_variante_id' => 'nullable|integer|exists:inventario_variantes,id',
 
             'puestos' => 'nullable|array',
             'puestos.*' => 'exists:puestos,id',
