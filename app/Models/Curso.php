@@ -67,6 +67,7 @@ class Curso extends Model
 
         $activity->properties = $activity->properties->merge([
             'reference_name' => $referencia,
+            'proyecto_id' => session('active_proyecto_id') ?: $this->proyectos()->value('proyectos.id'),
             'ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);

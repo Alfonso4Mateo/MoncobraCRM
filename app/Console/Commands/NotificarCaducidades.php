@@ -2,98 +2,129 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Setting;
-use App\Models\Personal;
-use Illuminate\Support\Facades\Mail;
 use App\Mail\AlertaCursosMail;
+use App\Models\Personal;
+use App\Models\Proyecto;
+use App\Models\Setting;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Mail;
 
 class NotificarCaducidades extends Command
 {
-    protected $signature = 'cursos:notificar-caducidades';
-    protected $description = 'Revisa las caducidades de los cursos y envía un correo a los técnicos.';
+    protected $signature = 'cursos:notificar-caducidades {--proyecto= : ID del proyecto específico a procesar}';
+    protected $description = 'Revisa las caducidades de los cursos por proyecto y envía un correo a los técnicos de cada sede.';
 
-    public function __construct()
+    public function handle(): int
     {
-        parent::__construct();
-    }
+        $proyectoOption = $this->option('proyecto');
 
-    public function handle()
-    {
-        $enviar = Setting::where('key', 'alertas_prl_enviar_caducidades')->value('value');
-        if ($enviar !== null && $enviar === '0') {
-            $this->info('El envío de alertas de caducidades está desactivado en la configuración.');
+        $proyectos = $proyectoOption
+            ? Proyecto::where('id', (int) $proyectoOption)->get()
+            : Proyecto::orderBy('id')->get();
+
+        if ($proyectos->isEmpty()) {
+            $this->warn('No se encontraron proyectos para procesar.');
             return 0;
         }
 
-        $this->info('--- INICIANDO ESCANEO DE CURSOS ---');
+        $hoy = Carbon::now()->startOfDay();
 
-        $emailSetting = Setting::where('key', 'alertas_prl_email')->value('value');
+        foreach ($proyectos as $proyecto) {
+            $this->procesarProyecto($proyecto, $hoy, $proyectoOption !== null);
+        }
+
+        return 0;
+    }
+
+    private function procesarProyecto(Proyecto $proyecto, Carbon $hoy, bool $esManual): void
+    {
+        $enviar = Setting::where('key', "alertas_prl_enviar_caducidades_proyecto_{$proyecto->id}")->value('value')
+            ?? Setting::where('key', 'alertas_prl_enviar_caducidades')->value('value');
+
+        if (!$esManual && $enviar !== null && $enviar === '0') {
+            $this->line("[{$proyecto->nombre}] Envío de caducidades desactivado.");
+            return;
+        }
+
+        $emailSetting = Setting::where('key', "alertas_prl_email_proyecto_{$proyecto->id}")->value('value');
+        if ($emailSetting === null && $proyecto->id === (int) Proyecto::orderBy('id')->value('id')) {
+            $emailSetting = Setting::where('key', 'alertas_prl_email')->value('value');
+        }
+
         $decodedEmails = json_decode((string) $emailSetting, true);
         $emails = is_array($decodedEmails)
             ? $decodedEmails
             : (is_string($emailSetting) && trim($emailSetting) !== '' ? [trim($emailSetting)] : []);
 
         if (empty($emails)) {
-            $this->warn('❌ ABORTADO: No hay correos configurados en el panel de ajustes.');
-            return 0;
+            $this->line("[{$proyecto->nombre}] Sin destinatarios configurados.");
+            return;
         }
 
         $caducados = [];
         $enAviso = [];
-        $hoy = Carbon::now()->startOfDay();
 
-        // Buscamos personal activo y forzamos la carga de la tabla pivote por si acaso
-        $personals = Personal::with(['cursos' => function($q) {
-            $q->withPivot('fecha_realizacion', 'apto');
-        }])->where('activo', 1)->get();
-
-        $this->info('👥 Trabajadores activos encontrados en BD: ' . $personals->count());
+        // Solo trabajadores activos que pertenecen a ESTE proyecto y solo cursos vinculados a ESTE proyecto
+        $personals = Personal::where('activo', true)
+            ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyecto->id))
+            ->with(['cursos' => function ($q) use ($proyecto) {
+                $q->whereHas('proyectos', fn ($pq) => $pq->where('proyectos.id', $proyecto->id))
+                  ->withPivot('fecha_realizacion', 'apto');
+            }])
+            ->get();
 
         foreach ($personals as $personal) {
+            $nombreTrabajador = trim($personal->name . ' ' . $personal->apellido);
+
             foreach ($personal->cursos as $curso) {
-                if (!empty($curso->pivot->fecha_realizacion) && $curso->meses_validez) {
-                    
-                    $fRealizacion = Carbon::parse($curso->pivot->fecha_realizacion)->startOfDay();
+                $esApto = (bool) ($curso->pivot->apto ?? false);
+                $fechaRaw = $curso->pivot->fecha_realizacion;
+
+                if (!$esApto && !empty($fechaRaw)) {
+                    $fRealizacion = Carbon::parse($fechaRaw)->startOfDay();
+                    $caducados[] = [
+                        'trabajador' => $nombreTrabajador,
+                        'curso' => $curso->nombre,
+                        'fecha' => 'No Apto (' . $fRealizacion->format('d/m/Y') . ')',
+                    ];
+                    continue;
+                }
+
+                if ($esApto && !empty($fechaRaw) && $curso->meses_validez) {
+                    $fRealizacion = Carbon::parse($fechaRaw)->startOfDay();
                     $fCaducidad = $fRealizacion->copy()->addMonths($curso->meses_validez);
                     $fAviso = $fCaducidad->copy()->subDays($curso->dias_aviso_previo ?? 30);
 
-                    // Chivato en consola para ver qué está leyendo
-                    $this->line("Analizando a {$personal->name} - Curso: {$curso->nombre} - Caduca: {$fCaducidad->format('d/m/Y')}");
-
                     if ($hoy->gt($fCaducidad)) {
                         $caducados[] = [
-                            'trabajador' => $personal->name . ' ' . $personal->apellido,
+                            'trabajador' => $nombreTrabajador,
                             'curso' => $curso->nombre,
-                            'fecha' => $fCaducidad->format('d/m/Y')
+                            'fecha' => $fCaducidad->format('d/m/Y'),
                         ];
                     } elseif ($hoy->gte($fAviso)) {
                         $enAviso[] = [
-                            'trabajador' => $personal->name . ' ' . $personal->apellido,
+                            'trabajador' => $nombreTrabajador,
                             'curso' => $curso->nombre,
-                            'fecha' => $fCaducidad->format('d/m/Y')
+                            'fecha' => $fCaducidad->format('d/m/Y'),
                         ];
                     }
                 }
             }
         }
 
-        $this->info("⚠️ Total Caducados detectados: " . count($caducados));
-        $this->info("⚠️ Total En Aviso detectados: " . count($enAviso));
-
         if (empty($caducados) && empty($enAviso)) {
-            $this->info('✅ Todo en orden. No hay cursos caducados ni en aviso.');
-            return 0;
+            $this->info("[{$proyecto->nombre}] Sin caducidades ni avisos pendientes.");
+            return;
         }
 
-        $this->info('📧 Enviando correo a: ' . implode(', ', $emails) . '...');
-        
         foreach ($emails as $email) {
-            Mail::to($email)->send(new AlertaCursosMail($caducados, $enAviso));
+            Mail::to($email)->send(
+                (new AlertaCursosMail($caducados, $enAviso))
+                    ->subject("⚠️ Alerta de Caducidad de Formación (PRL) - {$proyecto->nombre}")
+            );
         }
 
-        $this->info('🚀 ¡Correo enviado con éxito!');
-        return 0;
+        $this->info("[{$proyecto->nombre}] Correo enviado a: " . implode(', ', $emails));
     }
 }

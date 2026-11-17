@@ -72,7 +72,7 @@
             </div>
 
             <div class="cursos-actions">
-                <a href="{{ route('cursos.index') }}" class="cursos-btn cursos-btn--soft">Cancelar</a>
+                <a href="{{ route('cursos.gestion') }}" class="cursos-btn cursos-btn--soft">Cancelar</a>
                 <button type="submit" class="cursos-btn cursos-btn--primary">Guardar Cambios</button>
             </div>
         </form>

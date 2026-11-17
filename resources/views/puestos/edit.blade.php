@@ -234,41 +234,10 @@
             box-shadow: 0 6px 14px rgba(220, 38, 38, 0.22);
             transition: transform 0.15s ease, opacity 0.15s ease;
             border: none;
+            cursor: pointer;
         }
         .btn-pdf-epi:hover { transform: translateY(-1px); opacity: 0.95; }
 
-        .puesto-assign-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 520px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-        .puesto-assign-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px 18px;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            border-radius: 12px;
-            transition: all 0.18s ease;
-            gap: 14px;
-        }
-        .puesto-assign-item:hover { border-color: #cbd5e1; background: #fff; }
-        .puesto-assign-item.is-selected {
-            background: #ffffff;
-            border-color: #0284c7;
-            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.07);
-        }
-        .epi-check-input {
-            width: 18px;
-            height: 18px;
-            accent-color: #0f2942;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
         .epi-item-title-row {
             display: flex;
             align-items: center;
@@ -278,7 +247,7 @@
         .epi-item-name {
             font-weight: 800;
             color: #0f2942;
-            font-size: 0.92rem;
+            font-size: 0.9rem;
             text-transform: uppercase;
         }
         .epi-norma-pill {
@@ -301,7 +270,7 @@
             letter-spacing: 0.02em;
         }
         .puesto-assign-item__desc {
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: #64748b;
             margin-top: 3px;
             display: block;
@@ -315,11 +284,6 @@
             border-radius: 8px;
             overflow: hidden;
             height: 34px;
-        }
-        .qty-stepper.is-disabled {
-            opacity: 0.45;
-            pointer-events: none;
-            background: #f1f5f9;
         }
         .qty-step-btn {
             width: 30px;
@@ -398,6 +362,140 @@
 
         .epis-empty { padding: 34px; text-align: center; border: 2px dashed #cbd5e1; border-radius: 12px; color: #64748b; }
 
+        /* PANEL PARTIDO (OPCIÓN B) */
+        .epi-builder-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.15fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .epi-builder-col {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 580px;
+        }
+        .epi-builder-col--assigned {
+            background: #fff;
+            border: 2px solid #0f2942;
+            box-shadow: 0 10px 25px rgba(15, 41, 66, 0.05);
+        }
+        .epi-builder-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .epi-builder-head h5 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f2942;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .epi-builder-filters {
+            display: grid;
+            grid-template-columns: 1fr 180px;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .epi-builder-filters input,
+        .epi-builder-filters select {
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+            padding: 7px 11px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: #fff;
+            color: #1e293b;
+        }
+        .epi-builder-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .epi-catalog-item,
+        .epi-assigned-item {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 11px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.15s ease;
+        }
+        .epi-catalog-item:hover {
+            border-color: #0284c7;
+            box-shadow: 0 4px 10px rgba(2, 132, 199, 0.06);
+        }
+        .epi-assigned-item {
+            background: #f8fbff;
+            border-color: #bae6fd;
+        }
+        .btn-epi-add {
+            background: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .btn-epi-add:hover {
+            background: #0284c7;
+            color: #fff;
+            border-color: #0284c7;
+        }
+        .btn-epi-remove {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #dc2626;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-epi-remove:hover {
+            background: #dc2626;
+            color: #fff;
+        }
+        .epi-column-empty {
+            margin: auto;
+            text-align: center;
+            color: #94a3b8;
+            padding: 24px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 992px) {
+            .epi-builder-grid { grid-template-columns: 1fr; }
+            .epi-builder-col { height: 420px; }
+            .epi-builder-filters { grid-template-columns: 1fr; }
+        }
         @media (max-width: 900px) {
             .epi-kpi-grid { grid-template-columns: 1fr; }
             .section-tabs { overflow-x: auto; }
@@ -449,9 +547,11 @@
                     <i class="fas fa-chart-bar"></i> Ver Auditoría
                 </a>
 
-                <a href="{{ route('puestos.auditoria.export', $puesto->id) }}" class="btn-top-action btn-top-action--csv">
-                    <i class="fas fa-file-excel"></i> Descargar Auditoría CSV
-                </a>
+                @canany(['cursos.export', 'cursos.normas', 'cursos.view'])
+                    <a href="{{ route('puestos.auditoria.export', $puesto->id) }}" class="btn-top-action btn-top-action--csv">
+                        <i class="fas fa-file-excel"></i> Descargar Auditoría CSV
+                    </a>
+                @endcanany
             </div>
         </div>
 
@@ -515,7 +615,7 @@
                             <div class="col-12">
                                 <div class="epis-empty">
                                     <i class="fas fa-graduation-cap fa-2x mb-2 text-muted"></i>
-                                    <p class="mb-0">No hay cursos registrados en el catálogo.</p>
+                                    <p class="mb-0">No hay cursos registrados en el catálogo de esta sede.</p>
                                 </div>
                             </div>
                         @endforelse
@@ -537,18 +637,17 @@
                 <div class="tab-subhead">
                     <div>
                         <h4>Dotación de EPIs Obligatorios <span class="header-badge-norma ml-1">RD 773/1997</span></h4>
-                        <p>Selecciona y parametriza los Equipos de Protección Individual obligatorios que este puesto exige según evaluación de riesgos.</p>
+                        <p>Añade desde el catálogo izquierdo los Equipos de Protección Individual requeridos para este perfil y ajusta sus unidades.</p>
                     </div>
-                    <input type="search" id="search-epis-input" class="tab-search-input" placeholder="Buscar EPI o norma EN..." autocomplete="off">
                 </div>
 
                 <div class="epi-banner-actions">
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        @can('cursos.view')
+                        @canany(['cursos.view', 'cursos.normas', 'cursos.export', 'personal.export'])
                             <button type="button" class="btn-pdf-epi" data-toggle="modal" data-target="#modal-config-pdf">
                                 <i class="fas fa-sliders-h"></i> Parametrizar y Sacar Documento EPIs
                             </button>
-                        @endcan
+                        @endcanany
                     </div>
 
                     <div class="epi-banner-meta">
@@ -557,7 +656,7 @@
                     </div>
                 </div>
 
-                <form action="{{ route('puestos.sync-epis', $puesto->id) }}" method="POST">
+                <form action="{{ route('puestos.sync-epis', $puesto->id) }}" method="POST" id="form-sync-epis">
                     @csrf
 
                     @if ($episDisponibles->isEmpty())
@@ -569,69 +668,184 @@
                             </a>
                         </div>
                     @else
-                        <div class="puesto-assign-list" id="epis-assign-list">
-                            @foreach ($episDisponibles as $epi)
-                                @php
-                                    $estaAsignado = array_key_exists($epi->id, $episAsignados);
-                                    $cantidadActual = $estaAsignado ? (int) $episAsignados[$epi->id]['cantidad'] : 1;
-                                    $codigoInv = $epi->inventarioVariante?->codigo ?? $epi->inventario?->codigo;
-                                    $stockTotal = $epi->stock_disponible;
-                                @endphp
-                                <div class="puesto-assign-item js-epi-row {{ $estaAsignado ? 'is-selected' : '' }}"
-                                     data-search="{{ mb_strtolower($epi->nombre . ' ' . ($epi->categoria ?? '') . ' ' . ($epi->descripcion ?? '') . ' ' . ($codigoInv ?? '')) }}">
-                                    <label style="margin: 0; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; flex: 1; min-width: 0;">
-                                        <input
-                                            type="checkbox"
-                                            name="epis[]"
-                                            value="{{ $epi->id }}"
-                                            class="epi-checkbox epi-check-input mt-1"
-                                            data-target="epi-qty-{{ $epi->id }}"
-                                            @checked($estaAsignado)
-                                        >
-                                        <div style="min-width: 0;">
-                                            <div class="epi-item-title-row">
-                                                <span class="epi-item-name">{{ $epi->nombre }}</span>
-                                                @if (!empty($epi->categoria))
-                                                    <span class="epi-norma-pill">{{ $epi->categoria }}</span>
-                                                @endif
-                                                @if ($codigoInv)
-                                                    <span class="epi-inv-pill" title="Enlazado con Inventario (Stock: {{ $stockTotal }} uds.)">
-                                                        <i class="fas fa-boxes"></i> SKU: {{ $codigoInv }} (Stock: {{ $stockTotal }})
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            @if ($epi->descripcion)
-                                                <span class="puesto-assign-item__desc">{{ $epi->descripcion }}</span>
-                                            @else
-                                                <span class="puesto-assign-item__desc">Homologación CE / UNE-EN reglamentaria</span>
-                                            @endif
-                                        </div>
-                                    </label>
+                        @php
+                            $categoriasEpi = $episDisponibles->pluck('categoria')->filter()->unique()->sort()->values();
+                        @endphp
 
-                                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
-                                        <span style="font-size: 0.72rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em;">UDS:</span>
-                                        <div class="qty-stepper {{ !$estaAsignado ? 'is-disabled' : '' }}" id="stepper-{{ $epi->id }}">
-                                            <button type="button" class="qty-step-btn js-qty-step" data-target="epi-qty-{{ $epi->id }}" data-step="-1">−</button>
-                                            <input
-                                                type="number"
-                                                name="cantidades[{{ $epi->id }}]"
-                                                id="epi-qty-{{ $epi->id }}"
-                                                class="qty-input js-epi-qty-input"
-                                                value="{{ $cantidadActual }}"
-                                                min="1"
-                                                max="99"
-                                                @disabled(!$estaAsignado)
-                                            >
-                                            <button type="button" class="qty-step-btn js-qty-step" data-target="epi-qty-{{ $epi->id }}" data-step="1">+</button>
+                        <div class="epi-builder-grid">
+                            <!-- COLUMNA IZQUIERDA: CATÁLOGO DISPONIBLE -->
+                            <div class="epi-builder-col">
+                                <div class="epi-builder-head">
+                                    <h5><i class="fas fa-boxes text-secondary"></i> Catálogo Disponible</h5>
+                                    <span class="badge badge-secondary" id="count-catalog-available">0 disponibles</span>
+                                </div>
+
+                                <div class="epi-builder-filters">
+                                    <input type="search" id="search-epis-input" placeholder="Buscar EPI, SKU o norma..." autocomplete="off">
+                                    <select id="filter-epis-category">
+                                        <option value="all">Todas las categorías</option>
+                                        @foreach ($categoriasEpi as $cat)
+                                            <option value="{{ mb_strtolower($cat) }}">{{ $cat }}</option>
+                                        @endforeach
+                                        <option value="sin categoría">Sin categoría</option>
+                                    </select>
+                                </div>
+
+                                <div class="epi-builder-scroll" id="epi-available-list">
+
+                                    {{-- AVISO DE EPIS DADOS DE BAJA EN EL CATÁLOGO --}}
+                                    @if(isset($episInactivosAsignados) && $episInactivosAsignados->isNotEmpty())
+                                        @foreach($episInactivosAsignados as $epiBaja)
+                                            <div class="epi-assigned-item js-inactive-epi-item"
+                                                id="inactive-epi-{{ $epiBaja->id }}"
+                                                style="background: #fffbeb; border: 1px dashed #f59e0b;">
+                                                <input type="hidden" name="epis_inactivos_mantener[]" value="{{ $epiBaja->id }}" id="keep-inactive-{{ $epiBaja->id }}">
+
+                                                <div style="min-width: 0; flex: 1;">
+                                                    <div class="epi-item-title-row">
+                                                        <span class="epi-item-name" style="color: #92400e; text-decoration: line-through;">{{ $epiBaja->nombre }}</span>
+                                                        <span class="badge badge-warning" style="font-size: 0.68rem; font-weight: 800; background: #fef3c7; color: #b45309; border: 1px solid #fcd34d;">
+                                                            <i class="fas fa-exclamation-triangle mr-1"></i> DADO DE BAJA (NO CUENTA EN PERFIL)
+                                                        </span>
+                                                    </div>
+                                                    <span class="puesto-assign-item__desc" style="color: #b45309; font-weight: 600;">
+                                                        Equipo retirado/no homologado ({{ (int) ($epiBaja->pivot->cantidad ?? 1) }} uds.). Sustitúyelo por uno activo o elimínalo de la lista.
+                                                    </span>
+                                                </div>
+
+                                                <button type="button"
+                                                        class="btn-epi-remove js-btn-remove-inactive-epi"
+                                                        data-epi-id="{{ $epiBaja->id }}"
+                                                        title="Retirar definitivamente este EPI obsoleto del puesto">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    @endif
+
+                                    @foreach ($episDisponibles as $epi)
+                                        @php
+                                            $estaAsignado = array_key_exists($epi->id, $episAsignados);
+                                            $codigoInv = $epi->inventarioArticulo?->codigo ?? $epi->inventarioVariante?->codigo ?? $epi->inventario?->codigo;
+                                            $stockTotal = $epi->stock_disponible;
+                                            $catLower = mb_strtolower($epi->categoria ?: 'sin categoría');
+                                        @endphp
+                                        <div class="epi-catalog-item js-catalog-epi-item"
+                                             id="catalog-epi-{{ $epi->id }}"
+                                             data-epi-id="{{ $epi->id }}"
+                                             data-assigned="{{ $estaAsignado ? '1' : '0' }}"
+                                             data-category="{{ $catLower }}"
+                                             data-search="{{ mb_strtolower($epi->nombre . ' ' . ($epi->categoria ?? '') . ' ' . ($epi->descripcion ?? '') . ' ' . ($codigoInv ?? '')) }}"
+                                             style="{{ $estaAsignado ? 'display:none;' : '' }}">
+                                            <div style="min-width: 0; flex: 1;">
+                                                <div class="epi-item-title-row">
+                                                    <span class="epi-item-name">{{ $epi->nombre }}</span>
+                                                    @if (!empty($epi->categoria))
+                                                        <span class="epi-norma-pill">{{ $epi->categoria }}</span>
+                                                    @endif
+                                                    @if ($codigoInv)
+                                                        <span class="epi-inv-pill" title="Enlazado con Inventario">
+                                                            <i class="fas fa-boxes"></i> {{ $codigoInv }} ({{ $stockTotal }})
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <span class="puesto-assign-item__desc">
+                                                    {{ $epi->descripcion ?: 'Homologación CE / UNE-EN reglamentaria' }}
+                                                </span>
+                                            </div>
+
+                                            <button type="button" class="btn-epi-add js-btn-add-epi" data-epi-id="{{ $epi->id }}">
+                                                <i class="fas fa-plus"></i> Añadir
+                                            </button>
                                         </div>
+                                    @endforeach
+
+                                    <div class="epi-column-empty" id="empty-catalog-msg" style="display:none;">
+                                        <i class="fas fa-check-double fa-2x mb-2 d-block"></i>
+                                        No hay más EPIs disponibles con este filtro.
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
+
+                            <!-- COLUMNA DERECHA: DOTACIÓN ASIGNADA AL PUESTO -->
+                            <div class="epi-builder-col epi-builder-col--assigned">
+                                <div class="epi-builder-head">
+                                    <h5><i class="fas fa-hard-hat text-primary"></i> Dotación Asignada a {{ $puesto->nombre }}</h5>
+                                    <span class="badge badge-primary" style="background:#0f2942;" id="count-assigned-pill">{{ count($episAsignados) }} asignados</span>
+                                </div>
+
+                                <div class="epi-builder-scroll" id="epi-assigned-list">
+                                    @foreach ($episDisponibles as $epi)
+                                        @php
+                                            $estaAsignado = array_key_exists($epi->id, $episAsignados);
+                                            $cantidadActual = $estaAsignado ? (int) $episAsignados[$epi->id]['cantidad'] : 1;
+                                            $codigoInv = $epi->inventarioArticulo?->codigo ?? $epi->inventarioVariante?->codigo ?? $epi->inventario?->codigo;
+                                            $stockTotal = $epi->stock_disponible;
+                                        @endphp
+                                        <div class="epi-assigned-item js-assigned-epi-item"
+                                             id="assigned-epi-{{ $epi->id }}"
+                                             data-epi-id="{{ $epi->id }}"
+                                             style="{{ $estaAsignado ? '' : 'display:none;' }}">
+                                            
+                                            {{-- Checkbox oculto que se envía en el POST --}}
+                                            <input type="checkbox"
+                                                   name="epis[]"
+                                                   value="{{ $epi->id }}"
+                                                   id="chk-epi-{{ $epi->id }}"
+                                                   class="epi-checkbox d-none"
+                                                   data-target="epi-qty-{{ $epi->id }}"
+                                                   @checked($estaAsignado)>
+
+                                            <div style="min-width: 0; flex: 1;">
+                                                <div class="epi-item-title-row">
+                                                    <span class="epi-item-name">{{ $epi->nombre }}</span>
+                                                    @if (!empty($epi->categoria))
+                                                        <span class="epi-norma-pill">{{ $epi->categoria }}</span>
+                                                    @endif
+                                                    @if ($codigoInv)
+                                                        <span class="epi-inv-pill">
+                                                            <i class="fas fa-boxes"></i> SKU: {{ $codigoInv }} (Stock: {{ $stockTotal }})
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <span class="puesto-assign-item__desc">
+                                                    {{ $epi->descripcion ?: 'Homologación CE / UNE-EN reglamentaria' }}
+                                                </span>
+                                            </div>
+
+                                            <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                                                <span style="font-size: 0.72rem; color: #64748b; font-weight: 800;">UDS:</span>
+                                                <div class="qty-stepper" id="stepper-{{ $epi->id }}">
+                                                    <button type="button" class="qty-step-btn js-qty-step" data-target="epi-qty-{{ $epi->id }}" data-step="-1">−</button>
+                                                    <input type="number"
+                                                           name="cantidades[{{ $epi->id }}]"
+                                                           id="epi-qty-{{ $epi->id }}"
+                                                           class="qty-input js-epi-qty-input"
+                                                           value="{{ $cantidadActual }}"
+                                                           min="1"
+                                                           max="99"
+                                                           @disabled(!$estaAsignado)>
+                                                    <button type="button" class="qty-step-btn js-qty-step" data-target="epi-qty-{{ $epi->id }}" data-step="1">+</button>
+                                                </div>
+
+                                                <button type="button" class="btn-epi-remove js-btn-remove-epi" data-epi-id="{{ $epi->id }}" title="Quitar EPI del puesto">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endforeach
+
+                                    <div class="epi-column-empty" id="empty-assigned-msg" style="{{ count($episAsignados) > 0 ? 'display:none;' : '' }}">
+                                        <i class="fas fa-hand-point-left fa-2x mb-2 d-block text-muted"></i>
+                                        Este perfil no tiene EPIs asignados todavía.<br>Pulsa <strong>"+ Añadir"</strong> en la columna izquierda.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center flex-wrap" style="gap: 12px;">
                             <span class="text-muted small font-weight-bold">
-                                <i class="fas fa-info-circle mr-1"></i> Cualquier cambio se reflejará inmediatamente al generar la Ficha Oficial de EPIs en PDF.
+                                <i class="fas fa-info-circle mr-1"></i> Recuerda pulsar en "Guardar Dotación de EPIs" para aplicar los cambios en la ficha oficial.
                             </span>
                             <button type="submit" class="btn-save">
                                 <i class="fas fa-save"></i> Guardar Dotación de EPIs
@@ -659,74 +873,174 @@
                         </div>
                     @endif
                 </form>
-            </div>
+                <!-- HISTÓRICO DE REVISIONES HOMOLOGADAS -->
+                <div style="margin-top: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+                        <div>
+                            <h5 style="margin: 0; font-weight: 800; color: #0f2942; font-size: 0.98rem;">
+                                <i class="fas fa-archive text-primary mr-1"></i> Archivo Documental de Revisiones Oficiales
+                            </h5>
+                            <p style="margin: 2px 0 0; font-size: 0.8rem; color: #64748b;">
+                                Historial inmutable de fichas homologadas. El documento marcado como <strong>Vigente</strong> es el que se descarga desde los listados y fichas de personal.
+                            </p>
+                        </div>
+                        <span class="badge badge-secondary">{{ $puesto->documentosEpis->count() }} {{ $puesto->documentosEpis->count() === 1 ? 'revisión archivada' : 'revisiones archivadas' }}</span>
+                    </div>
 
+                    @if($puesto->documentosEpis->isEmpty())
+                        <div style="padding: 18px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fff; color: #64748b; font-size: 0.84rem;">
+                            Aún no se ha homologado ninguna revisión oficial para este puesto. Pulsa en <strong>"Parametrizar y Sacar Documento EPIs"</strong> para publicar la primera versión.
+                        </div>
+                    @else
+                        <div class="table-responsive" style="background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;">
+                            <table class="table table-sm table-hover mb-0" style="font-size: 0.84rem;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Revisión</th>
+                                        <th>Fecha Emisión</th>
+                                        <th>Ítems EPI</th>
+                                        <th>Homologado por</th>
+                                        <th>Estado</th>
+                                        <th class="text-right">Documento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($puesto->documentosEpis as $docEpi)
+                                        <tr>
+                                            <td class="font-weight-bold text-dark">{{ $docEpi->codigo_iso }}</td>
+                                            <td><span class="badge badge-info">{{ $docEpi->revision }}</span></td>
+                                            <td>{{ $docEpi->fecha_emision?->format('d/m/Y') }}</td>
+                                            <td>{{ is_array($docEpi->epis_snapshot) ? count($docEpi->epis_snapshot) : 0 }} EPIs</td>
+                                            <td class="text-muted">{{ optional($docEpi->autor)->name ?: 'Sistema' }}</td>
+                                            <td>
+                                                @if($docEpi->es_vigente)
+                                                    <span class="badge badge-success"><i class="fas fa-check-circle mr-1"></i> Vigente Oficial</span>
+                                                @else
+                                                    <span class="badge badge-secondary">Obsoleta (Histórico)</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-right">
+                                                <a href="{{ route('puestos.epis.pdf.revision', [$puesto->id, $docEpi->id]) }}" target="_blank" class="btn btn-xs btn-outline-danger font-weight-bold">
+                                                    <i class="fas fa-file-pdf mr-1"></i> Ver PDF
+                                                </a>
+                                                <a href="{{ route('puestos.epis.pdf.revision', [$puesto->id, $docEpi->id, 'download' => 1]) }}" class="btn btn-xs btn-outline-secondary font-weight-bold ml-1" title="Descargar PDF">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
     </section>
 
-    <!-- MODAL DE CONFIGURACIÓN DE PDF -->
+    <!-- MODAL DE CONFIGURACIÓN Y HOMOLOGACIÓN DE PDF -->
+    @php
+        $docVigente = $puesto->documentoEpiVigente;
+        $codigoDefault = $docVigente?->codigo_iso ?? 'SST-0840-002-1-2';
+        $marcoDefault = $docVigente?->marco_prl ?? 'RD 773/1997';
+        $selloPrevDefault = $docVigente?->sello_prevencion ?? 'FIRMADO / HOMOLOGADO';
+        $selloDelDefault = $docVigente?->sello_delegacion ?? 'CONFORME / VALIDADO';
+        $dptoPrevDefault = $docVigente?->dpto_prevencion ?? 'Dpto. SST Moncobra, S.A.';
+        $dptoDelDefault = $docVigente?->dpto_delegacion ?? 'Jefatura de Producción / Planta';
+
+        $revisionSugerida = 'Rev. 1';
+        if ($docVigente && preg_match('/(\d+)/', $docVigente->revision, $m)) {
+            $revisionSugerida = 'Rev. ' . ((int) $m[1] + 1);
+        } elseif ($docVigente) {
+            $revisionSugerida = $docVigente->revision;
+        }
+    @endphp
+
     <div class="modal fade" id="modal-config-pdf" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
             <div class="modal-content" style="border-radius: 14px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
                 <div class="modal-header" style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 14px 14px 0 0; padding: 18px 24px;">
-                    <h5 class="modal-title" style="font-weight: 800; color: #0f2942;"><i class="fas fa-sliders-h mr-2 text-primary"></i> Parametrizar Documento Oficial</h5>
+                    <h5 class="modal-title" style="font-weight: 800; color: #0f2942;"><i class="fas fa-sliders-h mr-2 text-primary"></i> Parametrizar y Homologar Documento Oficial</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                
-                <form action="{{ route('puestos.epis.pdf', $puesto->id) }}" method="GET" target="_blank">
+
+                <form id="form-config-pdf" action="{{ route('puestos.epis.pdf.homologar', $puesto->id) }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="preview" value="1">
+
                     <div class="modal-body" style="padding: 24px;">
+                        @if($docVigente)
+                            <div class="alert alert-info py-2 px-3 mb-3" style="border-radius: 10px; font-size: 0.82rem; font-weight: 600;">
+                                <i class="fas fa-info-circle mr-1"></i> Última revisión vigente: <strong>{{ $docVigente->codigo_iso }} ({{ $docVigente->revision }})</strong> emitida el {{ $docVigente->fecha_emision?->format('d/m/Y') }}. Se sugiere <strong>{{ $revisionSugerida }}</strong> para la nueva publicación.
+                            </div>
+                        @endif
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Código del Documento</label>
-                                <input type="text" name="codigo_iso" class="form-control" value="SST-0840-002-1-2" style="border-radius: 8px;">
+                                <input type="text" name="codigo_iso" class="form-control" value="{{ $codigoDefault }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Revisión / Versión</label>
-                                <input type="text" name="revision_iso" class="form-control" value="Rev. 4" style="border-radius: 8px;">
+                                <input type="text" name="revision_iso" class="form-control" value="{{ $revisionSugerida }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Fecha de Emisión</label>
-                                <input type="text" name="fecha_emision" class="form-control" value="{{ now()->format('d/m/Y') }}" style="border-radius: 8px;">
+                                <input type="text" name="fecha_emision" class="form-control" value="{{ now()->format('d/m/Y') }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Marco Reglamentario PRL</label>
-                                <input type="text" name="marco_prl" class="form-control" value="RD 773/1997" style="border-radius: 8px;">
+                                <input type="text" name="marco_prl" class="form-control" value="{{ $marcoDefault }}" style="border-radius: 8px;" required>
                             </div>
                         </div>
-                        
+
                         <hr style="border-color: #e2e8f0; margin: 20px 0;">
                         <h6 style="font-weight: 800; color: #0f2942; margin-bottom: 16px;">Textos de Sellos y Departamentos</h6>
-                            
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Prevención SST</label>
-                                <input type="text" name="sello_prevencion" class="form-control" value="FIRMADO / HOMOLOGADO" style="border-radius: 8px;">
+                                <input type="text" name="sello_prevencion" class="form-control" value="{{ $selloPrevDefault }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Sello Resp. Delegación</label>
-                                <input type="text" name="sello_delegacion" class="form-control" value="CONFORME / VALIDADO" style="border-radius: 8px;">
+                                <input type="text" name="sello_delegacion" class="form-control" value="{{ $selloDelDefault }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Prevención (Texto bajo sello)</label>
-                                <input type="text" name="dpto_prevencion" class="form-control" value="Dpto. SST Moncobra, S.A." style="border-radius: 8px;">
+                                <input type="text" name="dpto_prevencion" class="form-control" value="{{ $dptoPrevDefault }}" style="border-radius: 8px;" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: #475569; text-transform: uppercase;">Dpto. Delegación (Texto bajo sello)</label>
-                                <input type="text" name="dpto_delegacion" class="form-control" value="Jefatura de Producción / Planta" style="border-radius: 8px;">
+                                <input type="text" name="dpto_delegacion" class="form-control" value="{{ $dptoDelDefault }}" style="border-radius: 8px;" required>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 14px 14px; padding: 16px 24px;">
+
+                    <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 14px 14px; padding: 16px 24px; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                         <button type="button" class="btn btn-light" data-dismiss="modal" style="font-weight: 700; border-radius: 8px;">Cancelar</button>
-                        <button type="submit" name="download" value="0" class="btn btn-danger" style="font-weight: 700; border-radius: 8px; background: linear-gradient(135deg, #dc2626, #b91c1c); border: none;" onclick="$('#modal-config-pdf').modal('hide');">
-                            <i class="fas fa-file-pdf mr-1"></i> Visualizar PDF
-                        </button>
-                        <button type="submit" name="download" value="1" class="btn btn-primary" style="font-weight: 700; border-radius: 8px; background: #0f2942; border: none;" onclick="$('#modal-config-pdf').modal('hide');">
-                            <i class="fas fa-download mr-1"></i> Descargar Archivo
-                        </button>
+
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="submit"
+                                    formaction="{{ route('puestos.epis.pdf', $puesto->id) }}"
+                                    formmethod="GET"
+                                    formtarget="_blank"
+                                    class="btn btn-outline-secondary"
+                                    style="font-weight: 700; border-radius: 8px;"
+                                    onclick="$('#modal-config-pdf').modal('hide');">
+                                <i class="fas fa-eye mr-1"></i> Vista Previa (Borrador)
+                            </button>
+
+                            <button type="submit"
+                                    class="btn btn-success"
+                                    style="font-weight: 800; border-radius: 8px; background: #16a34a; border: none;"
+                                    onclick="return confirm('¿Homologar y archivar esta revisión como documento oficial vigente del puesto?');">
+                                <i class="fas fa-stamp mr-1"></i> Homologar y Guardar Revisión
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -737,6 +1051,7 @@
 @section('js')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // 1. GESTIÓN DE PESTAÑAS (CURSOS vs EPIS)
             const tabButtons = document.querySelectorAll('#puesto-tabs .tab-btn');
             const tabPanels = document.querySelectorAll('.tab-panel');
             const storageKey = 'puestoEditActiveTab';
@@ -774,6 +1089,7 @@
 
             activateTab(defaultTab);
 
+            // 2. BUSCADOR Y CONTADOR DE CURSOS (PESTAÑA 1)
             const searchCursos = document.getElementById('search-cursos-input');
             const badgeCountCursos = document.getElementById('badge-count-cursos');
 
@@ -802,10 +1118,52 @@
                 });
             }
 
+            // 3. CONSTRUCTOR DE DOTACIÓN DE EPIS (PESTAÑA 2 - OPCIÓN B)
             const badgeCountEpis = document.getElementById('badge-count-epis');
             const prescritosText = document.getElementById('epi-prescritos-text');
             const kpiTotalUnidades = document.getElementById('kpi-total-unidades');
+            const countAssignedPill = document.getElementById('count-assigned-pill');
+            const countCatalogAvailable = document.getElementById('count-catalog-available');
+            const emptyAssignedMsg = document.getElementById('empty-assigned-msg');
+            const emptyCatalogMsg = document.getElementById('empty-catalog-msg');
             const searchEpis = document.getElementById('search-epis-input');
+            const filterEpisCat = document.getElementById('filter-epis-category');
+
+            const filterAvailableCatalog = () => {
+                const term = searchEpis ? searchEpis.value.trim().toLowerCase() : '';
+                const cat = filterEpisCat ? filterEpisCat.value : 'all';
+                let visibleCount = 0;
+                let totalUnassigned = 0;
+
+                document.querySelectorAll('.js-catalog-epi-item').forEach(item => {
+                    const isAssigned = item.dataset.assigned === '1';
+                    if (isAssigned) {
+                        item.style.display = 'none';
+                        return;
+                    }
+                    totalUnassigned++;
+                    const matchSearch = term === '' || (item.dataset.search || '').includes(term);
+                    const matchCat = cat === 'all' || item.dataset.category === cat;
+
+                    if (matchSearch && matchCat) {
+                        item.style.display = '';
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                if (countCatalogAvailable) countCatalogAvailable.textContent = `${totalUnassigned} disponibles`;
+                if (emptyCatalogMsg) emptyCatalogMsg.style.display = visibleCount === 0 ? '' : 'none';
+            };
+
+            // Retirar definitivamente un EPI que estaba dado de baja
+            document.querySelectorAll('.js-btn-remove-inactive-epi').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const row = document.getElementById(`inactive-epi-${this.dataset.epiId}`);
+                    if (row) row.remove();
+                });
+            }); 
 
             const recalculateEpiTotals = () => {
                 let checkedCount = 0;
@@ -822,26 +1180,48 @@
 
                 if (badgeCountEpis) badgeCountEpis.textContent = checkedCount;
                 if (prescritosText) prescritosText.textContent = checkedCount;
+                if (countAssignedPill) countAssignedPill.textContent = `${checkedCount} asignados`;
                 if (kpiTotalUnidades) kpiTotalUnidades.textContent = totalUnits;
+                if (emptyAssignedMsg) emptyAssignedMsg.style.display = checkedCount === 0 ? '' : 'none';
+
+                filterAvailableCatalog();
             };
 
-            document.querySelectorAll('.epi-checkbox').forEach(chk => {
-                chk.addEventListener('change', function () {
-                    const targetId = this.getAttribute('data-target');
-                    const inputQty = document.getElementById(targetId);
-                    const row = this.closest('.js-epi-row');
-                    const stepper = row ? row.querySelector('.qty-stepper') : null;
+            // Pasar del Catálogo (Izquierda) a Dotación Asignada (Derecha)
+            document.querySelectorAll('.js-btn-add-epi').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const epiId = this.dataset.epiId;
+                    const catalogItem = document.getElementById(`catalog-epi-${epiId}`);
+                    const assignedItem = document.getElementById(`assigned-epi-${epiId}`);
+                    const chkById = document.getElementById(`chk-epi-${epiId}`);
+                    const qtyInput = document.getElementById(`epi-qty-${epiId}`);
 
-                    if (row) row.classList.toggle('is-selected', this.checked);
-                    if (stepper) stepper.classList.toggle('is-disabled', !this.checked);
+                    if (catalogItem) catalogItem.dataset.assigned = '1';
+                    if (assignedItem) assignedItem.style.display = '';
+                    if (chkById) chkById.checked = true;
+                    if (qtyInput) {
+                        qtyInput.disabled = false;
+                        if (!qtyInput.value || parseInt(qtyInput.value, 10) < 1) qtyInput.value = 1;
+                    }
+                    recalculateEpiTotals();
+                });
+            });
 
-                    if (inputQty) {
-                        if (this.checked) {
-                            inputQty.disabled = false;
-                        } else {
-                            inputQty.disabled = true;
-                            inputQty.value = 1;
-                        }
+            // Quitar de Dotación Asignada (Derecha) y devolver al Catálogo (Izquierda)
+            document.querySelectorAll('.js-btn-remove-epi').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const epiId = this.dataset.epiId;
+                    const catalogItem = document.getElementById(`catalog-epi-${epiId}`);
+                    const assignedItem = document.getElementById(`assigned-epi-${epiId}`);
+                    const chkById = document.getElementById(`chk-epi-${epiId}`);
+                    const qtyInput = document.getElementById(`epi-qty-${epiId}`);
+
+                    if (catalogItem) catalogItem.dataset.assigned = '0';
+                    if (assignedItem) assignedItem.style.display = 'none';
+                    if (chkById) chkById.checked = false;
+                    if (qtyInput) {
+                        qtyInput.disabled = true;
+                        qtyInput.value = 1;
                     }
                     recalculateEpiTotals();
                 });
@@ -853,8 +1233,7 @@
                     if (!inputQty || inputQty.disabled) return;
                     const step = parseInt(this.dataset.step || '0', 10);
                     const current = parseInt(inputQty.value || '1', 10);
-                    const nextVal = Math.max(1, Math.min(99, current + step));
-                    inputQty.value = nextVal;
+                    inputQty.value = Math.max(1, Math.min(99, current + step));
                     recalculateEpiTotals();
                 });
             });
@@ -863,15 +1242,8 @@
                 input.addEventListener('input', recalculateEpiTotals);
             });
 
-            if (searchEpis) {
-                searchEpis.addEventListener('input', function () {
-                    const term = this.value.trim().toLowerCase();
-                    document.querySelectorAll('.js-epi-row').forEach(row => {
-                        const match = term === '' || (row.dataset.search || '').includes(term);
-                        row.style.display = match ? '' : 'none';
-                    });
-                });
-            }
+            if (searchEpis) searchEpis.addEventListener('input', filterAvailableCatalog);
+            if (filterEpisCat) filterEpisCat.addEventListener('change', filterAvailableCatalog);
 
             recalculateEpiTotals();
         });

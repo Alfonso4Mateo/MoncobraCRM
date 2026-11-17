@@ -58,6 +58,20 @@ class Puesto extends Model
                     ->withTimestamps();
     }
 
+    public function documentosEpis()
+    {
+        return $this->hasMany(PuestoEpiDocumento::class, 'puesto_id')
+                    ->orderByDesc('es_vigente')
+                    ->orderByDesc('id');
+    }
+
+    public function documentoEpiVigente()
+    {
+        return $this->hasOne(PuestoEpiDocumento::class, 'puesto_id')
+                    ->where('es_vigente', true)
+                    ->latestOfMany();
+    }
+
     public function tapActivity(Activity $activity, string $eventName): void
     {
         $nombre = trim((string) $this->getAttribute('nombre'));

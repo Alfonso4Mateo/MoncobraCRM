@@ -10,16 +10,17 @@
         .cursos-hero,
         .cursos-shell,
         .cursos-panel { background: #fff; border: 1px solid #e7ecf3; border-radius: 18px; box-shadow: 0 16px 30px rgba(15, 23, 42, .06); }
-        .cursos-hero { display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; margin-bottom: 16px; align-items: center; }
+        .cursos-hero { display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
         .cursos-hero h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; color: #173e67; }
         .cursos-hero p { margin: 0; color: #667085; font-size: .92rem; }
-        .cursos-primary { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; background: linear-gradient(135deg, #173e67, #2f6b9c); color: #fff; text-decoration: none; font-weight: 800; }
+        .cursos-primary { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; background: linear-gradient(135deg, #173e67, #2f6b9c); color: #fff !important; text-decoration: none !important; font-weight: 800; }
+        .cursos-btn { display: inline-flex; align-items: center; border: 0; border-radius: 10px; padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-decoration: none; }
         .cursos-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; padding: 16px; }
         .cursos-sidebar { border-right: 1px solid #eef2f7; padding-right: 16px; }
         .cursos-main { min-width: 0; }
         .cursos-panel { padding: 14px; }
         .cursos-panel + .cursos-panel { margin-top: 12px; }
-        .cursos-section-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+        .cursos-section-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
         .cursos-section-title h3 { margin: 0; font-size: 1.05rem; font-weight: 800; color: #173e67; }
         .cursos-section-title p { margin: 0; color: #667085; font-size: .9rem; }
         .cursos-filter-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
@@ -36,34 +37,29 @@
             border-radius: 14px;
             padding: 10px 12px;
             margin-bottom: 8px;
-            text-decoration: none;
+            text-decoration: none !important;
             color: inherit;
         }
         .personal-item.is-active { border-color: #173e67; box-shadow: 0 0 0 3px rgba(23, 62, 103, .08); }
         .personal-item__top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-        
-        .personal-item__name { 
-            font-weight: 800; 
-            color: #173e67; 
-            word-break: break-word; 
+
+        .personal-item__name {
+            font-weight: 800;
+            color: #173e67;
+            word-break: break-word;
             overflow-wrap: break-word;
         }
 
-        .personal-item__meta { 
-            font-size: .82rem; 
-            color: #667085; 
-            margin-top: 2px; 
+        .personal-item__meta {
+            font-size: .82rem;
+            color: #667085;
+            margin-top: 2px;
             word-break: break-word;
         }
 
-        .worker-strip__value { 
-            font-size: .92rem; 
-            font-weight: 700; 
-            color: #173e67; 
-            white-space: normal !important; 
-            word-break: break-word;        
-            overflow-wrap: break-word;
-        }
+        .course-card__badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 800; background: #e8f5e9; color: #2e7d32; }
+        .course-card__badge--warn { background: #fef3c7; color: #b45309; }
+
         .worker-strip {
             display: grid;
             grid-template-columns: minmax(150px, 1.2fr) minmax(90px, .7fr) minmax(130px, 1fr) minmax(100px, .8fr) minmax(160px, 1.2fr) minmax(80px, .5fr) minmax(70px, .4fr);
@@ -76,7 +72,14 @@
         }
         .worker-strip__item { min-width: 0; }
         .worker-strip__label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: #8a98ab; margin-bottom: 2px; }
-        .worker-strip__value { font-size: .92rem; font-weight: 700; color: #173e67; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .worker-strip__value {
+            font-size: .92rem;
+            font-weight: 700;
+            color: #173e67;
+            white-space: normal !important;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
         .worker-strip__value--muted { color: #667085; font-weight: 600; }
         .worker-status-pill {
             display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 800;
@@ -84,25 +87,31 @@
         .worker-status-pill--active { background: #e8f5e9; color: #2e7d32; }
         .worker-status-pill--inactive { background: #eef2f7; color: #667085; }
         .course-group { margin-bottom: 12px; }
-        .course-group__head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px; padding-top: 4px; }
+        .course-group__head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px; padding-top: 4px; cursor: pointer; user-select: none; transition: background-color 0.2s; padding: 8px 12px; border-radius: 8px; }
+        .course-group__head:hover { background: #f8fafc; }
         .course-group__head h4 { margin: 0; font-size: .9rem; font-weight: 800; color: #173e67; text-transform: uppercase; letter-spacing: .08em; }
-        .course-group__head .course-card__badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 800; background: #e8f5e9; color: #2e7d32; }
-        .course-list { border: 1px solid #e7ecf3; border-radius: 14px; overflow: hidden; }
-        
+        .course-group__head-left { display: flex; align-items: center; gap: 10px; }
+        .course-group__toggle-icon { transition: transform 0.3s ease; color: #8a98ab; font-size: 0.85rem; }
+        .course-group.is-open .course-group__toggle-icon { transform: rotate(180deg); }
+
+        .course-list-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-in-out; }
+        .course-list-wrapper > div { overflow: hidden; }
+        .course-group.is-open .course-list-wrapper { grid-template-rows: 1fr; }
+        .course-list { border: 1px solid #e7ecf3; border-radius: 14px; overflow: hidden; margin-top: 8px; }
+
         .course-row {
             display: grid;
-            grid-template-columns: minmax(220px, 1.2fr) minmax(0, 3.8fr); 
-            gap: 20px; 
-            align-items: start; 
+            grid-template-columns: minmax(220px, 1.2fr) minmax(0, 3.8fr);
+            gap: 20px;
+            align-items: start;
             padding: 16px 14px;
             border-top: 1px solid #edf2f7;
             background: #fff;
         }
-
         .course-row:first-child { border-top: 0; }
         .course-row__name { font-weight: 800; color: #173e67; line-height: 1.3; font-size: 0.95rem; }
         .course-row__meta { font-size: .8rem; color: #64748b; margin-top: 4px; }
-        
+
         .course-row__control-wrap {
             display: grid;
             grid-template-columns: 140px 75px 135px 110px minmax(180px, 1fr);
@@ -115,7 +124,7 @@
             display: flex;
             flex-direction: column;
             width: 100%;
-            min-width: 0; 
+            min-width: 0;
         }
 
         .course-row__field-label {
@@ -127,7 +136,7 @@
             margin-bottom: 6px;
             height: 14px;
         }
-        
+
         .course-row__field input,
         .course-row__field select {
             width: 100%;
@@ -138,28 +147,29 @@
             font-weight: 600;
             color: #1e293b;
             background: #f8fafc;
-            height: 34px; 
+            height: 34px;
             transition: all 0.2s;
         }
         .course-row__field input:focus:not(:disabled), .course-row__field select:focus:not(:disabled) { border-color: #3b82f6; background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         .course-row__field input:disabled, .course-row__field select:disabled { cursor: not-allowed; background: #f1f5f9; color: #94a3b8; }
-        
-       .course-row__comment {
+
+        .course-row__comment {
             width: 100%;
             border: 1px solid #dbe3ef;
             border-radius: 10px;
             padding: 7px 9px;
             font-size: .83rem;
             line-height: 1.15;
-            min-height: 32px; 
+            min-height: 32px;
             overflow: hidden;
-            resize: none; 
+            resize: none;
             background: #fff;
             word-break: break-word;
             white-space: pre-wrap;
         }
-        .course-row__comment[readonly] { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
-        
+        .course-row__comment[readonly],
+        .course-row__comment:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
+
         .course-toggle {
             position: relative;
             width: 48px;
@@ -177,6 +187,7 @@
             background: #dbe3ef;
             border-radius: 999px;
             transition: all .18s ease;
+            cursor: pointer;
         }
         .course-toggle__thumb {
             position: absolute;
@@ -199,10 +210,10 @@
 
         .course-row__field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .course-row__field-header .course-row__field-label { margin-bottom: 0; }
-        
+
         .course-comment-save-btn { background: #10b981; color: white; border: none; border-radius: 6px; width: 24px; height: 24px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; }
         .course-comment-save-btn:hover { background: #059669; }
-        .course-comment-save-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+        .course-comment-save-btn:disabled { background: #9ca3af; cursor: not-allowed; opacity: 0.6; }
 
         .course-row--caducado { border-left: 4px solid #ef4444 !important; background: #fffcfc; }
         .course-row--aviso { border-left: 4px solid #f59e0b !important; background: #fffefc; }
@@ -211,19 +222,8 @@
         .course-badge-status--caducado { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
         .course-badge-status--aviso { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
 
-        .course-group__head { cursor: pointer; user-select: none; transition: background-color 0.2s; padding: 8px 12px; border-radius: 8px; }
-        .course-group__head:hover { background: #f8fafc; }
-        .course-group__head-left { display: flex; align-items: center; gap: 10px; }
-        .course-group__toggle-icon { transition: transform 0.3s ease; color: #8a98ab; font-size: 0.85rem; }
-        .course-group.is-open .course-group__toggle-icon { transform: rotate(180deg); }
-        
-        .course-list-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-in-out; }
-        .course-list-wrapper > div { overflow: hidden; }
-        .course-group.is-open .course-list-wrapper { grid-template-rows: 1fr; }
-        .course-list { margin-top: 8px; }
-        
         .trabajadores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
-        .trabajador-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e7ecf3; border-radius: 14px; padding: 16px; text-decoration: none; color: inherit; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(15, 23, 42, 0.02); }
+        .trabajador-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e7ecf3; border-radius: 14px; padding: 16px; text-decoration: none !important; color: inherit; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(15, 23, 42, 0.02); }
         .trabajador-card:hover { border-color: #173e67; box-shadow: 0 8px 15px rgba(15, 23, 42, 0.05); transform: translateY(-2px); }
         .trabajador-card__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
         .trabajador-card__name { font-size: 1.1rem; font-weight: 800; color: #173e67; margin: 0; line-height: 1.2; }
@@ -233,18 +233,22 @@
         .cursos-shell--directory { grid-template-columns: 1fr !important; }
 
         .erp-puestos-panel { padding: 14px 16px; background: #fff; border: 1px dashed #cbd5e1; border-radius: 12px; margin-top: 12px; }
-        .erp-puestos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .erp-puestos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
         .erp-puestos-title { font-size: 0.75rem; font-weight: 800; color: #8a98ab; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
         .erp-tags-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .erp-chip { display: inline-flex; align-items: center; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; transition: all 0.2s; }
-        .erp-chip-remove { background: transparent; border: none; color: #166534; margin-left: 6px; cursor: pointer; padding: 0 2px; opacity: 0.6; transition: opacity 0.2s; }
+        .erp-chip { display: inline-flex; align-items: center; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; transition: all 0.2s; gap: 6px; }
+        .erp-chip-pdf { color: #dc2626; font-size: 0.75rem; text-decoration: none !important; opacity: 0.8; }
+        .erp-chip-pdf:hover { opacity: 1; }
+        .erp-chip-remove { background: transparent; border: none; color: #166534; margin-left: 2px; cursor: pointer; padding: 0 2px; opacity: 0.6; transition: opacity 0.2s; }
         .erp-chip-remove:hover { opacity: 1; color: #dc2626; }
         .erp-add-wrapper { position: relative; display: inline-block; }
         .erp-add-btn { background: #f8fafc; border: 1px dashed #cbd5e1; color: #64748b; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.2s; height: 28px; display: inline-flex; align-items: center; justify-content: center; }
         .erp-add-btn:hover { background: #f1f5f9; color: #173e67; border-color: #94a3b8; }
         .erp-select-input { display: none; border: 1px solid #173e67; border-radius: 999px; padding: 0 12px; font-size: 0.8rem; font-weight: 600; color: #173e67; outline: none; box-shadow: 0 4px 12px rgba(23, 62, 103, 0.1); cursor: pointer; height: 28px; line-height: 28px; }
 
-        /* ESTILOS DE INACTIVOS */
+        .erp-epi-summary { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .erp-epi-pill { display: inline-flex; align-items: center; gap: 5px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0369a1; font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; }
+
         .personal-item.is-inactive {
             opacity: 0.65;
             background: #f1f5f9;
@@ -257,32 +261,16 @@
             filter: grayscale(80%);
         }
         .filter-toggle-inactive {
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
-            font-size: 0.85rem; 
-            font-weight: 700; 
-            color: #64748b; 
-            cursor: pointer; 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
             user-select: none;
         }
 
-        /* ETIQUETA DE NUEVO INGRESO */
-        .badge-nuevo {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: #fff;
-            font-size: 0.6rem;
-            padding: 3px 6px;
-            border-radius: 6px;
-            margin-left: 6px;
-            font-weight: 800;
-            text-transform: uppercase;
-            vertical-align: middle;
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-            animation: pulse-soft 2s infinite;
-        }
-
-        /* ETIQUETAS ANIMADAS */
         .badge-nuevo {
             background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; font-size: 0.6rem; padding: 3px 6px; border-radius: 6px; margin-left: 6px; font-weight: 800; text-transform: uppercase; vertical-align: middle; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); animation: pulse-blue 2s infinite;
         }
@@ -294,11 +282,6 @@
         }
         @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
         @keyframes pulse-orange { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
-        @keyframes pulse-soft {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-            70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
 
         @media (max-width: 1100px) {
             .cursos-shell { grid-template-columns: 1fr; }
@@ -309,7 +292,6 @@
         @media (max-width: 720px) {
             .worker-strip { grid-template-columns: 1fr; }
             .course-row { grid-template-columns: 1fr; gap: 8px; }
-            .course-row__count { justify-self: start; }
             .course-row__control-wrap { grid-template-columns: 1fr; }
         }
     </style>
@@ -332,7 +314,6 @@
                 <p>Centraliza la formación preventiva y técnica del personal.</p>
             </div>
 
-            <!-- CONTENEDOR DE BOTONES BLINDADO -->
             <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 @can('cursos.create')
                     <a href="{{ route('cursos.create') }}" class="cursos-primary">
@@ -352,11 +333,11 @@
                     </a>
                 @endcan
 
-                @can('cursos.normas')
+                @canany(['cursos.normas', 'cursos.edit', 'cursos.view'])
                     <a href="{{ route('puestos.index') }}" class="cursos-primary" style="background: linear-gradient(135deg, #6366f1, #4338ca);">
                         <i class="fas fa-sitemap"></i> Panel de Normas
                     </a>
-                @endcan
+                @endcanany
 
                 @can('cursos.alertas')
                     <a href="{{ route('cursos.config.alertas') }}" class="cursos-primary" style="background: linear-gradient(135deg, #ea580c, #c2410c);">
@@ -365,24 +346,35 @@
                 @endcan
             </div>
         </header>
-        
+
         @php
-            // ORDENACIÓN INTELIGENTE: Primero los pendientes de revisión, luego alfabéticamente.
-            $personals = $personals->sortBy(function($personal) {
-                // Si prl_revisado es false (0), le ponemos '0-' delante para que suba. Si es true (1), le ponemos '1-'.
+            $personals = $personals->sortBy(function ($personal) {
                 $estadoPrl = $personal->prl_revisado ? '1-' : '0-';
                 return $estadoPrl . mb_strtolower(trim($personal->name . ' ' . $personal->apellido));
             });
 
-            $listaDepartamentos = \App\Models\Departamento::orderBy('nombre')->pluck('nombre');
-            
+            $listaDepartamentos = $personals->pluck('departamento')
+                ->flatMap(function ($depto) {
+                    if (is_string($depto)) {
+                        $decoded = json_decode($depto, true);
+                        return is_array($decoded) ? $decoded : explode(',', $depto);
+                    }
+                    return (array) $depto;
+                })
+                ->map(fn ($d) => trim((string) $d))
+                ->filter()
+                ->unique(fn ($d) => mb_strtolower($d))
+                ->sort()
+                ->values();
+
             $currentDepto = request('departamento', 'all');
+            $hoy = \Carbon\Carbon::now()->startOfDay();
         @endphp
 
         <section class="cursos-shell {{ !$selectedPersonal ? 'cursos-shell--directory' : '' }}">
-            
+
             @if($selectedPersonal)
-                @can('cursos.plantilla')
+                @canany(['cursos.plantilla', 'cursos.view', 'cursos.edit', 'cursos.create'])
                 <aside class="cursos-sidebar">
                     <div class="cursos-section-title">
                         <div>
@@ -393,7 +385,7 @@
 
                     <div class="cursos-filter-row">
                         <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar trabajador..." autocomplete="off">
-                        
+
                         <select id="js-worker-category">
                             <option value="all" @selected(($categoria ?? 'all') === 'all')>Todas las categorías</option>
                             @foreach($categorias as $categoriaOption)
@@ -408,7 +400,6 @@
                             @endforeach
                         </select>
 
-                        <!-- NUEVO: FILTRO DE ESTADO FORMATIVO -->
                         <select id="js-worker-status-sidebar" style="width: 100%; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px; margin-bottom: 10px;">
                             <option value="all">Cualquier estado</option>
                             <option value="pendientes">⚠️ Pendientes de revisión</option>
@@ -417,95 +408,93 @@
                     </div>
 
                     @forelse($personals as $personal)
-                    @php
-                        $workerCats = mb_strtolower($personal->cursos->pluck('categoria')->filter()->unique()->implode(' '));
-                        $nombreCompleto = trim($personal->name . ' ' . $personal->apellido);
-                        $cursosCount = $personal->cursos->count();
-                        $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
-                        
-                        $hasCaducado = false;
-                        $hasAviso = false;
-                        $hoy = \Carbon\Carbon::now()->startOfDay();
-                        $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
-                        $esReactivado = $personal->fecha_reactivacion && \Carbon\Carbon::parse($personal->fecha_reactivacion)->startOfDay()->diffInDays($hoy) <= 14;
+                        @php
+                            $workerCats = mb_strtolower($personal->cursos->pluck('categoria')->filter()->unique()->implode(' '));
+                            $nombreCompleto = trim($personal->name . ' ' . $personal->apellido);
+                            $cursosCount = $personal->cursos->count();
+                            $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
 
-                        foreach ($personal->cursos as $c) {
-                            if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
-                                $fRealizacion = \Carbon\Carbon::parse($c->pivot->fecha_realizacion)->startOfDay();
-                                $fCaducidad = $fRealizacion->copy()->addMonths($c->meses_validez);
-                                $fAviso = $fCaducidad->copy()->subDays($c->dias_aviso_previo ?? 30);
+                            $hasCaducado = false;
+                            $hasAviso = false;
+                            $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
+                            $esReactivado = $personal->fecha_reactivacion && \Carbon\Carbon::parse($personal->fecha_reactivacion)->startOfDay()->diffInDays($hoy) <= 14;
 
-                                if ($hoy->gt($fCaducidad)) {
+                            foreach ($personal->cursos as $c) {
+                                $esAptoCurso = (bool) ($c->pivot->apto ?? false);
+                                if (!$esAptoCurso && !empty($c->pivot->fecha_realizacion)) {
                                     $hasCaducado = true;
-                                } elseif ($hoy->gte($fAviso)) {
-                                    $hasAviso = true;
-                                }
-                                
-                                if ($hasCaducado && $hasAviso) break; 
-                            }
-                        }
+                                } elseif ($esAptoCurso && !empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
+                                    $fRealizacion = \Carbon\Carbon::parse($c->pivot->fecha_realizacion)->startOfDay();
+                                    $fCaducidad = $fRealizacion->copy()->addMonths($c->meses_validez);
+                                    $fAviso = $fCaducidad->copy()->subDays($c->dias_aviso_previo ?? 30);
 
-                        $deptosActuales = is_string($personal->departamento)
-                            ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento)
-                            : (array) $personal->departamento;
-                    @endphp
-                    
-                    <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
-                        class="personal-item js-worker-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }} {{ !$personal->activo ? 'is-inactive' : '' }}"
-                        data-name="{{ mb_strtolower($nombreCompleto) }}"
-                        data-cats="{{ $workerCats }}"
-                        data-activo="{{ $personal->activo ? '1' : '0' }}"
-                        data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
-                        data-nuevo="{{ $esNuevo ? '1' : '0' }}"
-                        data-cursos="{{ $cursosCount }}"
-                        data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}"
-                        data-cursos="{{ $cursosCount }}">
-                        
-                       
-                        <div class="personal-item__top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                            <div style="flex: 1; min-width: 0;">
-                                <div class="personal-item__name" style="line-height: 1.3; margin-bottom: 4px;">
-                                    {{ $nombreCompleto }}
+                                    if ($hoy->gt($fCaducidad)) {
+                                        $hasCaducado = true;
+                                    } elseif ($hoy->gte($fAviso)) {
+                                        $hasAviso = true;
+                                    }
+                                }
+                                if ($hasCaducado && $hasAviso) break;
+                            }
+
+                            $deptosActuales = is_string($personal->departamento)
+                                ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento)
+                                : (array) $personal->departamento;
+                        @endphp
+
+                        <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}"
+                           class="personal-item js-worker-item {{ (int) $personal->id === (int) optional($selectedPersonal)->id ? 'is-active' : '' }} {{ !$personal->activo ? 'is-inactive' : '' }}"
+                           data-name="{{ mb_strtolower($nombreCompleto) }}"
+                           data-cats="{{ $workerCats }}"
+                           data-activo="{{ $personal->activo ? '1' : '0' }}"
+                           data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
+                           data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                           data-cursos="{{ $cursosCount }}"
+                           data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}">
+
+                            <div class="personal-item__top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="personal-item__name" style="line-height: 1.3; margin-bottom: 4px;">
+                                        {{ $nombreCompleto }}
+                                    </div>
+
+                                    <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px;">
+                                        @if(!$personal->prl_revisado)
+                                            <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
+                                        @endif
+
+                                        @if($esNuevo)
+                                            <span class="badge-nuevo" style="margin: 0;" title="Alta reciente (14 días)">Nuevo</span>
+                                        @elseif($esReactivado)
+                                            <span class="badge-reactivado" style="margin: 0;" title="Reactivado (14 días)">Reactivado</span>
+                                        @endif
+
+                                        @if($hasCaducado)
+                                            <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 2px;" title="Tiene cursos caducados o no aptos"></i>
+                                        @endif
+                                    </div>
                                 </div>
-                                
-                                <!-- Contenedor de etiquetas flex-wrap para nombres largos -->
-                                <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px;">
-                                    @if(!$personal->prl_revisado)
-                                        <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
-                                    @endif
-                                    
-                                    @if($esNuevo)
-                                        <span class="badge-nuevo" style="margin: 0;" title="Alta reciente (14 días)">Nuevo</span>
-                                    @elseif($esReactivado)
-                                        <span class="badge-reactivado" style="margin: 0;" title="Reactivado (14 días)">Reactivado</span>
-                                    @endif
-                                    
-                                    @if($hasCaducado)
-                                        <i class="fas fa-exclamation-circle" style="color: #ef4444; margin-left: 2px;" title="Tiene cursos caducados"></i>
-                                    @endif
-                                </div>
+
+                                <span class="course-card__badge {{ $cursosCount === $cursosAptos ? '' : 'course-card__badge--warn' }}" style="flex-shrink: 0;">
+                                    {{ $cursosAptos }}/{{ $cursosCount ?: 0 }}
+                                </span>
                             </div>
-                            
-                            <span class="course-card__badge {{ $cursosCount === $cursosAptos ? '' : 'course-card__badge--warn' }}" style="flex-shrink: 0;">
-                                {{ $cursosAptos }}/{{ $cursosCount ?: 0 }}
-                            </span>
-                        </div>
-                        <div class="personal-item__meta">{{ $personal->dni_nie ?: ($personal->telefono ?: 'Sin identificador') }}</div>
-                        <div class="personal-item__meta">
-                            {{ $personal->departamento ? implode(', ', (array) $personal->departamento) : 'Sin departamento' }}
-                        </div>
-                    </a>
+                            <div class="personal-item__meta">{{ $personal->dni_nie ?: ($personal->telefono ?: 'Sin identificador') }}</div>
+                            <div class="personal-item__meta">
+                                {{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}
+                            </div>
+                        </a>
                     @empty
                         <div class="cursos-empty">No hay trabajadores para mostrar.</div>
                     @endforelse
                 </aside>
-                @endcan
+                @endcanany
             @endif
 
-            <main class="cursos-main">
-               <div class="cursos-panel">
+           <main class="cursos-main">
+                <div class="cursos-panel">
                     @if(!$selectedPersonal)
-                        @can('cursos.plantilla')
+                        @canany(['cursos.plantilla', 'cursos.view', 'cursos.edit', 'cursos.create'])
                             <div class="cursos-section-title" style="margin-bottom: 20px;">
                                 <div>
                                     <h3>Directorio de Plantilla</h3>
@@ -513,7 +502,7 @@
                                 </div>
                             </div>
 
-                           <div class="cursos-filter-row" style="flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
+                            <div class="cursos-filter-row" style="flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
                                 <input type="search" id="js-worker-search" value="{{ $query ?? '' }}" placeholder="Buscar por nombre..." style="flex: 1; min-width: 200px; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px;" autocomplete="off">
 
                                 <select id="js-worker-depto" style="width: auto; min-width: 180px; border: 1px solid #dbe3ef; border-radius: 12px; padding: 9px 12px;">
@@ -541,15 +530,17 @@
                                         $workerCats = mb_strtolower($personal->cursos->pluck('categoria')->filter()->unique()->implode(' '));
                                         $nombreCompleto = trim($personal->name . ' ' . $personal->apellido);
                                         $cursosCount = $personal->cursos->count();
-                                        
+
                                         $hasCaducado = false;
                                         $hasAviso = false;
-                                        $hoy = \Carbon\Carbon::now()->startOfDay();
                                         $esNuevo = $personal->created_at && $personal->created_at->diffInDays($hoy) <= 14;
                                         $esReactivado = $personal->fecha_reactivacion && \Carbon\Carbon::parse($personal->fecha_reactivacion)->startOfDay()->diffInDays($hoy) <= 14;
 
                                         foreach ($personal->cursos as $c) {
-                                            if (!empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
+                                            $esAptoCurso = (bool) ($c->pivot->apto ?? false);
+                                            if (!$esAptoCurso && !empty($c->pivot->fecha_realizacion)) {
+                                                $hasCaducado = true;
+                                            } elseif ($esAptoCurso && !empty($c->pivot->fecha_realizacion) && $c->meses_validez) {
                                                 $fRealizacion = \Carbon\Carbon::parse($c->pivot->fecha_realizacion)->startOfDay();
                                                 $fCaducidad = $fRealizacion->copy()->addMonths($c->meses_validez);
                                                 $fAviso = $fCaducidad->copy()->subDays($c->dias_aviso_previo ?? 30);
@@ -559,39 +550,36 @@
                                                 } elseif ($hoy->gte($fAviso)) {
                                                     $hasAviso = true;
                                                 }
-                                                if ($hasCaducado && $hasAviso) break; 
                                             }
+                                            if ($hasCaducado && $hasAviso) break;
                                         }
-                                        
+
                                         $deptosActuales = is_string($personal->departamento)
                                             ? json_decode($personal->departamento, true) ?? explode(',', $personal->departamento)
                                             : (array) $personal->departamento;
                                     @endphp
-                                    
-                                    <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}" 
-                                        class="trabajador-card js-worker-item {{ !$personal->activo ? 'is-inactive' : '' }}"
-                                        data-name="{{ mb_strtolower($nombreCompleto) }}"
-                                        data-cats="{{ $workerCats }}"
-                                        data-activo="{{ $personal->activo ? '1' : '0' }}"
-                                        data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
-                                        data-nuevo="{{ $esNuevo ? '1' : '0' }}"
-                                        data-cursos="{{ $cursosCount }}"
-                                        data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}"
-                                        data-cursos="{{ $cursosCount }}">
+
+                                    <a href="{{ route('cursos.index', ['personal_id' => $personal->id, 'categoria' => $categoria, 'q' => $query]) }}"
+                                       class="trabajador-card js-worker-item {{ !$personal->activo ? 'is-inactive' : '' }}"
+                                       data-name="{{ mb_strtolower($nombreCompleto) }}"
+                                       data-cats="{{ $workerCats }}"
+                                       data-activo="{{ $personal->activo ? '1' : '0' }}"
+                                       data-depto="{{ mb_strtolower(!empty($deptosActuales) ? implode(' ', $deptosActuales) : 'sin departamento') }}"
+                                       data-nuevo="{{ $esNuevo ? '1' : '0' }}"
+                                       data-cursos="{{ $cursosCount }}"
+                                       data-pendiente="{{ $personal->prl_revisado ? '0' : '1' }}">
 
                                         <div class="trabajador-card__header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                                            <!-- Columna Izquierda: Nombre y Etiquetas con salto natural -->
                                             <div style="flex: 1; min-width: 0;">
                                                 <h4 class="trabajador-card__name" style="margin-bottom: 6px; line-height: 1.3;">
                                                     {{ $nombreCompleto }}
                                                 </h4>
-                                                
-                                                <!-- Contenedor de etiquetas fluido -->
+
                                                 <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
                                                     @if(!$personal->prl_revisado)
                                                         <span class="badge-pendiente" style="margin: 0;" title="Pendiente de revisar">⚠️ PENDIENTE</span>
                                                     @endif
-                                                    
+
                                                     @if($esNuevo)
                                                         <span class="badge-nuevo" style="margin: 0;" title="Alta reciente (14 días)">Nuevo</span>
                                                     @elseif($esReactivado)
@@ -601,8 +589,7 @@
 
                                                 <div class="trabajador-card__depto" style="margin-top: 6px;">{{ !empty($deptosActuales) ? implode(', ', $deptosActuales) : 'Sin departamento' }}</div>
                                             </div>
-                                            
-                                            <!-- Columna Derecha: Estado Fijo -->
+
                                             <div style="flex-shrink: 0;">
                                                 <span class="worker-status-pill {{ $personal->activo ? 'worker-status-pill--active' : 'worker-status-pill--inactive' }}">
                                                     {{ $personal->activo ? 'Activo' : 'Inactivo' }}
@@ -614,7 +601,7 @@
                                             <span style="font-size: 0.85rem; font-weight: 700; color: #667085;">{{ $cursosCount }} cursos asignados</span>
                                             <div class="trabajador-card__alerts">
                                                 @if($hasCaducado)
-                                                    <span class="course-badge-status course-badge-status--caducado" style="margin-left:0;" title="Cursos caducados"><i class="fas fa-exclamation-circle"></i></span>
+                                                    <span class="course-badge-status course-badge-status--caducado" style="margin-left:0;" title="Cursos caducados o no aptos"><i class="fas fa-exclamation-circle"></i></span>
                                                 @endif
                                                 @if($hasAviso)
                                                     <span class="course-badge-status course-badge-status--aviso" style="margin-left:0;" title="Cursos por renovar"><i class="fas fa-exclamation-triangle"></i></span>
@@ -632,13 +619,30 @@
                                 <h4 style="color: #1e293b; font-weight: 800;">Acceso Restringido</h4>
                                 <p style="color: #64748b; font-size: 1rem;">No tienes permisos para visualizar el directorio de trabajadores.</p>
                             </div>
-                        @endcan
+                        @endcanany
 
                     @else
                         @php
                             $deptosActuales = is_string($selectedPersonal->departamento)
                                 ? json_decode($selectedPersonal->departamento, true) ?? explode(',', $selectedPersonal->departamento)
                                 : (array) $selectedPersonal->departamento;
+
+                            $puestosTrabajador = $selectedPersonal->puestos->loadMissing('epis');
+                            $puestosAsignadosIds = $puestosTrabajador->pluck('id')->toArray();
+
+                            // Consolidamos los EPIs requeridos por todos sus perfiles activos (quedándonos con la cantidad máxima requerida)
+                            $episConsolidados = [];
+                            foreach ($puestosTrabajador->where('activo', true) as $puestoItem) {
+                                foreach ($puestoItem->epis as $epiItem) {
+                                    $cant = (int) ($epiItem->pivot->cantidad ?? 1);
+                                    if (!isset($episConsolidados[$epiItem->id]) || $cant > $episConsolidados[$epiItem->id]['cantidad']) {
+                                        $episConsolidados[$epiItem->id] = [
+                                            'nombre' => $epiItem->nombre,
+                                            'cantidad' => $cant,
+                                        ];
+                                    }
+                                }
+                            }
                         @endphp
 
                         <div style="margin-bottom: 16px;">
@@ -647,7 +651,6 @@
                             </a>
                         </div>
 
-                        <!-- BANNER DE REVISIÓN PENDIENTE -->
                         @if(!$selectedPersonal->prl_revisado)
                             <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                                 <div>
@@ -691,7 +694,9 @@
 
                                 <div class="worker-strip__item">
                                     <div class="worker-strip__label">Puesto</div>
-                                    <div class="worker-strip__value {{ optional($selectedPersonal->puestoTrabajo)->nombre ? '' : 'worker-strip__value--muted' }}">{{ optional($selectedPersonal->puestoTrabajo)->nombre ?: '—' }}</div>
+                                    <div class="worker-strip__value {{ (optional($selectedPersonal->puestoTrabajo)->nombre || $selectedPersonal->puesto) ? '' : 'worker-strip__value--muted' }}">
+                                        {{ optional($selectedPersonal->puestoTrabajo)->nombre ?: ($selectedPersonal->puesto ?: '—') }}
+                                    </div>
                                 </div>
 
                                 <div class="worker-strip__item">
@@ -712,56 +717,64 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div class="worker-strip__item">
-                                    <div class="worker-strip__label">Cursos</div>
-                                    <div class="worker-strip__value">{{ $selectedPersonal->cursos->count() }}</div>
-                                </div>
                             </div>
 
                             <div class="erp-puestos-panel">
                                 <div class="erp-puestos-header">
-                                    <h4 class="erp-puestos-title">Perfiles Formativos (Macros Automáticas)</h4>
+                                    <h4 class="erp-puestos-title">Perfiles Formativos y Dotación de EPIs (Macros Automáticas)</h4>
                                 </div>
-                                
+
                                 <div class="erp-tags-container" id="puestos-chip-container">
-                                    @foreach($selectedPersonal->puestos()->get() as $puesto)
-                                        <div class="erp-chip" id="chip-puesto-{{ $puesto->id }}">
-                                            {{ $puesto->nombre }}
-                                            @can('cursos.edit')
+                                    @foreach($puestosTrabajador as $puesto)
+                                        <div class="erp-chip" id="chip-puesto-{{ $puesto->id }}" data-puesto-nombre="{{ $puesto->nombre }}">
+                                            <span>{{ $puesto->nombre }}</span>
+                                            <a href="{{ route('puestos.epis.pdf', $puesto->id) }}" target="_blank" class="erp-chip-pdf" title="Ver Ficha Oficial de EPIs (PDF)">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                            @canany(['cursos.edit', 'cursos.normas'])
                                                 <button type="button" class="erp-chip-remove js-remove-puesto" data-puesto-id="{{ $puesto->id }}" title="Quitar perfil">
                                                     <i class="fas fa-times"></i>
                                                 </button>
-                                            @endcan
+                                            @endcanany
                                         </div>
                                     @endforeach
 
-                                    @can('cursos.edit')
+                                    @canany(['cursos.edit', 'cursos.normas'])
                                         <div class="erp-add-wrapper">
                                             <button type="button" class="erp-add-btn" id="js-btn-add-puesto">
                                                 <i class="fas fa-plus"></i> Añadir perfil
                                             </button>
-                                            
+
                                             <select id="js-select-add-puesto" class="erp-select-input">
                                                 <option value="">Buscar y seleccionar...</option>
-                                                @php
-                                                    // Obtenemos los IDs llamando forzosamente a la relación ()
-                                                    $puestosAsignados = $selectedPersonal->puestos()->pluck('puestos.id')->toArray();
-                                                @endphp
                                                 @foreach($todosLosPuestos as $p)
-                                                    @if(!in_array($p->id, $puestosAsignados))
+                                                    @if(!in_array($p->id, $puestosAsignadosIds))
                                                         <option value="{{ $p->id }}">{{ $p->nombre }}</option>
                                                     @endif
                                                 @endforeach
                                             </select>
                                         </div>
-                                    @endcan
+                                    @endcanany
                                 </div>
+
+                                @if(!empty($episConsolidados))
+                                    <div class="erp-epi-summary">
+                                        <span style="font-size: 0.72rem; font-weight: 800; color: #64748b; text-transform: uppercase; margin-right: 4px;">
+                                            <i class="fas fa-hard-hat text-primary mr-1"></i> EPIs Prescritos:
+                                        </span>
+                                        @foreach($episConsolidados as $epiData)
+                                            <span class="erp-epi-pill">
+                                                {{ $epiData['nombre'] }} <strong>({{ $epiData['cantidad'] }} uds.)</strong>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         </div>
 
                         <div class="cursos-section-title" style="margin-top: 24px; margin-bottom: 16px; border-top: 1px solid #eef2f7; padding-top: 16px;">
                             <div>
-                                <h3>Formación del Trabajador</h3>
+                                <h3>Formación del Trabajador ({{ $selectedPersonal->cursos->count() }} asignados)</h3>
                                 <p>Mostrando los cursos asignados o inyectados por sus perfiles formativos.</p>
                             </div>
                             <div>
@@ -785,16 +798,17 @@
                                     $catHasCaducado = false;
                                     $catHasAviso = false;
                                     $catHasAssigned = false;
-                                    $hoy = \Carbon\Carbon::now()->startOfDay();
-                                    
 
-                                    foreach($cursosGrupo as $c) {
+                                    foreach ($cursosGrupo as $c) {
                                         $asignadoCheck = $selectedPersonal ? $selectedPersonal->cursos->firstWhere('id', $c->id) : null;
-                                        
+
                                         if ($asignadoCheck) {
-                                            $catHasAssigned = true; 
-                                            
-                                            if (!empty($asignadoCheck->pivot->fecha_realizacion) && $c->meses_validez) {
+                                            $catHasAssigned = true;
+                                            $esAptoCheck = (bool) ($asignadoCheck->pivot->apto ?? false);
+
+                                            if (!$esAptoCheck && !empty($asignadoCheck->pivot->fecha_realizacion)) {
+                                                $catHasCaducado = true;
+                                            } elseif ($esAptoCheck && !empty($asignadoCheck->pivot->fecha_realizacion) && $c->meses_validez) {
                                                 $fRealizacion = \Carbon\Carbon::parse($asignadoCheck->pivot->fecha_realizacion)->startOfDay();
                                                 $fCaducidad = $fRealizacion->copy()->addMonths($c->meses_validez);
                                                 $fAviso = $fCaducidad->copy()->subDays($c->dias_aviso_previo ?? 30);
@@ -811,13 +825,13 @@
                                 @endphp
 
                                 <section class="course-group course-group--filterable {{ $isOpenClass }}" data-category="{{ $categoriaNombre }}">
-                                    <div class="course-group__head" onclick="this.closest('.course-group').classList.toggle('is-open')">
+                                    <div class="course-group__head">
                                         <div class="course-group__head-left">
                                             <i class="fas fa-chevron-down course-group__toggle-icon"></i>
                                             <h4>{{ $categoriaNombre }}</h4>
-                                            
+
                                             @if($catHasCaducado)
-                                                <i class="fas fa-exclamation-circle" style="color: #ef4444;" title="Contiene cursos caducados"></i>
+                                                <i class="fas fa-exclamation-circle" style="color: #ef4444;" title="Contiene cursos caducados o no aptos"></i>
                                             @endif
                                             @if($catHasAviso)
                                                 <i class="fas fa-exclamation-triangle" style="color: #f59e0b;" title="Contiene cursos próximos a caducar"></i>
@@ -833,36 +847,53 @@
                                                     @php
                                                         $asignado = $selectedPersonal ? $selectedPersonal->cursos->firstWhere('id', $curso->id) : null;
                                                         $descripcion = trim((string) $curso->descripcion);
+                                                        $esApto = $asignado ? (bool) ($asignado->pivot->apto ?? false) : false;
 
                                                         $estadoCaducidad = null;
-                                                        if ($asignado && !empty($asignado->pivot->fecha_realizacion) && $curso->meses_validez) {
-                                                            $fechaRealizacion = \Carbon\Carbon::parse($asignado->pivot->fecha_realizacion)->startOfDay();
-                                                            $fechaCaducidad = $fechaRealizacion->copy()->addMonths($curso->meses_validez);
-                                                            $fechaAviso = $fechaCaducidad->copy()->subDays($curso->dias_aviso_previo ?? 30);
+                                                        $fechaCaducidad = null;
 
-                                                            if ($hoy->gt($fechaCaducidad)) {
-                                                                $estadoCaducidad = 'caducado';
-                                                            } elseif ($hoy->gte($fechaAviso)) {
-                                                                $estadoCaducidad = 'aviso';
+                                                        if ($asignado) {
+                                                            if (!$esApto && !empty($asignado->pivot->fecha_realizacion)) {
+                                                                $estadoCaducidad = 'no_apto';
+                                                            } elseif ($esApto && !empty($asignado->pivot->fecha_realizacion) && $curso->meses_validez) {
+                                                                $fechaRealizacion = \Carbon\Carbon::parse($asignado->pivot->fecha_realizacion)->startOfDay();
+                                                                $fechaCaducidad = $fechaRealizacion->copy()->addMonths($curso->meses_validez);
+                                                                $fechaAviso = $fechaCaducidad->copy()->subDays($curso->dias_aviso_previo ?? 30);
+
+                                                                if ($hoy->gt($fechaCaducidad)) {
+                                                                    $estadoCaducidad = 'caducado';
+                                                                } elseif ($hoy->gte($fechaAviso)) {
+                                                                    $estadoCaducidad = 'aviso';
+                                                                }
                                                             }
                                                         }
-                                                        
+
                                                         $rowClasses = $asignado ? 'is-assigned' : '';
-                                                        if ($estadoCaducidad === 'caducado') $rowClasses .= ' course-row--caducado';
+                                                        if (in_array($estadoCaducidad, ['caducado', 'no_apto'], true)) $rowClasses .= ' course-row--caducado';
                                                         if ($estadoCaducidad === 'aviso') $rowClasses .= ' course-row--aviso';
+
+                                                        $puedeEditarFila = $asignado && auth()->user()?->can('cursos.edit');
                                                     @endphp
-                                                    
+
                                                     <div class="course-row {{ $rowClasses }}" data-course-name="{{ mb_strtolower($curso->nombre) }}">
                                                         <div>
                                                             <div class="course-row__name">
                                                                 {{ $curso->nombre }}
-                                                                @if($estadoCaducidad === 'caducado')
+                                                                @if($estadoCaducidad === 'caducado' && $fechaCaducidad)
                                                                     <span class="course-badge-status course-badge-status--caducado" title="Caducó el {{ $fechaCaducidad->format('d/m/Y') }}">
-                                                                        <i class="fas fa-exclamation-circle"></i> Caducado
+                                                                        <i class="fas fa-exclamation-circle"></i> Caducado ({{ $fechaCaducidad->format('d/m/Y') }})
                                                                     </span>
-                                                                @elseif($estadoCaducidad === 'aviso')
+                                                                @elseif($estadoCaducidad === 'no_apto')
+                                                                    <span class="course-badge-status course-badge-status--caducado">
+                                                                        <i class="fas fa-times-circle"></i> No Apto
+                                                                    </span>
+                                                                @elseif($estadoCaducidad === 'aviso' && $fechaCaducidad)
                                                                     <span class="course-badge-status course-badge-status--aviso" title="Caduca el {{ $fechaCaducidad->format('d/m/Y') }}">
-                                                                        <i class="fas fa-exclamation-triangle"></i> Renovar pronto
+                                                                        <i class="fas fa-exclamation-triangle"></i> Renovar pronto ({{ $fechaCaducidad->format('d/m/Y') }})
+                                                                    </span>
+                                                                @elseif($asignado && empty($asignado->pivot->fecha_realizacion))
+                                                                    <span class="course-badge-status course-badge-status--aviso">
+                                                                        <i class="fas fa-clock"></i> Pendiente de realizar
                                                                     </span>
                                                                 @endif
                                                             </div>
@@ -872,11 +903,11 @@
                                                         </div>
 
                                                         <div class="course-row__control-wrap">
-                                                            
+
                                                             <!-- COLUMNA 1: ASIGNACIÓN Y BOTONES -->
                                                             <div class="course-row__field">
                                                                 <div class="course-row__field-label" style="opacity: 0; user-select: none;">Acción</div>
-                                                                
+
                                                                 <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 34px; margin-bottom: 6px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 0 10px; border-radius: 8px;">
                                                                     <span class="course-row__assign-state" style="margin:0; font-size: 0.8rem;">{{ $asignado ? 'Asignado' : 'Disponible' }}</span>
                                                                     @can('cursos.edit')
@@ -888,7 +919,7 @@
                                                                         <i class="fas {{ $asignado ? 'fa-check text-success' : 'fa-lock text-muted' }}"></i>
                                                                     @endcan
                                                                 </div>
-                                                                
+
                                                                 @if($asignado)
                                                                     <div style="display: flex; gap: 6px; width: 100%;">
                                                                         <button type="button" class="btn btn-sm js-open-history" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" data-curso-nombre="{{ $curso->nombre }}" style="flex:1; font-size: 0.7rem; padding: 4px; color: #4338ca; background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 6px; font-weight: 700;" title="Historial">
@@ -908,16 +939,16 @@
                                                             <!-- COLUMNA 2: APTO -->
                                                             <div class="course-row__field">
                                                                 <div class="course-row__field-label">Apto</div>
-                                                                <select class="course-apto-select" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" @cannot('cursos.edit') disabled @endcannot>
-                                                                    <option value="1" @selected((bool) ($asignado->pivot->apto ?? false))>Sí</option>
-                                                                    <option value="0" @selected($asignado && ! (bool) ($asignado->pivot->apto ?? false))>No</option>
+                                                                <select class="course-apto-select" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" @disabled(!$puedeEditarFila)>
+                                                                    <option value="1" @selected($esApto)>Sí</option>
+                                                                    <option value="0" @selected(!$esApto)>No</option>
                                                                 </select>
                                                             </div>
 
                                                             <!-- COLUMNA 3: FECHA -->
                                                             <div class="course-row__field">
                                                                 <div class="course-row__field-label">Fecha</div>
-                                                                <input type="date" class="fecha-realizacion-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" value="{{ $asignado && !empty($asignado->pivot->fecha_realizacion) ? \Carbon\Carbon::parse($asignado->pivot->fecha_realizacion)->format('Y-m-d') : '' }}" @cannot('cursos.edit') disabled @endcannot>
+                                                                <input type="date" class="fecha-realizacion-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" value="{{ $asignado && !empty($asignado->pivot->fecha_realizacion) ? \Carbon\Carbon::parse($asignado->pivot->fecha_realizacion)->format('Y-m-d') : '' }}" @disabled(!$puedeEditarFila)>
                                                             </div>
 
                                                             <!-- COLUMNA 4: DIPLOMA -->
@@ -928,21 +959,21 @@
                                                                         <a href="{{ Storage::url($asignado->pivot->archivo_diploma) }}" target="_blank" class="btn btn-sm" style="flex:1; height: 100%; display: flex; align-items: center; justify-content: center; background: #3b82f6; color: white; font-weight: 700; border-radius: 8px; font-size: 0.75rem; border: none; box-shadow: 0 2px 4px rgba(59,130,246,0.2);" title="Ver Diploma">
                                                                             <i class="fas fa-file-pdf"></i>
                                                                         </a>
-                                                                        @can('cursos.edit')
+                                                                        @if($puedeEditarFila)
                                                                             <label class="btn btn-sm m-0 js-upload-label" style="cursor: pointer; height: 100%; width: 34px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border: 1px solid #cbd5e1; color: #64748b; border-radius: 8px;" title="Reemplazar">
                                                                                 <i class="fas fa-sync-alt"></i>
-                                                                                <input type="file" class="curso-diploma-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" accept=".pdf,.jpg,.png" style="display: none;">
+                                                                                <input type="file" class="curso-diploma-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
                                                                             </label>
-                                                                        @endcan
+                                                                        @endif
                                                                     @else
-                                                                        @can('cursos.edit')
+                                                                        @if($puedeEditarFila)
                                                                             <label class="btn btn-sm m-0 w-100 js-upload-label" style="cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #f8fafc; border: 1px dashed #cbd5e1; color: #64748b; font-weight: 700; font-size: 0.75rem;" title="Subir diploma">
                                                                                 <i class="fas fa-upload mr-2"></i> Subir
-                                                                                <input type="file" class="curso-diploma-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" accept=".pdf,.jpg,.png" style="display: none;">
+                                                                                <input type="file" class="curso-diploma-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
                                                                             </label>
                                                                         @else
-                                                                            <span style="font-size: 0.75rem; color: #64748b; margin: auto;">No adjunto</span>
-                                                                        @endcan
+                                                                            <span style="font-size: 0.75rem; color: #94a3b8; margin: auto;">{{ $asignado ? 'No adjunto' : 'Asigna primero' }}</span>
+                                                                        @endif
                                                                     @endif
                                                                 </div>
                                                             </div>
@@ -952,16 +983,16 @@
                                                                 <div class="course-row__field-header">
                                                                     <div class="course-row__field-label">Comentario</div>
                                                                     @can('cursos.edit')
-                                                                        <button type="button" class="course-comment-save-btn" title="Guardar comentario" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}">
+                                                                        <button type="button" class="course-comment-save-btn" title="Guardar comentario" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" @disabled(!$puedeEditarFila)>
                                                                             <i class="fas fa-check"></i>
                                                                         </button>
                                                                     @endcan
                                                                 </div>
-                                                                <textarea class="course-row__comment course-comment-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" rows="1" placeholder="Añadir observaciones..." @cannot('cursos.edit') readonly @endcannot>{{ $asignado ? ($asignado->pivot->descripcion_aptitud ?? '') : '' }}</textarea>
+                                                                <textarea class="course-row__comment course-comment-input" data-personal-id="{{ $selectedPersonal->id }}" data-curso-id="{{ $curso->id }}" rows="1" placeholder="Añadir observaciones..." @readonly(!$puedeEditarFila)>{{ $asignado ? ($asignado->pivot->descripcion_aptitud ?? '') : '' }}</textarea>
                                                             </div>
 
                                                         </div>
-                                                    </div> 
+                                                    </div>
                                                 @endforeach
                                             </div>
                                         </div>
@@ -990,7 +1021,7 @@
                     <h3 style="font-size: 1.1rem; font-weight: 800; color: #173e67; margin: 0;">Historial de Renovaciones</h3>
                     <button type="button" data-close-history style="background:none; border:none; font-size:1.2rem; color:#94a3b8; cursor:pointer;"><i class="fas fa-times"></i></button>
                 </div>
-                
+
                 <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
                     Curso: <strong id="history-curso-name" style="color: #173e67;">Cargando...</strong>
                 </p>
@@ -1006,9 +1037,9 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
         const autoResizeTextarea = (textarea) => {
-            if (textarea.offsetParent === null) return; 
-            textarea.style.height = '34px'; 
-            textarea.style.height = Math.max(34, textarea.scrollHeight) + 'px'; 
+            if (textarea.offsetParent === null) return;
+            textarea.style.height = '34px';
+            textarea.style.height = Math.max(34, textarea.scrollHeight) + 'px';
         };
 
         document.querySelectorAll('.course-comment-input').forEach(textarea => {
@@ -1017,8 +1048,7 @@
         });
 
         document.querySelectorAll('.course-group__head').forEach(head => {
-            head.removeAttribute('onclick'); 
-            head.addEventListener('click', function() {
+            head.addEventListener('click', function () {
                 const group = this.closest('.course-group');
                 group.classList.toggle('is-open');
                 if (group.classList.contains('is-open')) {
@@ -1064,6 +1094,11 @@
         updateRowVisibility();
 
         const persistExtraData = async (personalId, cursoId, payload, row) => {
+            const toggle = row ? row.querySelector('.course-toggle-input') : null;
+            if (toggle && !toggle.checked) {
+                throw new Error('Debes asignar el curso primero.');
+            }
+
             const dateInput = row ? row.querySelector('.fecha-realizacion-input') : null;
             const aptoSelect = row ? row.querySelector('.course-apto-select') : null;
             const commentInput = row ? row.querySelector('.course-comment-input') : null;
@@ -1071,16 +1106,16 @@
 
             const formData = new FormData();
             formData.append('curso_id', cursoId);
-            formData.append('_method', 'PUT'); 
+            formData.append('_method', 'PUT');
 
-            let finalApto = payload.apto !== undefined ? payload.apto : (aptoSelect ? aptoSelect.value : '1');
+            const finalApto = payload.apto !== undefined ? payload.apto : (aptoSelect ? aptoSelect.value : '1');
             formData.append('apto', finalApto);
 
             if (dateInput && dateInput.value) formData.append('fecha_realizacion', dateInput.value);
-            if (payload.fecha_realizacion) formData.set('fecha_realizacion', payload.fecha_realizacion);
-            
+            if (payload.fecha_realizacion !== undefined) formData.set('fecha_realizacion', payload.fecha_realizacion);
+
             if (commentInput && commentInput.value) formData.append('descripcion_aptitud', commentInput.value);
-            
+
             if (payload.archivo_diploma) {
                 formData.append('archivo_diploma', payload.archivo_diploma);
             } else if (fileInput && fileInput.files.length > 0) {
@@ -1103,8 +1138,8 @@
             }
         };
 
-        document.body.addEventListener('change', async function(e) {
-            
+        document.body.addEventListener('change', async function (e) {
+
             if (e.target.matches('.course-toggle-input')) {
                 const input = e.target;
                 const personalId = input.getAttribute('data-personal-id');
@@ -1115,38 +1150,49 @@
 
                 if (!personalId || !cursoId) return;
 
-                let fechaRealizacion = null;
                 const dateInput = row.querySelector('.fecha-realizacion-input');
-                if (dateInput && assigned && !dateInput.value) {
+                const aptoSelect = row.querySelector('.course-apto-select');
+                const commentInput = row.querySelector('.course-comment-input');
+                const saveCommentBtn = row.querySelector('.course-comment-save-btn');
+                const stateLabel = row.querySelector('.course-row__assign-state');
+
+                if (assigned && dateInput && !dateInput.value) {
                     dateInput.value = new Date().toISOString().slice(0, 10);
-                    fechaRealizacion = dateInput.value;
-                } else if (dateInput) {
-                    fechaRealizacion = dateInput.value;
                 }
 
-                try {
-                    const response = await fetch(assigned ? `{{ url('personal') }}/${personalId}/cursos` : `{{ url('personal') }}/${personalId}/cursos/${cursoId}`, {
-                        method: assigned ? 'PUT' : 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Content-Type': 'application/json',
-                        },
-                        body: assigned ? JSON.stringify({
-                            curso_id: cursoId,
-                            fecha_realizacion: fechaRealizacion,
-                            apto: row.querySelector('.course-apto-select')?.value || 1,
-                            descripcion_aptitud: row.querySelector('.course-comment-input')?.value || '',
-                        }) : null,
-                    });
+                input.disabled = true;
 
-                    if (!response.ok) throw new Error('Failed');
+                try {
+                    if (assigned) {
+                        await persistExtraData(personalId, cursoId, {
+                            apto: aptoSelect ? aptoSelect.value : '1',
+                            fecha_realizacion: dateInput ? dateInput.value : '',
+                        }, row);
+                    } else {
+                        const response = await fetch(`{{ url('personal') }}/${personalId}/cursos/${cursoId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                            },
+                        });
+                        if (!response.ok) throw new Error('Error al desasignar el curso.');
+                    }
 
                     input.setAttribute('data-assigned', assigned ? '1' : '0');
-                    window.location.reload();
+                    row.classList.toggle('is-assigned', assigned);
+                    if (stateLabel) stateLabel.textContent = assigned ? 'Asignado' : 'Disponible';
+
+                    [dateInput, aptoSelect, saveCommentBtn].forEach(el => { if (el) el.disabled = !assigned; });
+                    if (commentInput) commentInput.readOnly = !assigned;
+
+                    updateRowVisibility();
                 } catch (error) {
                     input.checked = previousState;
                     alert('No se pudo actualizar la asignación del curso.');
+                } finally {
+                    input.disabled = false;
                 }
             }
 
@@ -1154,8 +1200,8 @@
                 const input = e.target;
                 try {
                     await persistExtraData(input.dataset.personalId, input.dataset.cursoId, { fecha_realizacion: input.value }, input.closest('.course-row'));
-                    input.classList.add('border-green-500');
-                    setTimeout(() => input.classList.remove('border-green-500'), 2000);
+                    input.classList.add('border-success');
+                    setTimeout(() => input.classList.remove('border-success'), 2000);
                 } catch (error) {
                     alert('Error: ' + error.message);
                 }
@@ -1185,7 +1231,7 @@
                 const cursoId = input.dataset.cursoId;
                 const labelWrap = input.closest('.js-upload-label');
                 const originalHtml = labelWrap.innerHTML;
-                
+
                 labelWrap.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
                 labelWrap.style.pointerEvents = 'none';
 
@@ -1201,8 +1247,8 @@
             }
         });
 
-        document.body.addEventListener('click', async function(e) {
-            
+        document.body.addEventListener('click', async function (e) {
+
             const btnSaveComment = e.target.closest('.course-comment-save-btn');
             if (btnSaveComment) {
                 const row = btnSaveComment.closest('.course-row');
@@ -1227,7 +1273,7 @@
             const btnRenovar = e.target.closest('.js-renovar-curso');
             if (btnRenovar) {
                 if (!confirm('¿Iniciar proceso de renovación? Esto archivará el diploma y fecha actual en el historial.')) return;
-                
+
                 const originalHtml = btnRenovar.innerHTML;
                 btnRenovar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 btnRenovar.disabled = true;
@@ -1251,7 +1297,7 @@
                 const modal = document.getElementById('history-modal');
                 const timeline = document.getElementById('history-timeline');
                 document.getElementById('history-curso-name').textContent = btnHistorial.dataset.cursoNombre;
-                
+
                 timeline.innerHTML = '<div style="text-align: center; padding: 20px; color: #64748b;"><i class="fas fa-spinner fa-spin"></i> Consultando registros...</div>';
                 modal.classList.add('is-open');
 
@@ -1259,29 +1305,29 @@
                     const response = await fetch(`/personal/${btnHistorial.dataset.personalId}/cursos/${btnHistorial.dataset.cursoId}/historial`);
                     if (!response.ok) throw new Error('Error');
                     const data = await response.json();
-                    
+
                     timeline.innerHTML = '';
                     if (data.actual) {
                         const isApto = data.actual.apto;
                         const badgeBg = isApto ? '#dcfce7' : '#fee2e2';
                         const badgeColor = isApto ? '#166534' : '#b91c1c';
                         const dBtn = data.actual.diploma_url ? `<a href="${data.actual.diploma_url}" target="_blank" style="margin-right:12px; font-size:0.75rem; text-decoration:none; color:#166534; background:#dcfce7; padding:4px 10px; border-radius:6px; font-weight:800; border:1px solid #bbf7d0;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` : '';
-                        
+
                         timeline.innerHTML += `
                             <div style="padding:12px 16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
                                 <div><div style="font-size:0.75rem; font-weight:800; color:#166534;">CERTIFICADO ACTUAL</div><div style="font-weight:700; color:#14532d; font-size:1.1rem;">${data.actual.fecha}</div></div>
-                                <div style="display:flex; align-items:center;">${dBtn}<span style="font-size:11px; font-weight:800; padding:5px 9px; border-radius:999px; background:${badgeBg}; color:${badgeColor};">${isApto?'APTO':'NO APTO'}</span></div>
+                                <div style="display:flex; align-items:center;">${dBtn}<span style="font-size:11px; font-weight:800; padding:5px 9px; border-radius:999px; background:${badgeBg}; color:${badgeColor};">${isApto ? 'APTO' : 'NO APTO'}</span></div>
                             </div>`;
                     }
                     if (data.historico && data.historico.length > 0) {
                         data.historico.forEach(item => {
                             const isApto = item.apto;
                             const dBtn = item.diploma_url ? `<a href="${item.diploma_url}" target="_blank" style="margin-right:12px; font-size:0.75rem; text-decoration:none; color:#475569; background:#f1f5f9; padding:4px 10px; border-radius:6px; font-weight:800; border:1px solid #e2e8f0;"><i class="fas fa-file-pdf"></i> Ver certificado</a>` : '';
-                            
+
                             timeline.innerHTML += `
                                 <div style="padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; display:flex; justify-content:space-between; align-items:center; opacity:0.85;">
                                     <div><div style="font-size:0.75rem; font-weight:800; color:#64748b;">REGISTRO ARCHIVADO</div><div style="font-weight:700; color:#475569; font-size:1rem;">${item.fecha}</div></div>
-                                    <div style="display:flex; align-items:center;">${dBtn}<span style="font-size:11px; font-weight:800; padding:5px 9px; border-radius:999px; background:#e2e8f0; color:#64748b;">${isApto?'APTO':'NO APTO'}</span></div>
+                                    <div style="display:flex; align-items:center;">${dBtn}<span style="font-size:11px; font-weight:800; padding:5px 9px; border-radius:999px; background:#e2e8f0; color:#64748b;">${isApto ? 'APTO' : 'NO APTO'}</span></div>
                                 </div>`;
                         });
                     } else if (!data.actual) {
@@ -1297,40 +1343,34 @@
             }
         });
 
-        // -------------------------------------------------------------
         // FILTRO DE TRABAJADORES (BUSCADOR, CATEGORÍA, DEPTO E INACTIVOS)
-        // -------------------------------------------------------------
-        (function() {
+        (function () {
             const categorySelect = document.getElementById('js-worker-category');
             const searchInput = document.getElementById('js-worker-search');
             const deptoSelect = document.getElementById('js-worker-depto');
-            
-            // Hemos cambiado los IDs para que no choquen
             const statusSidebar = document.getElementById('js-worker-status-sidebar');
             const statusGrid = document.getElementById('js-worker-status-grid');
-            
             const toggleInactiveSidebar = document.getElementById('js-toggle-inactive-sidebar');
             const toggleInactiveGrid = document.getElementById('js-toggle-inactive-grid');
             const workerItems = document.querySelectorAll('.js-worker-item');
 
-            const storageKey = 'mostrarInactivosCursos'; 
+            const storageKey = 'mostrarInactivosCursos';
             const savedState = localStorage.getItem(storageKey);
             const isChecked = savedState !== null ? savedState === 'true' : true;
-            
+
             if (toggleInactiveSidebar) toggleInactiveSidebar.checked = isChecked;
             if (toggleInactiveGrid) toggleInactiveGrid.checked = isChecked;
 
             const saveStateAndFilter = (e) => {
                 const newState = e.target.checked;
-                localStorage.setItem(storageKey, newState); 
-                
+                localStorage.setItem(storageKey, newState);
+
                 if (toggleInactiveSidebar && e.target !== toggleInactiveSidebar) toggleInactiveSidebar.checked = newState;
                 if (toggleInactiveGrid && e.target !== toggleInactiveGrid) toggleInactiveGrid.checked = newState;
-                
-                filterWorkers(); 
+
+                filterWorkers();
             };
 
-            // Sincroniza ambos selectores de estado para que cambien a la vez
             const syncStatusAndFilter = (e) => {
                 const newVal = e.target.value;
                 if (statusSidebar && e.target !== statusSidebar) statusSidebar.value = newVal;
@@ -1344,12 +1384,11 @@
                 const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
                 const category = categorySelect ? categorySelect.value.toLowerCase() : 'all';
                 const depto = deptoSelect ? deptoSelect.value.toLowerCase() : 'all';
-                
-                // Lee el filtro de la vista en la que estemos trabajando
+
                 let status = 'all';
                 if (statusGrid && statusGrid.offsetParent !== null) status = statusGrid.value;
                 else if (statusSidebar) status = statusSidebar.value;
-                
+
                 let showInactive = true;
                 if (toggleInactiveSidebar) showInactive = toggleInactiveSidebar.checked;
                 else if (toggleInactiveGrid) showInactive = toggleInactiveGrid.checked;
@@ -1358,8 +1397,8 @@
                     const name = item.getAttribute('data-name') || '';
                     const cats = item.getAttribute('data-cats') || '';
                     const workerDepto = item.getAttribute('data-depto') || '';
-                    
-                    const isActivo = item.getAttribute('data-activo') === '1'; 
+
+                    const isActivo = item.getAttribute('data-activo') === '1';
                     const isPendiente = item.getAttribute('data-pendiente') === '1';
                     const numCursos = parseInt(item.getAttribute('data-cursos') || '0', 10);
 
@@ -1368,50 +1407,45 @@
                     const matchesDepto = depto === 'all' || workerDepto.includes(depto);
                     const matchesActivo = showInactive || isActivo;
 
-                    // Lógica del filtro de estado arreglada
                     let matchesStatus = true;
                     if (status === 'pendientes' && !isPendiente) matchesStatus = false;
                     if (status === 'sin_cursos' && numCursos > 0) matchesStatus = false;
 
-                    item.style.display = (matchesSearch && matchesCategory && matchesDepto && matchesActivo && matchesStatus) ? '' : 'none'; 
+                    item.style.display = (matchesSearch && matchesCategory && matchesDepto && matchesActivo && matchesStatus) ? '' : 'none';
                 });
             };
 
             if (categorySelect) categorySelect.addEventListener('change', filterWorkers);
             if (searchInput) searchInput.addEventListener('input', filterWorkers);
             if (deptoSelect) deptoSelect.addEventListener('change', filterWorkers);
-            
-            if (statusSidebar) statusSidebar.addEventListener('change', syncStatusAndFilter); 
-            if (statusGrid) statusGrid.addEventListener('change', syncStatusAndFilter); 
-            
+            if (statusSidebar) statusSidebar.addEventListener('change', syncStatusAndFilter);
+            if (statusGrid) statusGrid.addEventListener('change', syncStatusAndFilter);
             if (toggleInactiveSidebar) toggleInactiveSidebar.addEventListener('change', saveStateAndFilter);
             if (toggleInactiveGrid) toggleInactiveGrid.addEventListener('change', saveStateAndFilter);
-            
+
             filterWorkers();
         })();
 
-        // -------------------------------------------------------------
         // LÓGICA DE PERFILES FORMATIVOS (AÑADIR / QUITAR)
-        // -------------------------------------------------------------
-        (function() {
+        (function () {
             const btnAdd = document.getElementById('js-btn-add-puesto');
             const selectAdd = document.getElementById('js-select-add-puesto');
-            
+
             if (!btnAdd || !selectAdd) return;
 
-            btnAdd.addEventListener('click', function() {
+            btnAdd.addEventListener('click', function () {
                 this.style.display = 'none';
                 selectAdd.style.display = 'inline-block';
                 selectAdd.focus();
             });
 
-            selectAdd.addEventListener('blur', function() {
+            selectAdd.addEventListener('blur', function () {
                 this.style.display = 'none';
                 btnAdd.style.display = 'inline-block';
                 this.value = '';
             });
 
-            selectAdd.addEventListener('change', async function() {
+            selectAdd.addEventListener('change', async function () {
                 const puestoId = this.value;
                 if (!puestoId) return;
 
@@ -1424,7 +1458,7 @@
                         headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                         body: JSON.stringify({ puesto_id: puestoId })
                     });
-                    if (response.ok) window.location.reload(); 
+                    if (response.ok) window.location.reload();
                     else alert('Error al asignar el perfil.');
                 } catch (error) {
                     alert('Fallo de conexión.');
@@ -1432,8 +1466,8 @@
             });
 
             document.querySelectorAll('.js-remove-puesto').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    if(!confirm('¿Seguro que quieres quitar este perfil formativo?')) return;
+                btn.addEventListener('click', async function () {
+                    if (!confirm('¿Seguro que quieres quitar este perfil formativo?')) return;
                     const puestoId = this.getAttribute('data-puesto-id');
                     const personalId = '{{ $selectedPersonal->id ?? "" }}';
                     const chip = document.getElementById(`chip-puesto-${puestoId}`);
@@ -1444,22 +1478,12 @@
                             method: 'DELETE',
                             headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
                         });
-                        
+
                         if (response.ok) {
-                            const puestoNombre = chip.firstChild.textContent.trim();
-                            const selectAdd = document.getElementById('js-select-add-puesto');
-                            
-                            if (selectAdd) {
-                                const opt = document.createElement('option');
-                                opt.value = puestoId;
-                                opt.textContent = puestoNombre;
-                                selectAdd.appendChild(opt);
-                            }
-                            
-                            chip.remove(); 
-                        } else { 
-                            chip.style.opacity = '1'; 
-                            alert('Error al quitar el perfil.'); 
+                            window.location.reload();
+                        } else {
+                            chip.style.opacity = '1';
+                            alert('Error al quitar el perfil.');
                         }
                     } catch (error) {
                         chip.style.opacity = '1';

@@ -77,7 +77,7 @@
         }
         .puestos-btn--ghost:hover { background: #eef2f7; }
 
-        /* TARJETAS KPI SUPERIORES (SCREEN 5) */
+        /* TARJETAS KPI SUPERIORES */
         .puestos-kpi-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -127,7 +127,7 @@
             flex-shrink: 0;
         }
 
-        /* BARRA DE CREACIÓN RÁPIDA Y FILTRO (SCREEN 5) */
+        /* BARRA DE CREACIÓN RÁPIDA Y FILTRO */
         .create-toolbar {
             background: #fff;
             border: 1px solid #e2e8f0;
@@ -179,7 +179,7 @@
             outline: none;
         }
 
-        /* TARJETAS DE PUESTO (SCREEN 5) */
+        /* TARJETAS DE PUESTO */
         .puesto-card {
             background: #fff;
             border: 1px solid #e2e8f0;
@@ -261,7 +261,7 @@
             color: #334155;
             transition: background 0.15s;
         }
-        .puesto-stat-badge:hover {
+        a.puesto-stat-badge:hover {
             background: #eef2f7;
             color: #0f2942;
         }
@@ -270,7 +270,7 @@
             border-color: #bae6fd;
             color: #0369a1;
         }
-        .puesto-stat-badge--epi:hover {
+        a.puesto-stat-badge--epi:hover {
             background: #e0f2fe;
             color: #075985;
         }
@@ -318,7 +318,7 @@
         .puesto-icon-btn--delete { background: #fff1f2; border-color: #fecdd3; color: #e11d48; }
         .puesto-icon-btn--delete:hover { background: #ffe4e6; color: #be123c; }
 
-        /* BANNER INFERIOR INFORMATIVO (SCREEN 5) */
+        /* BANNER INFERIOR INFORMATIVO */
         .protocol-banner {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -373,8 +373,11 @@
 
 @section('content')
     @php
-        $totalPuestos = $puestos->count();$totalPersonalAdscrito = $puestos->sum('personal_count');$puestosConMatrizCompleta = $puestos->filter(fn ($p) => ($p->cursos_count ?? 0) > 0 && ($p->epis_count ?? 0) > 0)->count();
-        $totalAsignacionesEpi =$puestos->sum('epis_count');
+        $totalPuestos = $puestos->count();
+        $totalPersonalAdscrito = $puestos->sum('personal_count');
+        $puestosConMatrizCompleta = $puestos->filter(fn ($p) => ($p->cursos_count ?? 0) > 0 && ($p->epis_count ?? 0) > 0)->count();
+        $totalAsignacionesEpi = $puestos->sum('epis_count');
+        $puedeConfigurarPuestos = auth()->user()?->canAny(['cursos.normas', 'cursos.edit']);
     @endphp
 
     <section class="puestos-shell">
@@ -450,7 +453,7 @@
 
         <!-- BARRA DE CREACIÓN RÁPIDA Y FILTRO -->
         <div class="create-toolbar">
-            @can('cursos.edit')
+            @canany(['cursos.normas', 'cursos.edit'])
                 <form action="{{ route('puestos.store') }}" method="POST" class="create-toolbar__form">
                     @csrf
                     <input type="text" name="nombre" class="create-toolbar__input" placeholder="Ej: FONTANERO/A, SOLDADOR/A, TÉCNICO DE OBRA A..." required>
@@ -460,7 +463,7 @@
                 </form>
             @else
                 <div class="font-weight-bold text-muted small">Directorio de Perfiles Formativos Homologados</div>
-            @endcan
+            @endcanany
 
             <input type="search" id="search-puestos-input" class="create-toolbar__search" placeholder="Filtrar puestos por nombre..." autocomplete="off">
         </div>
@@ -474,14 +477,21 @@
                 @php
                     $cursosCount = (int) ($puesto->cursos_count ?? 0);
                     $episCount = (int) ($puesto->epis_count ?? 0);
+                    $todosEpisCount = (int) ($puesto->todos_los_epis_count ?? $episCount);
+                    $episBajaCount = max(0, $todosEpisCount - $episCount); 
                     $personalCount = (int) ($puesto->personal_count ?? 0);
-                    $matrizLista = $cursosCount > 0 && $episCount > 0;
+                    $matrizLista = $cursosCount > 0 && $episCount > 0 && $episBajaCount === 0;
                 @endphp
                 <div class="col-md-6 col-lg-4 js-puesto-col" data-name="{{ mb_strtolower($puesto->nombre) }}">
                     <article class="puesto-card">
                         <div>
                             <div class="puesto-card__top">
-                                <span class="puesto-id-pill">ID #PRF-{{ str_pad((string) $puesto->id, 3, '0', STR_PAD_LEFT) }}</span>
+                                <span class="puesto-id-pill">
+                                    ID #PRF-{{ str_pad((string) $puesto->id, 3, '0', STR_PAD_LEFT) }}
+                                    @if($puesto->documentoEpiVigente)
+                                        • {{ $puesto->documentoEpiVigente->revision }}
+                                    @endif
+                                </span>
                                 <span class="puesto-status-pill {{ $matrizLista ? 'puesto-status-pill--ready' : 'puesto-status-pill--pending' }}">
                                     {{ $matrizLista ? 'Matriz Completa' : 'En Configuración' }}
                                 </span>
@@ -490,17 +500,35 @@
                             <h3 class="puesto-title">{{ $puesto->nombre }}</h3>
 
                             <div class="puesto-stats">
-                                <a href="{{ route('puestos.edit', ['puesto' => $puesto->id, 'tab' => 'cursos']) }}" class="puesto-stat-badge" title="Configurar cursos obligatorios">
-                                    <i class="fas fa-graduation-cap"></i> {{ $cursosCount }} cursos req.
-                                </a>
+                                @if ($puedeConfigurarPuestos)
+                                    <a href="{{ route('puestos.edit', ['puesto' => $puesto->id, 'tab' => 'cursos']) }}" class="puesto-stat-badge" title="Configurar cursos obligatorios">
+                                        <i class="fas fa-graduation-cap"></i> {{ $cursosCount }} cursos req.
+                                    </a>
 
-                                <a href="{{ route('puestos.edit', ['puesto' => $puesto->id, 'tab' => 'epis']) }}" class="puesto-stat-badge puesto-stat-badge--epi" title="Configurar dotación de EPIs">
-                                    <i class="fas fa-hard-hat"></i> {{ $episCount }} EPIs
-                                </a>
+                                    <a href="{{ route('puestos.edit', ['puesto' => $puesto->id, 'tab' => 'epis']) }}" class="puesto-stat-badge puesto-stat-badge--epi" title="Configurar dotación de EPIs">
+                                        <i class="fas fa-hard-hat"></i> {{ $episCount }} EPIs
+                                    </a>
+                                @else
+                                    <span class="puesto-stat-badge" title="Cursos obligatorios del perfil">
+                                        <i class="fas fa-graduation-cap"></i> {{ $cursosCount }} cursos req.
+                                    </span>
 
-                                <span class="puesto-stat-badge" title="Trabajadores con este perfil asignado">
+                                    <span class="puesto-stat-badge puesto-stat-badge--epi" title="Dotación de EPIs del perfil">
+                                        <i class="fas fa-hard-hat"></i> {{ $episCount }} EPIs
+                                    </span>
+                                @endif
+
+                                <a href="{{ route('puestos.auditoria', $puesto->id) }}" class="puesto-stat-badge" title="Ver trabajadores con este perfil asignado">
                                     <i class="fas fa-users"></i> {{ $personalCount }} empleados
-                                </span>
+                                </a>
+
+                                @if ($episBajaCount > 0)
+                                    <a href="{{ route('puestos.edit', ['puesto' => $puesto->id, 'tab' => 'epis']) }}"
+                                    style="display: flex; align-items: center; gap: 8px; background: #fffbeb; border: 1px solid #fcd34d; color: #b45309; padding: 7px 10px; border-radius: 9px; font-size: 0.76rem; font-weight: 800; margin-bottom: 12px; text-decoration: none;">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <span>{{ $episBajaCount }} {{ $episBajaCount === 1 ? 'EPI dado de baja (Revisar)' : 'EPIs dados de baja (Revisar)' }}</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
 
@@ -509,9 +537,11 @@
 
                             <div class="puesto-actions-group">
                                 <!-- Botón directo para ver la Ficha Oficial de EPIs en PDF -->
-                                <a href="{{ route('puestos.epis.pdf', $puesto->id) }}" target="_blank" class="puesto-icon-btn puesto-icon-btn--pdf" title="Ver Ficha Oficial de EPIs (PDF)">
-                                    <i class="fas fa-file-pdf"></i>
-                                </a>
+                                @canany(['cursos.view', 'cursos.normas', 'cursos.export', 'personal.export'])
+                                    <a href="{{ route('puestos.epis.pdf', $puesto->id) }}" target="_blank" class="puesto-icon-btn puesto-icon-btn--pdf" title="Ver Ficha Oficial de EPIs (PDF)">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                @endcanany
 
                                 <!-- Botón para ver el Dashboard de Auditoría -->
                                 <a href="{{ route('puestos.auditoria', $puesto->id) }}" class="puesto-icon-btn puesto-icon-btn--audit" title="Ver Matriz de Auditoría">
@@ -519,7 +549,7 @@
                                 </a>
 
                                 <!-- Botón para Configurar Cursos y EPIs -->
-                                @can('cursos.edit')
+                                @canany(['cursos.normas', 'cursos.edit'])
                                     <a href="{{ route('puestos.edit', $puesto->id) }}" class="puesto-icon-btn puesto-icon-btn--config" title="Configurar Cursos y EPIs">
                                         <i class="fas fa-cog"></i>
                                     </a>
@@ -531,7 +561,7 @@
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </form>
-                                @endcan
+                                @endcanany
                             </div>
                         </div>
                     </article>
@@ -542,6 +572,11 @@
                     <p class="mb-0 font-weight-bold">No hay perfiles formativos registrados en el sistema todavía.</p>
                 </div>
             @endforelse
+
+            <div class="col-12 text-center py-5 text-muted" id="puestos-empty-search" style="display: none;">
+                <i class="fas fa-search fa-2x mb-2 text-secondary"></i>
+                <p class="mb-0 font-weight-bold">No se encontraron perfiles formativos con ese nombre.</p>
+            </div>
         </div>
 
         <!-- BANNER INFORMATIVO INFERIOR -->
@@ -563,14 +598,23 @@
         document.addEventListener('DOMContentLoaded', function () {
             const searchInput = document.getElementById('search-puestos-input');
             const cols = document.querySelectorAll('.js-puesto-col');
+            const emptySearch = document.getElementById('puestos-empty-search');
 
             if (searchInput && cols.length > 0) {
                 searchInput.addEventListener('input', function () {
                     const term = this.value.trim().toLowerCase();
+                    let visibleCount = 0;
+
                     cols.forEach(col => {
                         const name = col.getAttribute('data-name') || '';
-                        col.style.display = (term === '' || name.includes(term)) ? '' : 'none';
+                        const match = term === '' || name.includes(term);
+                        col.style.display = match ? '' : 'none';
+                        if (match) visibleCount++;
                     });
+
+                    if (emptySearch) {
+                        emptySearch.style.display = visibleCount === 0 ? '' : 'none';
+                    }
                 });
             }
         });

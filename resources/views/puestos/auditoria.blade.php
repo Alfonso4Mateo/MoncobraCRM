@@ -1,16 +1,17 @@
 @extends('adminlte::page')
 
-@section('title', 'Auditoría de Matriz')
+@section('title', 'Auditoría de Matriz - ' . $puesto->nombre)
 
 @section('css')
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        .audit-shell { font-family: 'Manrope', sans-serif; }
         .audit-hero { background: #fff; border: 1px solid #e7ecf3; border-radius: 14px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(15,23,42,0.02); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px; }
         .audit-title h1 { font-size: 1.6rem; font-weight: 800; color: #173e67; margin: 0 0 5px; text-transform: uppercase; }
         .audit-title p { color: #64748b; margin: 0; font-size: 0.9rem; }
         
-        .kpi-container { display: flex; gap: 15px; }
-        .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 20px; min-width: 140px; }
+        .kpi-container { display: flex; gap: 15px; flex-wrap: wrap; }
+        .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 20px; min-width: 150px; }
         .kpi-card span { display: block; font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
         .kpi-card strong { display: block; font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
         .kpi-card--green strong { color: #166534; }
@@ -26,13 +27,16 @@
         .matrix-table tbody tr:hover td { background: #f8fafc; }
         .matrix-table tbody tr:hover td.col-worker { background: #f1f5f9; }
 
-        .status-dot { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; cursor: help; }
+        .worker-audit-link { color: #173e67; text-decoration: none; transition: color 0.15s; }
+        .worker-audit-link:hover { color: #0284c7; text-decoration: underline; }
+
+        .status-dot { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; cursor: pointer; }
         .status-vigente { background: #dcfce7; color: #166534; box-shadow: 0 0 0 1px #bbf7d0; }
         .status-aviso { background: #fef9c3; color: #854d0e; box-shadow: 0 0 0 1px #fef08a; }
         .status-caducado { background: #fee2e2; color: #b91c1c; box-shadow: 0 0 0 1px #fecaca; }
         .status-pendiente { background: #f1f5f9; color: #94a3b8; box-shadow: 0 0 0 1px #e2e8f0; }
 
-        .legend { display: flex; gap: 15px; padding: 15px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 0.8rem; font-weight: 600; color: #64748b; }
+        .legend { display: flex; flex-wrap: wrap; gap: 15px; padding: 15px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 0.8rem; font-weight: 600; color: #64748b; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
 
         .audit-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1050; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
@@ -56,23 +60,27 @@
 @endsection
 
 @section('content')
-    <section class="p-3">
+    <section class="p-3 audit-shell">
         <div class="audit-hero">
             <div class="audit-title">
                 <div style="font-size: 0.75rem; font-weight: 800; color: #8a98ab; letter-spacing: 0.1em; margin-bottom: 4px;">REPORTE DE AUDITORÍA</div>
                 <h1>{{ $puesto->nombre }}</h1>
                 <p>Matriz de cumplimiento de cursos obligatorios por trabajador.</p>
                 
-                <div class="mt-3 d-flex" style="gap: 10px;">
+                <div class="mt-3 d-flex flex-wrap" style="gap: 10px;">
                     <a href="{{ route('puestos.index') }}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px; font-weight: 700;">
                         <i class="fas fa-arrow-left"></i> Volver
                     </a>
-                    <a href="{{ route('puestos.edit', $puesto->id) }}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px; font-weight: 700;">
-                        <i class="fas fa-cog"></i> Editar Matriz
-                    </a>
-                    <a href="{{ route('puestos.auditoria.export', $puesto->id) }}" class="btn btn-sm" style="background: #10b981; color: white; border-radius: 8px; font-weight: 700;">
-                        <i class="fas fa-file-excel"></i> Exportar CSV
-                    </a>
+                    @canany(['cursos.normas', 'cursos.edit'])
+                        <a href="{{ route('puestos.edit', $puesto->id) }}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px; font-weight: 700;">
+                            <i class="fas fa-cog"></i> Editar Matriz
+                        </a>
+                    @endcanany
+                    @canany(['cursos.export', 'cursos.normas', 'cursos.view'])
+                        <a href="{{ route('puestos.auditoria.export', $puesto->id) }}" class="btn btn-sm" style="background: #10b981; color: white; border-radius: 8px; font-weight: 700;">
+                            <i class="fas fa-file-excel"></i> Exportar CSV
+                        </a>
+                    @endcanany
                 </div>
             </div>
 
@@ -86,7 +94,7 @@
                     <strong>{{ $porcentajeCumplimiento }}%</strong>
                 </div>
                 <div class="kpi-card kpi-card--red">
-                    <span>Alertas (Caducados)</span>
+                    <span>Incumplimientos / Alertas</span>
                     <strong>{{ $alertas }}</strong>
                 </div>
             </div>
@@ -113,24 +121,33 @@
                                 ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
                                 : (array) $trabajador->departamento;
                             $departamentoStr = !empty($deptos) ? implode(', ', $deptos) : 'Sin departamento';
+                            $nombrePuesto = optional($trabajador->puestoTrabajo)->nombre ?: ($trabajador->puesto ?: '—');
                         @endphp
                         <tr>
                             <td class="col-worker">
                                 <div style="line-height: 1.3;">
-                                    <strong>{{ $trabajador->name }} {{ $trabajador->apellido }}</strong>
+                                    <a href="{{ route('cursos.index', ['personal_id' => $trabajador->id]) }}" class="worker-audit-link" title="Ir a la ficha formativa del trabajador">
+                                        <strong>{{ $trabajador->name }} {{ $trabajador->apellido }}</strong>
+                                    </a>
                                     <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 2px;">
                                         ID RRHH: {{ $trabajador->id_rrhh ?: '—' }} | DNI: {{ $trabajador->dni_nie ?: '—' }}
                                     </div>
                                 </div>
                             </td>
                             <td><span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">{{ strtoupper($departamentoStr ?: '—') }}</span></td>
-                            <td><span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">{{ $trabajador->puesto ?: '—' }}</span></td>
+                            <td><span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">{{ $nombrePuesto }}</span></td>
                             
                             @foreach($cursosExigidos as $curso)
                                 @php
-                                    $info = $trabajador->matriz_cursos[$curso->id];
+                                    $info = $trabajador->matriz_cursos[$curso->id] ?? [
+                                        'estado' => 'pendiente',
+                                        'curso_nombre' => $curso->nombre,
+                                        'fecha_realizacion' => '—',
+                                        'fecha_vencimiento' => '—',
+                                        'dias_restantes' => '—',
+                                    ];
                                     $icono = 'fa-minus';
-                                    $estadoTexto = 'Pendiente';
+                                    $estadoTexto = 'Pendiente / No Apto';
                                     $colorClase = 'status-pendiente';
                                     
                                     if ($info['estado'] === 'vigente') { $icono = 'fa-check'; $estadoTexto = 'Vigente'; $colorClase = 'status-vigente'; }
@@ -146,7 +163,7 @@
                                     data-realizacion="{{ $info['fecha_realizacion'] }}"
                                     data-vencimiento="{{ $info['fecha_vencimiento'] }}"
                                     data-restante="{{ $info['dias_restantes'] }}"
-                                    title="Clic para ver detalles">
+                                    title="{{ $info['tooltip'] ?? 'Clic para ver detalles' }}">
                                     <span class="status-dot {{ $colorClase }}">
                                         <i class="fas {{ $icono }}"></i>
                                     </span>
@@ -155,10 +172,9 @@
                         </tr>
                     @empty
                         <tr>
-                            {{-- Colspan ajustado a 3 columnas fijas + número de cursos --}}
                             <td colspan="{{ $cursosExigidos->count() + 3 }}" class="text-center py-5 text-muted">
                                 <i class="fas fa-users-slash fa-2x mb-2 text-light"></i><br>
-                                No hay trabajadores asignados al perfil de {{ $puesto->nombre }}.
+                                No hay trabajadores asignados al perfil de {{ $puesto->nombre }} en esta sede.
                             </td>
                         </tr>
                     @endforelse
@@ -169,7 +185,7 @@
                 <div class="legend-item"><span class="status-dot status-vigente"><i class="fas fa-check"></i></span> Vigente / Apto</div>
                 <div class="legend-item"><span class="status-dot status-aviso"><i class="fas fa-exclamation"></i></span> Próximo a caducar</div>
                 <div class="legend-item"><span class="status-dot status-caducado"><i class="fas fa-times"></i></span> Caducado</div>
-                <div class="legend-item"><span class="status-dot status-pendiente"><i class="fas fa-minus"></i></span> Pendiente de realizar</div>
+                <div class="legend-item"><span class="status-dot status-pendiente"><i class="fas fa-minus"></i></span> Pendiente de realizar / No Apto</div>
             </div>
         </div>
     </section>
@@ -187,19 +203,22 @@
             <div class="audit-modal-body">
                 <div class="audit-data-row">
                     <span class="audit-data-label">Estado</span>
-                    <span class="audit-data-value"><span class="status-dot" id="modal-estado-dot" style="position:relative; top:2px; margin-right:6px;"></span> <span id="modal-estado-texto">Vigente</span></span>
+                    <span class="audit-data-value">
+                        <span class="status-dot" id="modal-estado-dot" style="position:relative; top:2px; margin-right:6px;"></span>
+                        <span id="modal-estado-texto">Vigente</span>
+                    </span>
                 </div>
                 <div class="audit-data-row">
                     <span class="audit-data-label">Fecha Realización</span>
-                    <span class="audit-data-value" id="modal-fecha-realizacion">10/05/2023</span>
+                    <span class="audit-data-value" id="modal-fecha-realizacion">—</span>
                 </div>
                 <div class="audit-data-row">
                     <span class="audit-data-label">Fecha Vencimiento</span>
-                    <span class="audit-data-value" id="modal-fecha-vencimiento">10/05/2026</span>
+                    <span class="audit-data-value" id="modal-fecha-vencimiento">—</span>
                 </div>
                 <div class="audit-data-row">
                     <span class="audit-data-label">Tiempo Restante</span>
-                    <span class="audit-data-value" id="modal-dias-restantes">145 días</span>
+                    <span class="audit-data-value" id="modal-dias-restantes">—</span>
                 </div>
             </div>
         </div>
@@ -239,10 +258,10 @@
             
             btnClose.addEventListener('click', closeModal);
             modal.addEventListener('click', function(e) {
-                if(e.target === modal) closeModal();
+                if (e.target === modal) closeModal();
             });
             document.addEventListener('keydown', (e) => {
-                if(e.key === 'Escape') closeModal();
+                if (e.key === 'Escape') closeModal();
             });
         });
     </script>

@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'Ficha del Curso')
+@section('title', 'Ficha del Curso - ' . $curso->nombre)
 
 @section('css')
     <style>
@@ -14,21 +14,20 @@
             font-weight: 700; 
             font-size: 0.85rem; 
             transition: all 0.2s; 
-            text-decoration: none;
+            text-decoration: none !important;
         }
-        .cursos-btn--primary { background: #173e67; color: #fff; }
-        .cursos-btn--primary:hover { background: #0f2a47; color: #fff; text-decoration: none; }
-        .cursos-btn--soft { background: #eef3f8; color: #173e67; }
-        .cursos-btn--soft:hover { background: #dbe3ef; color: #173e67; text-decoration: none; }
-        .cursos-btn--csv { background: #10b981; color: #fff; }
-        .cursos-btn--csv:hover { background: #059669; color: #fff; text-decoration: none; }
-        .cursos-btn--pdf { background: #ef4444; color: #fff; }
-        .cursos-btn--pdf:hover { background: #dc2626; color: #fff; text-decoration: none; }
+        .cursos-btn--primary { background: #173e67; color: #fff !important; }
+        .cursos-btn--primary:hover { background: #0f2a47; color: #fff !important; }
+        .cursos-btn--soft { background: #eef3f8; color: #173e67 !important; }
+        .cursos-btn--soft:hover { background: #dbe3ef; color: #173e67 !important; }
+        .cursos-btn--csv { background: #10b981; color: #fff !important; }
+        .cursos-btn--csv:hover { background: #059669; color: #fff !important; }
+        .cursos-btn--pdf-disabled { background: #f1f5f9; color: #94a3b8 !important; border: 1px solid #e2e8f0; cursor: not-allowed; }
 
         /* Estilos de la tarjeta */
         .curso-header { background: #fff; border: 1px solid #e7ecf3; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(15,23,42,.03); }
         .curso-header h2 { color: #173e67; font-weight: 800; margin-bottom: 5px; font-size: 1.6rem; }
-        .curso-meta { display: flex; gap: 20px; color: #667085; font-size: 0.9rem; margin-bottom: 15px; }
+        .curso-meta { display: flex; flex-wrap: wrap; gap: 20px; color: #667085; font-size: 0.9rem; margin-bottom: 15px; }
         .curso-meta-item { display: flex; align-items: center; gap: 6px; }
         .curso-desc { padding-top: 15px; border-top: 1px dashed #eef2f7; color: #475569; }
         
@@ -37,6 +36,9 @@
         .status-dot.green { background-color: #10b981; box-shadow: 0 0 6px rgba(16,185,129,.4); }
         .status-dot.yellow { background-color: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.4); }
         .status-dot.red { background-color: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,.4); }
+
+        .worker-link { color: #173e67; text-decoration: none; transition: color 0.15s; }
+        .worker-link:hover { color: #0284c7; text-decoration: underline; }
     </style>
 @endsection
 
@@ -44,7 +46,7 @@
     <section class="p-3">
         <!-- Tarjeta de metadatos del curso -->
         <div class="curso-header">
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex justify-content-between align-items-start flex-wrap" style="gap: 14px;">
                 <div>
                     <span class="badge badge-secondary mb-2 text-uppercase">{{ $curso->categoria ?: 'Sin categoría' }}</span>
                     <h2>{{ $curso->nombre }}</h2>
@@ -57,22 +59,25 @@
                             {{ $curso->meses_validez ? "Validez: {$curso->meses_validez} meses" : 'Sin caducidad' }}
                         </div>
                         @if($curso->meses_validez)
-                        <div class="curso-meta-item">
-                            <i class="fas fa-bell"></i> Aviso previo: {{ $curso->dias_aviso_previo }} días
-                        </div>
+                            <div class="curso-meta-item">
+                                <i class="fas fa-bell"></i> Aviso previo: {{ $curso->dias_aviso_previo ?? 30 }} días
+                            </div>
                         @endif
                     </div>
                 </div>
-                <div class="d-flex align-items-center" style="gap: 12px;">
-                    <a href="{{ route('cursos.gestion') }}" class="cursos-btn cursos-btn--soft">
-                        <i class="fas fa-arrow-left mr-2"></i> Volver a gestión
-                    </a>
-
-                @can('cursos.edit')
-                    <a href="{{ route('cursos.edit', $curso->id) }}" class="cursos-btn cursos-btn--primary">
-                        <i class="fas fa-edit mr-2"></i> Editar curso
-                    </a>
-                @endcan
+                <div class="d-flex align-items-center flex-wrap" style="gap: 12px;">
+                    @can('cursos.edit')
+                        <a href="{{ route('cursos.gestion') }}" class="cursos-btn cursos-btn--soft">
+                            <i class="fas fa-arrow-left mr-2"></i> Volver a gestión
+                        </a>
+                        <a href="{{ route('cursos.edit', $curso->id) }}" class="cursos-btn cursos-btn--primary">
+                            <i class="fas fa-edit mr-2"></i> Editar curso
+                        </a>
+                    @else
+                        <a href="{{ route('cursos.index') }}" class="cursos-btn cursos-btn--soft">
+                            <i class="fas fa-arrow-left mr-2"></i> Volver al catálogo
+                        </a>
+                    @endcan
                 </div>
             </div>
             
@@ -86,21 +91,17 @@
 
         <!-- Tabla de Trabajadores Asignados -->
         <div class="card">
-            <div class="card-header border-bottom-0">
-                <h3 class="card-title font-weight-bold" style="color: #173e67;">Listado de asistentes</h3>
-                <div class="card-tools">
-                @can('cursos.export')
-                    <!-- Espacio reservado para el futuro botón de exportación -->
-                    <a href="{{ route('cursos.export', $curso->id) }}" class="cursos-btn cursos-btn--csv">
-                        <i class="fas fa-file-excel" style="margin-right: 6px;"></i> Exportar CSV
-                    </a>
-                @endcan
-
-                @can('cursos.export')
-                    <a href="{{ route('cursos.export', $curso->id) }}" class="cursos-btn cursos-btn--pdf">
-                        <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Exportar PDF (próximamente)
-                    </a>
-                @endcan
+            <div class="card-header border-bottom-0 d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
+                <h3 class="card-title font-weight-bold mb-0" style="color: #173e67;">Listado de asistentes</h3>
+                <div class="card-tools d-flex align-items-center" style="gap: 8px; margin-left: auto;">
+                    @canany(['cursos.export', 'cursos.view', 'cursos.edit'])
+                        <a href="{{ route('cursos.export', $curso->id) }}" class="cursos-btn cursos-btn--csv">
+                            <i class="fas fa-file-excel" style="margin-right: 6px;"></i> Exportar CSV
+                        </a>
+                        <a href="{{ route('cursos.export.pdf', $curso->id) }}" class="cursos-btn cursos-btn--primary">
+                            <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Exportar PDF
+                        </a>
+                    @endcanany
                 </div>
             </div>
             
@@ -131,13 +132,19 @@
                                 $fechaCaducidad = null;
                                 $textoCaducidad = '—';
                                 
-                                // Recuperamos los datos de la tabla pivote
-                                $fechaRealizacion = $trabajador->pivot->fecha_realizacion ? \Carbon\Carbon::parse($trabajador->pivot->fecha_realizacion)->startOfDay() : null;
+                                $fechaRealizacion = $trabajador->pivot->fecha_realizacion
+                                    ? \Carbon\Carbon::parse($trabajador->pivot->fecha_realizacion)->startOfDay()
+                                    : null;
                                 $esApto = (bool) $trabajador->pivot->apto;
 
                                 if (!$esApto) {
-                                    $estado = 'No Apto';
-                                    $color = 'red';
+                                    if ($fechaRealizacion) {
+                                        $estado = 'No Apto';
+                                        $color = 'red';
+                                    } else {
+                                        $estado = 'Pendiente de realizar';
+                                        $color = 'yellow';
+                                    }
                                 } elseif ($fechaRealizacion && $curso->meses_validez) {
                                     $fechaCaducidad = $fechaRealizacion->copy()->addMonths($curso->meses_validez);
                                     $fechaAviso = $fechaCaducidad->copy()->subDays($curso->dias_aviso_previo ?? 30);
@@ -150,28 +157,32 @@
                                         $estado = 'En Aviso';
                                         $color = 'yellow';
                                     }
+                                } elseif ($fechaRealizacion && !$curso->meses_validez) {
+                                    $textoCaducidad = 'Sin caducidad';
                                 } elseif (!$fechaRealizacion) {
                                     $estado = 'Pendiente de fecha';
                                     $color = 'yellow';
                                 }
 
-                                // Descodificamos el departamento para la vista
                                 $deptos = is_string($trabajador->departamento) 
                                     ? json_decode($trabajador->departamento, true) ?? explode(',', $trabajador->departamento) 
                                     : (array) $trabajador->departamento;
                                 $departamentoStr = !empty($deptos) ? strtoupper(implode(', ', $deptos)) : '—';
+                                $nombrePuesto = optional($trabajador->puestoTrabajo)->nombre ?: ($trabajador->puesto ?: '—');
                             @endphp
 
                             <tr>
                                 <td class="text-muted font-weight-bold">{{ $trabajador->id_rrhh ?: '—' }}</td>
                                 <td>
-                                    <strong>{{ $trabajador->name ?: '—' }} {{ $trabajador->apellido ?: '—' }}</strong>
-                                    @if(!$esApto)
+                                    <a href="{{ route('cursos.index', ['personal_id' => $trabajador->id]) }}" class="worker-link" title="Ir a la ficha formativa del trabajador">
+                                        <strong>{{ $trabajador->name ?: '—' }} {{ $trabajador->apellido ?: '' }}</strong>
+                                    </a>
+                                    @if(!$esApto && $fechaRealizacion)
                                         <span class="badge badge-danger ml-1" title="El trabajador no superó el curso">No apto</span>
                                     @endif
                                 </td>
                                 <td><span class="text-muted">{{ $departamentoStr ?: '—' }}</span></td>
-                                <td class="text-muted">{{ optional($trabajador->puestoTrabajo)->nombre ?: '—' }}</td>
+                                <td class="text-muted">{{ $nombrePuesto }}</td>
                                 <td class="text-muted">{{ $trabajador->dni_nie ?: '—' }}</td>
                                 <td class="text-muted">{{ $trabajador->telefono ?: '—' }}</td>
                                 <td>{{ $fechaRealizacion ? $fechaRealizacion->format('d/m/Y') : '—' }}</td>
@@ -203,8 +214,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <!-- colspan ajustado a 8 -->
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <i class="fas fa-inbox fa-2x mb-3 text-light"></i><br>
                                     Nadie ha sido asignado a este curso todavía.
                                 </td>
@@ -236,9 +246,7 @@
                 Curso: <strong style="color: #173e67;">{{ $curso->nombre }}</strong>
             </p>
 
-            <div id="history-timeline" style="display: flex; flex-direction: column; gap: 10px;">
-                <!-- Aquí se inyectan los datos -->
-            </div>
+            <div id="history-timeline" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
     </div>
 @endsection
@@ -261,8 +269,8 @@
             };
 
             btnClose.forEach(btn => btn.addEventListener('click', closeHistoryModal));
-            modalHistory.addEventListener('click', (e) => { if(e.target === modalHistory) closeHistoryModal(); });
-            document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeHistoryModal(); });
+            modalHistory.addEventListener('click', (e) => { if (e.target === modalHistory) closeHistoryModal(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHistoryModal(); });
 
             btnsOpen.forEach(btn => {
                 btn.addEventListener('click', async function() {
@@ -283,7 +291,6 @@
                         const data = await response.json();
                         timelineContainer.innerHTML = '';
 
-                        // Renderizamos el curso actual
                         if (data.actual) {
                             const isApto = data.actual.apto;
                             const badgeColor = isApto ? '#166534' : '#b91c1c';
@@ -308,12 +315,9 @@
                             `;
                         }
 
-                        // Renderizamos los cursos pasados
                         if (data.historico && data.historico.length > 0) {
                             data.historico.forEach(item => {
                                 const isApto = item.apto;
-                                const badgeColor = isApto ? '#166534' : '#b91c1c';
-                                const badgeBg = isApto ? '#dcfce7' : '#fee2e2';
                                 const badgeTexto = isApto ? 'APTO' : 'NO APTO';
                                 
                                 const diplomaBtn = item.diploma_url 

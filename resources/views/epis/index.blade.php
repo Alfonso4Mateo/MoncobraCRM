@@ -5,12 +5,15 @@
 @section('css')
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        .erp-hero { background: #fff; border: 1px solid #e7ecf3; border-radius: 18px; box-shadow: 0 16px 30px rgba(15, 23, 42, .06); display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; margin-bottom: 20px; align-items: center; }
+        .erp-hero { background: #fff; border: 1px solid #e7ecf3; border-radius: 18px; box-shadow: 0 16px 30px rgba(15, 23, 42, .06); display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
         .erp-hero h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; color: #173e67; }
         .erp-hero p { margin: 0; color: #667085; font-size: .92rem; }
-        .erp-primary-btn { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; text-decoration: none; font-weight: 800; border: none; cursor: pointer; transition: opacity 0.2s; }
-        .erp-primary-btn:hover { opacity: 0.9; color: #fff; }
+        .erp-primary-btn { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff !important; text-decoration: none !important; font-weight: 800; border: none; cursor: pointer; transition: opacity 0.2s; }
+        .erp-primary-btn:hover { opacity: 0.9; color: #fff !important; }
         .erp-primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .erp-ghost-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: #f8fafc; border: 1px solid #dbe3ef; color: #173e67 !important; text-decoration: none !important; font-weight: 800; transition: background 0.2s; }
+        .erp-ghost-btn:hover { background: #eef2f7; }
 
         .epi-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
         .epi-toolbar input[type="search"],
@@ -51,14 +54,57 @@
 
         .erp-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1060; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
         .erp-modal-overlay.is-open { display: flex; opacity: 1; }
-        .erp-modal-panel { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(20px); transition: transform 0.2s; padding: 24px; }
+        .erp-modal-panel { background: #fff; border-radius: 16px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(20px); transition: transform 0.2s; padding: 24px; }
         .erp-modal-overlay.is-open .erp-modal-panel { transform: translateY(0); }
 
-        .puesto-assign-list { border: 1px solid #e2e8f0; border-radius: 10px; max-height: 250px; overflow-y: auto; background: #f8fafc; padding: 10px; margin-top: 10px; }
-        .puesto-assign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e2e8f0; background: #fff; border-radius: 8px; margin-bottom: 6px; }
-        .puesto-assign-item:last-child { margin-bottom: 0; }
-        .qty-input { width: 70px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; }
-        .qty-input:disabled { background: #e2e8f0; opacity: 0.6; cursor: not-allowed; }
+        /* ESTILOS DEL BUSCADOR + SELECTOR COMBINADO DE INVENTARIO */
+        /* DROPDOWN UNIFICADO CON BUSCADOR DENTRO (COMBOBOX) */
+        .inv-combobox { position: relative; width: 100%; }
+        .inv-combobox-trigger {
+            width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px;
+            padding: 9px 14px; font-size: 0.86rem; font-weight: 700; color: #1e293b;
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            cursor: pointer; text-align: left; transition: all 0.15s;
+        }
+        .inv-combobox-trigger:hover, .inv-combobox.is-open .inv-combobox-trigger {
+            border-color: #0284c7; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+        }
+        .inv-combobox-trigger__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .inv-combobox-trigger__text.is-placeholder { color: #64748b; font-weight: 600; }
+
+        .inv-combobox-menu {
+            position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 1100;
+            background: #fff; border: 1px solid #cbd5e1; border-radius: 12px;
+            box-shadow: 0 15px 30px rgba(15, 23, 42, 0.15); display: none; flex-direction: column; overflow: hidden;
+        }
+        .inv-combobox.is-open .inv-combobox-menu { display: flex; }
+
+        .inv-combobox-search-bar {
+            padding: 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .inv-combobox-search-input {
+            width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+            padding: 7px 12px; font-size: 0.84rem; font-weight: 600; color: #1e293b; outline: none;
+        }
+        .inv-combobox-search-input:focus { border-color: #0284c7; }
+
+        .inv-combobox-list { max-height: 240px; overflow-y: auto; padding: 6px; }
+        .inv-combobox-group-label {
+            font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #64748b; padding: 8px 10px 4px;
+        }
+        .inv-combobox-option {
+            padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center; gap: 10px; font-size: 0.83rem;
+            font-weight: 600; color: #1e293b; transition: background 0.12s;
+        }
+        .inv-combobox-option:hover, .inv-combobox-option.is-active { background: #e0f2fe; color: #0369a1; }
+        .inv-combobox-option__sku { font-weight: 800; color: #0f2942; }
+        .inv-combobox-option__stock {
+            font-size: 0.72rem; font-weight: 800; background: #f0fdf4; border: 1px solid #bbf7d0;
+            color: #166534; padding: 2px 7px; border-radius: 6px; flex-shrink: 0;
+        }
 
         #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
         .erp-toast {
@@ -98,9 +144,14 @@
             <div>
                 <div style="font-size:.75rem;font-weight:800;letter-spacing:.12em;color:#8a98ab;text-transform:uppercase;">Prevención y Seguridad</div>
                 <h1>Catálogo de EPIs</h1>
-                <p>Gestiona los Equipos de Protección Individual y vincúlalos al inventario y a los perfiles formativos.</p>
+                <p>Registra los Equipos de Protección Individual y vincúlalos con el almacén para asignarlos después en cada Perfil Formativo.</p>
             </div>
-            <div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                @canany(['cursos.normas', 'cursos.edit', 'cursos.view'])
+                    <a href="{{ route('puestos.index') }}" class="erp-ghost-btn">
+                        <i class="fas fa-sitemap"></i> Ir a Perfiles Formativos
+                    </a>
+                @endcanany
                 <button type="button" class="erp-primary-btn" id="btn-open-modal">
                     <i class="fas fa-plus"></i> Crear Nuevo EPI
                 </button>
@@ -178,33 +229,78 @@
                 <input type="hidden" name="inventario_id" id="create-inventario-id" value="">
                 <input type="hidden" name="inventario_variante_id" id="create-inventario-variante-id" value="">
 
-                <!-- Vinculación con Inventario -->
-                <div class="form-group" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 10px; padding: 12px 14px;">
-                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px;">
-                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Inventario (Opcional)
+                <!-- Vinculación con Inventario (Buscador + Selector Combinado) -->
+                <!-- En modal-create-epi (Para modal-edit-epi cambia create- por edit-) -->
+                <div class="inv-picker-box" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px; display: block;">
+                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Almacén (Opcional)
                     </label>
-                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Conecta este EPI con el stock real del almacén para controlar existencias y tallas.</p>
-                    <select id="create-select-inventario" class="form-control" style="border-radius: 8px; font-weight: 600;">
-                        <option value="">-- Sin vinculación a inventario --</option>
-                        @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
-                            <optgroup label="Productos con Variantes (Familias de Tallas/Colores)">
-                                @foreach($variantesInventario as $var)
-                                    <option value="var-{{ $var->id }}" data-tipo="variante" data-id="{{ $var->id }}" data-nombre="{{ $var->nombre }}">
-                                        [FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} (Stock total: {{ $var->stock_total }} uds.)
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
-                            <optgroup label="Productos Simples (Sin Variantes)">
-                                @foreach($itemsSueltosInventario as $it)
-                                    <option value="item-{{ $it->id }}" data-tipo="item" data-id="{{ $it->id }}" data-nombre="{{ $it->nombre ?: $it->descripcion }}">
-                                        [ITEM] {{ $it->codigo }} - {{ $it->nombre ?: $it->descripcion }} (Stock: {{ $it->stock_actual }} uds.)
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                    </select>
+                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Haz clic en el selector y escribe para buscar en tiempo real por código SKU o nombre.</p>
+
+                    <div class="inv-combobox" id="create-inv-combobox">
+                        <button type="button" class="inv-combobox-trigger" id="create-inv-trigger">
+                            <span class="inv-combobox-trigger__text is-placeholder" id="create-inv-trigger-text">-- Sin vinculación a inventario --</span>
+                            <i class="fas fa-chevron-down text-muted" style="font-size: 0.8rem;"></i>
+                        </button>
+
+                        <div class="inv-combobox-menu">
+                            <div class="inv-combobox-search-bar">
+                                <i class="fas fa-search text-muted ml-1"></i>
+                                <input type="search" id="create-inv-search" class="inv-combobox-search-input" placeholder="Escribe SKU, nombre, talla o color..." autocomplete="off">
+                            </div>
+
+                            <div class="inv-combobox-list" id="create-inv-list">
+                                <div class="inv-combobox-option" data-value="" data-tipo="" data-id="" data-label="-- Sin vinculación a inventario --">
+                                    <span class="text-muted"><i class="fas fa-unlink mr-1"></i> -- Sin vinculación a inventario --</span>
+                                </div>
+
+                                @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
+                                    <div class="inv-combobox-group" data-group="variantes">
+                                        <div class="inv-combobox-group-label">Productos con Variantes (Familias / Tallas)</div>
+                                        @foreach($variantesInventario as $var)
+                                            <div class="inv-combobox-option js-inv-opt"
+                                                data-value="var-{{ $var->id }}"
+                                                data-tipo="variante"
+                                                data-id="{{ $var->id }}"
+                                                data-nombre="{{ $var->nombre }}"
+                                                data-label="[FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} ({{ $var->stock_total }} uds.)"
+                                                data-search="{{ mb_strtolower(($var->codigo ?? '') . ' ' . ($var->nombre ?? '')) }}">
+                                                <div>
+                                                    <span class="inv-combobox-option__sku">{{ $var->codigo }}</span> — {{ $var->nombre }}
+                                                </div>
+                                                <span class="inv-combobox-option__stock">{{ $var->stock_total }} uds.</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
+                                    <div class="inv-combobox-group" data-group="items">
+                                        <div class="inv-combobox-group-label">Productos Simples</div>
+                                        @foreach($itemsSueltosInventario as $it)
+                                            @php $nomIt = $it->nombre ?: $it->descripcion; @endphp
+                                            <div class="inv-combobox-option js-inv-opt"
+                                                data-value="item-{{ $it->id }}"
+                                                data-tipo="item"
+                                                data-id="{{ $it->id }}"
+                                                data-nombre="{{ $nomIt }}"
+                                                data-label="[ITEM] {{ $it->codigo }} - {{ $nomIt }} ({{ $it->stock_actual }} uds.)"
+                                                data-search="{{ mb_strtolower(($it->codigo ?? '') . ' ' . ($nomIt ?? '')) }}">
+                                                <div>
+                                                    <span class="inv-combobox-option__sku">{{ $it->codigo }}</span> — {{ $nomIt }}
+                                                </div>
+                                                <span class="inv-combobox-option__stock">{{ $it->stock_actual }} uds.</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                <div class="text-center py-3 text-muted small js-inv-empty" style="display: none;">
+                                    No se encontraron artículos con esa búsqueda.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -219,30 +315,15 @@
 
                 <div class="form-group">
                     <label style="font-weight: 700; color: #1e293b;">Descripción / Normativa</label>
-                    <textarea name="descripcion" class="form-control" style="border-radius: 8px;" rows="2" placeholder="Detalles técnicos o normativa aplicable (ej. UNE-EN 397)...">{{ old('descripcion') }}</textarea>
+                    <textarea name="descripcion" class="form-control" style="border-radius: 8px;" rows="3" placeholder="Detalles técnicos o normativa aplicable (ej. UNE-EN 397)...">{{ old('descripcion') }}</textarea>
                 </div>
 
-                <div class="form-group" style="margin-top: 24px;">
-                    <label style="font-weight: 700; color: #1e293b; margin-bottom: 4px;">Vinculación Inicial a Perfiles de Trabajo</label>
-                    <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0;">Selecciona a qué puestos aplica este EPI y especifica la cantidad necesaria por trabajador.</p>
-
-                    <div class="puesto-assign-list">
-                        @foreach($puestos as $puesto)
-                            <div class="puesto-assign-item">
-                                <label style="margin: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #334155;">
-                                    <input type="checkbox" name="puestos[]" value="{{ $puesto->id }}" class="puesto-checkbox" data-target="qty-{{ $puesto->id }}">
-                                    {{ $puesto->nombre }}
-                                </label>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">UDS:</span>
-                                    <input type="number" name="cantidades[{{ $puesto->id }}]" id="qty-{{ $puesto->id }}" class="qty-input" value="1" min="1" disabled>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
+                <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; padding: 10px 14px; font-size: 0.8rem; color: #64748b;">
+                    <i class="fas fa-info-circle text-primary mr-1"></i>
+                    Una vez registrado el EPI en el catálogo, podrás asignarlo a cada puesto desde <strong>Perfiles Formativos &rarr; Dotación de EPIs</strong>.
                 </div>
 
-                <div class="form-group text-right" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                <div class="form-group text-right" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;">
                     <button type="button" class="btn btn-light mr-2" id="btn-cancel-modal" style="border-radius: 8px; font-weight: 600;">Cancelar</button>
                     <button type="submit" class="erp-primary-btn">
                         <i class="fas fa-save"></i> Guardar Ítem
@@ -267,34 +348,80 @@
                 @method('PUT')
                 <input type="hidden" name="inventario_id" id="edit-inventario-id" value="">
                 <input type="hidden" name="inventario_variante_id" id="edit-inventario-variante-id" value="">
+                <input type="hidden" name="inventario_articulo_id" id="edit-inventario-articulo-id" value="">
 
-                <!-- Vinculación con Inventario -->
-                <div class="form-group" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 10px; padding: 12px 14px;">
-                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px;">
-                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Inventario (Opcional)
+                <!-- Vinculación con Inventario (Buscador + Selector Combinado) -->
+                <!-- En modal-create-epi (Para modal-edit-epi cambia create- por edit-) -->
+                <div class="inv-picker-box" style="background: #f8fbff; border: 1px solid #dce6f4; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                    <label style="font-weight: 800; color: #173e67; font-size: 0.85rem; margin-bottom: 4px; display: block;">
+                        <i class="fas fa-boxes mr-1"></i> Vincular a Ítem del Almacén (Opcional)
                     </label>
-                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Conecta este EPI con el stock real del almacén para controlar existencias y tallas.</p>
-                    <select id="edit-select-inventario" class="form-control" style="border-radius: 8px; font-weight: 600;">
-                        <option value="">-- Sin vinculación a inventario --</option>
-                        @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
-                            <optgroup label="Productos con Variantes (Familias de Tallas/Colores)">
-                                @foreach($variantesInventario as $var)
-                                    <option value="var-{{ $var->id }}" data-tipo="variante" data-id="{{ $var->id }}" data-nombre="{{ $var->nombre }}">
-                                        [FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} (Stock total: {{ $var->stock_total }} uds.)
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
-                            <optgroup label="Productos Simples (Sin Variantes)">
-                                @foreach($itemsSueltosInventario as $it)
-                                    <option value="item-{{ $it->id }}" data-tipo="item" data-id="{{ $it->id }}" data-nombre="{{ $it->nombre ?: $it->descripcion }}">
-                                        [ITEM] {{ $it->codigo }} - {{ $it->nombre ?: $it->descripcion }} (Stock: {{ $it->stock_actual }} uds.)
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                    </select>
+                    <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">Haz clic en el selector y escribe para buscar en tiempo real por código SKU o nombre.</p>
+
+                    <div class="inv-combobox" id="edit-inv-combobox">
+                        <button type="button" class="inv-combobox-trigger" id="edit-inv-trigger">
+                            <span class="inv-combobox-trigger__text is-placeholder" id="edit-inv-trigger-text">-- Sin vinculación a inventario --</span>
+                            <i class="fas fa-chevron-down text-muted" style="font-size: 0.8rem;"></i>
+                        </button>
+
+                        <div class="inv-combobox-menu">
+                            <div class="inv-combobox-search-bar">
+                                <i class="fas fa-search text-muted ml-1"></i>
+                                <input type="search" id="edit-inv-search" class="inv-combobox-search-input" placeholder="Escribe SKU, nombre, talla o color..." autocomplete="off">
+                            </div>
+
+                            <div class="inv-combobox-list" id="edit-inv-list">
+                                <div class="inv-combobox-option" data-value="" data-tipo="" data-id="" data-label="-- Sin vinculación a inventario --">
+                                    <span class="text-muted"><i class="fas fa-unlink mr-1"></i> -- Sin vinculación a inventario --</span>
+                                </div>
+
+                                @if(isset($variantesInventario) && $variantesInventario->isNotEmpty())
+                                    <div class="inv-combobox-group" data-group="variantes">
+                                        <div class="inv-combobox-group-label">Productos con Variantes (Familias / Tallas)</div>
+                                        @foreach($variantesInventario as $var)
+                                            <div class="inv-combobox-option js-inv-opt"
+                                                data-value="var-{{ $var->id }}"
+                                                data-tipo="variante"
+                                                data-id="{{ $var->id }}"
+                                                data-nombre="{{ $var->nombre }}"
+                                                data-label="[FAMILIA] {{ $var->codigo }} - {{ $var->nombre }} ({{ $var->stock_total }} uds.)"
+                                                data-search="{{ mb_strtolower(($var->codigo ?? '') . ' ' . ($var->nombre ?? '')) }}">
+                                                <div>
+                                                    <span class="inv-combobox-option__sku">{{ $var->codigo }}</span> — {{ $var->nombre }}
+                                                </div>
+                                                <span class="inv-combobox-option__stock">{{ $var->stock_total }} uds.</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @if(isset($itemsSueltosInventario) && $itemsSueltosInventario->isNotEmpty())
+                                    <div class="inv-combobox-group" data-group="items">
+                                        <div class="inv-combobox-group-label">Productos Simples</div>
+                                        @foreach($itemsSueltosInventario as $it)
+                                            @php $nomIt = $it->nombre ?: $it->descripcion; @endphp
+                                            <div class="inv-combobox-option js-inv-opt"
+                                                data-value="item-{{ $it->id }}"
+                                                data-tipo="item"
+                                                data-id="{{ $it->id }}"
+                                                data-nombre="{{ $nomIt }}"
+                                                data-label="[ITEM] {{ $it->codigo }} - {{ $nomIt }} ({{ $it->stock_actual }} uds.)"
+                                                data-search="{{ mb_strtolower(($it->codigo ?? '') . ' ' . ($nomIt ?? '')) }}">
+                                                <div>
+                                                    <span class="inv-combobox-option__sku">{{ $it->codigo }}</span> — {{ $nomIt }}
+                                                </div>
+                                                <span class="inv-combobox-option__stock">{{ $it->stock_actual }} uds.</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                <div class="text-center py-3 text-muted small js-inv-empty" style="display: none;">
+                                    No se encontraron artículos con esa búsqueda.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -309,30 +436,10 @@
 
                 <div class="form-group">
                     <label style="font-weight: 700; color: #1e293b;">Descripción / Normativa</label>
-                    <textarea name="descripcion" id="edit-epi-descripcion" class="form-control" style="border-radius: 8px;" rows="2"></textarea>
+                    <textarea name="descripcion" id="edit-epi-descripcion" class="form-control" style="border-radius: 8px;" rows="3"></textarea>
                 </div>
 
-                <div class="form-group" style="margin-top: 24px;">
-                    <label style="font-weight: 700; color: #1e293b; margin-bottom: 4px;">Vinculación a Perfiles de Trabajo</label>
-                    <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0;">Ajusta a qué puestos aplica este EPI y la cantidad necesaria por trabajador.</p>
-
-                    <div class="puesto-assign-list">
-                        @foreach($puestos as $puesto)
-                            <div class="puesto-assign-item">
-                                <label style="margin: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #334155;">
-                                    <input type="checkbox" name="puestos[]" value="{{ $puesto->id }}" class="puesto-checkbox-edit" data-target="edit-qty-{{ $puesto->id }}">
-                                    {{ $puesto->nombre }}
-                                </label>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">UDS:</span>
-                                    <input type="number" name="cantidades[{{ $puesto->id }}]" id="edit-qty-{{ $puesto->id }}" class="qty-input" value="1" min="1" disabled>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div class="form-group text-right" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                <div class="form-group text-right" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;">
                     <button type="button" class="btn btn-light mr-2" id="btn-cancel-edit-modal" style="border-radius: 8px; font-weight: 600;">Cancelar</button>
                     <button type="submit" class="erp-primary-btn">
                         <i class="fas fa-save"></i> Guardar Cambios
@@ -474,7 +581,7 @@
             }
 
             // ---------------------------------------------------------
-            // Búsqueda + filtros (Inactivos DESACTIVADOS por defecto)
+            // Búsqueda + filtros del catálogo general
             // ---------------------------------------------------------
             const searchInput = document.getElementById('epi-search');
             const categoriaSelect = document.getElementById('epi-filter-categoria');
@@ -482,7 +589,6 @@
             const storageKey = 'epiCatalogoMostrarInactivos';
 
             const savedState = localStorage.getItem(storageKey);
-            // Por defecto falso (ocultar inactivos), solo true si el usuario lo marcó expresamente
             toggleInactive.checked = savedState === 'true';
 
             function applyFilters() {
@@ -530,58 +636,146 @@
                 else modal.classList.toggle('is-open', show);
             };
 
-            function bindQtyToggle(checkboxSelector) {
-                document.querySelectorAll(checkboxSelector).forEach(chk => {
-                    chk.addEventListener('change', function () {
-                        const inputQty = document.getElementById(this.dataset.target);
-                        inputQty.disabled = !this.checked;
-                        if (!this.checked) inputQty.value = 1; else inputQty.focus();
+            // ---------------------------------------------------------
+            // COMBINADOR: BUSCADOR EN VIVO + SELECTOR DE INVENTARIO
+            // ---------------------------------------------------------
+            function setupInventoryCombobox({
+                comboboxId,
+                triggerId,
+                triggerTextId,
+                searchInputId,
+                listId,
+                hiddenInvId,
+                hiddenVarId,
+                hiddenArtId = null,
+                nameInputId,
+                autoFillName = false
+            }) {
+                const box = document.getElementById(comboboxId);
+                const trigger = document.getElementById(triggerId);
+                const triggerText = document.getElementById(triggerTextId);
+                const searchInput = document.getElementById(searchInputId);
+                const list = document.getElementById(listId);
+                const inputInvId = document.getElementById(hiddenInvId);
+                const inputVarId = document.getElementById(hiddenVarId);
+                const inputArtId = hiddenArtId ? document.getElementById(hiddenArtId) : null;
+                const inputNombre = nameInputId ? document.getElementById(nameInputId) : null;
+                const emptyMsg = list.querySelector('.js-inv-empty');
+
+                const filterList = () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    let totalVisible = 0;
+
+                    list.querySelectorAll('.inv-combobox-group').forEach(group => {
+                        let groupVisible = 0;
+                        group.querySelectorAll('.js-inv-opt').forEach(opt => {
+                            const match = term === '' || (opt.dataset.search || '').includes(term);
+                            opt.style.display = match ? '' : 'none';
+                            if (match) { groupVisible++; totalVisible++; }
+                        });
+                        group.style.display = groupVisible > 0 ? '' : 'none';
                     });
+
+                    if (emptyMsg) emptyMsg.style.display = totalVisible === 0 ? '' : 'none';
+                };
+
+                const selectByValue = (val, legacyArticuloId = '') => {
+                    inputInvId.value = '';
+                    inputVarId.value = '';
+                    if (inputArtId) inputArtId.value = '';
+                    list.querySelectorAll('.inv-combobox-option').forEach(o => o.classList.remove('is-active'));
+
+                    if (!val && legacyArticuloId) {
+                        if (inputArtId) inputArtId.value = legacyArticuloId;
+                        triggerText.textContent = `[ARTÍCULO VINCULADO #${legacyArticuloId}] (Mantener enlace actual)`;
+                        triggerText.classList.remove('is-placeholder');
+                        return;
+                    }
+
+                    const opt = list.querySelector(`.inv-combobox-option[data-value="${CSS.escape(val)}"]`);
+                    if (!opt || !val) {
+                        triggerText.textContent = '-- Sin vinculación a inventario --';
+                        triggerText.classList.add('is-placeholder');
+                        return;
+                    }
+
+                    opt.classList.add('is-active');
+                    triggerText.textContent = opt.dataset.label;
+                    triggerText.classList.remove('is-placeholder');
+
+                    if (opt.dataset.tipo === 'variante') inputVarId.value = opt.dataset.id;
+                    if (opt.dataset.tipo === 'item') inputInvId.value = opt.dataset.id;
+
+                    if (autoFillName && inputNombre && inputNombre.value.trim() === '' && opt.dataset.nombre) {
+                        inputNombre.value = opt.dataset.nombre.toUpperCase();
+                    }
+                };
+
+                trigger.addEventListener('click', () => {
+                    const opening = !box.classList.contains('is-open');
+                    box.classList.toggle('is-open', opening);
+                    if (opening) {
+                        searchInput.value = '';
+                        filterList();
+                        setTimeout(() => searchInput.focus(), 50);
+                    }
                 });
+
+                searchInput.addEventListener('input', filterList);
+
+                list.addEventListener('click', (e) => {
+                    const opt = e.target.closest('.inv-combobox-option');
+                    if (!opt) return;
+                    selectByValue(opt.dataset.value || '');
+                    box.classList.remove('is-open');
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!box.contains(e.target)) box.classList.remove('is-open');
+                });
+
+                return {
+                    reset: () => selectByValue(''),
+                    setValue: (val, legacyArticuloId = '') => selectByValue(val, legacyArticuloId)
+                };
             }
-            bindQtyToggle('.puesto-checkbox');
-            bindQtyToggle('.puesto-checkbox-edit');
+
+            const createInvCombo = setupInventoryCombobox({
+                comboboxId: 'create-inv-combobox',
+                triggerId: 'create-inv-trigger',
+                triggerTextId: 'create-inv-trigger-text',
+                searchInputId: 'create-inv-search',
+                listId: 'create-inv-list',
+                hiddenInvId: 'create-inventario-id',
+                hiddenVarId: 'create-inventario-variante-id',
+                nameInputId: 'create-epi-nombre',
+                autoFillName: true
+            });
+
+            const editInvCombo = setupInventoryCombobox({
+                comboboxId: 'edit-inv-combobox',
+                triggerId: 'edit-inv-trigger',
+                triggerTextId: 'edit-inv-trigger-text',
+                searchInputId: 'edit-inv-search',
+                listId: 'edit-inv-list',
+                hiddenInvId: 'edit-inventario-id',
+                hiddenVarId: 'edit-inventario-variante-id',
+                hiddenArtId: 'edit-inventario-articulo-id',
+                nameInputId: 'edit-epi-nombre',
+                autoFillName: false
+            });
 
             // ---------------------------------------------------------
-            // Modal CREAR (con selector de Inventario y autocompletado)
+            // Modal CREAR
             // ---------------------------------------------------------
             const modalCreate = document.getElementById('modal-create-epi');
             const btnOpen = document.getElementById('btn-open-modal');
             const btnClose = document.getElementById('btn-close-modal');
             const btnCancel = document.getElementById('btn-cancel-modal');
             const formCreate = document.getElementById('form-create-epi');
-            const createSelectInv = document.getElementById('create-select-inventario');
-            const createInputInvId = document.getElementById('create-inventario-id');
-            const createInputVarId = document.getElementById('create-inventario-variante-id');
-            const createInputNombre = document.getElementById('create-epi-nombre');
-
-            createSelectInv.addEventListener('change', function () {
-                const opt = this.options[this.selectedIndex];
-                createInputInvId.value = '';
-                createInputVarId.value = '';
-
-                if (!opt.value) return;
-
-                const tipo = opt.dataset.tipo;
-                const id = opt.dataset.id;
-                const nombreSugerido = opt.dataset.nombre || '';
-
-                if (tipo === 'variante') {
-                    createInputVarId.value = id;
-                } else if (tipo === 'item') {
-                    createInputInvId.value = id;
-                }
-
-                // Autocompletar el nombre si el campo está vacío
-                if (createInputNombre.value.trim() === '' && nombreSugerido) {
-                    createInputNombre.value = nombreSugerido.toUpperCase();
-                }
-            });
 
             btnOpen.addEventListener('click', () => {
-                createSelectInv.value = '';
-                createInputInvId.value = '';
-                createInputVarId.value = '';
+                createInvCombo.reset();
                 toggleModal(modalCreate, true);
             });
             btnClose.addEventListener('click', () => toggleModal(modalCreate, false));
@@ -610,12 +804,7 @@
                     showToast(data.message, 'success');
                     toggleModal(modalCreate, false);
                     formCreate.reset();
-                    createSelectInv.value = '';
-                    createInputInvId.value = '';
-                    createInputVarId.value = '';
-                    document.querySelectorAll('.puesto-checkbox').forEach(chk => {
-                        document.getElementById(chk.dataset.target).disabled = true;
-                    });
+                    createInvCombo.reset();
                 } catch (error) {
                     showToast(error.message, 'error');
                 } finally {
@@ -624,34 +813,15 @@
             });
 
             // ---------------------------------------------------------
-            // Modal EDITAR (con selector de Inventario precargado)
+            // Modal EDITAR
             // ---------------------------------------------------------
             const modalEdit = document.getElementById('modal-edit-epi');
             const btnCloseEdit = document.getElementById('btn-close-edit-modal');
             const btnCancelEdit = document.getElementById('btn-cancel-edit-modal');
             const formEdit = document.getElementById('form-edit-epi');
-            const editSelectInv = document.getElementById('edit-select-inventario');
-            const editInputInvId = document.getElementById('edit-inventario-id');
-            const editInputVarId = document.getElementById('edit-inventario-variante-id');
             const inputEditNombre = document.getElementById('edit-epi-nombre');
             const inputEditDescripcion = document.getElementById('edit-epi-descripcion');
             const inputEditCategoria = document.getElementById('edit-epi-categoria');
-
-            editSelectInv.addEventListener('change', function () {
-                const opt = this.options[this.selectedIndex];
-                editInputInvId.value = '';
-                editInputVarId.value = '';
-
-                if (!opt.value) return;
-
-                const tipo = opt.dataset.tipo;
-                const id = opt.dataset.id;
-                if (tipo === 'variante') {
-                    editInputVarId.value = id;
-                } else if (tipo === 'item') {
-                    editInputInvId.value = id;
-                }
-            });
 
             btnCloseEdit.addEventListener('click', () => toggleModal(modalEdit, false));
             btnCancelEdit.addEventListener('click', () => toggleModal(modalEdit, false));
@@ -659,42 +829,17 @@
 
             function openEditModal(card) {
                 const epiId = card.dataset.epiId;
-                const puestosAsignados = JSON.parse(card.dataset.epiPuestos || '{}');
                 const invId = card.dataset.epiInventarioId || '';
                 const varId = card.dataset.epiInventarioVarianteId || '';
+                const artId = card.dataset.epiInventarioArticuloId || '';
 
                 formEdit.action = `${baseEpisUrl}/${epiId}`;
-                inputEditNombre.value = card.dataset.epiNombre;
-                inputEditDescripcion.value = card.dataset.epiDescripcion;
-                inputEditCategoria.value = card.dataset.epiCategoria;
+                inputEditNombre.value = card.dataset.epiNombre || '';
+                inputEditDescripcion.value = card.dataset.epiDescripcion || '';
+                inputEditCategoria.value = card.dataset.epiCategoria || '';
 
-                // Precargar la vinculación con Inventario en el selector
-                editInputInvId.value = invId;
-                editInputVarId.value = varId;
-                if (varId) {
-                    editSelectInv.value = `var-${varId}`;
-                } else if (invId) {
-                    editSelectInv.value = `item-${invId}`;
-                } else {
-                    editSelectInv.value = '';
-                }
-
-                document.querySelectorAll('.puesto-checkbox-edit').forEach(chk => {
-                    chk.checked = false;
-                    const inputQty = document.getElementById(chk.dataset.target);
-                    inputQty.disabled = true;
-                    inputQty.value = 1;
-                });
-
-                Object.keys(puestosAsignados).forEach(puestoId => {
-                    const chk = document.querySelector(`.puesto-checkbox-edit[value="${puestoId}"]`);
-                    const inputQty = document.getElementById(`edit-qty-${puestoId}`);
-                    if (chk && inputQty) {
-                        chk.checked = true;
-                        inputQty.disabled = false;
-                        inputQty.value = puestosAsignados[puestoId];
-                    }
-                });
+                const comboVal = varId ? 'var-' + varId : (invId ? 'item-' + invId : '');
+                editInvCombo.setValue(comboVal, artId);
 
                 toggleModal(modalEdit, true);
             }
@@ -755,7 +900,10 @@
                         showToast(data.message, 'success');
                     } catch (error) {
                         showToast(error.message, 'error');
-                        btnToggle.disabled = false;
+                    } finally {
+                        if (document.body.contains(btnToggle)) {
+                            btnToggle.disabled = false;
+                        }
                     }
                     return;
                 }

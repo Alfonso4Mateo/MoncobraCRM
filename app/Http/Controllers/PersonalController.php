@@ -197,7 +197,10 @@ class PersonalController extends Controller
             $avisosCount = 0;
         }
 
-        $cursosCatalogo = Curso::all();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+        $cursosCatalogo = Curso::whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoActivoId))
+            ->orderBy('nombre')
+            ->get();
         $departamentos = Departamento::orderBy('nombre')->get();
 
         if ($request->ajax()) {
@@ -304,7 +307,10 @@ class PersonalController extends Controller
             'cursos' => fn ($query) => $query->orderBy('nombre'),
         ]);
 
-        $cursosCatalogo = Curso::orderBy('nombre')->get();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+        $cursosCatalogo = Curso::whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoActivoId))
+            ->orderBy('nombre')
+            ->get();
         $nombreCompleto = trim(preg_replace('/\s+/', ' ', trim((string) $personal->name . ' ' . (string) $personal->apellido)));
         $nombreNormalizado = mb_strtolower($nombreCompleto);
         $articuloBuscar = trim((string) $request->input('articulo', ''));
@@ -791,6 +797,15 @@ class PersonalController extends Controller
             'descripcion_aptitud' => 'nullable|string',
         ]);
 
+        $user = auth()->user();
+        if ($user && $user->role !== 'superadmin') {
+            $misProyectosIds = $user->proyectos->pluck('id')->all();
+            $cursoPertenece = Curso::where('id', $validated['curso_id'])
+                ->whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $misProyectosIds))
+                ->exists();
+            abort_unless($cursoPertenece, 403, 'No tienes acceso a un curso de otra sede.');
+        }
+
         try {
             $pivotData = [
                 'fecha_realizacion' => $validated['fecha_realizacion'],
@@ -798,7 +813,11 @@ class PersonalController extends Controller
                 'descripcion_aptitud' => $validated['descripcion_aptitud'],
             ];
 
-            $personals = Personal::whereIn('id', $validated['personal_ids'])->get();
+            $personals = Personal::whereIn('id', $validated['personal_ids'])
+                ->when($user && $user->role !== 'superadmin', function ($q) use ($user) {
+                    $q->whereHas('proyectos', fn ($pq) => $pq->whereIn('proyectos.id', $user->proyectos->pluck('id')));
+                })
+                ->get();
 
             foreach ($personals as $personal) {
                 $personal->cursos()->syncWithoutDetaching([
@@ -806,7 +825,7 @@ class PersonalController extends Controller
                 ]);
             }
 
-            session()->flash('success', 'El curso ha sido asignado correctamente a ' . count($validated['personal_ids']) . ' trabajadores.');
+            session()->flash('success', 'El curso ha sido asignado correctamente a ' . $personals->count() . ' trabajadores.');
 
             return response()->json(['success' => true]);
 
@@ -873,15 +892,21 @@ class PersonalController extends Controller
             'departamento.*' => 'string|max:255',
         ]);
 
+        $user = auth()->user();
+
         try {
-            $personals = Personal::whereIn('id', $validated['personal_ids'])->get();
+            $personals = Personal::whereIn('id', $validated['personal_ids'])
+                ->when($user && $user->role !== 'superadmin', function ($q) use ($user) {
+                    $q->whereHas('proyectos', fn ($pq) => $pq->whereIn('proyectos.id', $user->proyectos->pluck('id')));
+                })
+                ->get();
 
             foreach ($personals as $personal) {
                 $personal->departamento = $validated['departamento'] ?? null;
                 $personal->save();
             }
 
-            session()->flash('success', 'Departamento actualizado correctamente a ' . count($validated['personal_ids']) . ' trabajadores.');
+            session()->flash('success', 'Departamento actualizado correctamente a ' . $personals->count() . ' trabajadores.');
 
             return response()->json(['success' => true]);
 
@@ -924,6 +949,7 @@ class PersonalController extends Controller
     public function marcarRevisadoPrl(Personal $personal)
     {
         $this->authorize('cursos.edit');
+        $this->authorizePersonalProyecto($personal);
 
         $personal->update([
             'prl_revisado' => true
@@ -934,9 +960,12 @@ class PersonalController extends Controller
 
     public function puestos()
     {
-        $this->authorize('personal.edit'); 
+        $this->authorize('personal.edit');
 
-        $puestos = Puesto::orderBy('nombre')->get();
+        $proyectoId = $this->resolveProyectoForCorrelativo(request());
+        $puestos = Puesto::where('proyecto_id', $proyectoId)
+            ->orderBy('nombre')
+            ->get();
 
         return view('personal.puestos', compact('puestos'));
     }

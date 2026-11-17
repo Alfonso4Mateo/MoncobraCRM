@@ -30,14 +30,16 @@
                                 <td>{{ $alerta->personal_name }} {{ $alerta->personal_apellido }}</td>
                                 <td>{{ $alerta->curso_nombre }}</td>
                                 <td>{{ \Illuminate\Support\Carbon::parse($alerta->fecha_realizacion)->format('d/m/Y') }}</td>
-                                <td>{{ \Illuminate\Support\Carbon::parse($alerta->fecha_caducidad)->format('d/m/Y') }}</td>
-                                <td>
-                                    @if($alerta->estado === 'Caducado')
-                                        <span class="badge badge-danger">Caducado</span>
-                                    @else
-                                        <span class="badge badge-warning">En Aviso</span>
-                                    @endif
-                                </td>
+                                <td>{{ $alerta->fecha_caducidad ? \Illuminate\Support\Carbon::parse($alerta->fecha_caducidad)->format('d/m/Y') : '—' }}</td>
+                                    <td>
+                                        @if($alerta->estado === 'No Apto')
+                                            <span class="badge badge-danger">No Apto</span>
+                                        @elseif($alerta->estado === 'Caducado')
+                                            <span class="badge badge-danger">Caducado</span>
+                                        @else
+                                            <span class="badge badge-warning">En Aviso</span>
+                                        @endif
+                                    </td>
                             </tr>
                         @empty
                             <tr>

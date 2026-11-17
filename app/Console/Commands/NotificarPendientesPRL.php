@@ -2,41 +2,56 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Setting;
-use App\Models\Personal;
-use Illuminate\Support\Facades\Mail;
 use App\Mail\AlertaPendientesMail;
+use App\Models\Personal;
+use App\Models\Proyecto;
+use App\Models\Setting;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Mail;
 
 class NotificarPendientesPRL extends Command
 {
-    protected $signature = 'cursos:notificar-pendientes';
-    protected $description = 'Envía un correo avisando de los trabajadores pendientes de revisión PRL';
+    protected $signature = 'cursos:notificar-pendientes {--proyecto= : ID del proyecto específico a procesar}';
+    protected $description = 'Envía un correo por proyecto avisando de los trabajadores pendientes de revisión PRL';
 
-    public function handle()
+    public function handle(): int
     {
-        // 1. Comprobar si el envío de pendientes está habilitado en la configuración
-        $enviar = Setting::where('key', 'alertas_prl_enviar_pendientes')->value('value');
-        if ($enviar !== null && $enviar === '0') {
-            $this->info('El envío de alertas de pendientes está desactivado en la configuración.');
+        $proyectoOption = $this->option('proyecto');
+
+        $proyectos = $proyectoOption
+            ? Proyecto::where('id', (int) $proyectoOption)->get()
+            : Proyecto::orderBy('id')->get();
+
+        foreach ($proyectos as $proyecto) {
+            $this->procesarProyecto($proyecto, $proyectoOption !== null);
+        }
+
+        return 0;
+    }
+
+    private function procesarProyecto(Proyecto $proyecto, bool $esManual): void
+    {
+        $enviar = Setting::where('key', "alertas_prl_enviar_pendientes_proyecto_{$proyecto->id}")->value('value')
+            ?? Setting::where('key', 'alertas_prl_enviar_pendientes')->value('value');
+
+        if (!$esManual && $enviar !== null && $enviar === '0') {
+            $this->line("[{$proyecto->nombre}] Envío de pendientes desactivado.");
             return;
         }
 
-        // 2. Rescatar los destinatarios
-        $emailSetting = Setting::where('key', 'alertas_prl_email')->first();
-        if (!$emailSetting || empty($emailSetting->value)) {
-            $this->error('No hay correos configurados en el sistema.');
-            return;
+        $emailSetting = Setting::where('key', "alertas_prl_email_proyecto_{$proyecto->id}")->value('value');
+        if ($emailSetting === null && $proyecto->id === (int) Proyecto::orderBy('id')->value('id')) {
+            $emailSetting = Setting::where('key', 'alertas_prl_email')->value('value');
         }
 
-        $emails = json_decode($emailSetting->value, true) ?? [];
+        $emails = json_decode((string) $emailSetting, true) ?? [];
         if (empty($emails)) {
-            $this->error('La lista de correos está vacía.');
+            $this->line("[{$proyecto->nombre}] Lista de correos vacía.");
             return;
         }
 
-        // 3. Buscar a los trabajadores: Solo Activos y NO revisados.
         $pendientes = Personal::where('activo', true)
+            ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyecto->id))
             ->where(function ($q) {
                 $q->where('prl_revisado', false)
                     ->orWhereNull('prl_revisado');
@@ -44,15 +59,17 @@ class NotificarPendientesPRL extends Command
             ->get();
 
         if ($pendientes->isEmpty()) {
-            $this->info('Todo en orden. No hay trabajadores pendientes de revisión. No se enviará correo.');
+            $this->info("[{$proyecto->nombre}] Sin trabajadores pendientes de revisión.");
             return;
         }
 
-        // 4. Enviar el correo
         foreach ($emails as $email) {
-            Mail::to($email)->send(new AlertaPendientesMail($pendientes));
+            Mail::to($email)->send(
+                (new AlertaPendientesMail($pendientes))
+                    ->subject("👷 Trabajadores Pendientes de Revisión PRL - {$proyecto->nombre}")
+            );
         }
 
-        $this->info('Aviso enviado correctamente a ' . count($emails) . ' destinatario(s).');
+        $this->info("[{$proyecto->nombre}] Aviso enviado a " . count($emails) . ' destinatario(s).');
     }
 }

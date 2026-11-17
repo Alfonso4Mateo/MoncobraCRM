@@ -40,25 +40,39 @@ class PersonalCurso extends Pivot
 
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        $persona = $this->relationLoaded('personal') ? trim((string) $this->personal?->name . ' ' . (string) $this->personal?->apellido) : '';
-        $curso = $this->relationLoaded('curso') ? trim((string) $this->curso?->nombre) : '';
-        $persona = trim($persona);
+        $personalModel = $this->relationLoaded('personal')
+            ? $this->personal
+            : Personal::with('proyectos:id')->find($this->getAttribute('personal_id'));
+
+        $cursoModel = $this->relationLoaded('curso')
+            ? $this->curso
+            : Curso::find($this->getAttribute('curso_id'));
+
+        $persona = $personalModel
+            ? trim((string) $personalModel->name . ' ' . (string) $personalModel->apellido)
+            : '';
+        $curso = $cursoModel ? trim((string) $cursoModel->nombre) : '';
+
         $cursoId = $this->getAttribute('curso_id');
         $personalId = $this->getAttribute('personal_id');
         $referencia = $curso !== '' ? 'Curso: ' . $curso : ($cursoId ? 'Curso ID: ' . $cursoId : '');
 
         if ($persona !== '') {
-            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Personal: ' . $persona;
+            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Trabajador: ' . $persona;
         } elseif ($personalId) {
-            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Personal ID: ' . $personalId;
+            $referencia .= ($referencia !== '' ? ' - ' : '') . 'Trabajador ID: ' . $personalId;
         }
 
         if ($referencia === '') {
             $referencia = 'Sin referencia (ID: ' . $this->getKey() . ')';
         }
 
+        $proyectoIds = $personalModel ? $personalModel->proyectos->pluck('id')->all() : [];
+
         $activity->properties = $activity->properties->merge([
             'reference_name' => $referencia,
+            'proyecto_id' => $proyectoIds[0] ?? null,
+            'proyecto_ids' => $proyectoIds,
             'ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);

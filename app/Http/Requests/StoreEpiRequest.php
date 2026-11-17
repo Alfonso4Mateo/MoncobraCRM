@@ -8,7 +8,7 @@ class StoreEpiRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('epis.gestion') ?? false;
     }
 
     public function rules(): array
@@ -18,9 +18,10 @@ class StoreEpiRequest extends FormRequest
             'descripcion' => 'nullable|string|max:1000',
             'categoria' => 'nullable|string|max:100',
 
-            // Vinculación opcional con el módulo de Inventario
+            // Vinculación opcional con las 3 vías del módulo de Inventario
             'inventario_id' => 'nullable|integer|exists:inventario,id',
             'inventario_variante_id' => 'nullable|integer|exists:inventario_variantes,id',
+            'inventario_articulo_id' => 'nullable|integer|exists:inventario_articulos,id',
 
             'puestos' => 'nullable|array',
             'puestos.*' => 'exists:puestos,id',

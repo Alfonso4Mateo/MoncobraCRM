@@ -118,7 +118,9 @@
         'AlbaranLineaPartida' => 'Repartos de Albarán por Partida',
         'Articulo' => 'Catálogo de Artículos',
         'Cliente' => 'Directorio de Clientes',
+        'Curso' => 'Catálogo de Cursos',
         'Documento' => 'Gestor Documental',
+        'Epi' => 'Catálogo de EPIs',
         'EquipoInformatico' => 'Equipos Informáticos',
         'Evento' => 'Eventos Transaccionales',
         'HistorialPrl' => 'Registro PRL (Prevención)',
@@ -129,10 +131,12 @@
         'PersonalCurso' => 'Formación / Cursos',
         'Presupuesto' => 'Presupuestos',
         'Proyecto' => 'Proyectos',
+        'Puesto' => 'Perfiles Formativos (Puestos)',
+        'PuestoEpiDocumento' => 'Fichas Técnicas de EPIs (ISO)',
         'PuestoTrabajo' => 'Puestos de Trabajo',
         'QrCarpeta' => 'Carpetas QR',
         'Setting' => 'Configuración Global',
-        'User' => 'Gestión de Usuarios'
+        'User' => 'Gestión de Usuarios',
     ];
 
     // Diccionario visual de Permisos

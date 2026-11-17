@@ -24,14 +24,16 @@ class ActivityHumanizer
         'linea_id' => ['App\Models\LineaBolsa', 'descripcion'],
         'linea_bolsa_id' => ['App\Models\LineaBolsa', 'descripcion'],
         'articulo_id' => ['App\Models\Articulo', 'descripcion'],
+        'inventario_id' => ['App\Models\Inventario', ['codigo', 'descripcion']],
+        'inventario_variante_id' => ['App\Models\InventarioVariante', ['codigo', 'nombre']],
         'user_id' => ['App\Models\User', 'name'],
         'usuario_id' => ['App\Models\User', 'name'],
         'created_by' => ['App\Models\User', 'name'],
         'updated_by' => ['App\Models\User', 'name'],
         'responsable_id' => ['App\Models\User', 'name'],
-        'personal_id' => ['App\Models\Personal', ['nombre', 'apellidos']],
+        'personal_id' => ['App\Models\Personal', ['name', 'apellido']],
         'puesto_trabajo_id' => ['App\Models\PuestoTrabajo', 'nombre'],
-        'puesto_id' => ['App\Models\PuestoTrabajo', 'nombre'],
+        'puesto_id' => ['App\Models\Puesto', 'nombre'],
         'departamento_id' => ['App\Models\Departamento', 'nombre'],
         'ubicacion_id' => ['App\Models\Ubicacion', 'nombre'],
         'familia_id' => ['App\Models\FamiliaHerramienta', 'nombre'],
@@ -42,6 +44,7 @@ class ActivityHumanizer
         'qr_carpeta_id' => ['App\Models\QrCarpeta', 'nombre'],
         'carpeta_id' => ['App\Models\QrCarpeta', 'nombre'],
         'curso_id' => ['App\Models\Curso', 'nombre'],
+        'epi_id' => ['App\Models\Epi', 'nombre'],
     ];
 
     private const FIELD_LABELS = [
@@ -78,9 +81,34 @@ class ActivityHumanizer
         'lista_articulos' => 'Líneas / Artículos',
         'archivo_pdf' => 'Documento adjunto',
         'archivo_documento' => 'Documento adjunto',
+        'archivo_diploma' => 'Diploma adjunto',
+        'file_path' => 'Archivo PDF archivado',
         'ruta_archivo' => 'Documento adjunto',
         'empresa_nombre' => 'Empresa',
         'personal_id' => 'Trabajador',
+        'curso_id' => 'Curso formativo',
+        'epi_id' => 'Equipo EPI',
+        'puesto_id' => 'Perfil formativo (Puesto)',
+        'inventario_id' => 'Artículo de almacén',
+        'inventario_variante_id' => 'Familia de almacén (Tallas)',
+        'inventario_articulo_id' => 'Referencia de almacén',
+        'meses_validez' => 'Validez (meses)',
+        'dias_aviso_previo' => 'Días de aviso previo',
+        'fecha_realizacion' => 'Fecha de realización',
+        'apto' => 'Calificación Apto',
+        'descripcion_aptitud' => 'Observaciones / Aptitud',
+        'prl_revisado' => 'Revisión PRL confirmada',
+        'fecha_reactivacion' => 'Fecha de reactivación',
+        'codigo_iso' => 'Código documento ISO',
+        'revision' => 'Revisión oficial',
+        'fecha_emision' => 'Fecha de emisión',
+        'marco_prl' => 'Normativa PRL',
+        'sello_prevencion' => 'Sello Prevención SST',
+        'sello_delegacion' => 'Sello Delegación',
+        'dpto_prevencion' => 'Dpto. Prevención',
+        'dpto_delegacion' => 'Dpto. Delegación',
+        'epis_snapshot' => 'Dotación de EPIs homologada',
+        'es_vigente' => 'Revisión vigente oficial',
         'user_id' => 'Usuario',
         'usuario_id' => 'Usuario',
         'created_by' => 'Creado por',
@@ -99,11 +127,16 @@ class ActivityHumanizer
         'tipo_bolsa' => 'Tipo de bolsa',
         'numero_referencia' => 'Nº de referencia',
         'titulo' => 'Título',
+        'nombre' => 'Nombre',
+        'categoria' => 'Categoría',
         'descripcion' => 'Descripción',
         'email' => 'Correo electrónico',
     ];
 
-    private const BOOLEAN_FIELDS = ['bolsa', 'facturado', 'bloqueado', 'activo', 'es_abierta'];
+    private const BOOLEAN_FIELDS = [
+        'bolsa', 'facturado', 'bloqueado', 'activo', 'es_abierta',
+        'apto', 'prl_revisado', 'es_vigente', 'es_obligatorio',
+    ];
     private const MONEY_FIELDS = ['total', 'importe', 'precio_unitario', 'importe_asignado', 'importe_objetivo'];
 
     public static function fieldLabel(string $field): string
@@ -178,20 +211,19 @@ class ActivityHumanizer
         return $resolved;
     }
 
-        public static function formatValue(string $field, mixed $val, array $relaciones = []): string
+    public static function formatValue(string $field, mixed $val, array $relaciones = []): string
     {
         if ($val === null || $val === '') {
             return 'Vacío';
         }
-        
+
         // INTERCEPTOR DE FECHAS ISO (Como 2026-10-18T22:00:00.000000Z)
         if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $val)) {
             try {
                 return \Illuminate\Support\Carbon::parse($val)
                     ->timezone('Europe/Madrid')
                     ->format('d/m/Y H:i');
-            } catch (\Exception $e) {
-                // Si falla el parseo por lo que sea, continúa el flujo normal
+            } catch (\Exception) {
             }
         }
 
@@ -201,7 +233,7 @@ class ActivityHumanizer
         if (is_scalar($val) && isset($relaciones[$field][(string) $val])) {
             return (string) $relaciones[$field][(string) $val];
         }
-        if (in_array($field, ['archivo_pdf', 'archivo_documento', 'ruta_archivo'], true)) {
+        if (in_array($field, ['archivo_pdf', 'archivo_documento', 'archivo_diploma', 'file_path', 'ruta_archivo'], true)) {
             return basename((string) $val);
         }
         if (in_array($field, self::MONEY_FIELDS, true) && is_numeric($val)) {
@@ -217,11 +249,19 @@ class ActivityHumanizer
         return (string) $val;
     }
 
-
     public static function formatLineItem(mixed $item): string
     {
         if (!is_array($item)) {
             return self::formatValue('', $item);
+        }
+
+        // Si es un ítem de dotación EPI (no tiene importes económicos)
+        if (!array_key_exists('precio_unitario', $item) && !array_key_exists('precio', $item) && !array_key_exists('total', $item)) {
+            $nombre = $item['nombre'] ?? $item['descripcion'] ?? 'Ítem';
+            $cantidad = $item['cantidad'] ?? 1;
+            $cat = !empty($item['categoria']) ? " [{$item['categoria']}]" : '';
+
+            return "• {$nombre}{$cat} — Dotación: {$cantidad} " . ((int) $cantidad === 1 ? 'ud.' : 'uds.');
         }
 
         $description = $item['descripcion'] ?? $item['nombre'] ?? 'Artículo';
@@ -338,10 +378,15 @@ class ActivityHumanizer
             'AlbaranCliente' => 'Albarán de cliente',
             'Articulo' => 'artículo',
             'Cliente' => 'cliente',
+            'Curso' => 'curso formativo',
             'Documento' => 'documento',
+            'Epi' => 'equipo EPI',
             'PedidoCliente' => 'pedido',
+            'PersonalCurso' => 'formación de trabajador',
             'Presupuesto' => 'presupuesto',
             'Proyecto' => 'proyecto',
+            'Puesto' => 'perfil formativo',
+            'PuestoEpiDocumento' => 'ficha técnica de EPIs',
         ];
 
         return $labels[$name] ?? strtolower(preg_replace('/(?<!^)[A-Z]/', ' $0', $name) ?: 'registro');

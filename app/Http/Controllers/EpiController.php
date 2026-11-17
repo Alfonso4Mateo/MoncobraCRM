@@ -31,12 +31,40 @@ class EpiController extends Controller
         $this->middleware('auth');
     }
 
+    private function getMisProyectosIds(): ?array
+    {
+        $user = auth()->user();
+        if (!$user || $user->role === 'superadmin') {
+            return null;
+        }
+
+        return $user->proyectos->pluck('id')->all();
+    }
+
+    private function authorizeEpiProyecto(Epi $epi): void
+    {
+        $misProyectosIds = $this->getMisProyectosIds();
+        if ($misProyectosIds === null) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $epi->proyecto_id, array_map('intval', $misProyectosIds), true),
+            403,
+            'No tienes acceso a un EPI de otra sede.'
+        );
+    }
+
     public function index(): View
     {
-        $proyectoId = $this->resolveActiveProyectoId(request());
+        $this->authorize('epis.gestion');
 
-        $epis = Epi::withCount('puestos')
-            ->with(['puestos', 'inventario', 'inventarioVariante.items'])
+        $proyectoId = $this->resolveProyectoForCorrelativo(request());
+
+        $epis = Epi::query()
+            ->where('proyecto_id', $proyectoId)
+            ->withCount(['puestos' => fn ($q) => $q->where('puestos.proyecto_id', $proyectoId)])
+            ->with(['puestos', 'inventario', 'inventarioVariante.items', 'inventarioArticulo'])
             ->orderBy('nombre')
             ->get();
 
@@ -44,7 +72,10 @@ class EpiController extends Controller
             ->groupBy(fn ($epi) => $epi->categoria ?: 'Sin categoría')
             ->sortKeys();
 
-        $puestos = Puesto::where('activo', true)->orderBy('nombre')->get();
+        $puestos = Puesto::where('proyecto_id', $proyectoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
 
         $categoriasDisponibles = $epis->pluck('categoria')
             ->filter()
@@ -54,7 +85,7 @@ class EpiController extends Controller
             ->sort()
             ->values();
 
-        // Opciones de inventario (familias con variantes e ítems individuales) para el selector de vinculación
+        // Opciones de inventario (familias con variantes e ítems individuales) filtradas por sede activa
         $variantesInventario = InventarioVariante::query()
             ->where('proyecto_id', $proyectoId)
             ->with('items')
@@ -78,21 +109,31 @@ class EpiController extends Controller
 
     public function store(StoreEpiRequest $request)
     {
+        $this->authorize('epis.gestion');
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
         $validated = $request->validated();
 
-        $epi = DB::transaction(function () use ($validated) {
+        $epi = DB::transaction(function () use ($validated, $proyectoId) {
             $epi = Epi::create([
+                'proyecto_id' => $proyectoId,
                 'nombre' => mb_strtoupper($validated['nombre']),
                 'descripcion' => $validated['descripcion'] ?? null,
                 'categoria' => $validated['categoria'] ?? null,
                 'inventario_id' => !empty($validated['inventario_id']) ? (int) $validated['inventario_id'] : null,
                 'inventario_variante_id' => !empty($validated['inventario_variante_id']) ? (int) $validated['inventario_variante_id'] : null,
+                'inventario_articulo_id' => !empty($validated['inventario_articulo_id']) ? (int) $validated['inventario_articulo_id'] : null,
                 'activo' => true,
             ]);
 
             if (!empty($validated['puestos'])) {
+                $puestosValidosIds = Puesto::where('proyecto_id', $proyectoId)
+                    ->whereIn('id', $validated['puestos'])
+                    ->pluck('id')
+                    ->all();
+
                 $syncData = [];
-                foreach ($validated['puestos'] as $puestoId) {
+                foreach ($puestosValidosIds as $puestoId) {
                     $cantidad = $validated['cantidades'][$puestoId] ?? 1;
                     $syncData[$puestoId] = ['cantidad' => max(1, (int) $cantidad)];
                 }
@@ -102,7 +143,7 @@ class EpiController extends Controller
             return $epi;
         });
 
-        $mensaje = 'EPI creado y vinculado correctamente.';
+        $mensaje = 'EPI creado correctamente.';
 
         if ($request->wantsJson()) {
             return $this->jsonCardResponse($epi, $mensaje);
@@ -113,25 +154,44 @@ class EpiController extends Controller
 
     public function update(UpdateEpiRequest $request, Epi $epi)
     {
+        $this->authorize('epis.gestion');
+        $this->authorizeEpiProyecto($epi);
+
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $epi) {
+        DB::transaction(function () use ($validated, $epi, $request) {
+            $invId = !empty($validated['inventario_id']) ? (int) $validated['inventario_id'] : null;
+            $varId = !empty($validated['inventario_variante_id']) ? (int) $validated['inventario_variante_id'] : null;
+            $artId = !empty($validated['inventario_articulo_id']) ? (int) $validated['inventario_articulo_id'] : null;
+
+            if ($invId !== null || $varId !== null) {
+                $artId = null;
+            }
+
             $epi->update([
                 'nombre' => mb_strtoupper($validated['nombre']),
                 'descripcion' => $validated['descripcion'] ?? null,
                 'categoria' => $validated['categoria'] ?? null,
-                'inventario_id' => !empty($validated['inventario_id']) ? (int) $validated['inventario_id'] : null,
-                'inventario_variante_id' => !empty($validated['inventario_variante_id']) ? (int) $validated['inventario_variante_id'] : null,
+                'inventario_id' => $invId,
+                'inventario_variante_id' => $varId,
+                'inventario_articulo_id' => $artId,
             ]);
 
-            $syncData = [];
-            if (!empty($validated['puestos'])) {
-                foreach ($validated['puestos'] as $puestoId) {
-                    $cantidad = $validated['cantidades'][$puestoId] ?? 1;
-                    $syncData[$puestoId] = ['cantidad' => max(1, (int) $cantidad)];
+            if ($request->has('puestos') || $request->has('sync_puestos')) {
+                $syncData = [];
+                if (!empty($validated['puestos'])) {
+                    $puestosValidosIds = Puesto::where('proyecto_id', $epi->proyecto_id)
+                        ->whereIn('id', $validated['puestos'])
+                        ->pluck('id')
+                        ->all();
+
+                    foreach ($puestosValidosIds as $puestoId) {
+                        $cantidad = $validated['cantidades'][$puestoId] ?? 1;
+                        $syncData[$puestoId] = ['cantidad' => max(1, (int) $cantidad)];
+                    }
                 }
+                $epi->puestos()->sync($syncData);
             }
-            $epi->puestos()->sync($syncData);
         });
 
         $mensaje = 'EPI actualizado correctamente.';
@@ -145,6 +205,9 @@ class EpiController extends Controller
 
     public function toggleActivo(Request $request, Epi $epi)
     {
+        $this->authorize('epis.gestion');
+        $this->authorizeEpiProyecto($epi);
+
         $epi->update(['activo' => !$epi->activo]);
 
         $mensaje = $epi->activo
@@ -160,6 +223,9 @@ class EpiController extends Controller
 
     public function destroy(Request $request, Epi $epi)
     {
+        $this->authorize('epis.gestion');
+        $this->authorizeEpiProyecto($epi);
+
         if ($epi->puestos()->exists()) {
             $mensaje = 'No se puede eliminar: este EPI está vinculado a uno o más puestos. Quítalo de esos puestos o dalo de baja en su lugar.';
 
@@ -182,8 +248,8 @@ class EpiController extends Controller
 
     private function jsonCardResponse(Epi $epi, string $mensaje)
     {
-        $epi->load(['puestos', 'inventario', 'inventarioVariante.items']);
-        $epi->loadCount('puestos');
+        $epi->load(['puestos', 'inventario', 'inventarioVariante.items', 'inventarioArticulo']);
+        $epi->loadCount(['puestos' => fn ($q) => $q->where('puestos.proyecto_id', $epi->proyecto_id)]);
 
         return response()->json([
             'success' => true,

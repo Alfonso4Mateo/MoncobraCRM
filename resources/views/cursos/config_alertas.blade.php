@@ -94,6 +94,7 @@
             <div class="config-card">
                 <div class="config-header">
                     <h2>Destinatarios (PRL)</h2>
+                    @if(isset($proyecto)) <span class="badge badge-info mb-2">Proyecto: {{ $proyecto->nombre }}</span> @endif
                     <p>Añade los correos del personal que debe recibir los informes automatizados.</p>
                 </div>
 
