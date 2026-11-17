@@ -65,12 +65,10 @@
         /* =========================================================
            2. MAQUILLAJE SELECT2 (Limpio, sin conflictos)
            ========================================================= */
-        /* Contenedor principal: Fuerza el 100% del grid */
         .select2-container {
             width: 100% !important;
         }
 
-        /* La caja visual (Caja blanca) */
         .select2-container--default .select2-selection--multiple {
             background-color: #fff;
             border: 1px solid var(--profile-line);
@@ -80,13 +78,11 @@
             cursor: text;
         }
 
-        /* Foco al hacer clic en la caja blanca */
         .select2-container--default.select2-container--focus .select2-selection--multiple {
             border-color: var(--profile-primary);
             box-shadow: 0 0 0 3px rgba(23, 62, 103, 0.08);
         }
 
-        /* Contenedor Flexbox interno (donde viven las píldoras y el cursor) */
         .select2-container--default .select2-selection--multiple .select2-selection__rendered {
             display: flex;
             flex-wrap: wrap;
@@ -97,7 +93,6 @@
             list-style: none;
         }
 
-        /* Diseño de las píldoras azules */
         .select2-container--default .select2-selection--multiple .select2-selection__choice {
             background-color: #eff6ff;
             border: 1px solid #bfdbfe;
@@ -113,7 +108,6 @@
             gap: 8px;
         }
 
-        /* La cruz "X" de las píldoras */
         .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
             color: #60a5fa;
             border: none;
@@ -127,9 +121,8 @@
         }
 
         /* =========================================================
-           3. LA CIRUGÍA DEL CURSOR (Esto arregla los saltos)
+           3. LA CIRUGÍA DEL CURSOR
            ========================================================= */
-        /* Quitamos el float nativo de Select2 para que use Flexbox */
         .select2-container--default .select2-selection--multiple .select2-search--inline {
             float: none;
             margin: 0;
@@ -138,7 +131,6 @@
             align-items: center;
         }
 
-        /* EL INPUT: Limpiamos los estilos para que JS controle la anchura al teclear */
         .select2-container--default .select2-search--inline .select2-search__field {
             margin: 0;
             padding: 0;
@@ -150,7 +142,6 @@
             font-family: inherit;
             color: var(--profile-ink);
             outline: none;
-            /* PROHIBIDO PONER WIDTH AQUI. SELECT2 LO CALCULA SOLO. */
         }
 
         /* =========================================================
@@ -168,7 +159,6 @@
             font-weight: 600;
         }
 
-        /* Lista del Modal de Gestión */
         .depto-list-item {
             display: flex; justify-content: space-between; align-items: center; 
             padding: 10px 14px; border-bottom: 1px solid var(--profile-line); transition: background 0.2s;
@@ -316,7 +306,10 @@
 
                                 @if(auth()->user()?->role === 'superadmin' || auth()->user()?->proyectos?->count() > 1)
                                     @php
-                                        $proyectosSeleccionados = old('proyecto_ids', isset($personal) ? $personal->proyectos->pluck('id')->toArray() : []);
+                                        $defaultProyectos = ($isCreate ?? false)
+                                            ? [($proyectoActivoId ?? null)]
+                                            : (isset($personal) ? $personal->proyectos->pluck('id')->toArray() : []);
+                                        $proyectosSeleccionados = old('proyecto_ids', array_filter($defaultProyectos));
                                     @endphp
                                     <div class="profile-edit-form-group">
                                         <label for="proyecto_ids">Sedes / Proyectos</label>
@@ -360,7 +353,7 @@
                                 </div>
 
                             @can('personal.medico')
-                                <!-- 3. CAJA MÉDICA (Contenedor externo limpio al 100% de ancho) -->
+                                <!-- 3. CAJA MÉDICA -->
                                 <div style="width: 100%; box-sizing: border-box; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; margin-top: 24px; grid-column: 1 / -1;">
                                     
                                     <div style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px dashed #bbf7d0;">
@@ -557,7 +550,7 @@
             </div>
         </form>
 
-            <!-- MODAL GESTIÓN DE DEPARTAMENTOS -->
+        <!-- MODAL GESTIÓN DE DEPARTAMENTOS -->
         <div class="profile-modal" id="manage-deptos-modal" aria-hidden="true" role="dialog">
             <div class="profile-modal__panel" style="max-width: 480px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--profile-line); padding-bottom: 12px;">
@@ -583,11 +576,10 @@
 @endsection
 
 @section('js')
-<!-- SCRIPT OFICIAL SELECT2 -->
+    <!-- SCRIPT OFICIAL SELECT2 -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        // INICIALIZAR SELECT2 (Anti-Fantasmas Definitivo)
         $(document).ready(function() {
             $('#departamento').select2({
                 placeholder: "Busca o selecciona departamentos...",
@@ -598,7 +590,6 @@
                         return "No se ha encontrado el departamento";
                     }
                 },
-                // LA MAGIA: Si la opción ya está seleccionada, no la renderiza en el menú
                 templateResult: function(option) {
                     if (option.element && option.element.selected) {
                         return null; 
@@ -612,14 +603,11 @@
     <script>
         // Lógica de fechas
         (function() {
-            // Elementos de Revisión Médica
-            const btnHoyUltima = document.getElementById('btn-hoy-ultima'); // ID CORREGIDO
+            const btnHoyUltima = document.getElementById('btn-hoy-ultima');
             const ultimaMedicaInput = document.getElementById('ultima_revision_medica');
             const proximaMedicaInput = document.getElementById('proxima_revision_medica');
-            
             const btnHoyProxima = document.getElementById('btn-hoy-proxima');
 
-            // Elementos de Graduación (gafas)
             const btnHoyGrad = document.getElementById('set-graduacion-hoy');
             const ultimaGradInput = document.getElementById('ultima_graduacion');
             const proximaGradInput = document.getElementById('proxima_graduacion');
@@ -650,7 +638,7 @@
 
             const getMesesPuesto = () => {
                 const selectPuesto = document.getElementById('puesto_trabajo_id');
-                let minMeses = 12; // Valor seguro por defecto
+                let minMeses = 12;
 
                 if (selectPuesto && selectPuesto.selectedIndex >= 0) {
                     const option = selectPuesto.options[selectPuesto.selectedIndex];
@@ -662,12 +650,10 @@
                 return minMeses;
             };
 
-            // 1. Botón "Poner hoy" para ÚLTIMA Revisión Médica
             if (btnHoyUltima && ultimaMedicaInput) {
                 btnHoyUltima.addEventListener('click', function() {
                     const today = new Date();
                     ultimaMedicaInput.value = formatDate(today);
-                    // Calcula la próxima revisión automáticamente según el puesto
                     setNextFrom(today, proximaMedicaInput, getMesesPuesto());
                 });
 
@@ -676,7 +662,6 @@
                 });
             }
 
-            // Si cambia el puesto laboral, recalcular próxima revisión médica automáticamente
             const selectPuesto = document.getElementById('puesto_trabajo_id');
             if (selectPuesto && ultimaMedicaInput && proximaMedicaInput) {
                 selectPuesto.addEventListener('change', function() {
@@ -686,7 +671,6 @@
                 });
             }
 
-            // 2. Botón "Poner hoy" para PRÓXIMA Revisión Médica
             if (btnHoyProxima && proximaMedicaInput) {
                 btnHoyProxima.addEventListener('click', function() {
                     const today = new Date();
@@ -694,12 +678,10 @@
                 });
             }
 
-            // 3. Botón "Poner hoy" para ÚLTIMA Graduación
             if (btnHoyGrad && ultimaGradInput) {
                 btnHoyGrad.addEventListener('click', function() {
                     const today = new Date();
                     ultimaGradInput.value = formatDate(today);
-                    // Calcula la próxima graduación (+12 meses por defecto)
                     setNextFrom(today, proximaGradInput);
                 });
 
@@ -711,37 +693,19 @@
 
         // LÓGICA PARA MOSTRAR/OCULTAR CAMPOS DE GRADUACIÓN
         (function() {
-            // Seleccionamos el campo de gafas y todos los campos que dependen de él
             const gafasSelect = document.getElementById('gafas');
             const graduacionFields = document.querySelectorAll('.js-graduacion-field');
 
             const toggleGraduacionFields = () => {
                 if (!gafasSelect) return;
-                
-                // Comprobamos si el valor exacto es 'Graduadas'
                 const isGraduadas = gafasSelect.value === 'Graduadas';
-                
                 graduacionFields.forEach(field => {
-                    // Si es "Graduadas", mostramos el elemento con 'block', si no, lo ocultamos con 'none'
                     field.style.display = isGraduadas ? 'block' : 'none';
-                    
-                    // Opcional: Si quieres que los campos se borren al ocultarse para que 
-                    // no se envíe información errónea a la base de datos, descomenta estas líneas:
-                    /*
-                    if (!isGraduadas) {
-                        const input = field.querySelector('input');
-                        if (input) input.value = '';
-                    }
-                    */
                 });
             };
 
-            // Asegurarnos de que existe el selector en la página antes de añadir eventos
             if (gafasSelect) {
-                // Cada vez que el usuario cambie la opción del selector, verificamos
                 gafasSelect.addEventListener('change', toggleGraduacionFields);
-                
-                // Ejecutamos la función inmediatamente al cargar la página para revisar el estado inicial
                 toggleGraduacionFields(); 
             }
         })();
@@ -758,12 +722,11 @@
             const btnAddDeptoAjax = document.getElementById('btn-add-depto-ajax');
             const selectDepto = document.getElementById('departamento');
 
-            // Pinta la lista leyendo el <select> invisible
             const renderList = () => {
                 deptoList.innerHTML = '';
                 const options = Array.from(selectDepto.options).filter(opt => opt.value !== '');
                 
-                if(options.length === 0) {
+                if (options.length === 0) {
                     deptoList.innerHTML = '<li style="padding: 16px; text-align: center; color: #94a3b8; font-size: 0.9rem;">No hay departamentos. Crea uno arriba.</li>';
                     return;
                 }
@@ -788,7 +751,7 @@
             const closeModal = () => {
                 modalManage.classList.remove('is-open');
                 modalManage.setAttribute('aria-hidden', 'true');
-                inputNewDepto.value = ''; // Limpiar el input al salir
+                inputNewDepto.value = '';
             };
 
             btnManage.addEventListener('click', openModal);
@@ -797,7 +760,7 @@
             // AÑADIR AJAX
             btnAddDeptoAjax.addEventListener('click', async () => {
                 const nombre = inputNewDepto.value.trim();
-                if(!nombre) return;
+                if (!nombre) return;
                 
                 btnAddDeptoAjax.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 btnAddDeptoAjax.disabled = true;
@@ -813,8 +776,7 @@
                     });
                     const data = await response.json();
                     
-                    if(response.ok && data.success) {
-                        // Inyectar en el select y avisar a Select2
+                    if (response.ok && data.success) {
                         const option = document.createElement('option');
                         option.value = data.departamento.nombre;
                         option.text = data.departamento.nombre.toUpperCase();
@@ -822,11 +784,11 @@
                         $('#departamento').trigger('change');
                         
                         inputNewDepto.value = '';
-                        renderList(); // Repintar la lista en vivo
+                        renderList();
                     } else {
-                        alert('El departamento ya existe o el nombre no es válido.');
+                        alert(data.message || 'El departamento ya existe o el nombre no es válido.');
                     }
-                } catch(e) {
+                } catch (e) {
                     alert('Error de conexión al crear.');
                 } finally {
                     btnAddDeptoAjax.innerHTML = 'Añadir';
@@ -834,13 +796,13 @@
                 }
             });
 
-            // BORRAR AJAX (Delegación de eventos)
+            // BORRAR AJAX
             deptoList.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.depto-btn-delete');
-                if(!btn) return;
+                if (!btn) return;
 
                 const val = btn.getAttribute('data-val');
-                if(!confirm(`¿Seguro que deseas eliminar definitivamente "${val}" de la base de datos?`)) return;
+                if (!confirm(`¿Seguro que deseas eliminar definitivamente "${val}" de la base de datos?`)) return;
 
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 try {
@@ -849,20 +811,20 @@
                         headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
                     });
                     
-                    if(response.ok) {
-                        // Buscarlo en el select y aniquilarlo
+                    if (response.ok) {
                         const opt = Array.from(selectDepto.options).find(o => o.value === val);
-                        if(opt) {
-                            opt.selected = false; // Desmarcarlo si estaba puesto
+                        if (opt) {
+                            opt.selected = false;
                             opt.remove();
                         }
-                        $('#departamento').trigger('change'); // Refrescar UI Select2
-                        renderList(); // Repintar modal
+                        $('#departamento').trigger('change');
+                        renderList();
                     } else {
-                        alert('Error del servidor al intentar borrar.');
+                        const errData = await response.json().catch(() => ({}));
+                        alert(errData.message || 'Error del servidor al intentar borrar.');
                         renderList();
                     }
-                } catch(err) {
+                } catch (err) {
                     alert('Error de conexión al borrar.');
                     renderList();
                 }

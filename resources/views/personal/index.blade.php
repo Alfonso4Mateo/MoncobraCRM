@@ -160,29 +160,6 @@
             </article>
 
             <section class="personal-footer-grid">
-                @php
-                    $tallasFaltantes = 0;
-                    $personalNecesitaEpi = \App\Models\Personal::query()
-                        ->where('activo', true)
-                        ->when(auth()->user()?->role !== 'superadmin', function ($query) {
-                            $query->whereHas('proyectos', function ($projectQuery) {
-                                $projectQuery->whereIn('proyectos.id', auth()->user()->proyectos->pluck('id'));
-                            });
-                        })
-                        ->where('sin_tallas', false)
-                        ->get(['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod']);
-                                        
-                    $columnas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod'];
-                    
-                    foreach ($personalNecesitaEpi as $p) {
-                        foreach ($columnas as $col) {
-                            if (empty($p->{$col})) {
-                                $tallasFaltantes++;
-                            }
-                        }
-                    }
-                @endphp
-
                 <article class="personal-foot-card personal-foot-card--blue">
                     <div class="personal-foot-card__title">
                         <i class="fas fa-users"></i>
@@ -198,7 +175,7 @@
                         <i class="fas fa-ruler-combined"></i>
                         Tallas No Registradas
                     </div>
-                    <strong class="personal-foot-card__value">{{ $tallasFaltantes }}</strong>
+                    <strong class="personal-foot-card__value">{{ $tallasFaltantes ?? 0 }}</strong>
                     <p>Prendas individuales por asignar</p>
                 </article>
             @endcan
@@ -247,7 +224,7 @@
         </div>
     </section>
 
-    <!-- MODAL DE ASIGNACIÓN MASIVA DE CURSOS (Solo para quien pueda editar cursos) -->
+    <!-- MODAL DE ASIGNACIÓN MASIVA DE CURSOS -->
     @can('cursos.edit')
         <div class="bulk-modal" id="bulk-course-modal" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="bulk-modal__panel">
@@ -298,7 +275,7 @@
         </div>
     @endcan
 
-    <!-- MODAL DE CAMBIO MASIVO DE DEPARTAMENTO (Solo para quien pueda hacer acciones bulk) -->
+    <!-- MODAL DE CAMBIO MASIVO DE DEPARTAMENTO -->
     @can('personal.bulk')
     <div class="bulk-modal" id="bulk-depto-modal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="bulk-modal__panel" style="max-width: 480px;">
@@ -331,7 +308,7 @@
     </div>
     @endcan
 
-    <!-- MODAL DE GESTIÓN DE SELECCIONADOS (Si tiene algún permiso de acción masiva) -->
+    <!-- MODAL DE GESTIÓN DE SELECCIONADOS -->
     @canany(['personal.bulk', 'cursos.edit'])
     <div class="bulk-modal" id="bulk-selected-modal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="bulk-modal__panel" style="max-width: 500px;">
@@ -359,7 +336,6 @@
 
 @section('js')
     <script>
-        // --- LÓGICA DE SELECCIÓN MASIVA, MODALES Y BÚSQUEDA AJAX ---
         (function() {
             // 1. Elementos DOM Generales y Contenedores
             const input = document.getElementById('q');
@@ -384,7 +360,7 @@
             const btnCloseDeptoModal = document.getElementById('btn-close-depto-modal');
             const bulkDeptoForm = document.getElementById('bulk-depto-form');
             const deptoCountText = document.getElementById('bulk-depto-count-text');
-            const btnSubmitDeptoModal = document.getElementById('btn-submit-bulk-modal');
+            const btnSubmitDeptoModal = document.getElementById('btn-submit-depto-modal');
 
             // Elementos Modal Ver Seleccionados
             const btnViewSelected = document.getElementById('btn-view-selected');
@@ -397,7 +373,6 @@
             window.updateBulkUI = () => {
                 const rowCheckboxes = document.querySelectorAll('.checkbox-row');
                 
-                // Recopilamos todos los marcados actualmente en el DOM visible
                 rowCheckboxes.forEach(cb => {
                     if (cb.checked && !selectedIds.includes(cb.value)) {
                         selectedIds.push(cb.value);
@@ -412,10 +387,10 @@
                     bulkBar.classList.add('is-visible');
                 } else {
                     bulkBar.classList.remove('is-visible');
-                    if(masterCheckbox) masterCheckbox.checked = false;
+                    if (masterCheckbox) masterCheckbox.checked = false;
                 }
 
-                if(masterCheckbox && rowCheckboxes.length > 0) {
+                if (masterCheckbox && rowCheckboxes.length > 0) {
                     const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
                     masterCheckbox.checked = allChecked;
                 }
@@ -426,19 +401,16 @@
                 const rowCheckboxes = document.querySelectorAll('.checkbox-row');
                 
                 rowCheckboxes.forEach(cb => {
-                    // Si este ID ya estaba seleccionado previamente en la memoria global, lo marcamos visualmente
                     if (selectedIds.includes(cb.value)) {
                         cb.checked = true;
                     }
-                    // Escuchamos cambios en los checkboxes de las filas de la tabla
-                    cb.removeEventListener('change', updateBulkUI); // Evita duplicar listeners
+                    cb.removeEventListener('change', updateBulkUI);
                     cb.addEventListener('change', updateBulkUI);
                 });
 
                 updateBulkUI();
             };
 
-            // Evento para el checkbox Maestro inicial
             if (masterCheckbox) {
                 masterCheckbox.addEventListener('change', function() {
                     const rowCheckboxes = document.querySelectorAll('.checkbox-row');
@@ -449,28 +421,27 @@
                 });
             }
 
-            // Vincular checkboxes iniciales al cargar la página
             document.querySelectorAll('.checkbox-row').forEach(cb => cb.addEventListener('change', updateBulkUI));
 
-            // 4. Búsqueda Reactiva por AJAX (Debounce de 400ms)
-            if(input && tableContainer) {
+            // 4. Búsqueda Reactiva por AJAX (Debounce de 400ms) conservando filtros activos
+            if (input && tableContainer) {
                 let timer = null;
-                input.addEventListener('input', function(){
+                input.addEventListener('input', function() {
                     clearTimeout(timer);
                     timer = setTimeout(async () => {
                         const queryValue = input.value;
-                        const url = `{{ route('personal.index') }}?q=${encodeURIComponent(queryValue)}`;
+                        const alertaDias = document.querySelector('input[name="alerta_dias"]')?.value || '0';
+                        const alertaNombre = document.getElementById('alerta_nombre')?.value || 'any';
+                        const url = `{{ route('personal.index') }}?q=${encodeURIComponent(queryValue)}&alerta_dias=${encodeURIComponent(alertaDias)}&alerta_nombre=${encodeURIComponent(alertaNombre)}`;
 
                         try {
                             const response = await fetch(url, {
                                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
                             });
                             
-                            if(response.ok) {
+                            if (response.ok) {
                                 const html = await response.text();
                                 tableContainer.innerHTML = html;
-                                
-                                // Mantenemos las selecciones de la memoria y re-vinculamos eventos en la nueva tabla
                                 rebindTableEvents();
                             }
                         } catch (error) {
@@ -491,9 +462,9 @@
                 bulkCourseForm.reset();
             };
 
-            if(btnBulkCurso) btnBulkCurso.addEventListener('click', openCourseModal);
-            if(btnCloseCourseModal) btnCloseCourseModal.addEventListener('click', closeCourseModal);
-            if(bulkCourseModal) {
+            if (btnBulkCurso) btnBulkCurso.addEventListener('click', openCourseModal);
+            if (btnCloseCourseModal) btnCloseCourseModal.addEventListener('click', closeCourseModal);
+            if (bulkCourseModal) {
                 bulkCourseModal.addEventListener('click', (e) => {
                     if (e.target === bulkCourseModal) closeCourseModal();
                 });
@@ -510,16 +481,16 @@
                 bulkDeptoForm.reset();
             };
 
-            if(btnBulkDepto) btnBulkDepto.addEventListener('click', openDeptoModal);
-            if(btnCloseDeptoModal) btnCloseDeptoModal.addEventListener('click', closeDeptoModal);
-            if(bulkDeptoModal) {
+            if (btnBulkDepto) btnBulkDepto.addEventListener('click', openDeptoModal);
+            if (btnCloseDeptoModal) btnCloseDeptoModal.addEventListener('click', closeDeptoModal);
+            if (bulkDeptoModal) {
                 bulkDeptoModal.addEventListener('click', (e) => {
                     if (e.target === bulkDeptoModal) closeDeptoModal();
                 });
             }
 
             // 7. Envío masivo de Cursos por AJAX
-            if(bulkCourseForm) {
+            if (bulkCourseForm) {
                 bulkCourseForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
                     if (selectedIds.length === 0) return;
@@ -565,7 +536,7 @@
             }
 
             // 8. Envío masivo de Departamentos por AJAX
-            if(bulkDeptoForm) {
+            if (bulkDeptoForm) {
                 bulkDeptoForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
                     if (selectedIds.length === 0) return;
@@ -610,7 +581,7 @@
             }
 
             // 9. Envío masivo para Exportar a CSV
-            if(btnBulkExport) {
+            if (btnBulkExport) {
                 btnBulkExport.addEventListener('click', function() {
                     if (selectedIds.length === 0) return;
 
@@ -645,7 +616,6 @@
                 if (selectedIds.length === 0) {
                     selectedWorkersList.innerHTML = '<span style="color: var(--personal-muted); text-align: center; padding: 20px;">No hay trabajadores seleccionados.</span>';
                 } else {
-                    // Buscamos los nombres de los trabajadores seleccionados recorriendo las filas visibles de la tabla
                     selectedIds.forEach(id => {
                         const row = document.querySelector(`tr[data-id="${id}"]`);
                         const name = row ? row.querySelector('.personal-person-name strong').textContent : `ID: ${id}`;
@@ -668,35 +638,31 @@
                 bulkSelectedModal.classList.remove('is-open');
             };
 
-            if(btnViewSelected) btnViewSelected.addEventListener('click', openSelectedModal);
-            if(btnCloseSelectedModal) btnCloseSelectedModal.addEventListener('click', closeSelectedModal);
-            if(bulkSelectedModal) {
+            if (btnViewSelected) btnViewSelected.addEventListener('click', openSelectedModal);
+            if (btnCloseSelectedModal) btnCloseSelectedModal.addEventListener('click', closeSelectedModal);
+            if (bulkSelectedModal) {
                 bulkSelectedModal.addEventListener('click', (e) => {
                     if (e.target === bulkSelectedModal) closeSelectedModal();
                 });
             }
 
-            // Eliminar un trabajador individual desde dentro del modal
-            selectedWorkersList.addEventListener('click', function(e) {
-                const removeBtn = e.target.closest('[data-remove-id]');
-                if (!removeBtn) return;
+            if (selectedWorkersList) {
+                selectedWorkersList.addEventListener('click', function(e) {
+                    const removeBtn = e.target.closest('[data-remove-id]');
+                    if (!removeBtn) return;
 
-                const idToRemove = removeBtn.getAttribute('data-remove-id');
-                
-                // Quitamos el ID de la memoria global
-                selectedIds = selectedIds.filter(id => id !== idToRemove);
+                    const idToRemove = removeBtn.getAttribute('data-remove-id');
+                    selectedIds = selectedIds.filter(id => id !== idToRemove);
 
-                // Desmarcamos su checkbox en la tabla si está visible
-                const checkboxInTable = document.querySelector(`.checkbox-row[value="${idToRemove}"]`);
-                if (checkboxInTable) checkboxInTable.checked = false;
+                    const checkboxInTable = document.querySelector(`.checkbox-row[value="${idToRemove}"]`);
+                    if (checkboxInTable) checkboxInTable.checked = false;
 
-                // Actualizamos la interfaz de la barra y redibujamos la lista del modal
-                updateBulkUI();
-                openSelectedModal(); 
-            });
+                    updateBulkUI();
+                    openSelectedModal(); 
+                });
+            }
 
-            // Botón Limpiar Todo
-            if(btnClearAllSelected) {
+            if (btnClearAllSelected) {
                 btnClearAllSelected.addEventListener('click', function() {
                     selectedIds = [];
                     document.querySelectorAll('.checkbox-row').forEach(cb => cb.checked = false);

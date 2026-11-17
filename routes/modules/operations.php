@@ -249,7 +249,7 @@ Route::get('personal/tallas', [PersonalController::class, 'tallas'])
 
 Route::get('personal/puestos', [PersonalController::class, 'puestos'])
     ->name('personal.puestos.info')
-    ->middleware('permission:personal.view');
+    ->middleware('permission:personal.edit');
 
 Route::post('/personal/cursos/bulk', [PersonalController::class, 'assignBulkCourses'])
     ->name('personal.cursos.bulk')
@@ -261,7 +261,7 @@ Route::post('/personal/export/bulk', [PersonalController::class, 'exportBulk'])
 
 Route::post('/personal/departamento/bulk', [PersonalController::class, 'updateBulkDepartamento'])
     ->name('personal.departamento.bulk')
-    ->middleware('permission:personal.edit');
+    ->middleware('permission:personal.bulk');
 
 Route::post('/personal/{personal}/prl-revisado', [PersonalController::class, 'marcarRevisadoPrl'])
     ->name('personal.prl.revisado')
@@ -289,7 +289,7 @@ Route::put('personal/{personal}', [PersonalController::class, 'update'])
 
 Route::delete('personal/{personal}', [PersonalController::class, 'destroy'])
     ->name('personal.destroy')
-    ->middleware('permission:personal.destroy');
+    ->middleware('permission:personal.delete');
 
 Route::post('/personal/{personal}/entregas-epi', [PersonalController::class, 'uploadDocumentosPrl'])
     ->name('personal.entregas_epi.store')

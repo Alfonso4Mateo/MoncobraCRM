@@ -115,12 +115,12 @@
                             
                             <!-- CANDADO PARA EXPORTACIONES MASIVAS -->
                             @can('personal.export')
-                                <button type="submit" name="export" value="csv" class="personal-search-submit personal-btn-csv" title="Descargar listado actual en Excel">
-                                    <i class="fas fa-file-csv"></i> Exportación simple
-                                </button>
-                                <button type="button" disabled class="personal-search-submit personal-btn-pdf" title="Descargar listado actual en PDF">
-                                    <i class="fas fa-file-pdf"></i> PDF (Próximamente)
-                                </button>
+                                <a href="{{ route('personal.tallas', array_merge(request()->query(), ['export' => 'csv'])) }}" class="personal-search-submit personal-btn-csv" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;" title="Descargar resumen y listado en CSV">
+                                    <i class="fas fa-file-csv"></i> Exportar CSV
+                                </a>
+                                <a href="{{ route('personal.tallas', array_merge(request()->query(), ['export' => 'pdf'])) }}" target="_blank" class="personal-search-submit personal-btn-pdf" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;" title="Descargar informe resumen y listado en PDF">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                                </a>
                             @endcan
                         </div>
                     </form>

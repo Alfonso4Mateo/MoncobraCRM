@@ -44,19 +44,15 @@ class PersonalController extends Controller
         $alertaNombre = (string) $request->input('alerta_nombre', 'any');
         $alertaNombre = in_array($alertaNombre, ['any', 'with', 'without'], true) ? $alertaNombre : 'any';
 
-        $buildQuery = function () use ($query, $alertaNombre, $alertaLimite, $user) {
-            $personalQuery = Personal::query()->with([
-                'proyectos',
-                'cursos' => fn ($query) => $query->orderBy('nombre'),
-            ]);
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
 
-            if ($user && $user->role !== 'superadmin') {
-                $misProyectosIds = $user->proyectos->pluck('id')->toArray();
-                
-                $personalQuery->whereHas('proyectos', function ($q) use ($misProyectosIds) {
-                    $q->whereIn('proyectos.id', $misProyectosIds);
-                });
-            }
+        $buildQuery = function () use ($query, $alertaNombre, $alertaLimite, $proyectoActivoId) {
+            $personalQuery = Personal::query()
+                ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoActivoId))
+                ->with([
+                    'proyectos',
+                    'cursos' => fn ($query) => $query->orderBy('nombre'),
+                ]);
 
             if ($query !== '') {
                 $personalQuery->where(function ($subQuery) use ($query) {
@@ -95,7 +91,7 @@ class PersonalController extends Controller
 
         if ($export === 'csv') {
             $this->authorize('personal.export');
-            
+
             $rows = $buildQuery()->get();
 
             return response()->streamDownload(function () use ($rows) {
@@ -110,7 +106,7 @@ class PersonalController extends Controller
                         $row->apellido,
                         $row->dni_nie,
                         $row->telefono,
-                        $row->departamento,
+                        is_array($row->departamento) ? implode(', ', $row->departamento) : $row->departamento,
                         $row->activo ? 'Activo' : 'Inactivo',
                         $row->sin_tallas ? 'Sí' : 'No',
                         $row->proyectos->pluck('nombre')->join(' | '),
@@ -124,7 +120,7 @@ class PersonalController extends Controller
         $personals = $buildQuery()->paginate(12)->withQueryString();
         $personals->getCollection()->transform(function (Personal $personal) use ($alertaLimite) {
             $hoy = \Carbon\Carbon::now()->startOfDay();
-            
+
             if ($personal->proxima_revision_medica) {
                 $prox = \Carbon\Carbon::parse($personal->proxima_revision_medica)->startOfDay();
                 if ($hoy->gt($prox)) {
@@ -137,7 +133,7 @@ class PersonalController extends Controller
             } else {
                 $personal->estado_medico = 'ok';
             }
-            
+
             $personal->alerta_revision_medica = in_array($personal->estado_medico, ['caducada', 'aviso']);
 
             $cursosAptos = $personal->cursos->filter(fn ($curso) => (bool) ($curso->pivot->apto ?? false))->count();
@@ -170,34 +166,37 @@ class PersonalController extends Controller
 
             return $personal;
         });
-        
-        $personalTotalQuery = Personal::query();
-        $personalActivosQuery = Personal::where('activo', true);
-        $avisosCountQuery = Personal::whereNotNull('proxima_revision_medica');
 
-        if ($user && $user->role !== 'superadmin') {
-            $misProyectosIds = $user->proyectos->pluck('id')->toArray();
-            
-            $filtroProyectos = function ($q) use ($misProyectosIds) {
-                $q->whereIn('proyectos.id', $misProyectosIds);
-            };
+        $filtroProyectoActivo = fn ($q) => $q->where('proyectos.id', $proyectoActivoId);
 
-            $personalTotalQuery->whereHas('proyectos', $filtroProyectos);
-            $personalActivosQuery->whereHas('proyectos', $filtroProyectos);
-            $avisosCountQuery->whereHas('proyectos', $filtroProyectos);
-        }
-
-        $personalTotal = $personalTotalQuery->count();
-        $personalActivos = $personalActivosQuery->count();
+        $personalTotal = Personal::whereHas('proyectos', $filtroProyectoActivo)->count();
+        $personalActivos = Personal::where('activo', true)->whereHas('proyectos', $filtroProyectoActivo)->count();
 
         if ($alertaLimite) {
-            $avisosCountQuery->where('proxima_revision_medica', '<=', $alertaLimite);
-            $avisosCount = $avisosCountQuery->count();
+            $avisosCount = Personal::whereNotNull('proxima_revision_medica')
+                ->where('proxima_revision_medica', '<=', $alertaLimite)
+                ->whereHas('proyectos', $filtroProyectoActivo)
+                ->count();
         } else {
             $avisosCount = 0;
         }
 
-        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+        // Cálculo de tallas faltantes filtrado por el proyecto activo
+        $tallasFaltantes = 0;
+        $columnasTallas = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod'];
+        $personalNecesitaEpi = Personal::where('activo', true)
+            ->where('sin_tallas', false)
+            ->whereHas('proyectos', $filtroProyectoActivo)
+            ->get($columnasTallas);
+
+        foreach ($personalNecesitaEpi as $p) {
+            foreach ($columnasTallas as $col) {
+                if (empty($p->{$col})) {
+                    $tallasFaltantes++;
+                }
+            }
+        }
+
         $cursosCatalogo = Curso::whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoActivoId))
             ->orderBy('nombre')
             ->get();
@@ -217,25 +216,37 @@ class PersonalController extends Controller
             'avisosCount' => $avisosCount,
             'personalTotal' => $personalTotal,
             'personalActivos' => $personalActivos,
+            'tallasFaltantes' => $tallasFaltantes,
             'cursosCatalogo' => $cursosCatalogo,
             'departamentos' => $departamentos,
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $this->authorize('personal.create');
 
+        $user = auth()->user();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
         $personal = new Personal(['activo' => true]);
+
+        $proyectos = ($user && $user->role === 'superadmin')
+            ? Proyecto::orderBy('nombre')->get()
+            : ($user?->proyectos()->orderBy('nombre')->get() ?? collect());
+
         $departamentos = Departamento::orderBy('nombre')->get();
-        $puestosTrabajoCatalogo = PuestoTrabajo::where('activo', true)->orderBy('nombre')->get();
+        $puestosTrabajoCatalogo = PuestoTrabajo::where('proyecto_id', $proyectoActivoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
 
         return view('personal.edit', [
             'personal' => $personal,
             'isCreate' => true,
-            'proyectos' => Proyecto::orderBy('nombre')->get(),
-            'departamentos' => $departamentos, 
-            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo
+            'proyectoActivoId' => $proyectoActivoId,
+            'proyectos' => $proyectos,
+            'departamentos' => $departamentos,
+            'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo,
         ]);
     }
 
@@ -248,7 +259,7 @@ class PersonalController extends Controller
         if (!empty($validated['ultima_revision_medica']) && !empty($validated['puesto_trabajo_id'])) {
             $puestoTrabajo = PuestoTrabajo::find($validated['puesto_trabajo_id']);
             $meses = $puestoTrabajo ? ($puestoTrabajo->periodicidad_meses ?? 12) : 12;
-            
+
             $fechaCalculada = \Carbon\Carbon::parse($validated['ultima_revision_medica'])
                 ->addMonths($meses)
                 ->format('Y-m-d');
@@ -268,31 +279,34 @@ class PersonalController extends Controller
             unset($validated['camiseta'], $validated['chaqueta'], $validated['sudadera'], $validated['pantalon'], $validated['calzado'], $validated['casco'], $validated['gafas'], $validated['guantes'], $validated['bolsa_fod'], $validated['sin_tallas']);
         }
 
-        $proyectoIds = $validated['proyecto_ids'] ?? [];
-
         $user = auth()->user();
+        $proyectoActivoId = $this->resolveActiveProyectoId($request);
+        $proyectoIds = array_values(array_filter(array_map('intval', (array) ($validated['proyecto_ids'] ?? []))));
+
         if ($user && $user->role !== 'superadmin') {
-            $proyectoIds = $user->proyectos->pluck('id')->toArray();
+            $misProyectosIds = $user->proyectos->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $proyectoIds = array_values(array_intersect($proyectoIds, $misProyectosIds));
+        }
+
+        if (empty($proyectoIds)) {
+            $proyectoIds = [$proyectoActivoId];
         }
 
         $departamentos = array_values(array_filter((array) $request->input('departamento', [])));
         $validated['departamento'] = $departamentos ?: null;
 
         $validated['activo'] = $request->boolean('activo', true);
-        
+
         if (isset($validated['sin_tallas'])) {
             $validated['sin_tallas'] = $request->boolean('sin_tallas', false);
         }
 
         $personal = Personal::create($validated);
-        
-        if (!empty($proyectoIds)) {
-            $personal->proyectos()->sync($proyectoIds);
-        }
+        $personal->proyectos()->sync($proyectoIds);
 
         $this->aplicarMacroDeCursos($personal);
 
-        return redirect()->route('personal.index')->with('success', 'Trabajador creado y asignado a tu sede correctamente.');
+        return redirect()->route('personal.index')->with('success', 'Trabajador creado y asignado correctamente.');
     }
 
     public function show(Personal $personal, Request $request)
@@ -300,7 +314,7 @@ class PersonalController extends Controller
         abort_unless(auth()->user()->canAny(['personal.view', 'personal.acciones']), 403);
         $this->authorize('view', $personal);
         $this->authorizePersonalProyecto($personal);
-        
+
         $personal->load([
             'proyectos',
             'historialPrl',
@@ -350,7 +364,7 @@ class PersonalController extends Controller
                 });
             });
 
-        // 2. SALIDAS LEGACY (SalidaStock) por si tenía entregas antiguas antes de la migración
+        // 2. SALIDAS LEGACY (SalidaStock)
         $salidasQuery = SalidaStock::query();
         if (Schema::hasColumn((new SalidaStock())->getTable(), 'personal_id')) {
             $salidasQuery->where(function ($query) use ($personal, $nombreNormalizado) {
@@ -411,7 +425,6 @@ class PersonalController extends Controller
                 });
             });
 
-        // Unificamos ambos historiales ordenados del más reciente al más antiguo
         $historicoSalidas = $movimientosKardex
             ->concat($salidasLegacy)
             ->sortByDesc('_timestamp')
@@ -453,18 +466,29 @@ class PersonalController extends Controller
         return $query->whereRaw("LOWER(TRIM({$legacyColumn})) = ?", [$nombreNormalizado]);
     }
 
-    public function edit(Personal $personal)
+    public function edit(Request $request, Personal $personal)
     {
         $this->authorize('personal.edit');
         $this->authorizePersonalProyecto($personal);
 
+        $user = auth()->user();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+
+        $proyectos = ($user && $user->role === 'superadmin')
+            ? Proyecto::orderBy('nombre')->get()
+            : ($user?->proyectos()->orderBy('nombre')->get() ?? collect());
+
         $departamentos = Departamento::orderBy('nombre')->get();
-        $puestosTrabajoCatalogo = PuestoTrabajo::where('activo', true)->orderBy('nombre')->get();
+        $puestosTrabajoCatalogo = PuestoTrabajo::where('proyecto_id', $proyectoActivoId)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
 
         return view('personal.edit', [
             'personal' => $personal,
             'isCreate' => false,
-            'proyectos' => Proyecto::orderBy('nombre')->get(),
+            'proyectoActivoId' => $proyectoActivoId,
+            'proyectos' => $proyectos,
             'departamentos' => $departamentos,
             'puestosTrabajoCatalogo' => $puestosTrabajoCatalogo,
         ]);
@@ -480,7 +504,7 @@ class PersonalController extends Controller
         if (!empty($validated['ultima_revision_medica']) && !empty($validated['puesto_trabajo_id'])) {
             $puestoTrabajo = PuestoTrabajo::find($validated['puesto_trabajo_id']);
             $meses = $puestoTrabajo ? ($puestoTrabajo->periodicidad_meses ?? 12) : 12;
-            
+
             $fechaCalculada = \Carbon\Carbon::parse($validated['ultima_revision_medica'])
                 ->addMonths($meses)
                 ->format('Y-m-d');
@@ -503,24 +527,48 @@ class PersonalController extends Controller
         $proyectoIds = $validated['proyecto_ids'] ?? null;
         unset($validated['proyecto_ids']);
 
+        // Candado obligatorio: no se permite dejar a un trabajador sin ninguna sede asignada
+        if (is_array($proyectoIds)) {
+            $user = auth()->user();
+            $proyectoIdsLimpios = array_values(array_filter(array_map('intval', $proyectoIds)));
+
+            if ($user && $user->role !== 'superadmin') {
+                $misProyectosIds = $user->proyectos->pluck('id')->map(fn ($id) => (int) $id)->all();
+                // Conservamos las sedes del trabajador de otras delegaciones que el usuario actual no gestiona
+                $sedesOtrasDelegaciones = $personal->proyectos()
+                    ->whereNotIn('proyectos.id', $misProyectosIds)
+                    ->pluck('proyectos.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $proyectoIdsLimpios = array_values(array_unique(array_merge(
+                    $sedesOtrasDelegaciones,
+                    array_intersect($proyectoIdsLimpios, $misProyectosIds)
+                )));
+            }
+
+            if (empty($proyectoIdsLimpios)) {
+                return back()
+                    ->withErrors(['proyecto_ids' => 'El trabajador debe permanecer asignado al menos a una sede o proyecto. Selecciona primero la nueva sede antes de quitar la anterior.'])
+                    ->withInput();
+            }
+
+            $personal->proyectos()->sync($proyectoIdsLimpios);
+        }
+
         $departamentos = array_values(array_filter((array) $request->input('departamento', [])));
         $validated['departamento'] = $departamentos ?: null;
 
         if ($request->has('activo')) {
             $validated['activo'] = $request->boolean('activo');
         } else {
-            unset($validated['activo']); 
+            unset($validated['activo']);
         }
-        
+
         if (isset($validated['sin_tallas'])) {
             $validated['sin_tallas'] = $request->boolean('sin_tallas', false);
         }
 
         $personal->update($validated);
-
-        if (is_array($proyectoIds)) {
-            $personal->proyectos()->sync($proyectoIds);
-        }
 
         $this->aplicarMacroDeCursos($personal);
 
@@ -541,21 +589,21 @@ class PersonalController extends Controller
     {
         $this->authorize('personal.edit');
         $this->authorizePersonalProyecto($personal);
-        
+
         $estabaInactivo = !$personal->activo;
-        $personal->activo = !$personal->activo; 
-        
+        $personal->activo = !$personal->activo;
+
         if ($personal->activo && $estabaInactivo) {
             $personal->fecha_reactivacion = now();
-            $personal->prl_revisado = false; 
+            $personal->prl_revisado = false;
         }
-        
+
         $personal->save();
-        
+
         $mensaje = $personal->activo ? 'Trabajador dado de ALTA correctamente.' : 'Trabajador dado de BAJA correctamente.';
         return redirect()->back()->with('success', $mensaje);
     }
-    
+
     public function uploadDocumentosPrl(Request $request, Personal $personal)
     {
         $this->authorize('personal.edit');
@@ -572,12 +620,12 @@ class PersonalController extends Controller
         $path = $request->file('archivo')->store('prl', 'public');
 
         $personal->update([
-            $columnaBaseDatos => $path
+            $columnaBaseDatos => $path,
         ]);
 
         $personal->historialPrl()->create([
             'tipo' => $tipo,
-            'archivo_path' => $path
+            'archivo_path' => $path,
         ]);
 
         return response()->json(['success' => true]);
@@ -597,7 +645,7 @@ class PersonalController extends Controller
         if ($personal->{$columnaBaseDatos}) {
             Storage::disk('public')->delete($personal->{$columnaBaseDatos});
         }
-        
+
         $personal->update([$columnaBaseDatos => null]);
 
         $nombreDoc = $tipo === 'riesgos' ? 'Riesgos' : 'EPIs';
@@ -630,21 +678,23 @@ class PersonalController extends Controller
 
         $query = (string) $request->input('q', '');
         $estado = (string) $request->input('estado', 'todos');
-        $departamentoFiltro = (string) $request->input('departamento', 'todos'); 
-        $export = $request->input('export'); 
-        
+        $departamentoFiltro = (string) $request->input('departamento', 'todos');
+        $export = $request->input('export');
+
         $incluirInactivos = $request->boolean('incluir_inactivos', false);
 
-        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas' , 'bolsa_fod'];
+        $columns = ['camiseta', 'chaqueta', 'sudadera', 'pantalon', 'calzado', 'guantes', 'casco', 'gafas', 'bolsa_fod'];
         $departamentosCatalogo = Departamento::orderBy('nombre')->get();
-        
+
         $user = auth()->user();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
 
         $personals = Personal::query()
+            ->whereHas('proyectos', fn ($subQ) => $subQ->where('proyectos.id', $proyectoActivoId))
             ->when(!$incluirInactivos, function ($q) {
                 $q->where('activo', true);
-        })
-        ->when($user && $user->role !== 'superadmin', function ($q) use ($user) {
+            })
+            ->when($user && $user->role !== 'superadmin', function ($q) use ($user) {
                 $misProyectosIds = $user->proyectos->pluck('id')->toArray();
                 $q->whereHas('proyectos', function ($subQ) use ($misProyectosIds) {
                     $subQ->whereIn('proyectos.id', $misProyectosIds);
@@ -661,16 +711,18 @@ class PersonalController extends Controller
             })
             ->when($estado === 'falta_epi', function ($q) use ($columns) {
                 $q->where('sin_tallas', false)
-                ->where(function ($subQ) use ($columns) {
-                    foreach ($columns as $col) {
-                        $subQ->orWhereNull($col)->orWhere($col, '');
-                    }
-                });
+                    ->where(function ($subQ) use ($columns) {
+                        foreach ($columns as $col) {
+                            $subQ->orWhereNull($col)->orWhere($col, '');
+                        }
+                    });
             })
             ->when($estado === 'sin_departamento', function ($q) {
-                $q->whereNull('departamento')
-                ->orWhere('departamento', '')
-                ->orWhere('departamento', '[]');
+                $q->where(function ($subQ) {
+                    $subQ->whereNull('departamento')
+                        ->orWhere('departamento', '')
+                        ->orWhere('departamento', '[]');
+                });
             })
             ->when($estado === 'sin_oficina', function ($q) {
                 $q->where('sin_tallas', false);
@@ -681,19 +733,50 @@ class PersonalController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Calcular resumen agregado de tallas (excluyendo personal sin_tallas)
+        $personalQueNecesitaTalla = $personals->where('sin_tallas', false);
+        $resumenTallas = [];
+        foreach ($columns as $col) {
+            $values = $personalQueNecesitaTalla->pluck($col)
+                ->filter(fn ($v) => $v !== null && trim((string) $v) !== '');
+            $resumenTallas[$col] = [
+                'label' => $col === 'bolsa_fod' ? 'Bolsa F.O.D.' : ucfirst($col),
+                'counts' => $values->countBy()->sortKeys(),
+                'missing' => $personalQueNecesitaTalla->count() - $values->count(),
+            ];
+        }
+
+        $proyectoActivo = Proyecto::find($proyectoActivoId);
+
         if ($export === 'csv') {
             $this->authorize('personal.export');
 
-            return response()->streamDownload(function () use ($personals, $columns) {
+            return response()->streamDownload(function () use ($personals, $columns, $resumenTallas, $proyectoActivo) {
                 $handle = fopen('php://output', 'w');
-                
                 fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-                
-                $headers = ['ID RRHH', 'Nombre', 'Apellido', 'Departamento'];
-                foreach ($columns as $col) {
-                    $headers[] = ucfirst($col);
+
+                // BLOQUE 1: RESUMEN AGREGADO POR PRENDA Y TALLA
+                fputcsv($handle, ['RESUMEN AGREGADO DE TALLAS', $proyectoActivo ? strtoupper($proyectoActivo->nombre) : 'GENERAL', date('d/m/Y H:i')], ';');
+                fputcsv($handle, ['Prenda / EPI', 'Talla', 'Cantidad (Trabajadores)'], ';');
+
+                foreach ($resumenTallas as $info) {
+                    foreach ($info['counts'] as $talla => $cantidad) {
+                        fputcsv($handle, [$info['label'], $talla, $cantidad], ';');
+                    }
+                    if ($info['missing'] > 0) {
+                        fputcsv($handle, [$info['label'], 'SIN ASIGNAR (Faltan)', $info['missing']], ';');
+                    }
                 }
-                fputcsv($handle, $headers, ';'); 
+
+                fputcsv($handle, [], ';');
+
+                // BLOQUE 2: LISTADO DETALLADO POR TRABAJADOR
+                fputcsv($handle, ['LISTADO DETALLADO POR TRABAJADOR'], ';');
+                $headers = ['ID RRHH', 'Nombre', 'Apellido', 'Departamento', 'Estado'];
+                foreach ($columns as $col) {
+                    $headers[] = $col === 'bolsa_fod' ? 'Bolsa F.O.D.' : ucfirst($col);
+                }
+                fputcsv($handle, $headers, ';');
 
                 foreach ($personals as $p) {
                     $deptos = is_string($p->departamento) ? json_decode($p->departamento, true) ?? explode(',', $p->departamento) : (array) $p->departamento;
@@ -703,7 +786,8 @@ class PersonalController extends Controller
                         $p->id_rrhh ?: '—',
                         $p->name,
                         $p->apellido,
-                        $deptosStr
+                        $deptosStr,
+                        $p->activo ? 'Activo' : 'De Baja',
                     ];
 
                     foreach ($columns as $c) {
@@ -718,7 +802,36 @@ class PersonalController extends Controller
                 }
 
                 fclose($handle);
-            }, 'listado_tallas_epis.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+            }, 'listado_tallas_epis_' . date('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        if ($export === 'pdf') {
+            $this->authorize('personal.export');
+
+            $fileName = 'resumen_tallas_epis_' . date('Y-m-d') . '.pdf';
+            $pdfContent = null;
+
+            if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                $pdfContent = \Barryvdh\DomPDF\Facade\Pdf::loadView('personal.pdf-tallas', compact(
+                    'personals',
+                    'columns',
+                    'resumenTallas',
+                    'proyectoActivo'
+                ))->setPaper('a4', 'landscape')->output();
+            } elseif (class_exists(\Dompdf\Dompdf::class)) {
+                $html = view('personal.pdf-tallas', compact('personals', 'columns', 'resumenTallas', 'proyectoActivo'))->render();
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->setPaper('A4', 'landscape');
+                $dompdf->loadHtml($html);
+                $dompdf->render();
+                $pdfContent = $dompdf->output();
+            }
+
+            if ($pdfContent !== null) {
+                return $this->respondWithPdfBlob($pdfContent, $fileName);
+            }
+
+            return view('personal.pdf-tallas', compact('personals', 'columns', 'resumenTallas', 'proyectoActivo'));
         }
 
         return view('personal.tallas', [
@@ -729,6 +842,45 @@ class PersonalController extends Controller
             'departamentosCatalogo' => $departamentosCatalogo,
             'columns' => $columns,
             'incluirInactivos' => $incluirInactivos,
+            'resumenTallas' => $resumenTallas,
+        ]);
+    }
+
+    /**
+     * Sirve el PDF mediante visor Blob en navegador (evita errores de red/corte en PHP built-in server).
+     */
+    private function respondWithPdfBlob(string $pdfContent, string $fileName)
+    {
+        $payloadJson = json_encode([
+            'mime' => 'application/pdf',
+            'filename' => $fileName,
+            'base64' => base64_encode($pdfContent),
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        $html = '<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>' . e($fileName) . '</title>
+<style>html,body{height:100%;margin:0;background:#202124}embed{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body><div id="visor" style="height:100%"></div>
+<script>
+(function () {
+    const data = ' . $payloadJson . ';
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: data.mime }));
+    const visor = document.getElementById("visor");
+    visor.innerHTML = "<embed type=\"application/pdf\">";
+    visor.firstElementChild.src = blobUrl;
+    window.addEventListener("unload", function () { URL.revokeObjectURL(blobUrl); });
+}());
+</script>
+</body></html>';
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
         ]);
     }
 
@@ -745,11 +897,8 @@ class PersonalController extends Controller
             ],
             'departamento'   => 'nullable|array',
             'departamento.*' => 'string|max:255',
-            
-            'puesto' => 'nullable|string|max:255', 
-            
+            'puesto' => 'nullable|string|max:255',
             'puesto_trabajo_id' => 'nullable|exists:puestos_trabajo,id',
-
             'tipo_personal' => 'nullable|in:indefinido,temporal',
             'camiseta' => 'nullable|string|max:20',
             'chaqueta' => 'nullable|string|max:20',
@@ -769,19 +918,24 @@ class PersonalController extends Controller
             'proxima_graduacion' => 'nullable|date',
             'reconocido_en' => 'nullable|string|max:255',
             'graduado_en' => 'nullable|string|max:255',
-            'proyecto_ids' => 'nullable|array',
+            'proyecto_ids' => 'sometimes|required|array|min:1',
             'proyecto_ids.*' => 'exists:proyectos,id',
             'sin_tallas' => 'boolean',
             'activo' => 'boolean',
             'id_rrhh' => [
                 'nullable',
                 'string',
-                'max:10', 
+                'max:10',
                 Rule::unique('personal', 'id_rrhh')->ignore($ignoreId),
             ],
         ];
 
-        return $request->validate($rules);
+        $messages = [
+            'proyecto_ids.required' => 'El trabajador debe estar asignado al menos a una sede o proyecto.',
+            'proyecto_ids.min' => 'El trabajador debe estar asignado al menos a una sede o proyecto.',
+        ];
+
+        return $request->validate($rules, $messages);
     }
 
     public function assignBulkCourses(Request $request)
@@ -821,18 +975,17 @@ class PersonalController extends Controller
 
             foreach ($personals as $personal) {
                 $personal->cursos()->syncWithoutDetaching([
-                    $validated['curso_id'] => $pivotData
+                    $validated['curso_id'] => $pivotData,
                 ]);
             }
 
             session()->flash('success', 'El curso ha sido asignado correctamente a ' . $personals->count() . ' trabajadores.');
 
             return response()->json(['success' => true]);
-
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
-                'message' => 'Hubo un error al procesar la asignación masiva en el servidor: ' . $e->getMessage()
+                'success' => false,
+                'message' => 'Hubo un error al procesar la asignación masiva en el servidor: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -846,16 +999,21 @@ class PersonalController extends Controller
             'personal_ids.*' => 'exists:personal,id',
         ]);
 
+        $user = auth()->user();
+
         $rows = Personal::with('proyectos')
-                    ->whereIn('id', $validated['personal_ids'])
-                    ->orderBy('name')
-                    ->get();
+            ->whereIn('id', $validated['personal_ids'])
+            ->when($user && $user->role !== 'superadmin', function ($q) use ($user) {
+                $q->whereHas('proyectos', fn ($pq) => $pq->whereIn('proyectos.id', $user->proyectos->pluck('id')));
+            })
+            ->orderBy('name')
+            ->get();
 
         return response()->streamDownload(function () use ($rows) {
             $handle = fopen('php://output', 'w');
-            
+
             fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            
+
             fputcsv($handle, ['ID RRHH', 'Nombre', 'Apellido', 'DNI/NIE', 'Telefono', 'Departamento', 'Puesto', 'Estado', 'Proyectos'], ';');
 
             foreach ($rows as $row) {
@@ -909,11 +1067,10 @@ class PersonalController extends Controller
             session()->flash('success', 'Departamento actualizado correctamente a ' . $personals->count() . ' trabajadores.');
 
             return response()->json(['success' => true]);
-
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
-                'message' => 'Hubo un error al actualizar los departamentos: ' . $e->getMessage()
+                'success' => false,
+                'message' => 'Hubo un error al actualizar los departamentos: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -939,7 +1096,7 @@ class PersonalController extends Controller
                 $syncData[$cursoId] = [
                     'apto' => false,
                     'fecha_realizacion' => null,
-                    'descripcion_aptitud' => 'Asignado automáticamente por matriz formativa.'
+                    'descripcion_aptitud' => 'Asignado automáticamente por matriz formativa.',
                 ];
             }
             $personal->cursos()->attach($syncData);
@@ -952,7 +1109,7 @@ class PersonalController extends Controller
         $this->authorizePersonalProyecto($personal);
 
         $personal->update([
-            'prl_revisado' => true
+            'prl_revisado' => true,
         ]);
 
         return redirect()->back()->with('success', 'Revisión confirmada. El trabajador ya no aparecerá como pendiente.');

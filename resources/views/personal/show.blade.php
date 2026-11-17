@@ -156,6 +156,10 @@
                                     <span>ANTIGÜEDAD</span>
                                     <strong>{{ optional($personal->created_at)->format('d M Y') }}</strong>
                                 </div>
+                                <div>
+                                    <span>SEDES / PROYECTOS</span>
+                                    <strong>{{ $personal->proyectos->isNotEmpty() ? $personal->proyectos->pluck('nombre')->join(', ') : 'Sin sede asignada' }}</strong>
+                                </div>
                             </div>
                         </article>
                     </div>
@@ -200,6 +204,19 @@
                                         <div>
                                             <span>PUESTO</span>
                                             <strong>{{ optional($personal->puestoTrabajo)->nombre ?: '—' }}</strong>
+                                        </div>
+
+                                        <div>
+                                            <span>SEDES / PROYECTOS</span>
+                                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
+                                                @forelse($personal->proyectos as $proy)
+                                                    <span class="profile-chip profile-chip--ok" style="margin: 0; font-size: 0.72rem;">
+                                                        <i class="fas fa-building mr-1"></i> {{ $proy->nombre }}
+                                                    </span>
+                                                @empty
+                                                    <span class="text-muted">Sin proyecto asignado</span>
+                                                @endforelse
+                                            </div>
                                         </div>
 
                                         <div>

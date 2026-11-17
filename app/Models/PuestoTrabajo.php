@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Activity;
 
 /**
@@ -15,16 +16,28 @@ use Spatie\Activitylog\Models\Activity;
 class PuestoTrabajo extends Model
 {
     use Auditable;
+
     protected $table = 'puestos_trabajo';
 
-    protected $fillable = ['nombre', 'periodicidad_meses', 'activo'];
+    protected $fillable = [
+        'proyecto_id',
+        'nombre',
+        'periodicidad_meses',
+        'activo',
+    ];
 
     protected $casts = [
+        'proyecto_id' => 'integer',
         'periodicidad_meses' => 'integer',
         'activo' => 'boolean',
     ];
 
-    public function personal()
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    public function personal(): HasMany
     {
         return $this->hasMany(Personal::class, 'puesto_trabajo_id');
     }

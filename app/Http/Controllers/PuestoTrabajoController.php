@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PuestoTrabajo;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -19,9 +20,40 @@ class PuestoTrabajoController extends Controller
         $this->middleware('auth');
     }
 
+    private function getMisProyectosIds(): ?array
+    {
+        $user = auth()->user();
+        if (!$user || $user->role === 'superadmin') {
+            return null;
+        }
+
+        return $user->proyectos->pluck('id')->all();
+    }
+
+    private function authorizePuestoTrabajoProyecto(PuestoTrabajo $puestoTrabajo): void
+    {
+        $misProyectosIds = $this->getMisProyectosIds();
+        if ($misProyectosIds === null) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $puestoTrabajo->proyecto_id, array_map('intval', $misProyectosIds), true),
+            403,
+            'No tienes acceso a un puesto de trabajo de otra sede.'
+        );
+    }
+
     public function index(): View
     {
-        $puestosTrabajo = PuestoTrabajo::withCount('personal')
+        $this->authorize('personal.edit');
+
+        $proyectoId = $this->resolveProyectoForCorrelativo(request());
+
+        $puestosTrabajo = PuestoTrabajo::where('proyecto_id', $proyectoId)
+            ->withCount([
+                'personal' => fn ($q) => $q->whereHas('proyectos', fn ($pq) => $pq->where('proyectos.id', $proyectoId)),
+            ])
             ->orderBy('nombre')
             ->get();
 
@@ -30,12 +62,22 @@ class PuestoTrabajoController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('personal.edit');
+
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
         $validated = $request->validate([
-            'nombre' => 'required|string|max:255|unique:puestos_trabajo,nombre',
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('puestos_trabajo', 'nombre')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)),
+            ],
             'periodicidad_meses' => 'nullable|integer|min:1|max:120',
         ]);
 
         PuestoTrabajo::create([
+            'proyecto_id' => $proyectoId,
             'nombre' => mb_strtoupper($validated['nombre']),
             'periodicidad_meses' => $validated['periodicidad_meses'] ?? null,
             'activo' => true,
@@ -47,24 +89,34 @@ class PuestoTrabajoController extends Controller
 
     public function update(Request $request, PuestoTrabajo $puestoTrabajo)
     {
+        $this->authorize('personal.edit');
+        $this->authorizePuestoTrabajoProyecto($puestoTrabajo);
+
         $validated = $request->validate([
-            'nombre' => 'required|string|max:255|unique:puestos_trabajo,nombre,' . $puestoTrabajo->id,
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('puestos_trabajo', 'nombre')
+                    ->where(fn ($q) => $q->where('proyecto_id', $puestoTrabajo->proyecto_id))
+                    ->ignore($puestoTrabajo->id),
+            ],
             'periodicidad_meses' => 'nullable|integer|min:1|max:120',
         ]);
 
-        // AQUÍ ESTÁ LA MAGIA: Forzamos la conversión a entero (int)
         $mesesNuevos = isset($validated['periodicidad_meses']) ? (int) $validated['periodicidad_meses'] : null;
         $mesesAnteriores = $puestoTrabajo->periodicidad_meses;
 
-        // Actualizamos el puesto
         $puestoTrabajo->update([
             'nombre' => mb_strtoupper($validated['nombre']),
             'periodicidad_meses' => $mesesNuevos,
         ]);
 
-        // Si cambió la periodicidad y no es nula, propagamos el cambio a los automáticos
-        if ($mesesNuevos && $mesesNuevos !== $mesesAnteriores) {
+        // Si cambió la periodicidad, propagamos a los trabajadores automáticos de esta sede (usando 12 meses si queda en blanco)
+        $mesesEfectivos = $mesesNuevos ?? 12;
+        if ($mesesNuevos !== $mesesAnteriores) {
             $trabajadores = $puestoTrabajo->personal()
+                ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $puestoTrabajo->proyecto_id))
                 ->whereNotNull('ultima_revision_medica')
                 ->where(function ($q) {
                     $q->where('revision_medica_manual', false)
@@ -74,7 +126,7 @@ class PuestoTrabajoController extends Controller
 
             foreach ($trabajadores as $trabajador) {
                 $nuevaProxima = \Carbon\Carbon::parse($trabajador->ultima_revision_medica)
-                    ->addMonths($mesesNuevos) // Ahora ya recibe un número perfecto
+                    ->addMonths($mesesEfectivos)
                     ->format('Y-m-d');
 
                 $trabajador->update([
@@ -89,7 +141,9 @@ class PuestoTrabajoController extends Controller
 
     public function destroy(PuestoTrabajo $puestoTrabajo)
     {
-        // No dejamos borrar un puesto si hay trabajadores usándolo
+        $this->authorize('personal.edit');
+        $this->authorizePuestoTrabajoProyecto($puestoTrabajo);
+
         if ($puestoTrabajo->personal()->exists()) {
             return redirect()->route('personal.puestos-trabajo.index')
                 ->with('error', 'No se puede eliminar: hay trabajadores con este puesto de trabajo asignado.');
