@@ -171,6 +171,7 @@ class PresupuestoController extends Controller
             'archivo_pdf' => [$archivoPdfRule, 'file', 'mimes:pdf', 'max:10240'],
             'lista_articulos' => 'nullable|json',
             'descripcion_general' => 'nullable|string|max:5000',
+            'con_portada' => 'nullable|boolean'
         ]);
 
         $lineasFiltradas = $this->lineNormalizer->filter($validated['lista_articulos'] ?? '[]');
@@ -189,9 +190,9 @@ class PresupuestoController extends Controller
             $validated['lista_articulos'] = null;
         }
 
-        $validated['total'] = round((float) collect($validated['lista_articulos'] ?? [])
-            ->sum(fn (array $item) => (float) ($item['total'] ?? 0)), 2);
+        $validated['total'] = $this->lineNormalizer->sumLinesTotal($validated['lista_articulos'] ?? []);
         $validated['estado'] = 'pendiente';
+        $validated['con_portada'] = $request->boolean('con_portada');
 
         // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK (Double Submit) ---
         // Buscamos si existe un presupuesto idéntico creado hace menos de 10 segundos
@@ -272,7 +273,6 @@ class PresupuestoController extends Controller
 
             return $presupuesto;
         });
-        // --- FIN DE LA TRANSACCIÓN ---
 
         // Generar y guardar copia en PDF (solo si no subió uno manual en modo carga)
         if (!$request->hasFile('archivo_pdf')) {
@@ -513,12 +513,6 @@ class PresupuestoController extends Controller
             abort(404);
         }
 
-        // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK EN ACTUALIZAR ---
-        // Si el usuario hace doble clic, omitimos el segundo para no colapsar la BBDD haciendo el PDF 2 veces.
-        if ($presupuesto->updated_at && $presupuesto->updated_at->diffInSeconds(now()) < 5) {
-            return redirect()->route('presupuestos.show', $presupuesto)->with('success', 'Presupuesto actualizado correctamente');
-        }
-
         $user = $request->user();
 
         // Reglas base
@@ -529,6 +523,7 @@ class PresupuestoController extends Controller
             'descripcion_general' => 'nullable|string|max:5000', // <--- NUEVO CAMPO AÑADIDO
             'solicitante' => 'nullable|string|max:255', 
             'destinatario' => 'nullable|string|max:255', 
+            'con_portada' => 'nullable|boolean',
         ];
 
         // Añadimos validación estricta para todos
@@ -564,9 +559,7 @@ class PresupuestoController extends Controller
 
         $articulosNormalizados = $this->lineNormalizer->normalize($lineasFiltradas);
 
-        $totalComputed = collect($articulosNormalizados)->sum(function (array $item) {
-            return (float) ($item['total'] ?? 0);
-        });
+        $totalComputed = $this->lineNormalizer->sumLinesTotal($articulosNormalizados);
 
         // Unir la fecha seleccionada con la hora, minutos y segundos actuales del sistema
         $validated['fecha'] = \Carbon\Carbon::parse($validated['fecha'])
@@ -588,6 +581,7 @@ class PresupuestoController extends Controller
             'cliente_id' => $validated['cliente_id'],
             'titulo' => $validated['titulo'] ?? null,
             'ot' => $validated['ot'] ?? null,
+            'con_portada' => $request->boolean('con_portada'),
         ];
 
         // Lanzamos la actualización del registro
@@ -966,33 +960,34 @@ class PresupuestoController extends Controller
         if ((int) $presupuesto->proyecto_id !== $proyectoId) {
             abort(404);
         }
+
         $clientes = Cliente::where('proyecto_id', $proyectoId)->orderBy('empresa_nombre')->get();
 
-        // 1. Encontrar al Padre Original de esta familia
+        // 1. Encontrar al Padre Original de esta familia (incluyendo papelera por seguridad)
         $raizId = $presupuesto->parent_id ?? $presupuesto->id;
-        $padreOriginal = Presupuesto::where('proyecto_id', $proyectoId)->find($raizId);
+        $padreOriginal = Presupuesto::withTrashed()
+            ->where('proyecto_id', $proyectoId)
+            ->find($raizId) ?? $presupuesto;
 
-        // 2. Extraer la raíz del número (ej: Aibus28-0002)
-        // CAMBIO EXPERTO: Usamos preg_split para que corte la raíz tanto si el padre 
-        // tiene el formato antiguo (-Revision-) como el nuevo ( Rev-)
-        $numeroBase = preg_split('/(-Revision-| Rev-)/', $padreOriginal->numero)[0];
+        // 2. Extraer la raíz del número (ej: PR2026-0002)
+        $numeroBase = preg_split('/(-Revision-| Rev-)/', (string) $padreOriginal->numero)[0];
 
         // 3. Traer TODOS los números de esta familia (Padre + Hijos)
-        $numerosFamilia = Presupuesto::where('proyecto_id', $proyectoId)
+        $numerosFamilia = Presupuesto::withTrashed()
+            ->where('proyecto_id', $proyectoId)
             ->where(function ($query) use ($raizId) {
-            $query->where('id', $raizId)
-                  ->orWhere('parent_id', $raizId);
-        })->pluck('numero');
+                $query->where('id', $raizId)
+                      ->orWhere('parent_id', $raizId);
+            })
+            ->pluck('numero');
 
         // 4. Analizar los números para encontrar la revisión más alta actual
         $maxRevision = 0;
-        // CAMBIO EXPERTO: El patrón regex ahora busca ambos formatos "(?:-Revision-| Rev-)"
-        // Así nos aseguramos de que el contador no se reinicie si clonas un presupuesto viejo.
         $regex = '/' . preg_quote($numeroBase, '/') . '(?:-Revision-| Rev-)(\d+)/';
 
         foreach ($numerosFamilia as $num) {
             if ($num && preg_match($regex, $num, $matches)) {
-                $revNum = (int)$matches[1];
+                $revNum = (int) $matches[1];
                 if ($revNum > $maxRevision) {
                     $maxRevision = $revNum;
                 }
@@ -1001,19 +996,20 @@ class PresupuestoController extends Controller
 
         // 5. Asignar el siguiente número
         $siguienteRevision = $maxRevision + 1;
-        // CAMBIO ESTÉTICO: Aquí generamos el formato que querías
         $nuevoNumero = $numeroBase . ' Rev-' . $siguienteRevision;
 
-        // 6. Clonar y limpiar el título
+        // 6. Clonar y preparar datos de la nueva revisión
         $nuevaRevision = $presupuesto->replicate();
-        
+
         $tituloBase = str_replace(' - Revisión', '', $presupuesto->titulo ?? '');
         $nuevaRevision->titulo = $tituloBase ? $tituloBase . ' - Revisión' : 'Revisión';
-        
+        $nuevaRevision->con_portada = (bool) ($presupuesto->con_portada ?? false);
+        $nuevaRevision->archivo_pdf = null;
         $nuevaRevision->parent_id = $raizId;
         $nuevaRevision->fecha = now()->toDateString();
-        $nuevaRevision->estado = 'pendiente'; 
+        $nuevaRevision->estado = 'pendiente';
         $nuevaRevision->numero = $nuevoNumero;
+
         $centrosCoste = CentroCoste::orderBy('codigo')->get();
 
         return view('presupuestos.create', [
@@ -1023,7 +1019,7 @@ class PresupuestoController extends Controller
             'volverACliente' => false,
             'modo' => 'revision',
             'siguienteNumero' => $nuevoNumero,
-            'centrosCoste' => $centrosCoste
+            'centrosCoste' => $centrosCoste,
         ]);
     }
 }

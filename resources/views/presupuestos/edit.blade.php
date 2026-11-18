@@ -69,9 +69,36 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="field-group field-span-3">
-                                <label for="titulo">Título</label>
-                                <input type="text" id="titulo" name="titulo" value="{{ old('titulo', $presupuesto->titulo) }}">
+                            @php
+                                $tienePortada = (bool) old('con_portada', $presupuesto->con_portada ?? false);
+                            @endphp
+
+                            <div class="field-group field-full">
+                                <label for="titulo">Título del presupuesto</label>
+                                <input type="text"
+                                    id="titulo"
+                                    name="titulo"
+                                    value="{{ old('titulo', $presupuesto->titulo ?? '') }}"
+                                    placeholder="Ej: Suministro Equipos Informáticos para IT"
+                                    class="@error('titulo') is-invalid @enderror"
+                                    maxlength="255">
+
+                                <div class="mt-2">
+                                    <input type="hidden" name="con_portada" id="input_con_portada" value="{{ $tienePortada ? '1' : '0' }}">
+                                    <button type="button"
+                                            id="btn_toggle_portada"
+                                            class="btn btn-sm {{ $tienePortada ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                            style="font-weight: 700; border-radius: 6px; padding: 6px 14px;"
+                                            onclick="window.togglePortadaPresupuesto()">
+                                        <i class="fas {{ $tienePortada ? 'fa-check-square' : 'fa-file-image' }} mr-1" id="icon_toggle_portada"></i>
+                                        <span id="text_toggle_portada">
+                                            {{ $tienePortada ? 'Portada activada (se incluirá como página 1)' : 'Generar portada' }}
+                                        </span>
+                                    </button>
+                                    <small class="form-text text-muted" id="help_toggle_portada" style="{{ $tienePortada ? '' : 'display:none;' }}">
+                                        El <strong>Título</strong> aparecerá centrado en la portada junto al cliente y el nº de presupuesto.
+                                    </small>
+                                </div>
                             </div>
                             <div class="field-group">
                                 <label for="ot">CC (Centro de Coste)</label>
@@ -578,6 +605,35 @@
                     }
                 });
             }
+
+            window.togglePortadaPresupuesto = function () {
+                const input = document.getElementById('input_con_portada');
+                const btn = document.getElementById('btn_toggle_portada');
+                const icon = document.getElementById('icon_toggle_portada');
+                const text = document.getElementById('text_toggle_portada');
+                const help = document.getElementById('help_toggle_portada');
+                const tituloInput = document.getElementById('titulo');
+                const activo = input.value === '1';
+
+                if (activo) {
+                    input.value = '0';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-secondary');
+                    icon.className = 'fas fa-file-image mr-1';
+                    text.textContent = 'Generar portada';
+                    help.style.display = 'none';
+                } else {
+                    input.value = '1';
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('btn-primary');
+                    icon.className = 'fas fa-check-square mr-1';
+                    text.textContent = 'Portada activada (se incluirá como página 1)';
+                    help.style.display = 'block';
+                    if (tituloInput && tituloInput.value.trim() === '') {
+                        tituloInput.focus();
+                    }
+                }
+            };
         })();
     </script>
 @endsection

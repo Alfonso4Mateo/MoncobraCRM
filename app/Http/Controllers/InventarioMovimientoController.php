@@ -7,6 +7,7 @@ use App\Models\Personal;
 use App\Services\InventarioStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Throwable;
 
 class InventarioMovimientoController extends Controller
@@ -27,7 +28,6 @@ class InventarioMovimientoController extends Controller
         $clases = $movimiento->obtenerClasesInvolucradasAuditoria();
         $totalUnidades = (int) $movimiento->lineas()->sum('cantidad');
 
-        // Buscamos el log recién creado por el trait LogsActivity para este movimiento
         $ultimoLog = \Spatie\Activitylog\Models\Activity::query()
             ->where('subject_type', InventarioMovimiento::class)
             ->where('subject_id', $movimiento->id)
@@ -47,18 +47,28 @@ class InventarioMovimientoController extends Controller
 
     public function storeEntrada(Request $request): RedirectResponse
     {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
         $validated = $request->validate([
-            'almacen_destino_id' => 'required|integer|exists:almacenes,id',
+            'almacen_destino_id' => [
+                'required',
+                'integer',
+                Rule::exists('almacenes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
             'documento_referencia' => 'nullable|string|max:100',
             'observaciones' => 'nullable|string|max:500',
             'lineas' => 'required|array|min:1',
-            'lineas.*.variante_id' => 'required|integer|exists:inventario_variantes,id',
+            'lineas.*.variante_id' => [
+                'required',
+                'integer',
+                Rule::exists('inventario_variantes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
             'lineas.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        return $this->execute(function () use ($request, $validated) {
+        return $this->execute(function () use ($proyectoId, $validated) {
             return $this->stockService->entrada([
-                'proyecto_id' => $this->resolveActiveProyectoId($request),
+                'proyecto_id' => $proyectoId,
                 'almacen_destino_id' => (int) $validated['almacen_destino_id'],
                 'lineas' => $validated['lineas'],
                 'documento_referencia' => $validated['documento_referencia'] ?? null,
@@ -70,20 +80,41 @@ class InventarioMovimientoController extends Controller
 
     public function storeSalida(Request $request): RedirectResponse
     {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
         $validated = $request->validate([
-            'almacen_origen_id' => 'required|integer|exists:almacenes,id',
-            'personal_id' => 'nullable|integer|exists:' . Personal::class . ',id',
+            'almacen_origen_id' => [
+                'required',
+                'integer',
+                Rule::exists('almacenes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
+            'personal_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('personal', 'id'),
+            ],
             'ot' => 'nullable|string|max:100',
             'documento_referencia' => 'nullable|string|max:150',
             'observaciones' => 'nullable|string|max:1000',
             'lineas' => 'required|array|min:1',
-            'lineas.*.variante_id' => 'required|integer|exists:inventario_variantes,id',
+            'lineas.*.variante_id' => [
+                'required',
+                'integer',
+                Rule::exists('inventario_variantes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
             'lineas.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        try {
-            $proyectoId = $this->resolveActiveProyectoId($request);
+        if (!empty($validated['personal_id'])) {
+            $perteneceSede = Personal::where('id', (int) $validated['personal_id'])
+                ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoId))
+                ->exists();
+            if (!$perteneceSede) {
+                return back()->withInput()->with('error', 'El trabajador seleccionado no pertenece a la sede activa.');
+            }
+        }
 
+        try {
             $payload = [
                 'proyecto_id' => $proyectoId,
                 'almacen_origen_id' => (int) $validated['almacen_origen_id'],
@@ -121,19 +152,34 @@ class InventarioMovimientoController extends Controller
 
     public function storeTraslado(Request $request): RedirectResponse
     {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
         $validated = $request->validate([
-            'almacen_origen_id' => 'required|integer|exists:almacenes,id',
-            'almacen_destino_id' => 'required|integer|exists:almacenes,id|different:almacen_origen_id',
+            'almacen_origen_id' => [
+                'required',
+                'integer',
+                Rule::exists('almacenes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
+            'almacen_destino_id' => [
+                'required',
+                'integer',
+                'different:almacen_origen_id',
+                Rule::exists('almacenes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
             'documento_referencia' => 'nullable|string|max:100',
             'observaciones' => 'nullable|string|max:500',
             'lineas' => 'required|array|min:1',
-            'lineas.*.variante_id' => 'required|integer|exists:inventario_variantes,id',
+            'lineas.*.variante_id' => [
+                'required',
+                'integer',
+                Rule::exists('inventario_variantes', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true)),
+            ],
             'lineas.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        return $this->execute(function () use ($request, $validated) {
+        return $this->execute(function () use ($proyectoId, $validated) {
             return $this->stockService->traslado([
-                'proyecto_id' => $this->resolveActiveProyectoId($request),
+                'proyecto_id' => $proyectoId,
                 'almacen_origen_id' => (int) $validated['almacen_origen_id'],
                 'almacen_destino_id' => (int) $validated['almacen_destino_id'],
                 'lineas' => $validated['lineas'],
@@ -146,6 +192,10 @@ class InventarioMovimientoController extends Controller
 
     public function revertir(Request $request, InventarioMovimiento $movimiento): RedirectResponse
     {
+        abort_unless(in_array($request->user()?->role, ['admin', 'superadmin'], true), 403);
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        abort_unless((int) $movimiento->proyecto_id === $proyectoId, 404);
+
         return $this->execute(function () use ($movimiento) {
             $this->stockService->revertir($movimiento);
         }, 'Movimiento revertido correctamente y stock actualizado.');

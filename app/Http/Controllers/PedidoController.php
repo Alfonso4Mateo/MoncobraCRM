@@ -9,6 +9,7 @@ use App\Models\Cliente;
 use App\Models\LineaBolsa;
 use App\Models\PedidoCliente;
 use App\Models\Presupuesto;
+use App\Services\DocumentLineNormalizer;
 use App\Services\LineaBolsaService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -17,7 +18,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Str;
 
 class PedidoController extends Controller
 {
@@ -441,7 +441,9 @@ class PedidoController extends Controller
             'id_cliente' => [
                 'required',
                 'integer',
-                'exists:clientes,id',
+                Rule::exists('clientes', 'id')->where(fn ($query) => $query
+                    ->where('proyecto_id', $proyectoId)
+                    ->whereNull('deleted_at')),
             ],
             'ot' => 'nullable|string|max:100',
             'presupuesto_id' => [
@@ -518,15 +520,16 @@ class PedidoController extends Controller
         } else {
             $this->validateLineasPayload($lineasFiltradas);
 
-            $normalizer = new \App\Services\DocumentLineNormalizer();
+            $normalizer = new DocumentLineNormalizer();
 
             $lineas = array_map(function (array $l) {
+                $l['medida'] = $l['medida'] ?? 'und';
                 $l['medida'] = $l['medida'] ?: 'und';
                 $l['unidad'] = $l['medida'];
                 return $l;
-            }, $normalizer->normalize($lineasFiltradas));
+            }, $normalizer->normalize($lineasFiltradas, false, true, false));
 
-            $total = (float) collect($lineas)->sum('total');
+            $total = $normalizer->sumLinesTotal($lineas);
         }
 
         // --- ESCUDO DE SEGURIDAD LÍMITE DE BOLSA ---
@@ -836,8 +839,7 @@ class PedidoController extends Controller
     {
         $this->authorize('pedidos.view');
 
-        $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
-        $proyectoId = $sessionProyectoId > 0 ? $sessionProyectoId : (int) ($pedidoCliente->proyecto_id ?? 0);
+        $proyectoId = $this->resolveActiveProyectoId(request());
 
         if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
             abort(404);
@@ -1055,7 +1057,9 @@ class PedidoController extends Controller
             'id_cliente' => [
                 'required',
                 'integer',
-                'exists:clientes,id',
+                Rule::exists('clientes', 'id')->where(fn ($query) => $query
+                    ->where('proyecto_id', $proyectoId)
+                    ->whereNull('deleted_at')),
             ],
             'ot' => 'nullable|string|max:100',
             'presupuesto_id' => [
@@ -1124,35 +1128,15 @@ class PedidoController extends Controller
         } else {
             $this->validateLineasPayload($lineasFiltradas);
 
-            $lineas = collect($lineasFiltradas)
-                ->map(function (array $linea, int $index) {
-                    $modoConsumo = ($linea['modo_consumo'] ?? 'cantidad') === 'importe' ? 'importe' : 'cantidad';
-                    $cantidad = $modoConsumo === 'importe' ? 1.0 : max(0, (float) ($linea['cantidad'] ?? 0));
-                    $precioUnitario = max(0, (float) ($linea['precio_unitario'] ?? ($linea['precio'] ?? 0)));
-                    $margen = max(0, (float) ($linea['margen'] ?? 0));
-                    $totalLinea = $cantidad * $precioUnitario * (1 + ($margen / 100));
-                    $medida = trim((string) ($linea['medida'] ?? ($linea['unidad'] ?? '')));
-                    $medida = $medida !== '' ? $medida : 'und';
-                    $articuloOriginal = trim((string) ($linea['articulo'] ?? ''));
-                    $articuloFinal = $articuloOriginal === '' ? (string) ($index + 1) : $articuloOriginal;
-                    $uid = $linea['uid'] ?? (string) Str::uuid();
+            $normalizer = new DocumentLineNormalizer();
+            $lineas = array_map(function (array $l) {
+                $l['medida'] = $l['medida'] ?? 'und';
+                $l['medida'] = $l['medida'] ?: 'und';
+                $l['unidad'] = $l['medida'];
+                return $l;
+            }, $normalizer->normalize($lineasFiltradas, false, true, true));
 
-                    return [
-                        'uid' => $uid,
-                        'modo_consumo' => $modoConsumo,
-                        'articulo' => $articuloFinal,
-                        'descripcion' => trim((string) ($linea['descripcion'] ?? '')),
-                        'cantidad' => round($cantidad, 2),
-                        'medida' => $medida,
-                        'precio_unitario' => round($precioUnitario, 2),
-                        'margen' => round($margen, 2),
-                        'total' => round($totalLinea, 2),
-                    ];
-                })
-                ->values()
-                ->all();
-
-            $total = (float) collect($lineas)->sum('total');
+            $total = $normalizer->sumLinesTotal($lineas);
         }
 
         if ($bolsa && $bolsaGlobalId) {
@@ -1189,14 +1173,17 @@ class PedidoController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($pedidoCliente, $validated, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $esPartidaAbierta, $archivoPdf) {
+            DB::transaction(function () use ($pedidoCliente, $validated, $proyectoId, $presupuestoId, $antiguoPresupuestoId, $total, $lineas, $bolsa, $bolsaGlobalId, $lineasFiltradas, $esPartidaAbierta, $archivoPdf) {
 
                 if ($antiguoPresupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
-                    Presupuesto::where('id', $antiguoPresupuestoId)->update(['estado' => 'pendiente']);
+                    Presupuesto::where('proyecto_id', $proyectoId)
+                        ->where('id', $antiguoPresupuestoId)
+                        ->update(['estado' => 'pendiente']);
                 }
 
                 if ($presupuestoId && $antiguoPresupuestoId !== $presupuestoId) {
                     $pedidoExistente = PedidoCliente::query()
+                        ->where('proyecto_id', $proyectoId)
                         ->where('presupuesto_id', $presupuestoId)
                         ->where('id', '!=', $pedidoCliente->id)
                         ->first();
@@ -1207,7 +1194,9 @@ class PedidoController extends Controller
                         ]);
                     }
 
-                    Presupuesto::where('id', $presupuestoId)->update(['estado' => 'aceptado']);
+                    Presupuesto::where('proyecto_id', $proyectoId)
+                        ->where('id', $presupuestoId)
+                        ->update(['estado' => 'aceptado']);
                 }
 
                 // Generar la fecha combinada con la precisión horaria exacta de España
@@ -1236,6 +1225,10 @@ class PedidoController extends Controller
                     (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, []);
                 } elseif ($bolsa && !empty($lineasFiltradas)) {
                     (new LineaBolsaService())->sincronizarLineasDePartida($pedidoCliente, $lineas);
+                }
+
+                if (!$bolsa && !empty($lineas)) {
+                    $this->syncArticulosFromLineas($proyectoId, $lineas);
                 }
             });
         } catch (\Throwable $e) {
@@ -1432,8 +1425,8 @@ class PedidoController extends Controller
     {
         $this->authorize('pedidos.view');
 
-        $sessionProyectoId = (int) request()->session()->get('active_proyecto_id');
-        if ($sessionProyectoId > 0 && (int) $pedidoCliente->proyecto_id !== $sessionProyectoId) {
+        $proyectoId = $this->resolveActiveProyectoId($request);
+        if ($pedidoCliente->proyecto_id && (int) $pedidoCliente->proyecto_id !== $proyectoId) {
             abort(404);
         }
 
@@ -1547,6 +1540,11 @@ class PedidoController extends Controller
     public function actualizarDescripcion(Request $request, PedidoCliente $pedidoCliente)
     {
         $this->authorize('pedidos.manage');
+        $proyectoId = $this->resolveActiveProyectoId($request);
+
+        if ((int) $pedidoCliente->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         // 1. Validamos que nos llegue la descripción y el índice (la posición de la línea)
         $request->validate([

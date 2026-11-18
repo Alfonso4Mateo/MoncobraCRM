@@ -1,6 +1,17 @@
 @extends('adminlte::page')
 
-@section('title', 'Documento de Salida EPI - MoncobraCRM')
+@php
+    $delegacion = $documento['delegacion'] ?? '';
+    $delegacion = $delegacion !== '' ? $delegacion : ($delegacionPrefill ?? '');
+    $fecha = $documento['fecha'] ?? ($salida->fecha?->format('d/m/Y') ?? '');
+    $trabajador = $documento['trabajador'] ?? ($salida->solicitante ?? '');
+    $ficha = $documento['ficha'] ?? '';
+    $observaciones = $documento['observaciones'] ?? '';
+    $totalFilas = max(14, count($lineasDocumento ?? []));
+    $tituloDocumentoPdf = trim('Entrega EPI ' . ($salida->numero_salida ?? '') . ($trabajador !== '' ? ' - ' . $trabajador : ''));
+@endphp
+
+@section('title', $tituloDocumentoPdf)
 
 @section('css')
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -182,6 +193,9 @@
             table-layout: fixed;
             flex-grow: 1;
         }
+        .a4-table thead {
+            display: table-header-group;
+        }
         .a4-table thead th {
             background: #f1f5f9;
             color: #0f2747;
@@ -199,6 +213,10 @@
         .a4-table thead th:last-child {
             width: 42%;
         }
+        .a4-table tbody tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
         .a4-table tbody td {
             border: 1px solid #475569;
             padding: 8px 12px;
@@ -207,6 +225,8 @@
             font-size: 0.9rem;
             font-weight: 600;
             color: #0f172a;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .a4-table tbody td.td-qty {
             text-align: center;
@@ -242,6 +262,8 @@
         /* 5. Nota legal y Firmas al pie */
         .a4-footer-block {
             margin-top: 4px;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
         .a4-legal {
             font-size: 0.74rem;
@@ -264,48 +286,68 @@
             color: #0f2747;
         }
 
-        /* Reglas de Impresión A4 */
+        /* Reglas de Impresión A4: anula el min-width: 992px de Bootstrap 4 */
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 10mm;
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-sizing: border-box;
             }
-            body, .wrapper, .content-wrapper, .erp-doc-viewer {
+            html,
+            body,
+            .wrapper,
+            .content-wrapper,
+            body.sidebar-mini .content-wrapper,
+            body.sidebar-mini.sidebar-collapse .content-wrapper,
+            .content,
+            .container,
+            .container-fluid,
+            .erp-doc-viewer {
+                display: block !important;
+                min-width: 0 !important;
+                max-width: 210mm !important;
+                width: 210mm !important;
+                min-height: 0 !important;
                 background: #ffffff !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                overflow: visible !important;
             }
-            .no-print, .main-header, .main-sidebar, .main-footer, .erp-doc-toolbar {
+            .no-print,
+            .main-header,
+            .main-sidebar,
+            .main-footer,
+            .control-sidebar,
+            .erp-doc-toolbar {
                 display: none !important;
             }
             .a4-sheet {
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
                 box-shadow: none !important;
                 border: none !important;
-                max-width: 100% !important;
-                width: 100% !important;
-                min-height: 275mm !important;
-                padding: 0 !important;
+                min-width: 0 !important;
+                max-width: 210mm !important;
+                width: 210mm !important;
+                height: {{ count($lineasDocumento ?? []) > 14 ? 'auto' : '297mm' }} !important;
+                min-height: 297mm !important;
+                margin: 0 !important;
+                padding: 12mm 14mm 14mm !important;
             }
             .a4-table thead th {
                 background: #f1f5f9 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
             }
         }
     </style>
 @endsection
 
 @section('content')
-    @php
-        $delegacion = $documento['delegacion'] ?? '';
-        $delegacion = $delegacion !== '' ? $delegacion : ($delegacionPrefill ?? '');
-        $fecha = $documento['fecha'] ?? ($salida->fecha?->format('d/m/Y') ?? '');
-        $trabajador = $documento['trabajador'] ?? ($salida->solicitante ?? '');
-        $ficha = $documento['ficha'] ?? '';
-        $observaciones = $documento['observaciones'] ?? '';
-        $totalFilas = max(14, count($lineasDocumento ?? []));
-    @endphp
-
     <section class="erp-doc-viewer">
         {{-- BARRA SUPERIOR DE ACCIONES --}}
         <header class="erp-doc-toolbar no-print">

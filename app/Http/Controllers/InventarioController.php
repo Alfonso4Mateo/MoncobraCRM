@@ -16,6 +16,7 @@ use App\Services\InventarioStockService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class InventarioController extends Controller
 {
@@ -109,11 +110,15 @@ class InventarioController extends Controller
                     if ($stockVariante <= $criticoMin) {
                         $estadoVar = 'critico';
                         $estadoVarTexto = 'Crítico';
-                        if ($stockVariante > 0) $hijosCriticos++;
+                        if ($stockVariante > 0) {
+                            $hijosCriticos++;
+                        }
                     } elseif ($stockVariante <= $stockMin) {
                         $estadoVar = 'bajo';
                         $estadoVarTexto = 'Reposición';
-                        if ($stockVariante > 0) $hijosReposicion++;
+                        if ($stockVariante > 0) {
+                            $hijosReposicion++;
+                        }
                     } else {
                         $estadoVar = 'optimo';
                         $estadoVarTexto = 'Óptimo';
@@ -124,9 +129,9 @@ class InventarioController extends Controller
                     })->join(', ');
 
                     $atributosChips = collect($variante->atributos ?? [])
-                        ->map(function ($valores,$tipo) {
-                            $valStr = is_array($valores) ? implode(', ', $valores) : (string)$valores;
-                            return trim($tipo . ': ' .$valStr);
+                        ->map(function ($valores, $tipo) {
+                            $valStr = is_array($valores) ? implode(', ', $valores) : (string) $valores;
+                            return trim($tipo . ': ' . $valStr);
                         })
                         ->filter()
                         ->values()
@@ -211,20 +216,23 @@ class InventarioController extends Controller
             ->whereHas('variante', fn ($q) => $q->where('activo', true))
             ->sum('cantidad');
 
-        $nivelCritico = InventarioVariante::query()
-            ->whereHas('articulo', fn ($q) => $q->where('proyecto_id', $proyectoId))
+        $variantesActivasProyecto = InventarioVariante::query()
+            ->whereHas('articulo', fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true))
             ->where('activo', true)
             ->withSum('stockAlmacenes as stock_calculado', 'cantidad')
-            ->get()
+            ->get();
+
+        $nivelCritico = $variantesActivasProyecto
             ->filter(fn ($v) => (int) ($v->stock_calculado ?? 0) <= (int) ($v->nivel_critico ?? 0))
             ->count();
 
-        $stockBajo = InventarioVariante::query()
-            ->whereHas('articulo', fn ($q) => $q->where('proyecto_id', $proyectoId))
-            ->where('activo', true)
-            ->withSum('stockAlmacenes as stock_calculado', 'cantidad')
-            ->get()
-            ->filter(fn ($v) => (int) ($v->stock_calculado ?? 0) <= (int) ($v->stock_minimo ?? 0))
+        $stockBajo = $variantesActivasProyecto
+            ->filter(function ($v) {
+                $stock = (int) ($v->stock_calculado ?? 0);
+                $min = (int) ($v->stock_minimo ?? 0);
+                $crit = (int) ($v->nivel_critico ?? 0);
+                return $stock > $crit && $stock <= $min;
+            })
             ->count();
 
         $movimientosRecientes = InventarioMovimiento::query()
@@ -377,7 +385,9 @@ class InventarioController extends Controller
                         $valores = is_array($valor) ? $valor : [$valor];
                         foreach ($valores as $valorItem) {
                             $valorItem = trim((string) $valorItem);
-                            if ($valorItem === '') continue;
+                            if ($valorItem === '') {
+                                continue;
+                            }
                             $valoresIniciales[$tipo][] = $valorItem;
                         }
                     }
@@ -435,33 +445,32 @@ class InventarioController extends Controller
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'codigo']);
 
-    $variantesConStock = InventarioStockAlmacen::query()
+        $variantesConStock = InventarioStockAlmacen::query()
             ->whereHas('almacen', fn ($q) => $q->where('proyecto_id', $proyectoId)->where('activo', true))
             ->whereHas('variante', fn ($q) => $q->where('activo', true))
             ->where('cantidad', '>', 0)
             ->with(['variante.articulo.clase', 'almacen'])
             ->get();
 
-        $trabajadoresQuery = Personal::query()
+        // Filtrar trabajadores estrictamente por la sede activa
+        $trabajadores = Personal::query()
             ->where('activo', true)
+            ->whereHas('proyectos', fn ($query) => $query->where('proyectos.id', $proyectoId))
             ->orderBy('name')
-            ->orderBy('apellido');
-
-        if (auth()->user()?->role !== 'superadmin') {
-            $proyectoIds = auth()->user()?->proyectos()->pluck('proyectos.id') ?? collect();
-            $trabajadoresQuery->whereHas('proyectos', fn ($query) => $query->whereIn('proyectos.id', $proyectoIds));
-        }
-
-        $trabajadores = $trabajadoresQuery->get([
-            'id', 'name', 'apellido', 'dni_nie', 'id_rrhh', 'puesto', 'camiseta', 'sudadera',
-            'chaqueta', 'pantalon', 'calzado', 'casco', 'guantes', 'gafas', 'bolsa_fod', 'sin_tallas',
-        ]);
+            ->orderBy('apellido')
+            ->get([
+                'id', 'name', 'apellido', 'dni_nie', 'id_rrhh', 'puesto', 'camiseta', 'sudadera',
+                'chaqueta', 'pantalon', 'calzado', 'casco', 'guantes', 'gafas', 'bolsa_fod', 'sin_tallas',
+            ]);
 
         $solicitantePrefill = null;
         if ($personalId > 0) {
-            $persona = Personal::find($personalId);
+            $persona = Personal::whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoId))
+                ->find($personalId);
             if ($persona) {
                 $solicitantePrefill = trim("{$persona->name} {$persona->apellido}");
+            } else {
+                $personalId = 0;
             }
         }
 
@@ -510,15 +519,12 @@ class InventarioController extends Controller
         return app(InventarioMovimientoController::class)->storeTraslado($request);
     }
 
-    /**
-     * Soporta tanto un ID de InventarioMovimiento (Kardex nuevo) como un SalidaStock (Legacy)
-     */
     public function showSalidaDocumento(Request $request, $id)
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
+        $nombreProyecto = Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? 'Delegación';
 
-        // 1. Buscar primero en el nuevo motor de Kardex (InventarioMovimiento)
-        $movimiento = \App\Models\InventarioMovimiento::with(['lineas.variante.articulo', 'personal', 'almacenOrigen'])
+        $movimiento = InventarioMovimiento::with(['lineas.variante.articulo', 'personal', 'almacenOrigen'])
             ->where('proyecto_id', $proyectoId)
             ->where('tipo', 'SALIDA')
             ->find($id);
@@ -536,7 +542,7 @@ class InventarioController extends Controller
             ];
 
             $documento = [
-                'delegacion' => $movimiento->almacenOrigen?->nombre ?? 'Cádiz',
+                'delegacion' => $movimiento->almacenOrigen?->nombre ?? $nombreProyecto,
                 'fecha' => $movimiento->created_at?->format('d/m/Y') ?? now()->format('d/m/Y'),
                 'trabajador' => $nombreTrabajador,
                 'ficha' => $movimiento->personal?->id_rrhh ?? ($movimiento->personal?->dni_nie ?? ''),
@@ -552,7 +558,6 @@ class InventarioController extends Controller
                     ->map(fn ($v, $k) => ucfirst($k) . ': ' . (is_array($v) ? implode(', ', $v) : $v))
                     ->implode(' · ');
 
-                // Usamos el nombre del artículo padre para no duplicar los atributos que ya vienen en $variante->nombre
                 $nombreBase = $articulo?->nombre ?: ($variante?->nombre ?: ($articulo?->descripcion ?: 'Artículo'));
                 $textoArticulo = $atributos ? "{$nombreBase} ({$atributos})" : $nombreBase;
 
@@ -564,24 +569,23 @@ class InventarioController extends Controller
                     'articulo' => $textoArticulo,
                     'cantidad' => (string) $linea->cantidad,
                 ];
-            })->values()->all();    
+            })->values()->all();
 
             return view('inventario.salida-documento', [
                 'salida' => $salida,
                 'documento' => $documento,
                 'lineasDocumento' => $lineasDocumento,
-                'delegacionPrefill' => 'Cádiz',
+                'delegacionPrefill' => $nombreProyecto,
             ]);
         }
 
-        // 2. Fallback a SalidaStock legacy si era un registro antiguo
         $salida = SalidaStock::query()
             ->where('proyecto_id', $proyectoId)
             ->findOrFail($id);
 
         $documento = (array) ($salida->documento_meta ?? []);
         $lineasDocumento = $documento['lineas'] ?? [];
-        $delegacionPrefill = trim((string) ($documento['delegacion'] ?? (Proyecto::query()->where('id', $proyectoId)->value('nombre') ?? '')));
+        $delegacionPrefill = trim((string) ($documento['delegacion'] ?? $nombreProyecto));
 
         if (empty($lineasDocumento) && is_array($salida->items)) {
             $lineasDocumento = collect($salida->items)
@@ -608,7 +612,7 @@ class InventarioController extends Controller
             'nombre' => 'nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'referencia_proveedor' => 'nullable|string|max:255',
-            'clase_id' => 'nullable|integer|exists:clases,id',
+            'clase_id' => ['nullable', 'integer', Rule::exists('clases', 'id')->where('proyecto_id', $proyectoId)],
             'almacen' => 'nullable|string|max:255',
             'stock_actual' => 'nullable|integer|min:0|max:999999|required_without:variantes',
             'stock_minimo' => 'nullable|integer|min:0',
@@ -627,14 +631,18 @@ class InventarioController extends Controller
             'variantes.*.almacen_id' => 'nullable|string|max:255',
             'variantes.*.stock_minimo' => 'nullable|integer|min:0',
             'variantes.*.nivel_critico' => 'nullable|integer|min:0',
-            'nombre_proveedor' => 'nullable|string|max:255'
+            'nombre_proveedor' => 'nullable|string|max:255',
         ]);
 
         $nombreBase = trim((string) ($validated['nombre'] ?? ''));
         $descripcionBase = trim((string) ($validated['descripcion'] ?? ''));
 
-        if ($descripcionBase === '' && $nombreBase !== '') $descripcionBase = $nombreBase;
-        if ($nombreBase === '' && $descripcionBase !== '') $nombreBase = $descripcionBase;
+        if ($descripcionBase === '' && $nombreBase !== '') {
+            $descripcionBase = $nombreBase;
+        }
+        if ($nombreBase === '' && $descripcionBase !== '') {
+            $nombreBase = $descripcionBase;
+        }
 
         $validated['nombre'] = $nombreBase !== '' ? $nombreBase : $validated['codigo'];
         $validated['descripcion'] = $descripcionBase !== '' ? $descripcionBase : $validated['nombre'];
@@ -643,23 +651,9 @@ class InventarioController extends Controller
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
         $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null, true);
 
-        // Resolver almacén físico donde depositar el stock inicial
-        $almacenModel = null;
-        if (!empty($validated['almacen'])) {
-            $almacenModel = Almacen::query()
-                ->where('proyecto_id', $proyectoId)
-                ->where(function ($q) use ($validated) {
-                    $q->where('nombre', $validated['almacen'])
-                      ->orWhere('id', is_numeric($validated['almacen']) ? (int) $validated['almacen'] : 0);
-                })
-                ->first();
-        }
-        if (!$almacenModel) {
-            $almacenModel = Almacen::query()->where('proyecto_id', $proyectoId)->orderBy('id')->first();
-        }
+        $almacenModel = $this->resolveAlmacenProyecto($proyectoId, $validated['almacen'] ?? null);
 
         DB::transaction(function () use ($proyectoId, $validated, $tiposAtributos, $atributosVariante, $variantesRows, $almacenModel) {
-            // 1. Crear o actualizar el Artículo Maestro
             $articulo = InventarioArticulo::updateOrCreate(
                 ['proyecto_id' => $proyectoId, 'codigo' => $validated['codigo']],
                 [
@@ -676,7 +670,6 @@ class InventarioController extends Controller
                 ]
             );
 
-            // 2. Si tiene múltiples variantes en la rejilla
             if (!empty($variantesRows)) {
                 $existingVariantes = $articulo->variantes()->with('stockAlmacenes')->get()->keyBy('id');
                 $processedVariantIds = [];
@@ -687,7 +680,6 @@ class InventarioController extends Controller
                     $activo = (bool) ($varianteRow['activo'] ?? true);
                     $rowId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
 
-                    // Reutilizar ID solo si la variante conserva exactamente los mismos atributos dimensionales
                     $existingVar = null;
                     if ($rowId && $existingVariantes->has($rowId)) {
                         $candidate = $existingVariantes->get($rowId);
@@ -718,16 +710,7 @@ class InventarioController extends Controller
                         : $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingVar?->id);
 
                     $descripcionItem = $this->buildVariantDescription($validated['descripcion'], $atributos);
-
-                    $almacenFila = $almacenModel;
-                    if (!empty($varianteRow['almacen_id'])) {
-                        $encontradoAlm = Almacen::where('proyecto_id', $proyectoId)
-                            ->where(fn ($q) => $q->where('nombre', $varianteRow['almacen_id'])->orWhere('id', (int) $varianteRow['almacen_id']))
-                            ->first();
-                        if ($encontradoAlm) {
-                            $almacenFila = $encontradoAlm;
-                        }
-                    }
+                    $almacenFila = $this->resolveAlmacenProyecto($proyectoId, $varianteRow['almacen_id'] ?? null) ?? $almacenModel;
 
                     if ($existingVar) {
                         $existingVar->update([
@@ -775,10 +758,8 @@ class InventarioController extends Controller
                     $activeNewVariants->push($targetVar);
                 }
 
-                // Sincronizar y depurar variantes antiguas/desfasadas que ya no pertenecen a la matriz
                 $this->depurarVariantesDesfasadas($existingVariantes, $processedVariantIds, $activeNewVariants);
             } else {
-                // 3. Producto simple sin matriz de variantes (1 Artículo = 1 Variante base)
                 $stockInicial = (int) ($validated['stock_actual'] ?? 0);
 
                 $varModel = InventarioVariante::updateOrCreate(
@@ -814,9 +795,6 @@ class InventarioController extends Controller
         return redirect()->route('inventario.index')->with('success', 'Producto y existencias guardados correctamente en el catálogo.');
     }
 
-    /**
-     * Resuelve el ítem tanto si $id es de InventarioVariante, InventarioArticulo o Inventario legacy
-     */
     public function show($id)
     {
         $proyectoId = $this->resolveActiveProyectoId(request());
@@ -870,14 +848,14 @@ class InventarioController extends Controller
         $proyectoId = $this->resolveActiveProyectoId(request());
 
         $variante = InventarioVariante::with([
-            'articulo.variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')
+            'articulo.variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen'),
         ])->where('proyecto_id', $proyectoId)->find($id);
 
         $articulo = $variante?->articulo;
 
         if (!$articulo) {
             $articulo = InventarioArticulo::with([
-                'variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen')
+                'variantes' => fn ($q) => $q->where('activo', true)->with('stockAlmacenes.almacen'),
             ])->where('proyecto_id', $proyectoId)->find($id);
             $variante = $articulo?->variantes->first();
         }
@@ -951,7 +929,6 @@ class InventarioController extends Controller
             return view('inventario.edit', compact('inventario', 'clases', 'varianteBase', 'valoresIniciales', 'variantesIniciales', 'almacenes'));
         }
 
-        // Fallback a tabla legacy si no estaba en catálogo
         $inventario = Inventario::where('proyecto_id', $proyectoId)->findOrFail($id);
         $valoresIniciales = $this->normalizeVariantAttributes($inventario->atributos_variante ?? []);
         $varianteBase = (object) [
@@ -983,13 +960,20 @@ class InventarioController extends Controller
         }
 
         $validated = $request->validate([
-            'codigo' => 'required|string|max:255',
+            'codigo' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('inventario_articulos', 'codigo')
+                    ->where('proyecto_id', $proyectoId)
+                    ->ignore($articulo->id),
+            ],
             'nombre' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
             'referencia_proveedor' => 'nullable|string|max:255',
-            'clase_id' => 'nullable|integer|exists:clases,id',
+            'clase_id' => ['nullable', 'integer', Rule::exists('clases', 'id')->where('proyecto_id', $proyectoId)],
             'almacen' => 'nullable|string|max:255',
-            'stock_actual' => 'nullable|integer|min:0|required_without:variantes',
+            'stock_actual' => 'nullable|integer|min:0|max:999999|required_without:variantes',
             'stock_minimo' => 'nullable|integer|min:0',
             'nivel_critico' => 'nullable|integer|min:0',
             'tipos_atributos' => 'nullable|string',
@@ -999,14 +983,14 @@ class InventarioController extends Controller
             'variantes' => 'nullable|array',
             'variantes.*.id' => 'nullable|integer',
             'variantes.*.activo' => 'nullable|boolean',
-            'variantes.*.stock_actual' => 'nullable|integer|min:0',
+            'variantes.*.stock_actual' => 'nullable|integer|min:0|max:999999',
             'variantes.*.atributos' => 'nullable|array',
             'variantes.*.atributos.*' => 'nullable|string|max:255',
             'variantes.*.sku' => 'nullable|string|max:255',
             'variantes.*.almacen_id' => 'nullable|string|max:255',
             'variantes.*.stock_minimo' => 'nullable|integer|min:0',
             'variantes.*.nivel_critico' => 'nullable|integer|min:0',
-            'nombre_proveedor' => 'nullable|string|max:255'
+            'nombre_proveedor' => 'nullable|string|max:255',
         ]);
 
         $validated['descripcion'] = trim((string) ($validated['descripcion'] ?? '')) !== ''
@@ -1016,20 +1000,7 @@ class InventarioController extends Controller
         $tiposAtributos = $this->normalizeVariantTypes($validated['tipos_atributos'] ?? null);
         $atributosVariante = $this->normalizeVariantAttributes($validated['atributos_variante'] ?? null);
         $variantesRows = $this->normalizeVariantRows($validated['variantes'] ?? null, false);
-
-        $almacenModel = null;
-        if (!empty($validated['almacen'])) {
-            $almacenModel = Almacen::query()
-                ->where('proyecto_id', $proyectoId)
-                ->where(function ($q) use ($validated) {
-                    $q->where('nombre', $validated['almacen'])
-                      ->orWhere('id', is_numeric($validated['almacen']) ? (int) $validated['almacen'] : 0);
-                })
-                ->first();
-        }
-        if (!$almacenModel) {
-            $almacenModel = Almacen::query()->where('proyecto_id', $proyectoId)->orderBy('id')->first();
-        }
+        $almacenModel = $this->resolveAlmacenProyecto($proyectoId, $validated['almacen'] ?? null);
 
         DB::transaction(function () use ($proyectoId, $articulo, $variante, $validated, $tiposAtributos, $atributosVariante, $variantesRows, $almacenModel) {
             $articulo->update([
@@ -1055,7 +1026,6 @@ class InventarioController extends Controller
                     $activo = (bool) ($varianteRow['activo'] ?? true);
                     $rowId = isset($varianteRow['id']) ? (int) $varianteRow['id'] : null;
 
-                    // Reutilizar ID solo si la variante conserva exactamente los mismos atributos dimensionales
                     $existingVar = null;
                     if ($rowId && $existingVariantes->has($rowId)) {
                         $candidate = $existingVariantes->get($rowId);
@@ -1086,16 +1056,7 @@ class InventarioController extends Controller
                         : $this->buildVariantCode($validated['codigo'], $atributos, $index, $existingVar?->id);
 
                     $descripcionItem = $this->buildVariantDescription($validated['descripcion'], $atributos);
-
-                    $almacenFila = $almacenModel;
-                    if (!empty($varianteRow['almacen_id'])) {
-                        $encontradoAlm = Almacen::where('proyecto_id', $proyectoId)
-                            ->where(fn ($q) => $q->where('nombre', $varianteRow['almacen_id'])->orWhere('id', (int) $varianteRow['almacen_id']))
-                            ->first();
-                        if ($encontradoAlm) {
-                            $almacenFila = $encontradoAlm;
-                        }
-                    }
+                    $almacenFila = $this->resolveAlmacenProyecto($proyectoId, $varianteRow['almacen_id'] ?? null) ?? $almacenModel;
 
                     if ($existingVar) {
                         $existingVar->update([
@@ -1143,8 +1104,59 @@ class InventarioController extends Controller
                     $activeNewVariants->push($targetVar);
                 }
 
-                // Depuración y archivo de variantes de la estructura anterior
                 $this->depurarVariantesDesfasadas($existingVariantes, $processedVariantIds, $activeNewVariants);
+            } else {
+                // Producto simple (sin matriz de variantes): actualizar o crear su variante base y su stock
+                $existingVariantes = $articulo->variantes()->with('stockAlmacenes')->get()->keyBy('id');
+                $targetVar = $variante && $existingVariantes->has($variante->id)
+                    ? $existingVariantes->get($variante->id)
+                    : $existingVariantes->first(fn ($v) => (bool) $v->activo) ?? $existingVariantes->first();
+
+                if ($targetVar) {
+                    $targetVar->update([
+                        'codigo' => $validated['codigo'],
+                        'nombre' => $validated['nombre'],
+                        'descripcion' => $validated['descripcion'],
+                        'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                        'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                        'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                        'almacen' => $almacenModel?->nombre ?? $targetVar->almacen,
+                        'stock_minimo' => (int) ($validated['stock_minimo'] ?? 0),
+                        'nivel_critico' => (int) ($validated['nivel_critico'] ?? 0),
+                        'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                        'atributos' => !empty($atributosVariante) ? $atributosVariante : null,
+                        'activo' => true,
+                    ]);
+                } else {
+                    $targetVar = InventarioVariante::create([
+                        'articulo_id' => $articulo->id,
+                        'proyecto_id' => $proyectoId,
+                        'codigo' => $validated['codigo'],
+                        'nombre' => $validated['nombre'],
+                        'descripcion' => $validated['descripcion'],
+                        'referencia_proveedor' => $validated['referencia_proveedor'] ?? null,
+                        'nombre_proveedor' => $validated['nombre_proveedor'] ?? null,
+                        'clase_id' => $validated['clase_id'] ?? $articulo->clase_id,
+                        'almacen' => $almacenModel?->nombre ?? null,
+                        'stock_minimo' => (int) ($validated['stock_minimo'] ?? 0),
+                        'nivel_critico' => (int) ($validated['nivel_critico'] ?? 0),
+                        'tipos_atributos' => !empty($tiposAtributos) ? $tiposAtributos : null,
+                        'atributos' => !empty($atributosVariante) ? $atributosVariante : null,
+                        'activo' => true,
+                    ]);
+                }
+
+                if ($almacenModel && array_key_exists('stock_actual', $validated) && $validated['stock_actual'] !== null) {
+                    InventarioStockAlmacen::updateOrCreate(
+                        ['variante_id' => $targetVar->id, 'almacen_id' => $almacenModel->id],
+                        ['cantidad' => (int) $validated['stock_actual']]
+                    );
+                }
+
+                // Si antes tenía múltiples variantes y pasó a simple, depurar las sobrantes
+                if ($existingVariantes->count() > 1) {
+                    $this->depurarVariantesDesfasadas($existingVariantes, [$targetVar->id], collect([$targetVar]));
+                }
             }
         });
 
@@ -1154,9 +1166,8 @@ class InventarioController extends Controller
     public function destroy(Request $request, $id)
     {
         $proyectoId = $this->resolveActiveProyectoId($request);
-        $scope = $request->input('scope', 'auto'); // 'padre', 'variante' o 'auto'
+        $scope = $request->input('scope', 'auto');
 
-        // 1. Si se pide borrar una variante hija específica (desde el modal)
         if ($scope === 'variante') {
             $variante = InventarioVariante::where('proyecto_id', $proyectoId)->findOrFail($id);
             $stockVariante = (int) InventarioStockAlmacen::where('variante_id', $variante->id)->sum('cantidad');
@@ -1168,7 +1179,6 @@ class InventarioController extends Controller
             DB::transaction(function () use ($variante) {
                 $variante->update(['activo' => false]);
 
-                // Si era la última variante activa del artículo padre, damos de baja también al padre
                 if ($variante->articulo_id) {
                     $quedanActivas = InventarioVariante::where('articulo_id', $variante->articulo_id)
                         ->where('activo', true)
@@ -1183,7 +1193,6 @@ class InventarioController extends Controller
             return redirect()->route('inventario.index')->with('success', "Variante '{$variante->codigo}' eliminada correctamente.");
         }
 
-        // 2. Si se pide borrar el Artículo Padre completo (con todas sus variantes)
         $articulo = InventarioArticulo::where('proyecto_id', $proyectoId)->find($id);
         if (!$articulo) {
             $variante = InventarioVariante::where('proyecto_id', $proyectoId)->find($id);
@@ -1212,16 +1221,39 @@ class InventarioController extends Controller
         return redirect()->route('inventario.index')->with('success', 'Producto eliminado.');
     }
 
+    private function resolveAlmacenProyecto(int $proyectoId, mixed $almacenInput): ?Almacen
+    {
+        $valor = trim((string) ($almacenInput ?? ''));
+        if ($valor !== '') {
+            $encontrado = Almacen::query()
+                ->where('proyecto_id', $proyectoId)
+                ->where(function ($q) use ($valor) {
+                    $q->where('nombre', $valor)
+                      ->orWhere('id', is_numeric($valor) ? (int) $valor : 0);
+                })
+                ->first();
+            if ($encontrado) {
+                return $encontrado;
+            }
+        }
+
+        return Almacen::query()->where('proyecto_id', $proyectoId)->orderBy('id')->first();
+    }
+
     protected function normalizeVariantTypes(mixed $value): array
     {
-        if (empty($value)) return [];
+        if (empty($value)) {
+            return [];
+        }
 
         if (is_string($value)) {
             $decoded = json_decode($value, true);
             $value = is_array($decoded) ? $decoded : explode(',', $value);
         }
 
-        if (!is_array($value)) return [];
+        if (!is_array($value)) {
+            return [];
+        }
 
         return collect($value)
             ->map(fn ($item) => trim((string) $item))
@@ -1233,12 +1265,16 @@ class InventarioController extends Controller
 
     protected function normalizeVariantAttributes(mixed $value): array
     {
-        if (!is_array($value)) return [];
+        if (!is_array($value)) {
+            return [];
+        }
 
         $atributos = [];
         foreach ($value as $tipo => $valores) {
             $tipo = trim((string) $tipo);
-            if ($tipo === '') continue;
+            if ($tipo === '') {
+                continue;
+            }
 
             $listaValores = is_array($valores) ? $valores : [$valores];
             $listaValores = collect($listaValores)
@@ -1258,19 +1294,27 @@ class InventarioController extends Controller
 
     protected function normalizeVariantRows(mixed $value, bool $onlyActive = true): array
     {
-        if (!is_array($value)) return [];
+        if (!is_array($value)) {
+            return [];
+        }
 
         $variantes = [];
         foreach ($value as $row) {
-            if (!is_array($row)) continue;
+            if (!is_array($row)) {
+                continue;
+            }
 
             $activo = filter_var($row['activo'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             $activo = $activo !== false;
 
-            if ($onlyActive && !$activo) continue;
+            if ($onlyActive && !$activo) {
+                continue;
+            }
 
             $atributos = $this->normalizeVariantAttributes($row['atributos'] ?? []);
-            if (empty($atributos)) continue;
+            if (empty($atributos)) {
+                continue;
+            }
 
             $variantes[] = [
                 'id' => isset($row['id']) ? (int) $row['id'] : null,
@@ -1293,7 +1337,9 @@ class InventarioController extends Controller
         foreach ($atributos as $valores) {
             $valor = is_array($valores) ? implode('-', $valores) : (string) $valores;
             $segmento = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', $valor) ?? '');
-            if ($segmento !== '') $segmentos[] = $segmento;
+            if ($segmento !== '') {
+                $segmentos[] = $segmento;
+            }
         }
 
         $codigoBase = trim($baseCode);
@@ -1325,9 +1371,6 @@ class InventarioController extends Controller
         return $etiqueta !== '' ? trim($baseDescription . ' - ' . $etiqueta) : $baseDescription;
     }
 
-    /**
-     * Normaliza un valor de atributo (sea string o array) a texto plano sin acentos en minúsculas.
-     */
     protected function cleanAttrString(mixed $val): string
     {
         $str = is_array($val) ? implode(',', array_map('trim', $val)) : trim((string) $val);
@@ -1338,9 +1381,6 @@ class InventarioController extends Controller
         ]);
     }
 
-    /**
-     * Compara dos arrays de atributos de variante sin importar el orden de las claves, tildes o formato array/string.
-     */
     protected function sameVariantAttributes(array $a, array $b): bool
     {
         if (count($a) !== count($b)) {
@@ -1360,17 +1400,11 @@ class InventarioController extends Controller
         return $norm($a) === $norm($b);
     }
 
-    /**
-     * Busca si una variante desfasada (ej. Talla: 11) tiene una heredera directa
-     * en la nueva matriz (ej. Talla: 11 + Ignífugo: No, o Talla: 11 + Color: Verde).
-     */
     protected function encontrarVarianteHeredera(InventarioVariante $oldVar, \Illuminate\Support\Collection $newVariants): ?InventarioVariante
     {
         $oldAttrs = $oldVar->atributos ?? [];
         $valoresNeutros = ['no', '00', '0', 'false', 'estandar', 'standard', 'std', 'unica', 'unico', 'uni', 'n/a', 'na', 'normal', 'sin especificar'];
 
-        // Si la variante antigua era el producto base sin atributos (0 dimensiones),
-        // su heredera es la variante con valores neutros o la primera de la nueva matriz
         if (empty($oldAttrs)) {
             return $newVariants->first(function (InventarioVariante $cand) use ($valoresNeutros) {
                 foreach (($cand->atributos ?? []) as $v) {
@@ -1382,7 +1416,6 @@ class InventarioController extends Controller
             }) ?? $newVariants->first();
         }
 
-        // 1. Filtrar las nuevas variantes que contengan TODOS los atributos que ya tenía la variante antigua
         $candidatas = $newVariants->filter(function (InventarioVariante $newVar) use ($oldAttrs) {
             $newAttrs = $newVar->atributos ?? [];
             foreach ($oldAttrs as $tipoOld => $valOld) {
@@ -1409,7 +1442,6 @@ class InventarioController extends Controller
             return null;
         }
 
-        // 2. Priorizar la candidata cuyos atributos NUEVOS tengan un valor neutro ("No", "00", "Estándar", etc.)
         $oldKeysClean = array_map(fn ($k) => $this->cleanAttrString($k), array_keys($oldAttrs));
 
         $herederaPorDefecto = $candidatas->first(function (InventarioVariante $cand) use ($oldKeysClean, $valoresNeutros) {
@@ -1423,19 +1455,9 @@ class InventarioController extends Controller
             return false;
         });
 
-        // 3. Si no hay valor neutro (ej. se añadió Color: Verde, Rojo, Azul), devuelve la primera candidata de esa misma Talla
         return $herederaPorDefecto ?? $candidatas->first();
     }
 
-    /**
-     * Procesa las variantes que quedaron fuera de la nueva matriz dimensional:
-     * - Si ninguna de las nuevas variantes hijas de su rama recibió stock en el formulario,
-     *   traspasa el stock viejo a su heredera natural para evitar pérdidas accidentales.
-     * - Si el usuario ya asignó el stock en el formulario (ej. a "rojo" o repartido entre "verde" y "rojo"),
-     *   respeta exactamente el reparto del formulario sin duplicar.
-     * - Si la variante antigua tiene historial en Kardex, la archiva como inactiva ([OBSOLETO]) con stock 0.
-     * - Si no tiene historial en Kardex, la elimina físicamente de la base de datos.
-     */
     protected function depurarVariantesDesfasadas(
         \Illuminate\Support\Collection $existingVariantes,
         array $processedVariantIds,
@@ -1450,9 +1472,10 @@ class InventarioController extends Controller
             if ($totalViejo > 0 && $activeNewVariants->isNotEmpty()) {
                 $oldAttrs = $oldVar->atributos ?? [];
 
-                // Buscar todas las variantes nuevas que son hijas de esta variante antigua (ej. todas las de Talla 11)
                 $hijasDeRama = $activeNewVariants->filter(function (InventarioVariante $newVar) use ($oldAttrs) {
-                    if (empty($oldAttrs)) return true;
+                    if (empty($oldAttrs)) {
+                        return true;
+                    }
                     $newAttrs = $newVar->atributos ?? [];
                     foreach ($oldAttrs as $tipoOld => $valOld) {
                         $cleanKeyOld = $this->cleanAttrString($tipoOld);
@@ -1466,23 +1489,25 @@ class InventarioController extends Controller
                                 break;
                             }
                         }
-                        if (!$matched) return false;
+                        if (!$matched) {
+                            return false;
+                        }
                     }
                     return true;
                 });
 
-                // Comprobar cuánto stock total tienen ya asignado las hijas de esta rama tras guardar el formulario
                 $idsHijas = $hijasDeRama->pluck('id')->all();
                 $stockYaAsignadoEnRama = !empty($idsHijas)
                     ? (int) InventarioStockAlmacen::whereIn('variante_id', $idsHijas)->sum('cantidad')
                     : 0;
 
-                // Solo auto-migramos en backend si la rama entera llegó con 0 stock desde el formulario
                 if ($stockYaAsignadoEnRama === 0) {
                     $heredera = $this->encontrarVarianteHeredera($oldVar, $activeNewVariants);
                     if ($heredera) {
                         foreach ($stocksViejos as $stockAlm) {
-                            if ((int) $stockAlm->cantidad <= 0) continue;
+                            if ((int) $stockAlm->cantidad <= 0) {
+                                continue;
+                            }
 
                             InventarioStockAlmacen::updateOrCreate(
                                 ['variante_id' => $heredera->id, 'almacen_id' => $stockAlm->almacen_id],
@@ -1493,7 +1518,6 @@ class InventarioController extends Controller
                 }
             }
 
-            // Comprobar si tiene historial en el Kardex (movimientos registrados)
             $tieneHistorialKardex = \App\Models\InventarioMovimientoLinea::where('variante_id', $oldVar->id)->exists();
 
             if ($tieneHistorialKardex) {

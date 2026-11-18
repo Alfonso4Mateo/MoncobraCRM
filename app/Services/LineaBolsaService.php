@@ -7,6 +7,7 @@ use App\Models\AlbaranLineaPartida;
 use App\Models\AlbaranPedidoLinea;
 use App\Models\LineaBolsa;
 use App\Models\PedidoCliente;
+use App\Services\DocumentLineNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,7 @@ class LineaBolsaService
      */
     public function sincronizarLineasDePartida(PedidoCliente $partida, array $lineasPayload): void
     {
+        $normalizer = new DocumentLineNormalizer();
         // uids que YA tenía esta partida antes de este guardado, para poder detectar
         // cuáles ha quitado el usuario del formulario (editar un pedido y borrar una
         // línea) y limpiar su aportación, en vez de dejarla huérfana consumiendo saldo
@@ -51,18 +53,18 @@ class LineaBolsaService
                 ? LineaBolsa::MODO_IMPORTE
                 : LineaBolsa::MODO_CANTIDAD;
 
-            $cantidad = round(max(0, (float) ($lineaPayload['cantidad'] ?? 0)), 2);
-            $precioUnitario = round(max(0, (float) ($lineaPayload['precio_unitario'] ?? ($lineaPayload['precio'] ?? 0))), 2);
-            $margen = round(max(0, (float) ($lineaPayload['margen'] ?? 0)), 2);
-            $total = round(
-                (float) ($lineaPayload['total'] ?? ($cantidad * $precioUnitario * (1 + $margen / 100))),
-                2
+            $cantidad = $modoConsumo === LineaBolsa::MODO_IMPORTE
+                ? 1.0
+                : (float) $normalizer->roundQuantity($lineaPayload['cantidad'] ?? 0);
+            $precioUnitario = $normalizer->roundMoney($lineaPayload['precio_unitario'] ?? ($lineaPayload['precio'] ?? 0));
+            $margen = $normalizer->roundMoney($lineaPayload['margen'] ?? 0);
+            $total = $normalizer->calculateLineTotal(
+                $cantidad,
+                $precioUnitario,
+                $margen,
+                $modoConsumo,
+                isset($lineaPayload['total']) && is_numeric($lineaPayload['total']) ? (float) $lineaPayload['total'] : null
             );
-
-            // En modo importe la unidad siempre es 1: lo que varía es el importe, no la cantidad.
-            if ($modoConsumo === LineaBolsa::MODO_IMPORTE) {
-                $cantidad = 1;
-            }
 
             $lineaExistente = LineaBolsa::where('uid', $uid)->first();
 
@@ -232,6 +234,11 @@ class LineaBolsaService
         // Traza técnica de "cuánto ha consumido este albarán de esta línea".
         $partidaPrincipal = $linea->partidas()->orderBy('linea_partida.created_at')->first();
 
+        $unitWithMargin = (new DocumentLineNormalizer())->calculateUnitWithMargin(
+            (float) $linea->precio_unitario,
+            (float) $linea->margen
+        );
+
         AlbaranPedidoLinea::updateOrCreate(
             ['albaran_id' => $albaran->id, 'linea_id' => $linea->id],
             [
@@ -239,7 +246,7 @@ class LineaBolsaService
                 'linea_uid' => $linea->uid,
                 'cantidad' => $linea->esPorImporte()
                     ? 1
-                    : round($importeTotal / max(0.001, (float) $linea->precio_unitario * (1 + $linea->margen / 100)), 2),
+                    : round($importeTotal / max(0.001, $unitWithMargin), 2),
                 'precio_unitario' => (float) $linea->precio_unitario,
                 'total' => round($importeTotal, 2),
             ]

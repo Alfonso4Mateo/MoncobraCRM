@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AlbaranCliente;
 use App\Models\CentroCoste;
+use App\Models\PedidoCliente;
+use App\Models\Presupuesto;
 use Illuminate\Http\Request;
 
 class CentroCosteController extends Controller
@@ -36,6 +39,15 @@ class CentroCosteController extends Controller
     public function destroy(CentroCoste $centroCoste)
     {
         $this->authorize('presupuestos.manage');
+
+        $enUso = Presupuesto::where('ot', $centroCoste->codigo)->exists()
+            || PedidoCliente::where('ot', $centroCoste->codigo)->exists()
+            || AlbaranCliente::where('ot', $centroCoste->codigo)->exists();
+
+        if ($enUso) {
+            return back()->with('error', 'No se puede eliminar este Centro de Coste porque está vinculado a presupuestos, pedidos o albaranes.');
+        }
+
         $centroCoste->delete();
         return redirect()->route('centros-costes.index')
                          ->with('success', 'Centro de coste eliminado.');

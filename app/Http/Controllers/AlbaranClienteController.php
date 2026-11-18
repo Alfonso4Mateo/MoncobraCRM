@@ -316,7 +316,7 @@ class AlbaranClienteController extends Controller
             ],
             'titulo' => 'nullable|string|max:255',
             'lineas_json' => 'nullable|json',
-            'estado' => ['nullable', Rule::in(['pendiente', 'recibido', 'facturado', 'facturado_parcial', 'cancelado', 'rechazado'])],
+            'estado' => ['nullable', Rule::in(['pendiente', 'entregado', 'recibido', 'facturado', 'facturado_parcial', 'cancelado', 'rechazado'])],
             'archivo_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
@@ -327,7 +327,8 @@ class AlbaranClienteController extends Controller
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $this->assertLimitesLineaBolsa($lineas); 
-        $totalAlbaran = round((float) collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0)), 2);
+        $normalizer = new DocumentLineNormalizer();
+        $totalAlbaran = $normalizer->sumLinesTotal($lineas);
 
         // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK (Double Submit) ---
         $dobleEnvio = AlbaranCliente::where('proyecto_id', $proyectoId)
@@ -431,36 +432,7 @@ class AlbaranClienteController extends Controller
                 $this->adjustPedidoLineasFromAlbaran($pedido, $lineas, -1);
             }
 
-            // Restar stock de artículos
-            $consumos = collect($lineas)
-                ->filter(fn ($linea) => is_array($linea) && (int) ($linea['articulo_id'] ?? 0) > 0)
-                ->groupBy(fn ($linea) => (int) ($linea['articulo_id'] ?? 0))
-                ->map(fn ($items) => round($items->sum(fn ($linea) => (float) ($linea['cantidad'] ?? 0)), 2));
-
-            if ($consumos->isNotEmpty()) {
-                $articulos = Articulo::query()
-                    ->where('proyecto_id', $proyectoId)
-                    ->whereIn('id', $consumos->keys())
-                    ->lockForUpdate() 
-                    ->get();
-
-                foreach ($articulos as $articulo) {
-                    $consumo = (float) ($consumos[$articulo->id] ?? 0);
-                    if ($consumo <= 0) {
-                        continue;
-                    }
-
-                    $cantidadActual = (float) ($articulo->cantidad ?? 0);
-                    $restante = round(max(0, $cantidadActual - $consumo), 2);
-                    $precioUnitario = (float) ($articulo->precio_unitario ?? 0);
-                    $margen = (float) ($articulo->margen ?? 0);
-
-                    $articulo->cantidad = $restante;
-                    $articulo->facturado = $restante <= 0;
-                    $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
-                    $articulo->save();
-                }
-            }
+            $this->adjustArticulosStock($lineas, $proyectoId, -1);
         });
 
         return redirect()->route('albaranes.index')->with('success', 'Albarán procesado correctamente');
@@ -471,7 +443,7 @@ class AlbaranClienteController extends Controller
         // --- GUARDIA DE LA MURALLA ---
         $this->authorize('albaranes.manage');
 
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $proyectoId = $this->resolveActiveProyectoId(request());
         $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
@@ -509,25 +481,11 @@ class AlbaranClienteController extends Controller
         $this->authorize('albaranes.manage');
         abort_if($albaran->estado === 'facturado', 403, 'No se pueden modificar albaranes facturados.');
 
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $proyectoId = $this->resolveActiveProyectoId($request);
         $this->validateProyectoAccess($proyectoId);
 
         if ((int) $albaran->proyecto_id !== $proyectoId) {
             abort(404);
-        }
-
-        // --- PROTECCIÓN BACKEND CONTRA DOBLE CLICK EN ACTUALIZAR ---
-        if ($albaran->updated_at && $albaran->updated_at->diffInSeconds(now()) < 5) {
-            $returnTo = trim((string) ($request->input('return_to', '')));
-            
-            // CORRECCIÓN DE SEGURIDAD AQUÍ (1)
-            $hostRetorno = parse_url($returnTo, PHP_URL_HOST);
-            $hostApp = parse_url(config('app.url'), PHP_URL_HOST);
-
-            if ($returnTo !== '' && $hostRetorno === $hostApp) {
-                return redirect($returnTo)->with('success', 'Albarán actualizado correctamente.');
-            }
-            return redirect()->route('albaranes.index')->with('success', 'Albarán actualizado correctamente.');
         }
 
         $pedidoAnterior = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
@@ -569,7 +527,7 @@ class AlbaranClienteController extends Controller
         $this->validateLineasPayload($lineasRaw);
         $lineas = $this->normalizeLineas($validated['lineas_json'] ?? '[]', $lineasRaw);
         $this->assertLimitesLineaBolsa($lineas, (int) $albaran->id);
-        $total = collect($lineas)->sum(fn (array $linea) => (float) ($linea['total'] ?? 0));
+        $total = (new DocumentLineNormalizer())->sumLinesTotal($lineas);
 
         $pedidosSeleccionados = $validated['pedidos_cliente'] ?? [];
         $validated['pedido_cliente'] = !empty($pedidosSeleccionados) ? $pedidosSeleccionados[0] : null;
@@ -721,11 +679,15 @@ class AlbaranClienteController extends Controller
     {
         $this->authorize('albaranes.manage');
 
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $proyectoId = $this->resolveActiveProyectoId($request);
         $this->validateProyectoAccess($proyectoId);
 
+        if ((int) $albaran->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
+
         $validated = $request->validate([
-            'estado' => ['required', Rule::in(['pendiente', 'recibido', 'facturado', 'facturado_parcial', 'cancelado', 'rechazado'])],
+            'estado' => ['required', Rule::in(['pendiente', 'entregado', 'recibido', 'facturado', 'facturado_parcial', 'cancelado', 'rechazado'])],
         ]);
 
         DB::transaction(function () use ($albaran, $validated, $proyectoId) {
@@ -758,8 +720,12 @@ class AlbaranClienteController extends Controller
     public function desvincular(Request $request, AlbaranCliente $albaran)
     {
         $this->authorize('albaranes.manage');
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $proyectoId = $this->resolveActiveProyectoId($request);
         $this->validateProyectoAccess($proyectoId);
+
+        if ((int) $albaran->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         $pedidoIdEspecifico = (int) $request->input('pedido_id');
         $pedidoAfectado = null;
@@ -880,8 +846,12 @@ class AlbaranClienteController extends Controller
     public function destroy(AlbaranCliente $albaran)
     {
         $this->authorize('albaranes.delete');
-        $proyectoId = $this->resolveProyectoIdWithFallback((int) $albaran->proyecto_id);
+        $proyectoId = $this->resolveActiveProyectoId(request());
         $this->validateProyectoAccess($proyectoId);
+
+        if ((int) $albaran->proyecto_id !== $proyectoId) {
+            abort(404);
+        }
 
         $pedidosAfectados = $albaran->pedidosClientes()->get();
         $pedidoPrimario = $this->resolvePedidoFromAlbaran($albaran, $proyectoId);
@@ -1796,7 +1766,11 @@ class AlbaranClienteController extends Controller
             $linea['cantidad_max'] = max($cantidad, (float) ($linea['cantidad_max'] ?? $cantidad));
             $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
             $margen = (float) ($linea['margen'] ?? 0);
-            $linea['total'] = round($cantidad * $precioUnitario * (1 + ($margen / 100)), 2);
+            $linea['total'] = (new DocumentLineNormalizer())->calculateLineTotal(
+                $cantidad,
+                $precioUnitario,
+                $margen
+            );
 
             return $linea;
         })->values()->all();
@@ -1919,10 +1893,11 @@ class AlbaranClienteController extends Controller
             if ($direction > 0) {
                 $idx = $indexMap[$signature][0];
                 $pedidoLineas[$idx]['cantidad'] = round((float) ($pedidoLineas[$idx]['cantidad'] ?? 0) + $cantidad, 2);
-                $pedidoLineas[$idx]['total'] = round(
-                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
-                    * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
-                    * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)), 2);
+                $pedidoLineas[$idx]['total'] = (new DocumentLineNormalizer())->calculateLineTotal(
+                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0),
+                    (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)),
+                    (float) ($pedidoLineas[$idx]['margen'] ?? 0)
+                );
                 continue;
             }
 
@@ -1932,10 +1907,11 @@ class AlbaranClienteController extends Controller
 
                 $toSubtract = min($orig, $cantidad);
                 $pedidoLineas[$idx]['cantidad'] = round(max(0, $orig - $toSubtract), 2);
-                $pedidoLineas[$idx]['total'] = round(
-                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0)
-                    * max(0, (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)))
-                    * (1 + (max(0, (float) ($pedidoLineas[$idx]['margen'] ?? 0)) / 100)), 2);
+                $pedidoLineas[$idx]['total'] = (new DocumentLineNormalizer())->calculateLineTotal(
+                    (float) ($pedidoLineas[$idx]['cantidad'] ?? 0),
+                    (float) ($pedidoLineas[$idx]['precio_unitario'] ?? ($pedidoLineas[$idx]['precio'] ?? 0)),
+                    (float) ($pedidoLineas[$idx]['margen'] ?? 0)
+                );
                 $cantidad = round(max(0, $cantidad - $toSubtract), 2);
 
                 if ($cantidad <= 0) break;
@@ -2026,7 +2002,11 @@ class AlbaranClienteController extends Controller
             $articulo->facturado = $restante <= 0;
             
             // Sintaxis matemática corregida y redondeo a 2 decimales
-            $articulo->total = round($restante * $precioUnitario * (1 + ($margen / 100)), 2);
+            $articulo->total = (new DocumentLineNormalizer())->calculateLineTotal(
+                $restante,
+                $precioUnitario,
+                $margen
+            );
             
             $articulo->save();
         }

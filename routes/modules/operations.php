@@ -1,104 +1,109 @@
 <?php
 
+use App\Http\Controllers\AlertasMantenimientoController;
 use App\Http\Controllers\AlmacenController;
+use App\Http\Controllers\CalibrablesController;
 use App\Http\Controllers\ClaseController;
+use App\Http\Controllers\ClaseHerramientaController;
+use App\Http\Controllers\DepartamentoController;
+use App\Http\Controllers\EquiposController;
+use App\Http\Controllers\HerramientasPlantaController;
 use App\Http\Controllers\HistoricoController;
 use App\Http\Controllers\InventarioAccionController;
 use App\Http\Controllers\InventarioController;
-use App\Http\Controllers\InventarioMovimientoController;
-use App\Http\Controllers\PersonalController;
-use App\Http\Controllers\PuestoTrabajoController; 
-use App\Http\Controllers\UserController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DepartamentoController;
-use App\Http\Controllers\QrController;
-use App\Http\Controllers\CalibrablesController;
-use App\Http\Controllers\EquiposController;
-use App\Http\Controllers\HerramientasPlantaController;
-use App\Http\Controllers\AlertasMantenimientoController;
-use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\InventarioInformeController;
+use App\Http\Controllers\InventarioMovimientoController;
+use App\Http\Controllers\OrphanDataController;
+use App\Http\Controllers\PersonalController;
+use App\Http\Controllers\PuestoTrabajoController;
+use App\Http\Controllers\QrController;
+use App\Http\Controllers\UbicacionController;
+use App\Http\Controllers\UserController;
+use App\Models\EquipoInformatico;
+use Illuminate\Support\Facades\Route;
 
 // ==========================================
 // 0. ACTIVOS, HERRAMIENTAS Y CALIBRACIÓN
 // ==========================================
-
 Route::middleware(['auth', 'permission:activos.manage'])->group(function () {
-Route::post('/ubicaciones/ajax', [UbicacionController::class, 'storeAjax'])->name('ubicaciones.ajax');
-Route::delete('/ubicaciones/ajax/{ubicacion}', [App\Http\Controllers\UbicacionController::class, 'destroyAjax']);
-Route::post('/clases-herramientas/ajax', [App\Http\Controllers\ClaseHerramientaController::class, 'storeAjax'])->name('clases_herramientas.ajax');
-Route::delete('/clases-herramientas/ajax/{claseHerramienta}', [App\Http\Controllers\ClaseHerramientaController::class, 'destroyAjax']);
+    Route::post('/ubicaciones/ajax', [UbicacionController::class, 'storeAjax'])->name('ubicaciones.ajax');
+    Route::delete('/ubicaciones/ajax/{ubicacion}', [UbicacionController::class, 'destroyAjax']);
+    Route::post('/clases-herramientas/ajax', [ClaseHerramientaController::class, 'storeAjax'])->name('clases_herramientas.ajax');
+    Route::delete('/clases-herramientas/ajax/{claseHerramienta}', [ClaseHerramientaController::class, 'destroyAjax']);
 
-// EQUIPOS INFORMÁTICOS
-Route::get('equipos', [EquiposController::class, 'index'])->name('equipos.index');
-Route::get('equipos/nuevo', [EquiposController::class, 'create'])->name('equipos.create');
-Route::post('equipos', [EquiposController::class, 'store'])->name('equipos.store');
-Route::get('equipos/{equipo}', [EquiposController::class, 'show'])->name('equipos.show');
-Route::get('equipos/{equipo}/editar', [EquiposController::class, 'edit'])->name('equipos.edit');
-Route::put('equipos/{equipo}', [EquiposController::class, 'update'])->name('equipos.update');
-Route::delete('equipos/{equipo}', [EquiposController::class, 'destroy'])->name('equipos.destroy');
-Route::post('equipos/{equipo}/eventos', [EquiposController::class, 'storeEvento'])->name('equipos.eventos.store');
-Route::patch('equipos/{equipo}/estado', [EquiposController::class, 'updateEstado'])->name('equipos.estado');
-Route::patch('equipos/{equipo}/asignar', [EquiposController::class, 'updateAsignacion'])->name('equipos.asignar');
+    // EQUIPOS INFORMÁTICOS
+    Route::get('equipos', [EquiposController::class, 'index'])->name('equipos.index');
+    Route::get('equipos/nuevo', [EquiposController::class, 'create'])->name('equipos.create');
+    Route::post('equipos', [EquiposController::class, 'store'])->name('equipos.store');
+    Route::get('equipos/{equipo}', [EquiposController::class, 'show'])->name('equipos.show');
+    Route::get('equipos/{equipo}/editar', [EquiposController::class, 'edit'])->name('equipos.edit');
+    Route::put('equipos/{equipo}', [EquiposController::class, 'update'])->name('equipos.update');
+    Route::delete('equipos/{equipo}', [EquiposController::class, 'destroy'])->name('equipos.destroy');
+    Route::post('equipos/{equipo}/eventos', [EquiposController::class, 'storeEvento'])->name('equipos.eventos.store');
+    Route::patch('equipos/{equipo}/estado', [EquiposController::class, 'updateEstado'])->name('equipos.estado');
+    Route::patch('equipos/{equipo}/asignar', [EquiposController::class, 'updateAsignacion'])->name('equipos.asignar');
 
-// HERRAMIENTAS DE PLANTA
-Route::get('herramientas', [HerramientasPlantaController::class, 'index'])->name('herramientas.index');
-Route::get('herramientas/nuevo', [HerramientasPlantaController::class, 'create'])->name('herramientas.create');
-Route::post('herramientas', [HerramientasPlantaController::class, 'store'])->name('herramientas.store');
-Route::get('herramientas/importar/plantilla', [HerramientasPlantaController::class, 'descargarPlantillaCsv'])->name('herramientas.planta.plantilla');
-Route::post('herramientas/importar', [HerramientasPlantaController::class, 'importarCsv'])->name('herramientas.planta.importar');
-Route::get('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'show'])->name('herramientas.planta.show');
-Route::get('herramientas/{herramientaPlanta}/editar', [HerramientasPlantaController::class, 'edit'])->name('herramientas.planta.edit');
-Route::put('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'update'])->name('herramientas.planta.update');
-Route::delete('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'destroy'])->name('herramientas.planta.destroy');
-Route::post('herramientas/{herramientaPlanta}/eventos', [HerramientasPlantaController::class, 'storeEvento'])->name('herramientas.planta.eventos.store');
-Route::patch('herramientas/{herramientaPlanta}/estado', [HerramientasPlantaController::class, 'updateEstado'])->name('herramientas.planta.estado');
-Route::patch('herramientas/{herramientaPlanta}/asignar', [HerramientasPlantaController::class, 'updateAsignacion'])->name('herramientas.planta.asignar');
-// Rutas exclusivas de maquinaria
-Route::post('herramientas/{herramientaPlanta}/manual', [HerramientasPlantaController::class, 'uploadManual'])->name('herramientas.planta.manual');
-Route::post('herramientas/familias', [HerramientasPlantaController::class, 'storeFamilia'])->name('herramientas.familias.store');
+    // HERRAMIENTAS DE PLANTA
+    Route::get('herramientas', [HerramientasPlantaController::class, 'index'])->name('herramientas.index');
+    Route::get('herramientas/nuevo', [HerramientasPlantaController::class, 'create'])->name('herramientas.create');
+    Route::post('herramientas', [HerramientasPlantaController::class, 'store'])->name('herramientas.store');
+    Route::get('herramientas/importar/plantilla', [HerramientasPlantaController::class, 'descargarPlantillaCsv'])->name('herramientas.planta.plantilla');
+    Route::post('herramientas/importar', [HerramientasPlantaController::class, 'importarCsv'])->name('herramientas.planta.importar');
+    Route::get('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'show'])->name('herramientas.planta.show');
+    Route::get('herramientas/{herramientaPlanta}/editar', [HerramientasPlantaController::class, 'edit'])->name('herramientas.planta.edit');
+    Route::put('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'update'])->name('herramientas.planta.update');
+    Route::delete('herramientas/{herramientaPlanta}', [HerramientasPlantaController::class, 'destroy'])->name('herramientas.planta.destroy');
+    Route::post('herramientas/{herramientaPlanta}/eventos', [HerramientasPlantaController::class, 'storeEvento'])->name('herramientas.planta.eventos.store');
+    Route::patch('herramientas/{herramientaPlanta}/estado', [HerramientasPlantaController::class, 'updateEstado'])->name('herramientas.planta.estado');
+    Route::patch('herramientas/{herramientaPlanta}/asignar', [HerramientasPlantaController::class, 'updateAsignacion'])->name('herramientas.planta.asignar');
+    Route::post('herramientas/{herramientaPlanta}/manual', [HerramientasPlantaController::class, 'uploadManual'])->name('herramientas.planta.manual');
+    Route::post('herramientas/familias', [HerramientasPlantaController::class, 'storeFamilia'])->name('herramientas.familias.store');
 
-// APARATOS CALIBRABLES (Prefijo unificado a 'calibrables')
-Route::get('calibrables', [CalibrablesController::class, 'index'])->name('calibrables.index');
-Route::get('calibrables/nuevo', [CalibrablesController::class, 'create'])->name('calibrables.create');
-Route::post('calibrables', [CalibrablesController::class, 'store'])->name('calibrables.store');
-Route::get('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'show'])->name('calibrables.show');
-Route::get('calibrables/{aparatoCalibrable}/editar', [CalibrablesController::class, 'edit'])->name('calibrables.edit');
-Route::put('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'update'])->name('calibrables.update');
-Route::delete('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'destroy'])->name('calibrables.destroy');
-Route::post('calibrables/{aparatoCalibrable}/eventos', [CalibrablesController::class, 'storeEvento'])->name('calibrables.eventos.store');
-Route::patch('calibrables/{aparatoCalibrable}/estado', [CalibrablesController::class, 'updateEstado'])->name('calibrables.estado');
-Route::patch('calibrables/{aparatoCalibrable}/asignar', [CalibrablesController::class, 'updateAsignacion'])->name('calibrables.asignar');
+    // APARATOS CALIBRABLES
+    Route::get('calibrables', [CalibrablesController::class, 'index'])->name('calibrables.index');
+    Route::get('calibrables/nuevo', [CalibrablesController::class, 'create'])->name('calibrables.create');
+    Route::post('calibrables', [CalibrablesController::class, 'store'])->name('calibrables.store');
+    Route::get('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'show'])->name('calibrables.show');
+    Route::get('calibrables/{aparatoCalibrable}/editar', [CalibrablesController::class, 'edit'])->name('calibrables.edit');
+    Route::put('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'update'])->name('calibrables.update');
+    Route::delete('calibrables/{aparatoCalibrable}', [CalibrablesController::class, 'destroy'])->name('calibrables.destroy');
+    Route::post('calibrables/{aparatoCalibrable}/eventos', [CalibrablesController::class, 'storeEvento'])->name('calibrables.eventos.store');
+    Route::patch('calibrables/{aparatoCalibrable}/estado', [CalibrablesController::class, 'updateEstado'])->name('calibrables.estado');
+    Route::patch('calibrables/{aparatoCalibrable}/asignar', [CalibrablesController::class, 'updateAsignacion'])->name('calibrables.asignar');
 
-// CENTRO DE CONTROL Y ALERTAS
-Route::get('alertas-mantenimiento', [AlertasMantenimientoController::class, 'index'])->name('alertas.index');
-Route::get('alertas-mantenimiento/enviar', [AlertasMantenimientoController::class, 'enviarReporte'])->name('alertas.enviar');
-Route::get('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'configuracion'])->name('alertas.configuracion');
-Route::post('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'storeConfiguracion'])->name('alertas.configuracion.store');
+    // CENTRO DE CONTROL Y ALERTAS
+    Route::get('alertas-mantenimiento', [AlertasMantenimientoController::class, 'index'])->name('alertas.index');
+    Route::get('alertas-mantenimiento/enviar', [AlertasMantenimientoController::class, 'enviarReporte'])->name('alertas.enviar');
+    Route::get('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'configuracion'])->name('alertas.configuracion');
+    Route::post('alertas-mantenimiento/configuracion', [AlertasMantenimientoController::class, 'storeConfiguracion'])->name('alertas.configuracion.store');
 
-// ENLACES CORTOS / QR (Redirecciones dinámicas)
-Route::get('activos/{tipo}/{id}', function (string $tipo, int $id) {
-    return match ($tipo) {
-        'equipo' => redirect()->route('equipos.show', $id),
-        'planta' => redirect()->route('herramientas.planta.show', $id),
-        'calibrable' => redirect()->route('calibrables.show', $id),
-        default => abort(404),
-    };
-})->where('tipo', 'equipo|planta|calibrable')->name('activos.qr.show');
+    // ENLACES CORTOS / QR (Redirecciones dinámicas)
+    Route::get('activos/{tipo}/{id}', function (string $tipo, int $id) {
+        return match ($tipo) {
+            'equipo' => redirect()->route('equipos.show', $id),
+            'planta' => redirect()->route('herramientas.planta.show', $id),
+            'calibrable' => redirect()->route('calibrables.show', $id),
+            default => abort(404),
+        };
+    })->where('tipo', 'equipo|planta|calibrable')->name('activos.qr.show');
 
-Route::get('activos/{tipo}/{id}/qr', [QrController::class, 'descargarQrActivo'])
-    ->where('tipo', 'equipo|planta|calibrable')
-    ->name('activos.qr.download');
+    Route::get('activos/{tipo}/{id}/qr', [QrController::class, 'descargarQrActivo'])
+        ->where('tipo', 'equipo|planta|calibrable')
+        ->name('activos.qr.download');
 
-Route::get('activos/{id}/editar', function (int $id) {
-    if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.edit', $id);
-    return redirect()->route('herramientas.planta.edit', $id);
-})->name('herramientas.edit');
+    Route::get('activos/{id}/editar', function (int $id) {
+        if (EquipoInformatico::find($id)) {
+            return redirect()->route('equipos.edit', $id);
+        }
+        return redirect()->route('herramientas.planta.edit', $id);
+    })->name('herramientas.edit');
 
-Route::get('activos/{id}', function (int $id) {
-    if (App\Models\EquipoInformatico::find($id)) return redirect()->route('equipos.show', $id);
-    return redirect()->route('herramientas.planta.show', $id);
-})->name('herramientas.show');
+    Route::get('activos/{id}', function (int $id) {
+        if (EquipoInformatico::find($id)) {
+            return redirect()->route('equipos.show', $id);
+        }
+        return redirect()->route('herramientas.planta.show', $id);
+    })->name('herramientas.show');
 });
 
 // ==========================================
@@ -106,15 +111,16 @@ Route::get('activos/{id}', function (int $id) {
 // ==========================================
 Route::get('inventario/acciones', [InventarioAccionController::class, 'index'])
     ->name('inventario.acciones.index')
-    ->middleware('permission:inventario.manage');
+    ->middleware('permission:inventario.view');
 Route::get('inventario/acciones/{tipo}/{id}', [InventarioAccionController::class, 'show'])
     ->where('tipo', 'salida|entrada|traslado')
     ->name('inventario.acciones.show')
-    ->middleware('permission:inventario.manage');
+    ->middleware('permission:inventario.view');
 Route::post('inventario/acciones/{tipo}/{id}/cancelar', [InventarioAccionController::class, 'cancel'])
     ->where('tipo', 'salida|entrada|traslado')
     ->name('inventario.acciones.cancel')
     ->middleware('permission:inventario.manage');
+
 Route::post('inventario/entradas', [InventarioController::class, 'storeEntrada'])
     ->name('inventario.entrada.store')
     ->middleware('permission:inventario.manage');
@@ -133,15 +139,20 @@ Route::get('inventario/traslados/nuevo', [InventarioController::class, 'createTr
 Route::post('inventario/traslados', [InventarioController::class, 'storeTraslado'])
     ->name('inventario.traslado.store')
     ->middleware('permission:inventario.manage');
+
 Route::post('inventario/kardex/entradas', [InventarioMovimientoController::class, 'storeEntrada'])
-    ->name('inventario.kardex.entrada.store');
+    ->name('inventario.kardex.entrada.store')
+    ->middleware('permission:inventario.manage');
 Route::post('inventario/kardex/salidas', [InventarioMovimientoController::class, 'storeSalida'])
-    ->name('inventario.kardex.salida.store');
+    ->name('inventario.kardex.salida.store')
+    ->middleware('permission:inventario.manage');
 Route::post('inventario/kardex/traslados', [InventarioMovimientoController::class, 'storeTraslado'])
-    ->name('inventario.kardex.traslado.store');
+    ->name('inventario.kardex.traslado.store')
+    ->middleware('permission:inventario.manage');
 Route::post('inventario/kardex/{movimiento}/revertir', [InventarioMovimientoController::class, 'revertir'])
     ->name('inventario.kardex.revertir')
     ->middleware('permission:inventario.manage');
+
 Route::get('inventario/informes', [InventarioInformeController::class, 'index'])
     ->name('inventario.informes.index')
     ->middleware('permission:inventario.view');
@@ -151,18 +162,16 @@ Route::post('inventario/informes/exportar', [InventarioInformeController::class,
 Route::get('inventario/informes/{id}/descargar', [InventarioInformeController::class, 'descargarHistorico'])
     ->name('inventario.informes.descargar')
     ->middleware('permission:inventario.view');
+
 Route::get('inventario/nuevo-item', [InventarioController::class, 'createItem'])
     ->name('inventario.item.create')
     ->middleware('permission:inventario.manage');
-Route::resource('inventario', InventarioController::class);
 Route::get('inventario/historial', [HistoricoController::class, 'index'])
     ->name('inventario.acciones')
     ->middleware('permission:inventario.manage');
-Route::get('/inventario/salidas/{id}/documento', [InventarioController::class, 'showSalidaDocumento'])
-    ->name('inventario.salidas.documento')
-    ->middleware('permission:inventario.manage');
-Route::resource('historico', HistoricoController::class)->only(['index']);
 
+Route::resource('inventario', InventarioController::class);
+Route::resource('historico', HistoricoController::class)->only(['index']);
 
 // ==========================================
 // 2. ALMACENES Y CLASIFICACIONES
@@ -187,7 +196,6 @@ Route::delete('almacenes/{almacen}', [AlmacenController::class, 'destroy'])
     ->middleware('permission:inventario.manage');
 Route::resource('clases', ClaseController::class);
 
-
 // ==========================================
 // 3. ADMINISTRACIÓN: USUARIOS Y PERMISOS
 // ==========================================
@@ -200,23 +208,24 @@ Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive'
     ->middleware('permission:users.manage');
 Route::get('users/{user}/permissions', [UserController::class, 'permissionsEdit'])
     ->name('users.permissions.edit')
-    ->middleware('permission:users.permissions'); 
+    ->middleware('permission:users.permissions');
 Route::put('users/{user}/permissions', [UserController::class, 'permissionsUpdate'])
     ->name('users.permissions.update')
-    ->middleware('permission:users.permissions'); 
+    ->middleware('permission:users.permissions');
 Route::post('/users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])
     ->name('users.sendResetLink');
 
 // ==========================================
 // 3B. SANEAMIENTO DE DATOS HUÉRFANOS (SUPERADMIN)
 // ==========================================
-Route::get('admin/huerfanos', [\App\Http\Controllers\OrphanDataController::class, 'index'])
-    ->name('admin.orphans.index');
-Route::post('admin/huerfanos/assign', [\App\Http\Controllers\OrphanDataController::class, 'assign'])
-    ->name('admin.orphans.assign');
-Route::delete('admin/huerfanos/destroy', [\App\Http\Controllers\OrphanDataController::class, 'destroy'])
-    ->name('admin.orphans.destroy');
-
+Route::middleware(['auth'])->group(function () {
+    Route::get('admin/huerfanos', [OrphanDataController::class, 'index'])
+        ->name('admin.orphans.index');
+    Route::post('admin/huerfanos/assign', [OrphanDataController::class, 'assign'])
+        ->name('admin.orphans.assign');
+    Route::delete('admin/huerfanos/destroy', [OrphanDataController::class, 'destroy'])
+        ->name('admin.orphans.destroy');
+});
 
 // ==========================================
 // 4. GESTIÓN DE PUESTOS DE PERSONAL
@@ -224,19 +233,15 @@ Route::delete('admin/huerfanos/destroy', [\App\Http\Controllers\OrphanDataContro
 Route::get('personal/puestos-trabajo', [PuestoTrabajoController::class, 'index'])
     ->name('personal.puestos-trabajo.index')
     ->middleware('permission:personal.edit');
-
 Route::post('personal/puestos-trabajo', [PuestoTrabajoController::class, 'store'])
     ->name('personal.puestos-trabajo.store')
     ->middleware('permission:personal.edit');
-
 Route::put('personal/puestos-trabajo/{puestoTrabajo}', [PuestoTrabajoController::class, 'update'])
     ->name('personal.puestos-trabajo.update')
     ->middleware('permission:personal.edit');
-
 Route::delete('personal/puestos-trabajo/{puestoTrabajo}', [PuestoTrabajoController::class, 'destroy'])
     ->name('personal.puestos-trabajo.destroy')
     ->middleware('permission:personal.edit');
-
 
 // ==========================================
 // 5. MÓDULO DE PERSONAL (Rutas estáticas primero)
@@ -244,43 +249,33 @@ Route::delete('personal/puestos-trabajo/{puestoTrabajo}', [PuestoTrabajoControll
 Route::get('personal', [PersonalController::class, 'index'])
     ->name('personal.index')
     ->middleware('permission:personal.view');
-
 Route::get('personal/crear', [PersonalController::class, 'create'])
     ->name('personal.create')
     ->middleware('permission:personal.create');
-
 Route::post('personal', [PersonalController::class, 'store'])
     ->name('personal.store')
     ->middleware('permission:personal.create');
-
 Route::get('personal/tallas', [PersonalController::class, 'tallas'])
     ->name('personal.tallas')
     ->middleware('permission:personal.tallas');
-
 Route::get('personal/puestos', [PersonalController::class, 'puestos'])
     ->name('personal.puestos.info')
     ->middleware('permission:personal.edit');
-
 Route::post('/personal/cursos/bulk', [PersonalController::class, 'assignBulkCourses'])
     ->name('personal.cursos.bulk')
-    ->middleware('permission:cursos.edit'); 
-
+    ->middleware('permission:cursos.edit');
 Route::post('/personal/export/bulk', [PersonalController::class, 'exportBulk'])
     ->name('personal.export.bulk')
-    ->middleware('permission:personal.export'); 
-
+    ->middleware('permission:personal.export');
 Route::post('/personal/departamento/bulk', [PersonalController::class, 'updateBulkDepartamento'])
     ->name('personal.departamento.bulk')
     ->middleware('permission:personal.bulk');
-
 Route::post('/personal/{personal}/prl-revisado', [PersonalController::class, 'marcarRevisadoPrl'])
     ->name('personal.prl.revisado')
     ->middleware('permission:cursos.edit');
-
 Route::post('/personal/{personal}/toggle-status', [PersonalController::class, 'toggleStatus'])
     ->name('personal.toggleStatus')
     ->middleware('permission:personal.edit');
-
 
 // ==========================================
 // 6. MÓDULO DE PERSONAL (Rutas con parámetros al final)
@@ -288,31 +283,24 @@ Route::post('/personal/{personal}/toggle-status', [PersonalController::class, 't
 Route::get('personal/{personal}', [PersonalController::class, 'show'])
     ->name('personal.show')
     ->middleware('permission:personal.view');
-
 Route::get('personal/{personal}/edit', [PersonalController::class, 'edit'])
     ->name('personal.edit')
     ->middleware('permission:personal.edit');
-
 Route::put('personal/{personal}', [PersonalController::class, 'update'])
     ->name('personal.update')
     ->middleware('permission:personal.edit');
-
 Route::delete('personal/{personal}', [PersonalController::class, 'destroy'])
     ->name('personal.destroy')
     ->middleware('permission:personal.delete');
-
 Route::post('/personal/{personal}/entregas-epi', [PersonalController::class, 'uploadDocumentosPrl'])
     ->name('personal.entregas_epi.store')
     ->middleware('permission:personal.edit');
-
 Route::delete('/personal/{personal}/entregas-epi/{tipo}', [PersonalController::class, 'destroyDocumentosPrl'])
     ->name('personal.entregas_epi.destroy')
     ->middleware('permission:personal.edit');
-
 Route::delete('/personal/{personal}/historial-prl/{historial}', [PersonalController::class, 'destroyHistorialPrl'])
     ->name('personal.historial_prl.destroy')
     ->middleware('permission:personal.edit');
-
 
 // ==========================================
 // 7. DEPARTAMENTOS Y ACCESORIOS DE CURSOS/PRL
@@ -320,27 +308,26 @@ Route::delete('/personal/{personal}/historial-prl/{historial}', [PersonalControl
 Route::post('/departamentos', [DepartamentoController::class, 'store'])
     ->name('departamentos.store')
     ->middleware('permission:personal.edit');
-
 Route::delete('/departamentos/{nombre}', [DepartamentoController::class, 'destroy'])
     ->name('departamentos.destroy')
     ->middleware('permission:personal.edit');
 
 // ==========================================
-// 8. GESTOR DE CÓDIGOS QR 
+// 8. GESTOR DE CÓDIGOS QR
 // ==========================================
 Route::middleware(['auth', 'permission:activos.manage'])->group(function () {
-    Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
+    Route::get('/admin/qrs', [QrController::class, 'index'])
         ->name('qrs.index');
-    Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])
+    Route::post('/admin/qrs/generar', [QrController::class, 'store'])
         ->name('qrs.store');
-    Route::post('/admin/qrs/carpetas', [App\Http\Controllers\QrController::class, 'storeCarpeta'])
+    Route::post('/admin/qrs/carpetas', [QrController::class, 'storeCarpeta'])
         ->name('qrs.carpeta.store');
-    Route::get('/admin/qrs/{id}/download', [App\Http\Controllers\QrController::class, 'download'])
+    Route::get('/admin/qrs/{id}/download', [QrController::class, 'download'])
         ->name('qrs.download');
-    Route::delete('/admin/qrs/{id}', [App\Http\Controllers\QrController::class, 'destroy'])
+    Route::delete('/admin/qrs/{id}', [QrController::class, 'destroy'])
         ->name('qrs.destroy');
-    Route::put('/admin/qrs/{id}/mover', [App\Http\Controllers\QrController::class, 'moverCarpeta'])
+    Route::put('/admin/qrs/{id}/mover', [QrController::class, 'moverCarpeta'])
         ->name('qrs.mover');
-    Route::delete('/admin/qrs/carpetas/{id}', [App\Http\Controllers\QrController::class, 'destroyCarpeta'])
+    Route::delete('/admin/qrs/carpetas/{id}', [QrController::class, 'destroyCarpeta'])
         ->name('qrs.carpeta.destroy');
 });

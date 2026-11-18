@@ -49,6 +49,7 @@ class Presupuesto extends Model
         'archivo_pdf',
         'lista_articulos',
         'descripcion_general',
+        'con_portada',
     ];
 
     /**
@@ -57,10 +58,11 @@ class Presupuesto extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'fecha' => 'datetime:Y-m-d H:i:s', // <--- CORREGIDO: Conserva horas y minutos en la serialización JSON
+        'fecha' => 'datetime:Y-m-d H:i:s', 
         'total' => 'decimal:2',
         'lista_articulos' => 'array',
         'numero_correlativo' => 'integer',
+        'con_portada' => 'boolean',
     ];
 
     /**

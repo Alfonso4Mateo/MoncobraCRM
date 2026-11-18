@@ -97,6 +97,59 @@
 </head>
 <body>
 
+@if(!empty($presupuesto->con_portada))
+    @php
+        $logoPortadaPath = public_path('images/logo_moncobra.png');
+        $fondoPortadaPath = public_path('images/portada_fondo.png');
+        $tituloPortada = trim((string) ($presupuesto->titulo ?? '')) !== ''
+            ? $presupuesto->titulo
+            : ($presupuesto->documento ?: 'Presupuesto');
+        $clientePortada = mb_strtoupper((string) ($presupuesto->cliente->empresa_nombre ?? ''), 'UTF-8');
+    @endphp
+
+    <div style="page-break-after: always; width: 100%; font-family: DejaVu Sans, Arial, sans-serif; color: #000080; margin: 0; padding: 0;">
+        {{-- BLOQUE SUPERIOR: Título + Cliente a la izquierda | Barra azul | Logo + Nº Presupuesto a la derecha --}}
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 14px;">
+            <tr>
+                {{-- Columna Izquierda: Título del presupuesto + Nombre del cliente --}}
+                <td style="width: 57%; vertical-align: top; padding: 10px 18px 0 8px; text-align: center;">
+                    <div style="min-height: 155px; display: table; width: 100%; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 14px;">
+                        <div style="display: table-cell; vertical-align: middle; font-size: 23px; font-weight: bold; color: #000080; line-height: 1.32;">
+                            {{ $tituloPortada }}
+                        </div>
+                    </div>
+                    <div style="padding-top: 14px; font-size: 15px; font-weight: bold; color: #000080; letter-spacing: 0.4px;">
+                        {{ $clientePortada }}
+                    </div>
+                </td>
+
+                {{-- Barra Vertical Azul Corporativa --}}
+                <td style="width: 10px; background-color: #123c69; padding: 0;">&nbsp;</td>
+
+                {{-- Columna Derecha: Logo Moncobra + Número de Presupuesto --}}
+                <td style="width: 41%; vertical-align: top; padding: 4px 8px 0 18px; text-align: left;">
+                    <div style="text-align: right; margin-bottom: 24px;">
+                        @if(file_exists($logoPortadaPath))
+                            <img src="{{ $logoPortadaPath }}" alt="Moncobra" style="width: 195px; height: auto;">
+                        @endif
+                    </div>
+
+                    <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 26px 4px; font-size: 22px; font-weight: bold; color: #000080;">
+                        {{ $presupuesto->numero }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        {{-- BLOQUE INFERIOR: Ilustración corporativa (Mapamundi + Arco + Triángulos) --}}
+        @if(file_exists($fondoPortadaPath))
+            <div style="width: 100%; margin-top: 18px; text-align: center;">
+                <img src="{{ $fondoPortadaPath }}" alt="Portada Moncobra" style="width: 100%; max-height: 640px; object-fit: contain;">
+            </div>
+        @endif
+    </div>
+@endif
+
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
         <tr>
             <td width="50%" valign="top">
@@ -200,7 +253,6 @@
         $usarFormatoCompacto = false;
         $totalLineasVisuales = 0;
 
-        // Contabilizamos también el espacio ocupado por la descripción general si existe
         $descGeneral = trim((string) ($presupuesto->descripcion_general ?? ''));
         if ($descGeneral !== '') {
             $totalLineasVisuales += substr_count($descGeneral, "\n") + ceil(strlen($descGeneral) / 95) + 2;
@@ -211,11 +263,9 @@
             $longitud = strlen($texto);
             $saltosLinea = substr_count($texto, "\n");
 
-            // Estimamos el espacio visual consumido
             $lineasEstimadas = $saltosLinea + ceil($longitud / 80) + 1;
             $totalLineasVisuales += $lineasEstimadas;
 
-            // Si hay mucho texto, activamos el formato compacto
             if ($longitud > 250 || $totalLineasVisuales > 15) {
                 $usarFormatoCompacto = true;
                 break; 
@@ -224,7 +274,6 @@
     @endphp
 
     @if ($lineasValidas->isNotEmpty())
-    <!-- SE APLICA LA CLASE DINÁMICA A LA TABLA -->
     <table class="doc-table {{ $usarFormatoCompacto ? 'compact' : '' }}">
         <thead>
             <tr>
@@ -246,13 +295,8 @@
                     $medida = $line['medida'] ?? ($line['unidad'] ?? null);
                     $medida = is_string($medida) ? trim($medida) : $medida;
 
-                    // --- LIMPIEZA DE SÍMBOLOS '&' ---
                     $textoDesc = $line['descripcion'] ?? $line['articulo'] ?? '';
-                    
-                    // 1. Borrar agrupaciones de múltiples &&&&
                     $textoLimpio = preg_replace('/&{2,}/', '', $textoDesc);
-                    
-                    // 2. Borrar un '&' suelto en una línea, pero RESPETANDO el salto de línea.
                     $textoLimpio = preg_replace('/^\s*&\s*$/m', '', $textoLimpio);
                 @endphp
                 <tr>
