@@ -324,7 +324,7 @@ return [
         [
             'text' => 'Área Clientes',
             'icon' => 'fas fa-fw fa-users',
-            // El menú padre se mostrará si el usuario tiene acceso a AL MENOS UNO de los submódulos
+            
             'can'  => ['clientes.view', 'presupuestos.view', 'pedidos.view', 'albaranes.view'],
             'submenu' => [
                 [
@@ -332,35 +332,35 @@ return [
                     'url' => 'clientes',
                     'icon' => 'fas fa-fw fa-users',
                     'active' => ['clientes*'],
-                    'can' => 'clientes.view', // Candado específico
+                    'can' => 'clientes.view', 
                 ],
                 [
                     'text' => 'Presupuestos',
                     'url' => 'presupuestos',
                     'icon' => 'fas fa-fw fa-file-invoice-dollar',
                     'active' => ['presupuestos*'],
-                    'can' => 'presupuestos.view', // Candado específico
+                    'can' => 'presupuestos.view', 
                 ],
                 [
                     'text' => 'Gestión de Bolsas',
                     'url' => 'bolsas',
                     'icon' => 'fa-solid fa-sack-dollar',
                     'active' => ['bolsas', 'bolsas/*'],
-                    'can' => 'bolsas.view', // Candado específico
+                    'can' => 'bolsas.view', 
                 ],
                 [
                     'text' => 'Pedidos Clientes',
                     'url' => 'pedidos-clientes',
                     'icon' => 'fas fa-fw fa-briefcase',
                     'active' => ['pedidos-clientes*'],
-                    'can' => 'pedidos.view', // Candado específico
+                    'can' => 'pedidos.view', 
                 ],
                 [
                     'text' => 'Albaranes Clientes',
                     'url' => 'albaranes',
                     'icon' => 'fas fa-fw fa-file-alt',
                     'active' => ['albaranes', 'albaranes/*'],
-                    'can' => 'albaranes.view', // Candado específico
+                    'can' => 'albaranes.view', 
                 ],
             ],
         ],
@@ -371,7 +371,7 @@ return [
             'url' => 'inventario',
             'icon' => 'fas fa-fw fa-warehouse',
             'active' => ['inventario*'],
-            'can' => 'inventario.view', // <-- Corregido (antes ponía inventory.view)
+            'can' => 'inventario.view', 
         ],
 
         // Documentos
@@ -380,7 +380,7 @@ return [
             'url' => 'documentos',
             'icon' => 'fas fa-fw fa-folder-open',
             'active' => ['documentos*'],
-            'can' => 'documentos.view', // <-- Muro de Spatie añadido
+            'can' => 'documentos.view', 
         ],
 
         // Personal (vista dedicada)
@@ -389,7 +389,7 @@ return [
             'url' => 'personal',
             'icon' => 'fas fa-fw fa-users',
             'active' => ['personal*'],
-            'can' => 'personal.view', // <-- Este ya lo tenías bien
+            'can' => 'personal.view', 
         ],
 
         // Cursos
@@ -398,14 +398,14 @@ return [
             'url' => 'cursos',
             'icon' => 'fas fa-fw fa-graduation-cap',
             'active' => ['cursos*'],
-            'can' => 'cursos.view', // <-- Este ya lo tenías bien
+            'can' => 'cursos.view', 
         ],
 
         // Herramientas (vista dedicada)
         [
             'text' => 'Herramientas',
             'icon' => 'fas fa-fw fa-tools',
-            // El menú padre se mostrará si el usuario tiene acceso a AL MENOS UNO de los submódulos
+            
             'can'  => ['herramientas.view'],
             'submenu' => [
                 [
@@ -469,10 +469,18 @@ return [
         // Registro de cambios del ERP
         [
             'text' => 'Auditoría de cambios',
-            'url' => 'auditoria', // <-- ELIMINA 'herramientas/'
+            'url' => 'auditoria', 
             'icon' => 'fas fa-fw fa-history',
-            'active' => ['auditoria*'], // <-- ELIMINA 'herramientas/'
+            'active' => ['auditoria*'], 
             'can' => 'activitylog.view',
+            'classes' => 'sidebar-tools-item',
+        ],
+        [
+            'text' => 'Datos Huérfanos',
+            'route' => 'admin.orphans.index',
+            'icon' => 'fas fa-fw fa-life-ring',
+            'active' => ['admin/huerfanos*'],
+            'can' => 'manage-projects',
             'classes' => 'sidebar-tools-item',
         ],
 
@@ -482,7 +490,7 @@ return [
             'url' => 'users',
             'icon' => 'fas fa-fw fa-users-cog',
             'active' => ['users*'],
-            'can' => 'users.view', // <-- Corregido para sincronizarse con tu seeder (antes era manage-users)
+            'can' => 'users.view', 
             'classes' => 'sidebar-tools-item',
         ],
 
@@ -492,7 +500,7 @@ return [
             'url' => 'herramientas/gestion-proyectos',
             'icon' => 'fas fa-fw fa-code-branch',
             'active' => ['herramientas/gestion-proyectos*'],
-            'can' => 'manage-projects', // Si en el futuro lo añades a Spatie, recuerda actualizar este también
+            'can' => 'manage-projects', 
             'classes' => 'sidebar-tools-item',
         ],
     ],

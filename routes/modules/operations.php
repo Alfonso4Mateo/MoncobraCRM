@@ -207,6 +207,16 @@ Route::put('users/{user}/permissions', [UserController::class, 'permissionsUpdat
 Route::post('/users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])
     ->name('users.sendResetLink');
 
+// ==========================================
+// 3B. SANEAMIENTO DE DATOS HUÉRFANOS (SUPERADMIN)
+// ==========================================
+Route::get('admin/huerfanos', [\App\Http\Controllers\OrphanDataController::class, 'index'])
+    ->name('admin.orphans.index');
+Route::post('admin/huerfanos/assign', [\App\Http\Controllers\OrphanDataController::class, 'assign'])
+    ->name('admin.orphans.assign');
+Route::delete('admin/huerfanos/destroy', [\App\Http\Controllers\OrphanDataController::class, 'destroy'])
+    ->name('admin.orphans.destroy');
+
 
 // ==========================================
 // 4. GESTIÓN DE PUESTOS DE PERSONAL
