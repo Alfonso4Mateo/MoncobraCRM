@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Ubicacion extends Model
 {
+    use Auditable;
     use HasFactory;
 
     protected $table = 'ubicaciones';

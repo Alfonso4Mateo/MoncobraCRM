@@ -10,7 +10,7 @@
             <p>Control de custodia, trazabilidad operativa, ciclos de mantenimiento y estado de equipos.</p>
         </div>
         <div class="plant-actions">
-            <a class="plant-btn plant-btn-soft" href="#"><i class="fas fa-file-signature"></i> Exportar datos</a>
+            <a class="plant-btn plant-btn-soft" href="{{ route('herramientas.index', array_merge(request()->query(), ['export' => 'csv'])) }}"><i class="fas fa-file-signature"></i> Exportar datos</a>
             <button type="button" class="plant-btn plant-btn-soft" data-toggle="modal" data-target="#modalImportarPlanta">
                 <i class="fas fa-file-upload"></i> Importar CSV
             </button>
@@ -548,7 +548,12 @@
                 </div>
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Ubicación / Obra *</label>
-                    <input required type="text" name="ubicacion" class="form-control" placeholder="A dónde va" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                    <select required name="ubicacion_id" class="form-control" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                        <option value="">Seleccionar ubicación...</option>
+                        @foreach($ubicaciones as $ubicacion)
+                            <option value="{{ $ubicacion->id }}">{{ $ubicacion->nombre }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 

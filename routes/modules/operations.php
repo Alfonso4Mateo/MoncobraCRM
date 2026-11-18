@@ -328,7 +328,7 @@ Route::delete('/departamentos/{nombre}', [DepartamentoController::class, 'destro
 // ==========================================
 // 8. GESTOR DE CÓDIGOS QR 
 // ==========================================
-Route::middleware(['permission:activos.manage'])->group(function () {
+Route::middleware(['auth', 'permission:activos.manage'])->group(function () {
     Route::get('/admin/qrs', [App\Http\Controllers\QrController::class, 'index'])
         ->name('qrs.index');
     Route::post('/admin/qrs/generar', [App\Http\Controllers\QrController::class, 'store'])

@@ -14,7 +14,7 @@ class QrCarpeta extends Model
     use SoftDeletes;
 
     protected $table = 'qr_carpetas';
-    protected $fillable = ['nombre', 'parent_id'];
+    protected $fillable = ['proyecto_id', 'nombre', 'parent_id'];
 
     // Obtener la carpeta padre
     public function padre()
@@ -65,5 +65,10 @@ class QrCarpeta extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function proyecto()
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 }

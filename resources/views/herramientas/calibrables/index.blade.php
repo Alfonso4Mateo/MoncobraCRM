@@ -10,7 +10,7 @@
             <p>Control de certificaciones, fechas de calibración y exactitud operativa de los equipos.</p>
         </div>
         <div class="cal-actions">
-            <a class="cal-btn cal-btn-soft" href="#"><i class="fas fa-file-signature"></i> Exportar datos</a>
+            <a class="cal-btn cal-btn-soft" href="{{ route('calibrables.index', array_merge(request()->query(), ['export' => 'csv'])) }}"><i class="fas fa-file-signature"></i> Exportar datos</a>
             <a class="cal-btn cal-btn-main" href="{{ route('calibrables.create') }}"><i class="fas fa-plus"></i> Registrar equipo</a>
         </div>
     </div>
@@ -469,7 +469,12 @@
                 </div>
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Ubicación *</label>
-                    <input required type="text" name="ubicacion" class="form-control" placeholder="Taller, Laboratorio interno..." style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                    <select required name="ubicacion_id" class="form-control" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                        <option value="">Seleccionar ubicación...</option>
+                        @foreach($ubicaciones as $ubicacion)
+                            <option value="{{ $ubicacion->id }}">{{ $ubicacion->nombre }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Nota de entrega *</label>

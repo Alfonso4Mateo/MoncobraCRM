@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -19,6 +18,7 @@ class AparatoCalibrable extends Model
     protected $table = 'aparatos_calibrables';
 
     protected $fillable = [
+        'proyecto_id',
         'nombre',
         'codigo',
         'numero_serie',
@@ -51,12 +51,8 @@ class AparatoCalibrable extends Model
         'personal_id',
     ];
 
-    public function personalAsignado(): BelongsTo
-    {
-        return $this->belongsTo(Personal::class, 'personal_id');
-    }
-
     protected $casts = [
+        'proyecto_id' => 'integer',
         'fecha_certificado' => 'date',
         'proxima_calibracion' => 'date',
         'ultima_calibracion' => 'date',
@@ -64,6 +60,16 @@ class AparatoCalibrable extends Model
         'fecha_baja' => 'date',
         'dias_estimados_baja' => 'integer',
     ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    public function personalAsignado(): BelongsTo
+    {
+        return $this->belongsTo(Personal::class, 'personal_id');
+    }
 
     public function eventos(): MorphMany
     {
@@ -112,39 +118,33 @@ class AparatoCalibrable extends Model
         }
     }
 
-    public function ubicacion() 
+    public function ubicacion(): BelongsTo
     {
-        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
         return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
     }
 
-    public function departamento()
+    public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 
     public function getDiasEnEstado(string $estadoBuscado): int
     {
-        // Traemos todos los eventos de esta máquina, ordenados del más antiguo al más nuevo
         $eventos = $this->eventos()->oldest('fecha')->get();
-        
+
         $totalDias = 0;
         $fechaInicioEstado = null;
 
         foreach ($eventos as $evento) {
-            // Si el evento es del tipo que buscamos (ej. entra a 'calibracion') y no estábamos ya contando
             if ($evento->tipo === $estadoBuscado && !$fechaInicioEstado) {
                 $fechaInicioEstado = \Carbon\Carbon::parse($evento->fecha);
-            } 
-            // Si estábamos contando días y ocurre CUALQUIER OTRO evento (ej. vuelve a 'operativo')
-            elseif ($fechaInicioEstado && $evento->tipo !== $estadoBuscado) {
+            } elseif ($fechaInicioEstado && $evento->tipo !== $estadoBuscado) {
                 $fechaFinEstado = \Carbon\Carbon::parse($evento->fecha);
                 $totalDias += (int) $fechaInicioEstado->diffInDays($fechaFinEstado);
-                $fechaInicioEstado = null; // Detenemos el cronómetro
+                $fechaInicioEstado = null;
             }
         }
 
-        // Si el bucle termina y la máquina SIGUE en ese estado hoy en día
         if ($fechaInicioEstado && $this->estado === $estadoBuscado) {
             $totalDias += (int) $fechaInicioEstado->diffInDays(now());
         }

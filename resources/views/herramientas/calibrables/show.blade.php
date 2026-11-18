@@ -234,7 +234,17 @@
                         {{ optional($herramienta->proxima_calibracion)->format('d/m/Y') ?: 'No planificada' }}
                     </strong>
                 </li>
-                <li><span>Certificado Oficial Válido</span><strong>{{ $herramienta->certificado ?: 'Pendiente' }}</strong></li>
+                <li>
+                    <span>Certificado Oficial Válido</span>
+                    <strong>
+                        {{ $herramienta->certificado ?: 'Pendiente' }}
+                        @if(!empty($herramienta->certificado_pdf))
+                            <a href="{{ Storage::url($herramienta->certificado_pdf) }}" target="_blank" style="margin-left: 8px; color: #17619a; text-decoration: none;">
+                                <i class="fas fa-file-pdf"></i> Ver PDF
+                            </a>
+                        @endif
+                    </strong>
+                </li>
                 <li><span>Laboratorio certificador</span><strong>{{ $herramienta->laboratorio ?: 'No indicado' }}</strong></li>
             </ul>
         </section>

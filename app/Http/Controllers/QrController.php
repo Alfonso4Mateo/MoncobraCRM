@@ -8,6 +8,7 @@ use App\Models\QrCarpeta;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class QrController extends Controller
 {
@@ -16,18 +17,59 @@ class QrController extends Controller
         $this->middleware('auth');
     }
 
+    private function authorizeQrProyecto(EtiquetaQr $qr): void
+    {
+        $user = auth()->user();
+        if (!$user || $user->role === 'superadmin') {
+            return;
+        }
+
+        $misProyectos = $user->proyectos->pluck('id')->map(fn ($id) => (int) $id)->all();
+        abort_unless(
+            in_array((int) $qr->proyecto_id, $misProyectos, true),
+            403,
+            'No tienes acceso a una etiqueta QR de otra sede.'
+        );
+    }
+
+    private function authorizeCarpetaProyecto(QrCarpeta $carpeta): void
+    {
+        $user = auth()->user();
+        if (!$user || $user->role === 'superadmin') {
+            return;
+        }
+
+        $misProyectos = $user->proyectos->pluck('id')->map(fn ($id) => (int) $id)->all();
+        abort_unless(
+            in_array((int) $carpeta->proyecto_id, $misProyectos, true),
+            403,
+            'No tienes acceso a una carpeta de otra sede.'
+        );
+    }
+
     public function index(Request $request)
     {
-        $carpetas = QrCarpeta::whereNull('parent_id')->with('subcarpetasRecursivas')->get();
-        $carpetaSeleccionada = $request->get('carpeta');
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
 
-        $qrsQuery = EtiquetaQr::where('activo', true);
+        $carpetas = QrCarpeta::where('proyecto_id', $proyectoActivoId)
+            ->whereNull('parent_id')
+            ->with(['subcarpetasRecursivas' => fn ($q) => $q->where('proyecto_id', $proyectoActivoId)])
+            ->orderBy('nombre')
+            ->get();
+
+        $carpetaSeleccionada = $request->integer('carpeta') ?: null;
+
+        $qrsQuery = EtiquetaQr::where('activo', true)
+            ->where('proyecto_id', $proyectoActivoId);
+
         if ($carpetaSeleccionada) {
             $qrsQuery->where('carpeta_id', $carpetaSeleccionada);
         }
-        $qrs = $qrsQuery->latest()->get();
 
-        $todasLasCarpetas = QrCarpeta::all();
+        $qrs = $qrsQuery->latest()->get();
+        $todasLasCarpetas = QrCarpeta::where('proyecto_id', $proyectoActivoId)
+            ->orderBy('nombre')
+            ->get();
 
         return view('qrs.index', compact('carpetas', 'qrs', 'todasLasCarpetas', 'carpetaSeleccionada'));
     }
@@ -35,8 +77,10 @@ class QrController extends Controller
     public function download($id)
     {
         $qr = EtiquetaQr::findOrFail($id);
+        $this->authorizeQrProyecto($qr);
+
         $rutaAbsoluta = storage_path('app/public/' . $qr->ruta_archivo);
-        
+
         if (file_exists($rutaAbsoluta)) {
             return response()->download($rutaAbsoluta, Str::slug($qr->titulo) . '.svg');
         }
@@ -46,6 +90,19 @@ class QrController extends Controller
 
     public function descargarQrActivo(string $tipo, int $id)
     {
+        $model = match ($tipo) {
+            'equipo' => \App\Models\EquipoInformatico::findOrFail($id),
+            'planta' => \App\Models\HerramientaPlanta::findOrFail($id),
+            'calibrable' => \App\Models\AparatoCalibrable::findOrFail($id),
+            default => abort(404),
+        };
+
+        $user = auth()->user();
+        if ($user && $user->role !== 'superadmin') {
+            $misProyectos = $user->proyectos->pluck('id')->map(fn ($pid) => (int) $pid)->all();
+            abort_unless(in_array((int) $model->proyecto_id, $misProyectos, true), 403);
+        }
+
         $url = route('activos.qr.show', ['tipo' => $tipo, 'id' => $id]);
         $svg = QrCode::format('svg')
             ->size(350)
@@ -61,11 +118,12 @@ class QrController extends Controller
     public function destroy($id)
     {
         $qr = EtiquetaQr::findOrFail($id);
-        
-        if (Storage::disk('public')->exists($qr->ruta_archivo)) {
+        $this->authorizeQrProyecto($qr);
+
+        if ($qr->ruta_archivo && Storage::disk('public')->exists($qr->ruta_archivo)) {
             Storage::disk('public')->delete($qr->ruta_archivo);
         }
-        
+
         $qr->delete();
 
         return back()->with('success', 'Código QR eliminado correctamente.');
@@ -73,14 +131,18 @@ class QrController extends Controller
 
     public function store(Request $request)
     {
+        $proyectoActivoId = $this->resolveActiveProyectoId($request);
+
         $request->validate([
             'titulo'          => 'required|string|max:255',
             'contenido_datos' => 'required|url',
-            'carpeta_id'      => 'required|exists:qr_carpetas,id',
+            'carpeta_id'      => [
+                'required',
+                Rule::exists('qr_carpetas', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoActivoId)),
+            ],
             'color_qr'        => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
-        // Cambiamos la extensión a .svg para evitar cualquier dependencia de Imagick
         $nombreArchivo = 'qr_' . time() . '_' . uniqid() . '.svg';
         $rutaRelativa  = 'qrs/' . $nombreArchivo;
         $rutaAbsoluta  = storage_path('app/public/' . $rutaRelativa);
@@ -94,7 +156,6 @@ class QrController extends Controller
         $hex = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $request->color_qr) ? $request->color_qr : '#000000';
         [$r, $g, $b] = sscanf($hex, "#%02x%02x%02x");
 
-        // Generamos el QR en formato SVG nativo
         QrCode::format('svg')
               ->size(400)
               ->errorCorrection('H')
@@ -103,11 +164,12 @@ class QrController extends Controller
               ->generate($enlaceFinal, $rutaAbsoluta);
 
         EtiquetaQr::create([
+            'proyecto_id'     => $proyectoActivoId,
             'titulo'          => $request->titulo,
             'contenido_datos' => $request->contenido_datos,
             'carpeta_id'      => $request->carpeta_id,
             'ruta_archivo'    => $rutaRelativa,
-            'activo'          => true
+            'activo'          => true,
         ]);
 
         return back()->with('success', 'Código QR generado y guardado correctamente.');
@@ -125,17 +187,24 @@ class QrController extends Controller
 
     public function storeCarpeta(Request $request)
     {
+        $proyectoActivoId = $this->resolveActiveProyectoId($request);
+
         $request->validate([
             'nombre'    => 'required|string|max:255',
-            'parent_id' => 'nullable|exists:qr_carpetas,id',
+            'parent_id' => [
+                'nullable',
+                Rule::exists('qr_carpetas', 'id')->where(fn ($q) => $q->where('proyecto_id', $proyectoActivoId)),
+            ],
         ]);
+
         if ($request->filled('parent_id') && (int) $request->parent_id === (int) $request->input('id')) {
             return back()->withErrors(['parent_id' => 'Una carpeta no puede ser su propia padre.'])->withInput();
         }
 
         QrCarpeta::create([
-            'nombre'    => $request->nombre,
-            'parent_id' => $request->parent_id,
+            'proyecto_id' => $proyectoActivoId,
+            'nombre'      => $request->nombre,
+            'parent_id'   => $request->parent_id,
         ]);
 
         return back()->with('success', 'Carpeta creada correctamente.');
@@ -143,16 +212,18 @@ class QrController extends Controller
 
     public function moverCarpeta(Request $request, $id)
     {
-        $request->validate([
-            'carpeta_id' => 'required|exists:qr_carpetas,id',
-        ]);
-        if ((int) $request->carpeta_id === (int) $id) {
-            return back()->withErrors(['carpeta_id' => 'Una carpeta no puede ser su propia padre.'])->withInput();
-        }
-
         $qr = EtiquetaQr::findOrFail($id);
+        $this->authorizeQrProyecto($qr);
+
+        $request->validate([
+            'carpeta_id' => [
+                'required',
+                Rule::exists('qr_carpetas', 'id')->where(fn ($q) => $q->where('proyecto_id', $qr->proyecto_id)),
+            ],
+        ]);
+
         $qr->update([
-            'carpeta_id' => $request->carpeta_id
+            'carpeta_id' => $request->carpeta_id,
         ]);
 
         return back()->with('success', 'Código QR movido de carpeta correctamente.');
@@ -161,8 +232,8 @@ class QrController extends Controller
     public function destroyCarpeta($id)
     {
         $carpeta = QrCarpeta::with('subcarpetasRecursivas')->findOrFail($id);
+        $this->authorizeCarpetaProyecto($carpeta);
 
-        // Comprobamos si tiene códigos QR dentro o subcarpetas hijas
         $tieneQrs = EtiquetaQr::where('carpeta_id', $id)->exists();
         $tieneSubcarpetas = $carpeta->subcarpetasRecursivas->count() > 0;
 

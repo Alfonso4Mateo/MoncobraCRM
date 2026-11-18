@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -19,24 +18,34 @@ class EquipoInformatico extends Model
     protected $table = 'equipos_informaticos';
 
     protected $fillable = [
-        'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria', 'estado',
-        'ubicacion_id', 'departamento_id','clase',
+        'proyecto_id', 'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria', 'estado',
+        'ubicacion_id', 'departamento_id', 'clase',
         'responsable', 'proveedor', 'fecha_adquisicion', 'fecha_mantenimiento',
         'descripcion', 'imagen', 'activo', 'tipo_equipo', 'sistema_operativo', 'procesador',
         'memoria_ram', 'almacenamiento', 'mac_address', 'ip_address', 'garantia_hasta',
         'soporte_hasta', 'condicion_fisica', 'etiqueta_color', 'dias_estimados_baja', 'fecha_baja', 'personal_id',
     ];
 
+    protected $casts = [
+        'proyecto_id' => 'integer',
+        'fecha_adquisicion' => 'date',
+        'fecha_mantenimiento' => 'date',
+        'garantia_hasta' => 'date',
+        'soporte_hasta' => 'date',
+        'activo' => 'boolean',
+        'fecha_baja' => 'date',
+        'dias_estimados_baja' => 'integer',
+    ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
     public function personalAsignado(): BelongsTo
     {
         return $this->belongsTo(Personal::class, 'personal_id');
     }
-
-    protected $casts = [
-        'fecha_adquisicion' => 'date', 'fecha_mantenimiento' => 'date',
-        'garantia_hasta' => 'date', 'soporte_hasta' => 'date', 'activo' => 'boolean',
-        'fecha_baja' => 'date', 'dias_estimados_baja' => 'integer',
-    ];
 
     public function eventos(): MorphMany
     {
@@ -84,13 +93,12 @@ class EquipoInformatico extends Model
         }
     }
 
-    public function ubicacion() 
+    public function ubicacion(): BelongsTo
     {
-        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
         return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
     }
 
-    public function departamento()
+    public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');
     }

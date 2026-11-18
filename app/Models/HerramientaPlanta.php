@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -19,27 +18,40 @@ class HerramientaPlanta extends Model
     protected $table = 'herramientas_planta';
 
     protected $fillable = [
-        'id_interno', 'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria',
-        'estado', 'ubicacion_id', 'departamento_id','clase',
+        'proyecto_id', 'id_interno', 'nombre', 'codigo', 'numero_serie', 'marca', 'modelo', 'categoria',
+        'estado', 'ubicacion_id', 'departamento_id', 'clase',
         'responsable', 'proveedor', 'id_proveedor',
         'almacen', 'stock', 'unidad_medida', 'fecha_registro', 'fecha_adquisicion',
-        'fecha_mantenimiento', 'descripcion', 'imagen', 'familia_id', 'familia_energetica',
+        'fecha_mantenimiento', 'descripcion', 'imagen', 'manual_pdf', 'familia_id', 'familia_energetica',
         'potencia', 'tension', 'combustible', 'criticidad', 'horas_uso', 'bloqueado',
-        'motivo_bloqueo',         'garantia_hasta','fecha_inspeccion' , 'dias_estimados_baja', 'fecha_baja', 'personal_id',
+        'motivo_bloqueo', 'garantia_hasta', 'fecha_inspeccion', 'dias_estimados_baja', 'fecha_baja', 'personal_id',
     ];
+
+    protected $casts = [
+        'proyecto_id' => 'integer',
+        'stock' => 'decimal:3',
+        'fecha_registro' => 'date',
+        'fecha_adquisicion' => 'date',
+        'fecha_mantenimiento' => 'date',
+        'garantia_hasta' => 'date',
+        'horas_uso' => 'integer',
+        'bloqueado' => 'boolean',
+        'fecha_inspeccion' => 'date',
+        'fecha_baja' => 'date',
+        'dias_estimados_baja' => 'integer',
+    ];
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
 
     public function personalAsignado(): BelongsTo
     {
         return $this->belongsTo(Personal::class, 'personal_id');
     }
 
-    protected $casts = [
-        'stock' => 'decimal:3', 'fecha_registro' => 'date', 'fecha_adquisicion' => 'date',
-        'fecha_mantenimiento' => 'date', 'garantia_hasta' => 'date', 'horas_uso' => 'integer', 'bloqueado' => 'boolean','fecha_inspeccion' => 'date',
-        'fecha_baja' => 'date', 'dias_estimados_baja' => 'integer',
-    ];
-
-    public function familia()
+    public function familia(): BelongsTo
     {
         return $this->belongsTo(FamiliaHerramienta::class, 'familia_id');
     }
@@ -91,13 +103,12 @@ class HerramientaPlanta extends Model
         }
     }
 
-    public function ubicacion() 
+    public function ubicacion(): BelongsTo
     {
-        // Le llamo ubicacionRelacion para que no colisione temporalmente con tu campo de texto 'ubicacion'
         return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
     }
 
-    public function departamento()
+    public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');
     }

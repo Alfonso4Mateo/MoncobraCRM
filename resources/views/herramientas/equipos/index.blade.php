@@ -10,7 +10,7 @@
             <p>Control de hardware corporativo, trazabilidad de custodios, estado del equipo y ciclo de vida.</p>
         </div>
         <div class="it-header-actions">
-            <a href="#" class="it-btn it-btn-light"><i class="fas fa-file-export"></i> Exportar datos</a>
+            <a href="{{ route('equipos.index', array_merge(request()->query(), ['export' => 'csv'])) }}" class="it-btn it-btn-light"><i class="fas fa-file-export"></i> Exportar datos</a>
             <a href="{{ route('equipos.create') }}" class="it-btn it-btn-primary"><i class="fas fa-plus"></i> Registrar equipo</a>
         </div>
     </div>
@@ -469,7 +469,12 @@
                 </div>
                 <div>
                     <label style="display: block; font-size: 10px; text-transform: uppercase; font-weight: 800; color: #586873; margin-bottom: 5px;">Ubicación / Puesto *</label>
-                    <input required type="text" name="ubicacion" class="form-control" placeholder="Ej. Oficina Técnica, Nave 2" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                    <select required name="ubicacion_id" class="form-control" style="width: 100%; border: 0; background: #eef2f5; font-size: 12px; padding: 10px; border-radius: 4px;">
+                        <option value="">Seleccionar ubicación...</option>
+                        @foreach($ubicaciones as $ubicacion)
+                            <option value="{{ $ubicacion->id }}">{{ $ubicacion->nombre }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             

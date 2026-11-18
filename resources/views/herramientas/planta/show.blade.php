@@ -182,7 +182,7 @@
                 <form method="POST" action="{{ route('qrs.store') }}">
                     @csrf
                     {{-- Parámetros ocultos que enviamos a tu QrController --}}
-                    <input type="hidden" name="contenido_datos" value="{{ $herramienta->manual_pdf ? asset('storage/'.$herramienta->manual_pdf) : 'Sin manual asignado' }}">
+                    <input type="hidden" name="contenido_datos" value="{{ route('activos.qr.show', ['tipo' => 'planta', 'id' => $herramienta->id]) }}">
                     <input type="hidden" name="titulo" value="{{ $herramienta->id_interno }} - {{ $herramienta->nombre }}">
                     <button type="submit" class="detail-btn detail-btn-main w-100 justify-content-center">
                         Generar Etiqueta QR

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AparatoCalibrable;
 use App\Models\Ubicacion;
 use App\Models\Departamento;
+use App\Models\Personal;
+use App\Models\ClaseHerramienta;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -16,9 +18,41 @@ class CalibrablesController extends Controller
         $this->middleware('auth');
     }
 
+    private function authorizeActivoProyecto(AparatoCalibrable $item): void
+    {
+        $user = auth()->user();
+        if (!$user || $user->role === 'superadmin') {
+            return;
+        }
+
+        $misProyectos = $user->proyectos->pluck('id')->map(fn ($id) => (int) $id)->all();
+        abort_unless(
+            in_array((int) $item->proyecto_id, $misProyectos, true),
+            403,
+            'No tienes acceso a un aparato calibrable de otra sede.'
+        );
+    }
+
+    private function assertPersonalInProyecto(?int $personalId, int $proyectoId): void
+    {
+        if (!$personalId) {
+            return;
+        }
+
+        $pertenece = Personal::where('id', $personalId)
+            ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoId))
+            ->exists();
+
+        abort_unless($pertenece, 422, 'El trabajador seleccionado no pertenece a esta sede.');
+    }
+
     public function index(Request $request)
     {
-        $query = AparatoCalibrable::query();
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+
+        $query = AparatoCalibrable::with('ubicacion')
+            ->where('proyecto_id', $proyectoActivoId);
+
         $search = trim((string) $request->query('buscar'));
 
         if ($search !== '') {
@@ -35,7 +69,6 @@ class CalibrablesController extends Controller
         if ($request->filled('estado')) {
             $query->where('estado', (string) $request->string('estado'));
         }
-
         if ($request->filled('departamento_id')) {
             $query->where('departamento_id', $request->integer('departamento_id'));
         }
@@ -54,8 +87,36 @@ class CalibrablesController extends Controller
             }
         }
 
+        if ($request->input('export') === 'csv') {
+            $rows = (clone $query)->latest()->get();
+
+            return response()->streamDownload(function () use ($rows): void {
+                echo chr(0xEF) . chr(0xBB) . chr(0xBF);
+                $out = fopen('php://output', 'wb');
+                fputcsv($out, ['Código', 'Nombre', 'Magnitud', 'N/S', 'Estado', 'Responsable', 'Ubicación', 'Certificado', 'Última Calibración', 'Próxima Calibración'], ';');
+
+                foreach ($rows as $row) {
+                    fputcsv($out, [
+                        $row->codigo ?: '—',
+                        $row->nombre,
+                        $row->instrumento ?: '—',
+                        $row->numero_serie ?: '—',
+                        $row->estado_label,
+                        $row->responsable ?: 'Almacén',
+                        $row->ubicacion->nombre ?? 'Almacén',
+                        $row->certificado ?: '—',
+                        optional($row->ultima_calibracion)->format('d/m/Y') ?: '—',
+                        optional($row->proxima_calibracion)->format('d/m/Y') ?: '—',
+                    ], ';');
+                }
+                fclose($out);
+            }, 'metrologia_calibrables_' . date('Y-m-d') . '.csv', [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
         $items = $query->latest()->paginate(12)->withQueryString();
-        $statsQuery = AparatoCalibrable::query();
+        $statsQuery = AparatoCalibrable::where('proyecto_id', $proyectoActivoId);
         $stats = [
             'total' => (clone $statsQuery)->count(),
             'operativos' => (clone $statsQuery)->whereIn('estado', ['operativo', 'asignado'])->count(),
@@ -70,46 +131,61 @@ class CalibrablesController extends Controller
             'items' => $items,
             'stats' => $stats,
             'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
-            'estados' => AparatoCalibrable::distinct()->orderBy('estado')->pluck('estado'),
+            'estados' => AparatoCalibrable::where('proyecto_id', $proyectoActivoId)->distinct()->orderBy('estado')->pluck('estado'),
             'departamentos' => Departamento::orderBy('nombre')->get(),
-            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
-            'personalList' => $this->personalList(),
+            'clasesCatalogo' => ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList($proyectoActivoId),
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $proyectoActivoId = $this->resolveProyectoForCorrelativo($request);
+
         return view('herramientas.calibrables.form', [
-            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
-            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
-            'personalList' => $this->personalList(),
+            'clasesCatalogo' => ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList($proyectoActivoId),
         ]);
     }
 
     public function store(Request $request)
     {
+        $proyectoActivoId = $this->resolveActiveProyectoId($request);
         $data = $this->validated($request);
+        $this->assertPersonalInProyecto($data['personal_id'] ?? null, $proyectoActivoId);
         $data = $this->resolvePersonalAssignment($data);
-        if ($request->hasFile('imagen')) $data['imagen'] = $request->file('imagen')->store('calibrables/fotos', 'public');
-        if ($request->hasFile('certificado_pdf')) $data['certificado_pdf'] = $request->file('certificado_pdf')->store('calibrables/certificados', 'public');
-        
+        $data['proyecto_id'] = $proyectoActivoId;
+
+        if ($request->hasFile('imagen')) {
+            $data['imagen'] = $request->file('imagen')->store('calibrables/fotos', 'public');
+        }
+        if ($request->hasFile('certificado_pdf')) {
+            $data['certificado_pdf'] = $request->file('certificado_pdf')->store('calibrables/certificados', 'public');
+        }
+
         $aparato = AparatoCalibrable::create($data);
         return redirect()->route('calibrables.show', $aparato)->with('success', 'Aparato calibrable registrado correctamente.');
     }
 
     public function show(AparatoCalibrable $aparatoCalibrable)
     {
-        return view('herramientas.calibrables.show', ['herramienta' => $aparatoCalibrable->load('eventos.usuario', 'personalAsignado'), 'personalList' => $this->personalList()]);
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
+        return view('herramientas.calibrables.show', [
+            'herramienta' => $aparatoCalibrable->load('eventos.usuario', 'personalAsignado', 'ubicacion'),
+            'personalList' => $this->personalList((int) $aparatoCalibrable->proyecto_id),
+        ]);
     }
 
     public function storeEvento(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
         $data = $this->eventValidated($request);
         $data['usuario_id'] = auth()->id();
-        
-        // 1. Extraemos la próxima calibración antes de crear el evento
-        // Lo quitamos de $data con unset() para que no de error SQL de "columna desconocida" en la tabla eventos
+
         $nuevaCaducidad = $data['proxima_calibracion'] ?? null;
         unset($data['proxima_calibracion']);
 
@@ -117,21 +193,15 @@ class CalibrablesController extends Controller
             $data['archivo_adjunto'] = $request->file('archivo_adjunto')->store('calibrables/eventos', 'public');
         }
 
-        // 2. Guardamos el evento normalmente en la bitácora
         $aparatoCalibrable->eventos()->create($data);
 
-        // 3. LA MAGIA: Si es una calibración nueva, actualizamos el instrumento principal
         if ($request->tipo === 'calibracion' && $nuevaCaducidad) {
             $aparatoCalibrable->update([
-                // La fecha de la actuación (evento) es la nueva última calibración
-                'ultima_calibracion' => $request->fecha, 
-                // Renovamos la caducidad
+                'ultima_calibracion' => $request->fecha,
                 'proxima_calibracion' => $nuevaCaducidad,
-                // Lo ponemos Operativo automáticamente, asumiendo que ha pasado la revisión
-                'estado' => 'operativo', 
-                // Limpiamos los datos de baja si venía de un laboratorio
+                'estado' => 'operativo',
                 'dias_estimados_baja' => null,
-                'fecha_baja' => null
+                'fecha_baja' => null,
             ]);
         }
 
@@ -140,38 +210,48 @@ class CalibrablesController extends Controller
 
     public function edit(AparatoCalibrable $aparatoCalibrable)
     {
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
         return view('herramientas.calibrables.form', [
             'item' => $aparatoCalibrable,
-            'ubicaciones' => \App\Models\Ubicacion::orderBy('nombre')->get(),
+            'ubicaciones' => Ubicacion::orderBy('nombre')->get(),
             'departamentos' => Departamento::orderBy('nombre')->get(),
-            'clasesCatalogo' => \App\Models\ClaseHerramienta::orderBy('nombre')->get(),
-            'personalList' => $this->personalList(),
+            'clasesCatalogo' => ClaseHerramienta::orderBy('nombre')->get(),
+            'personalList' => $this->personalList((int) $aparatoCalibrable->proyecto_id),
         ]);
     }
 
     public function update(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
         $data = $this->validated($request, $aparatoCalibrable);
+        $this->assertPersonalInProyecto($data['personal_id'] ?? null, (int) $aparatoCalibrable->proyecto_id);
         $data = $this->resolvePersonalAssignment($data);
-        
+
         if ($request->hasFile('imagen')) {
-            if ($aparatoCalibrable->imagen) Storage::disk('public')->delete($aparatoCalibrable->imagen);
+            if ($aparatoCalibrable->imagen) {
+                Storage::disk('public')->delete($aparatoCalibrable->imagen);
+            }
             $data['imagen'] = $request->file('imagen')->store('calibrables/fotos', 'public');
         }
-        
+
         if ($request->hasFile('certificado_pdf')) {
-            if ($aparatoCalibrable->certificado_pdf) Storage::disk('public')->delete($aparatoCalibrable->certificado_pdf);
+            if ($aparatoCalibrable->certificado_pdf) {
+                Storage::disk('public')->delete($aparatoCalibrable->certificado_pdf);
+            }
             $data['certificado_pdf'] = $request->file('certificado_pdf')->store('calibrables/certificados', 'public');
         }
-        
+
         $aparatoCalibrable->update($data);
         return redirect()->route('calibrables.show', $aparatoCalibrable)->with('success', 'Aparato actualizado correctamente.');
     }
 
     public function destroy(AparatoCalibrable $aparatoCalibrable)
     {
-        $aparatoCalibrable->delete();
+        $this->authorizeActivoProyecto($aparatoCalibrable);
 
+        $aparatoCalibrable->delete();
         return redirect()->route('calibrables.index')->with('success', 'Aparato calibrable eliminado correctamente.');
     }
 
@@ -183,7 +263,7 @@ class CalibrablesController extends Controller
             'numero_serie' => ['nullable', 'string', 'max:150'],
             'marca' => ['nullable', 'string', 'max:100'],
             'modelo' => ['nullable', 'string', 'max:150'],
-            'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'asignado', 'calibracion', 'vencido', 'aislado'])],
+            'estado' => ['required', Rule::in(['operativo', 'asignado', 'calibracion', 'vencido', 'aislado'])],
             'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
             'responsable' => ['nullable', 'string', 'max:150'],
             'personal_id' => ['nullable', 'exists:personal,id'],
@@ -195,7 +275,7 @@ class CalibrablesController extends Controller
             'norma_calibracion' => ['nullable', 'string', 'max:100'],
             'laboratorio' => ['nullable', 'string', 'max:150'],
             'certificado' => ['nullable', 'string', 'max:150'],
-            'certificado_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:5120'], // Máximo 5MB
+            'certificado_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
             'proxima_calibracion' => ['nullable', 'date'],
             'ultima_calibracion' => ['nullable', 'date'],
             'imagen' => ['nullable', 'image', 'max:4096'],
@@ -204,9 +284,10 @@ class CalibrablesController extends Controller
         ]);
     }
 
-    private function personalList()
+    private function personalList(int $proyectoId)
     {
-        return \App\Models\Personal::where('activo', true)
+        return Personal::where('activo', true)
+            ->whereHas('proyectos', fn ($q) => $q->where('proyectos.id', $proyectoId))
             ->orderBy('name')
             ->orderBy('apellido')
             ->get(['id', 'name', 'apellido', 'id_rrhh']);
@@ -215,7 +296,7 @@ class CalibrablesController extends Controller
     private function resolvePersonalAssignment(array $data): array
     {
         if (!empty($data['personal_id'])) {
-            $personal = \App\Models\Personal::findOrFail($data['personal_id']);
+            $personal = Personal::findOrFail($data['personal_id']);
             $data['responsable'] = trim($personal->name . ' ' . $personal->apellido);
         }
 
@@ -225,57 +306,52 @@ class CalibrablesController extends Controller
     private function eventValidated(Request $request): array
     {
         return $request->validate([
-            'tipo' => ['required', \Illuminate\Validation\Rule::in(['averia', 'reparacion', 'calibracion', 'responsable', 'otro'])],
-            'titulo' => ['required', 'string', 'max:180'], 
+            'tipo' => ['required', Rule::in(['averia', 'reparacion', 'calibracion', 'responsable', 'otro'])],
+            'titulo' => ['required', 'string', 'max:180'],
             'descripcion' => ['nullable', 'string', 'max:5000'],
             'fecha' => ['required', 'date'],
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 
-            'proxima_calibracion' => ['nullable', 'date'], 
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'proxima_calibracion' => ['nullable', 'date'],
         ]);
     }
 
     public function updateEstado(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
-        // Validamos el estado y permitimos la subida del documento
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
         $request->validate([
-            'estado' => ['required', \Illuminate\Validation\Rule::in(['operativo', 'calibracion', 'aislado'])],
+            'estado' => ['required', Rule::in(['operativo', 'calibracion', 'aislado'])],
             'titulo_evento' => ['required', 'string', 'max:180'],
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
             'dias_estimados_baja' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
-        // 1. Actualizamos la ficha principal del instrumento
         $dataToUpdate = ['estado' => $request->estado];
 
         if ($request->estado === 'operativo') {
-            // Vuelve a estar disponible: limpiamos la previsión de baja
             $dataToUpdate['dias_estimados_baja'] = null;
             $dataToUpdate['fecha_baja'] = null;
             $dataToUpdate['responsable'] = null;
             $dataToUpdate['personal_id'] = null;
-        } elseif (in_array($request->estado, ['calibracion', 'aislado'])) {
-            // Entra en baja (envío a laboratorio o aislamiento): guardamos la aproximación
+        } elseif (in_array($request->estado, ['calibracion', 'aislado'], true)) {
             $dataToUpdate['dias_estimados_baja'] = $request->dias_estimados_baja;
             $dataToUpdate['fecha_baja'] = now();
         }
 
         $aparatoCalibrable->update($dataToUpdate);
 
-        // 2. Preparamos los datos para la bitácora
         $eventoData = [
-            'tipo' => in_array($request->estado, ['calibracion', 'aislado']) ? $request->estado : 'otro',
+            'tipo' => in_array($request->estado, ['calibracion', 'aislado'], true) ? $request->estado : 'otro',
             'titulo' => $request->titulo_evento,
             'descripcion' => 'Cambio rápido de estado metrológico a: ' . ucfirst($request->estado),
             'fecha' => now(),
             'usuario_id' => auth()->id(),
         ];
 
-        // 3. Procesamos el PDF o Foto si el operario lo ha adjuntado en el modal
         if ($request->hasFile('archivo_adjunto')) {
             $eventoData['archivo_adjunto'] = $request->file('archivo_adjunto')->store('calibrables/eventos', 'public');
         }
 
-        // 4. Guardamos en el historial
         $aparatoCalibrable->eventos()->create($eventoData);
 
         return back()->with('success', 'Estado metrológico actualizado y certificado documentado en la bitácora.');
@@ -283,36 +359,44 @@ class CalibrablesController extends Controller
 
     public function updateAsignacion(Request $request, AparatoCalibrable $aparatoCalibrable)
     {
+        $this->authorizeActivoProyecto($aparatoCalibrable);
+
         $request->validate([
             'responsable' => ['nullable', 'string', 'max:150', 'required_without:personal_id'],
             'personal_id' => ['nullable', 'exists:personal,id'],
-            'ubicacion' => ['required', 'string', 'max:150'],
+            'ubicacion_id' => ['nullable', 'exists:ubicaciones,id'],
+            'ubicacion' => ['nullable', 'string', 'max:150'],
             'titulo_evento' => ['required', 'string', 'max:180'],
-            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'archivo_adjunto' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $personal = $request->filled('personal_id') ? \App\Models\Personal::findOrFail($request->integer('personal_id')) : null;
+        $this->assertPersonalInProyecto($request->filled('personal_id') ? $request->integer('personal_id') : null, (int) $aparatoCalibrable->proyecto_id);
+
+        $personal = $request->filled('personal_id') ? Personal::findOrFail($request->integer('personal_id')) : null;
         $responsable = $personal ? trim($personal->name . ' ' . $personal->apellido) : trim((string) $request->input('responsable'));
 
-        // 1. Asignamos el equipo al área o persona
+        $ubicacionId = $request->filled('ubicacion_id')
+            ? $request->integer('ubicacion_id')
+            : (trim((string) $request->input('ubicacion')) !== '' ? Ubicacion::firstOrCreate(['nombre' => trim((string) $request->input('ubicacion'))])->id : null);
+
+        $nombreSitio = $ubicacionId ? (Ubicacion::find($ubicacionId)?->nombre ?? 'S/C') : 'S/C';
+
         $aparatoCalibrable->update([
             'estado' => 'asignado',
             'responsable' => $responsable,
             'personal_id' => $personal?->id,
-            'ubicacion' => $request->ubicacion,
+            'ubicacion_id' => $ubicacionId,
         ]);
 
-        // 2. Procesamos el archivo adjunto si existe (ej. albarán de entrega firmado)
         $rutaArchivo = null;
         if ($request->hasFile('archivo_adjunto')) {
             $rutaArchivo = $request->file('archivo_adjunto')->store('calibrables/eventos', 'public');
         }
 
-        // 3. Dejamos constancia de la entrega en la bitácora
         $aparatoCalibrable->eventos()->create([
             'tipo' => 'responsable',
             'titulo' => $request->titulo_evento,
-            'descripcion' => "Instrumento entregado a: {$responsable} | Área/Ubicación: {$request->ubicacion}",
+            'descripcion' => "Instrumento entregado a: {$responsable} | Área/Ubicación: {$nombreSitio}",
             'fecha' => now(),
             'archivo_adjunto' => $rutaArchivo,
             'usuario_id' => auth()->id(),

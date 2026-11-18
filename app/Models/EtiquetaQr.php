@@ -14,7 +14,7 @@ class EtiquetaQr extends Model
     use SoftDeletes;
 
     protected $table = 'etiquetas_qr';
-    protected $fillable = ['titulo', 'contenido_datos', 'carpeta_id', 'ruta_archivo', 'activo'];
+    protected $fillable = ['proyecto_id', 'titulo', 'contenido_datos', 'carpeta_id', 'ruta_archivo', 'activo'];
 
     // Obtener la carpeta a la que pertenece este QR
     public function carpeta()
@@ -45,5 +45,10 @@ class EtiquetaQr extends Model
         if ($eventName === 'deleted' && !$activity->properties->get('old')) {
             $activity->properties = $activity->properties->put('old', $this->getAttributes());
         }
+    }
+
+    public function proyecto()
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 }
